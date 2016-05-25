@@ -11,7 +11,7 @@ int main(){
   Timer tim;
   uint N = pow(2,20);
   tim.tic();
-  psystem = new Interactor(N,128, 2.5, 0.003f);
+  psystem = new Interactor(N, 128, 2.5, 0.003f);
   //  psystem->read("1Minit.pos");
 
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;  

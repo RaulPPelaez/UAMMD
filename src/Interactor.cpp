@@ -85,21 +85,25 @@ void Interactor::init(){
   }
 
   /*pos and force will be float4, vel float3*/
-  pos   = Vector<float>(4*N, true);  sortPos   = Vector<float>(4*N); 
-  vel   = Vector<float>(3*N); 
-  force = Vector<float>(4*N); 
+  pos   = Vector<float4>(N, true);  sortPos   = Vector<float4>(N); 
+  vel   = Vector<float3>(N); 
+  force = Vector<float4>(N); 
   
 
-  sortPos.fill_with(0.0f);
+  sortPos.fill_with(make_float4(0.0f));
   /*Start with a cubic lattice, later one can read a configuration from file*/
   cubicLattice(pos.data, L, N);   
   
 
-  vel.fill_with(0.0f);
-  force.fill_with(0.0f);
+  vel.fill_with(make_float3(0.0f));
+  force.fill_with(make_float4(0.0f));
 
   /*Random initial velocities*/
-  fori(0,3*N) vel[i] = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+  fori(0,N){
+    vel[i].x = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+    vel[i].y = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+    vel[i].z = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+  }
 
 
   pos.upload();
@@ -108,10 +112,10 @@ void Interactor::init(){
 
   sortPos.upload(); 
 
-  cellIndex = Vector<uint>(N+1); cellIndex.upload();
+  cellIndex    = Vector<uint>(N+1); cellIndex.upload();
   particleIndex= Vector<uint>(N+1); particleIndex.upload();
-  cellStart        = Vector<uint>(ncells); cellStart.upload();
-  cellEnd          = Vector<uint>(ncells); cellEnd.upload();
+  cellStart    = Vector<uint>(ncells); cellStart.upload();
+  cellEnd      = Vector<uint>(ncells); cellEnd.upload();
 
   int memneed = (2*4+3*3)*N*sizeof(float)+(2*ncells +2*N)*sizeof(uint);
   cerr<<"\nMemory needed: "<<setprecision(2)<<memneed/float(1024*1024)<<" mb"<<endl;
@@ -234,15 +238,15 @@ void Interactor::read(const char *fileName){
   float r,c,l;
   in>>l;
   fori(0,N){
-    in>>pos[4*i]>>pos[4*i+1]>>pos[4*i+2]>>r>>c;
+    in>>pos[i].x>>pos[i].y>>pos[i].z>>r>>c;
   }
   in.close();
   pos.upload();
 }
 //This function writes a step to disk
-void write_concurrent(float *pos, float L, uint N){
+void write_concurrent(float4 *pos, float L, uint N){
   cout<<"#L="<<L*0.5<<";\n";
   fori(0,N){
-    cout<<pos[4*i]<<" "<<pos[4*i+1]<<" "<<pos[4*i+2]<<" 0.56 1\n";
+    cout<<pos[i].x<<" "<<pos[i].y<<" "<<pos[i].z<<" 0.56 1\n";
   }
 }

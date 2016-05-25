@@ -24,7 +24,7 @@ enum forceType{LJ,NONE};
 
 typedef uint32_t uint;
 
-void write_concurrent(float *pos, float L, uint N);
+void write_concurrent(float4 *pos, float L, uint N);
 class Interactor{
 public:
   Interactor(int N, float L, float rcut, float dt, forceType fs=LJ);
@@ -36,7 +36,8 @@ public:
   void read(const char *fileName);
 
 private:
-  Vector<float> pos, vel, force, sortPos, sortForce;
+  Vector<float4> pos, force, sortPos, sortForce;
+  Vector<float3> vel;
   uint N;
   void init();
 

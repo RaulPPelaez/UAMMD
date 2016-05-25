@@ -24,22 +24,22 @@ struct InteractorParams{
   float L, invL, rcut, invrc2;
 };
 
-void initGPU(Params m_params, float *potDevPtr, size_t potSize,
+void initGPU(InteractorParams m_params, float *potDevPtr, size_t potSize,
 	     uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
-	     float *sortPos, uint N);
+	     float4 *sortPos, uint N);
 
-void integrate(float *pos, float *vel, float *force, float dt, uint N, int step, bool dump=false);
+void integrate(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump=false);
 
-void calcCellIndex(float *pos, uint *cellIndex, uint *particleIndex, uint N);
+void calcCellIndex(float4 *pos, uint *cellIndex, uint *particleIndex, uint N);
 
 void sortCellIndex(uint *&cellIndex, uint *&particleIndex, uint N);
 
-void reorderAndFind(float *sortPos,
+void reorderAndFind(float4 *sortPos,
 		    uint *cellIndex, uint *particleIndex, 
 		    uint *cellStart, uint *cellEnd, uint ncells,
-		    float*pos, uint N);
+		    float4 *pos, uint N);
 
-void computeForce(float *sortPos, float *force,
+void computeForce(float4 *sortPos, float4 *force,
 		  uint *cellStart, uint *cellEnd,
 		  uint *particleIndex, 
 		  uint N);

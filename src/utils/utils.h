@@ -13,6 +13,7 @@
 #include<algorithm>
 #include<cuda_runtime.h>
 #include"helper_gpu.cuh"
+#include"helper_math.h"
 #include<iostream>
 #include<sys/time.h>
 using namespace std;
@@ -111,5 +112,5 @@ public:
 
 
 //This function treats pos a s a float4 and puts the particles in a cubic lattice
-void cubicLattice(float *pos, float L, uint N);
+void cubicLattice(float4 *pos, float L, uint N);
 #endif

@@ -53,7 +53,7 @@ uint GPU_Nthreads;
 //Initialize gpu variables 
 void initGPU(InteractorParams m_params, float *potData, size_t potSize,
 	     uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
-	     float *sortPos, uint N){
+	     float4 *sortPos, uint N){
 
   /*Precompute some inverses to save time later*/
   m_params.invrc2 = 1.0f/(m_params.rcut*m_params.rcut);
@@ -64,7 +64,7 @@ void initGPU(InteractorParams m_params, float *potData, size_t potSize,
   gpuErrchk(cudaBindTexture(NULL, texCellStart, cellStart, ncells*sizeof(uint)));
   gpuErrchk(cudaBindTexture(NULL, texCellEnd,   cellEnd,   ncells*sizeof(uint)));
   gpuErrchk(cudaBindTexture(NULL, texParticleIndex,   particleIndex,   (N+1)*sizeof(uint)));
-  gpuErrchk(cudaBindTexture(NULL, texSortPos, (float4 *)sortPos, N*sizeof(float4)));
+  gpuErrchk(cudaBindTexture(NULL, texSortPos, sortPos, N*sizeof(float4)));
 
   /*Create and bind force texture, this needs interpolation*/
   cudaChannelFormatDesc channelDesc;
@@ -85,7 +85,7 @@ void initGPU(InteractorParams m_params, float *potData, size_t potSize,
 
 
   /*Upload parameters to constant memory*/
-  gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
+  gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(InteractorParams)));
 
   
   GPU_Nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
@@ -168,11 +168,11 @@ struct twoStepVelVerlet_functor{
 };
 
 //Update the positions
-void integrate(float *pos, float *vel, float *force, float dt, uint N, int step, bool dump){
+void integrate(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump){
 
-  device_ptr<float4> d_pos4((float4 *)pos);
-  device_ptr<float3> d_vel3((float3 *)vel);
-  device_ptr<float4> d_force4((float4 *)force);
+  device_ptr<float4> d_pos4(pos);
+  device_ptr<float3> d_vel3(vel);
+  device_ptr<float4> d_force4(force);
   /**Thrust black magic to perform a triple transformation, see the functor description**/
   for_each(
 	   make_zip_iterator( make_tuple( d_pos4, d_vel3, d_force4)),
@@ -198,8 +198,8 @@ __global__ void calcCellIndexD(uint *cellIndex, uint *particleIndex,
 }
 
 //CPU kernel caller
-void calcCellIndex(float *pos, uint *cellIndex, uint *particleIndex, uint N){
-  calcCellIndexD<<<GPU_Nblocks, GPU_Nthreads>>>(cellIndex, particleIndex, (float4*) pos, N);
+void calcCellIndex(float4 *pos, uint *cellIndex, uint *particleIndex, uint N){
+  calcCellIndexD<<<GPU_Nblocks, GPU_Nthreads>>>(cellIndex, particleIndex, pos, N);
   //  cudaCheckErrors("Calc hash");					   
 }
 
@@ -290,17 +290,17 @@ __global__ void reorderAndFindD(float4 *sortPos,
 }
 
 //CPU kernel caller
-void reorderAndFind(float *sortPos,
+void reorderAndFind(float4 *sortPos,
 		    uint *cellIndex, uint *particleIndex, 
 		    uint *cellStart, uint *cellEnd, uint ncells,
-		    float *pos, uint N){
+		    float4 *pos, uint N){
   //Reset CellStart
   cudaMemset(cellStart, 0xffffffff, ncells*sizeof(uint));
   //CellEnd does not need reset, a cell with cellStart=0xffffff is not checked for a cellEnd
-  reorderAndFindD<<<GPU_Nblocks, GPU_Nthreads>>>((float4 *)sortPos,
+  reorderAndFindD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos,
 						 cellIndex, particleIndex,
 						 cellStart, cellEnd,
-						 (float4 *)pos, N);
+						 pos, N);
   //  cudaCheckErrors("Reorder and find");					   
 }
 
@@ -394,11 +394,11 @@ __global__ void computeForceD(float4* __restrict__ newForce,
 }
  
 //CPU kernel caller
-void computeForce(float *sortPos, float *force,
+void computeForce(float4 *sortPos, float4 *force,
 		  uint *cellStart, uint *cellEnd,
 		  uint *particleIndex, 
 		  uint N){
-  computeForceD<<<GPU_Nblocks, GPU_Nthreads>>>((float4 *)force,
+  computeForceD<<<GPU_Nblocks, GPU_Nthreads>>>(force,
 					       particleIndex,
 					       N);
   //cudaCheckErrors("computeForce");
