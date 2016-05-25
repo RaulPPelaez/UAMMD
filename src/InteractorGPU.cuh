@@ -24,7 +24,7 @@ struct InteractorParams{
   float L, invL, rcut, invrc2;
 };
 
-void initGPU(Params m_params, float *potDevPtr, size_t potSize,
+void initGPU(InteractorParams m_params, float *potDevPtr, size_t potSize,
 	     uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 	     float *sortPos, uint N);
 
