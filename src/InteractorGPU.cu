@@ -12,14 +12,15 @@ http://docs.nvidia.com/cuda/samples/5_Simulations/particles/doc/particles.pdf
 
 TODO:
 100- Use Z-order curve as hash instead of cell index to improve memory coherence when traveling the 
-  neighbour cells
-
+     neighbour cells
 50- Try bindless textures again.
+20- Write coalesced to forces, and use sorted version to integrate, reading sparse from pos and force and writeing coalesced to vel
 10- There is no need to reconstruct the neighbour list from scratch each step,
   although computing the force is 50 times as expensive as this right now.
+
 */
 
-#include<cub-1.5.2/cub/cub.cuh>
+#include<cub/cub/cub.cuh>
 #include"InteractorGPU.cuh"
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"

@@ -9,12 +9,17 @@ Currently it is a full MD code that computes the forces and integrates the traje
 
 ##USAGE
 
+If you dont have cub (thrust comes bundled with the CUDA installation) clone or download the v1.5.2 (see dependencies).
+The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.
+The Makefile expects to find cub in /usr/local/cub, but you can change it. CUB doesnt need to be compiled.
+
 Hardcode the configuration in main.cpp, set number of particles, size of the box, dt and time of the simulation.
 
 The particles will start in a cubic lattice unless an initial configuration is readed using psystem->write(fileName);
 
 Then compile with make and run
 
+You may need to adequate the Makefile to you particular system
 
 ##DEPENDENCIES
 
@@ -30,4 +35,4 @@ Depends on:
 Needs an NVIDIA GPU with compute capability sm_2.0+
 
 ##TESTED ON
-	 - GTX980 on Ubuntu 14.04
+	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5
