@@ -12,10 +12,8 @@ See Interactor.cpp for additional info
 
 #include"utils/utils.h"
 #include"InteractorGPU.cuh"
-#include"Potential.h"
+#include"misc/Potential.h"
 #include<cstdint>
-
-#include<thread>
 
 #define fori(x,y) for(int i=x; i<y; i++)
 #define forj(x,y) for(int j=x; j<y; j++)
@@ -23,36 +21,31 @@ See Interactor.cpp for additional info
 enum forceType{LJ,NONE};
 
 typedef uint32_t uint;
-
-void write_concurrent(float *pos, float L, uint N);
 class Interactor{
 public:
-  Interactor(int N, float L, float rcut, float dt, forceType fs=LJ);
+  Interactor(int N, float L, float rcut,
+	     float *d_pos,
+	     forceType fs=LJ);
   ~Interactor();
 
-  void update();
-  void update_development();
-  void write(bool block = false);
-  void read(const char *fileName);
-
+  void compute_force();
+  float *get_force(){return this->force.d_m;}
 private:
-  Vector<float> pos, vel, force, sortPos, sortForce;
+  Vector<float> force, sortPos;
+  float *d_pos;
   uint N;
   void init();
 
   uint ncells;
   Vector<uint> cellIndex, particleIndex; 
-
   Vector<uint> cellStart, cellEnd;
 
   float rcut, L, dt;
 
   InteractorParams params;
   
-  std::thread *writeThread;
   forceType forceSelector;
 
   Potential pot;
-
 };
 #endif

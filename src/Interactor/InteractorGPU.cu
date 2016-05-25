@@ -128,60 +128,6 @@ inline __device__ uint getCellIndex(int3 gridPos){
     +gridPos.z*params.xcells*params.ycells;
 }
 
-//This struct is a thrust trick to perform an arbitrary transformation
-//In this case it performs a two step velocity verlet integration
-//Performs a two step velocity verlet integrator, pick with step
-struct twoStepVelVerlet_functor{
-  float dt;
-  int step;
-  bool dump;
-  __host__ __device__ twoStepVelVerlet_functor(float dt, int step, bool dump):
-    dt(dt),step(step), dump(dump){}
-
-  //The operation is performed on creation
-  template <typename Tuple>
-  __device__  void operator()(Tuple t){
-    /*Retrive the data*/
-    float4 pos = get<0>(t);
-    float4 vel = make_float4(get<1>(t),0.0f);
-    float4 force = get<2>(t);
-    switch(step){
-      /*First velocity verlet step*/
-    case 1: 
-      vel += force*dt*0.5f;
-      pos += vel*dt;
-      get<0>(t) = pos;
-      //      get<2>(t) = make_float4(0.0f);
-      break;
-      /*Second velocity verlet step*/
-    case 2:
-      vel += force*dt*0.5f;
-      if(dump) vel *= 0.99f;
-      
-      break;
-    }
-    /*Write new vel and reset force*/
-    get<1>(t) = make_float3(vel);
-
-    
-  }
-};
-
-//Update the positions
-void integrate(float *pos, float *vel, float *force, float dt, uint N, int step, bool dump){
-
-  device_ptr<float4> d_pos4((float4 *)pos);
-  device_ptr<float3> d_vel3((float3 *)vel);
-  device_ptr<float4> d_force4((float4 *)force);
-  /**Thrust black magic to perform a triple transformation, see the functor description**/
-  for_each(
-	   make_zip_iterator( make_tuple( d_pos4, d_vel3, d_force4)),
-	   make_zip_iterator( make_tuple( d_pos4 + N, d_vel3 + N, d_force4 +N)),
-	   twoStepVelVerlet_functor(dt, step, dump));
-  //cudaCheckErrors("Integrate");					   
-}
-
-
 //Compute the icell of each particle
 __global__ void calcCellIndexD(uint *cellIndex, uint *particleIndex, 
 			       const float4 __restrict__ *pos, uint N){

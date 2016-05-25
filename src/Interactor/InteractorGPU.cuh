@@ -24,11 +24,10 @@ struct InteractorParams{
   float L, invL, rcut, invrc2;
 };
 
-void initGPU(Params m_params, float *potDevPtr, size_t potSize,
+void initGPU(InteractorParams m_params, float *potDevPtr, size_t potSize,
 	     uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 	     float *sortPos, uint N);
 
-void integrate(float *pos, float *vel, float *force, float dt, uint N, int step, bool dump=false);
 
 void calcCellIndex(float *pos, uint *cellIndex, uint *particleIndex, uint N);
 

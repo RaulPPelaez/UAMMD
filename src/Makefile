@@ -3,7 +3,7 @@ CC=$(CXX)
 NVCC=nvcc
 
 #  -Ofast -march=native -pipe -funroll-loops
-CFLAGS= -pthread -std=c++11 -O3  -I/usr/local/cuda-7.5/targets/x86_64-linux/include/ -march=native -lpthread -I/usr/local/include -funroll-loops -m64
+CFLAGS= -pthread -std=c++11 -O3  -I/usr/local/cuda-7.5/targets/x86_64-linux/include/ -march=native -lpthread -I/usr/local/include -funroll-loops -m64 -I./
 
 #CFLAGS= -std=c++11 -O3  -I/usr/local/cuda-7.5/include/ -march=native -g
 CXXFLAGS=$(CFLAGS) 
@@ -15,24 +15,18 @@ LDFLAGS= -L/usr/local/cuda-7.5/lib64
 LDLIBS=-lcuda -lcudart -lpthread
 
 
-CUOBJS= InteractorGPU.o
-OBJS= Interactor.o utils/utils.o Potential.o
+CUOBJS= Interactor/InteractorGPU.o Integrator/IntegratorGPU.o
+OBJS= Interactor/Interactor.o Integrator/Integrator.o utils/utils.o misc/Potential.o 
 
-EXE=main benchmark
 
-all:main benchmark
-
-main:$(CUOBJS) $(OBJS)
-
-benchmark:$(CUOBJS) $(OBJS)
-
+all: $(OBJS) $(CUOBJS)
 %.o:%.cu
 	$(NVCC) $(NVFLAGS) -c $< -o $@
 %.o:%.cpp 
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(CUOBJS) $(OBJS) $(EXE) main.o benchmark.o
+	rm -f $(CUOBJS) $(OBJS)
 
 redo: clean all
 
