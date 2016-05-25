@@ -31,6 +31,7 @@ public:
   ~Interactor();
 
   void update();
+  void update_development();
   void write(bool block = false);
   void read(const char *fileName);
 

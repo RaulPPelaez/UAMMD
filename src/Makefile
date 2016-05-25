@@ -16,22 +16,23 @@ LDLIBS=-lcuda -lcudart -lpthread
 
 
 CUOBJS= InteractorGPU.o
-OBJS=main.o Interactor.o utils/utils.o Potential.o
+OBJS= Interactor.o utils/utils.o Potential.o
 
-EXE=main
+EXE=main benchmark
 
-all:main
+all:main benchmark
 
 main:$(CUOBJS) $(OBJS)
 
+benchmark:$(CUOBJS) $(OBJS)
 
 %.o:%.cu
 	$(NVCC) $(NVFLAGS) -c $< -o $@
-%.o:%.cpp Rlib.h
+%.o:%.cpp 
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(CUOBJS) $(OBJS) $(EXE)
+	rm -f $(CUOBJS) $(OBJS) $(EXE) main.o benchmark.o
 
 redo: clean all
 

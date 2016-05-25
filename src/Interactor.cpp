@@ -12,7 +12,7 @@ TODO:
 90- Non cubic boxes, almost done, just be carefull in the constructor and use vector types.
 
 NOTES:
-Comment cudaDeviceSynchronize calls in update to increase performance.
+Use update isntead of update_development to increase performance (update doesnt record time and doesnt sync device)
 
 */
 #include"Interactor.h"
@@ -122,6 +122,35 @@ void Interactor::init(){
 }
 /*Perform an integration step*/
 void Interactor::update(){
+  static int steps = 0;
+  if(steps%500==0) cerr<<"\rComputing step: "<<steps<<"   ";
+ 
+  /*** UPDATE POSITIONS***/
+  integrate(pos, vel, force, dt, N, 1);
+  /*** CONSTRUCT NEIGHBOUR LIST ***/
+  /*Compute cell id of each particle*/
+  calcCellIndex(pos, cellIndex, particleIndex, N);
+
+  /*Sort the particle indices by hash (cell index)*/
+  sortCellIndex(cellIndex, particleIndex, N);
+  /*Reorder positions by cell index and construct cellStart and cellEnd*/
+  reorderAndFind(sortPos,
+		 cellIndex, particleIndex,
+		 cellStart, cellEnd, params.ncells,
+		 pos, N); 
+  /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
+  computeForce(sortPos,
+	       force, 
+	       cellStart, cellEnd, 
+	       particleIndex,
+	       N);
+  /***UPDATE VELOCITIES***/
+  integrate(pos, vel, force, dt, N, 2);//, steps%10 ==0 && steps<10000 && steps>1000);
+  steps++;
+}
+//Performs an integration step like update, but syncs the GPU after each substep to measure time
+//Use this for debug and development
+void Interactor::update_development(){
   static int steps = 0;
   static Timer tim;
   static float tima[] = {0,0,0,0,0,0};
