@@ -47,7 +47,7 @@ private:
 
   float rcut, L, dt;
 
-  Params params;
+  InteractorParams params;
   
   std::thread *writeThread;
   forceType forceSelector;

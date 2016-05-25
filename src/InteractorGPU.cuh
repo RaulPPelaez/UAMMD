@@ -17,7 +17,7 @@ More info in the .cu
 #define INTERACTORGPU_CUH
 
 //Stores some simulation parameters to upload as constant memory.
-struct Params{
+struct InteractorParams{
   float cellSize, invCellSize;
   int ncells;
   int ycells, xcells, zcells;  

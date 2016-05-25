@@ -38,7 +38,7 @@ using namespace thrust;
 using std::cerr;
 using std::endl;
 
-__constant__ Params params; //Simulation parameters in constant memory, super fast access
+__constant__ InteractorParams params; //Simulation parameters in constant memory, super fast access
 
 //Texture references for scattered access
 texture<uint> texCellStart, texCellEnd, texParticleIndex;
@@ -51,7 +51,7 @@ uint GPU_Nthreads;
 
 
 //Initialize gpu variables 
-void initGPU(Params m_params, float *potData, size_t potSize,
+void initGPU(InteractorParams m_params, float *potData, size_t potSize,
 	     uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 	     float *sortPos, uint N){
 
