@@ -25,7 +25,7 @@ using namespace std;
 
 
 Interactor::Interactor(int N, float L, float rcut,
-		       float *d_pos,
+		       Vector<float4> *d_pos,
 		       forceType fs):
   N(N), L(L), rcut(rcut),
   d_pos(d_pos){
@@ -76,23 +76,23 @@ void Interactor::init(){
     pot = Potential(forceLJ, 4096, params.rcut);
     break;
   case NONE:
-    pot = Potential(nullForce, 4096, params.rcut);
+    pot = Potential(nullForce, 2, params.rcut);
     break;
   default:
     cerr<<"NON RECOGNIZED POTENTIAL SELECTED!!"<<endl;
     exit(1);
   }
 
-  sortPos   = Vector<float>(4*N); sortPos.fill_with(0.0f); sortPos.upload(); 
+  sortPos   = Vector<float4>(N); sortPos.fill_with(make_float4(0.0f)); sortPos.upload(); 
 
-  force = Vector<float>(4*N); force.fill_with(0.0f); force.upload();
+  force = Vector<float4>(N); force.fill_with(make_float4(0.0f)); force.upload();
 
   cellIndex = Vector<uint>(N+1); cellIndex.upload();
   particleIndex= Vector<uint>(N+1); particleIndex.upload();
   cellStart        = Vector<uint>(ncells); cellStart.upload();
   cellEnd          = Vector<uint>(ncells); cellEnd.upload();
 
-  initGPU(params, pot.getData(), pot.getSize(), cellStart, cellEnd, particleIndex, ncells, sortPos, N);
+  initInteractorGPU(params, pot.getData(), pot.getSize(), cellStart, cellEnd, particleIndex, ncells, sortPos, N);
 
   cerr<<"\tDONE!!"<<endl;
 }
@@ -100,7 +100,7 @@ void Interactor::init(){
 void Interactor::compute_force(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/
   /*Compute cell id of each particle*/
-  calcCellIndex(d_pos, cellIndex, particleIndex, N);
+  calcCellIndex(d_pos->d_m, cellIndex, particleIndex, N);
 
   /*Sort the particle indices by hash (cell index)*/
   sortCellIndex(cellIndex, particleIndex, N);
@@ -108,7 +108,7 @@ void Interactor::compute_force(){
   reorderAndFind(sortPos,
 		 cellIndex, particleIndex,
 		 cellStart, cellEnd, params.ncells,
-		 d_pos, N); 
+		 d_pos->d_m, N); 
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   computeForce(sortPos,
 	       force, 
@@ -116,3 +116,5 @@ void Interactor::compute_force(){
 	       particleIndex,
 	       N);
 }
+
+

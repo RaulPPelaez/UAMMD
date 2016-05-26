@@ -24,15 +24,16 @@ typedef uint32_t uint;
 class Interactor{
 public:
   Interactor(int N, float L, float rcut,
-	     float *d_pos,
+	     Vector<float4> *d_pos,
 	     forceType fs=LJ);
   ~Interactor();
 
   void compute_force();
-  float *get_force(){return this->force.d_m;}
+  //  float4 *get_force(){return this->force.d_m;}
+  Vector<float4>* getForce(){return &force;}
 private:
-  Vector<float> force, sortPos;
-  float *d_pos;
+  Vector<float4> *d_pos, force, sortPos, sortForce;
+  Vector<float3> vel;
   uint N;
   void init();
 

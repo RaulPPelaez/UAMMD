@@ -8,25 +8,28 @@ CFLAGS= -pthread -std=c++11 -O3  -I/usr/local/cuda-7.5/targets/x86_64-linux/incl
 #CFLAGS= -std=c++11 -O3  -I/usr/local/cuda-7.5/include/ -march=native -g
 CXXFLAGS=$(CFLAGS) 
 
-NVFLAGS= -O3 -ccbin=g++ -lineinfo -m64 -arch=sm_52 -restrict -src-in-ptx 
+NVFLAGS= -O3 -ccbin=g++ -lineinfo -m64 -arch=sm_52 -restrict -src-in-ptx  -I./
 
 #LDFLAGS= -L/usr/local/cuda-7.5/lib64 -L/usr/lib64/nvidia
 LDFLAGS= -L/usr/local/cuda-7.5/lib64 
-LDLIBS=-lcuda -lcudart -lpthread
+LDLIBS= -lcuda -lcudart -lpthread
 
 
 CUOBJS= Interactor/InteractorGPU.o Integrator/IntegratorGPU.o
-OBJS= Interactor/Interactor.o Integrator/Integrator.o utils/utils.o misc/Potential.o 
+OBJS= Interactor/Interactor.o Integrator/Integrator.o utils/utils.o misc/Potential.o Driver/Driver.o
 
 
-all: $(OBJS) $(CUOBJS)
+all: main
+
+main:  $(OBJS) $(CUOBJS)
+
 %.o:%.cu
 	$(NVCC) $(NVFLAGS) -c $< -o $@
 %.o:%.cpp 
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(CUOBJS) $(OBJS)
+	rm -f $(CUOBJS) $(OBJS) main
 
 redo: clean all
 
