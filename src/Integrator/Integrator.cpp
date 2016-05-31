@@ -1,24 +1,31 @@
-/*Raul P. Pelaez 2016. Integrator class
+/*Raul P. Pelaez 2016. Integrator abstract class base implementation
 
-  Integrator is intended to be a separated module that handles the update of positions given the forces
+  Integrator is intended to be a separated module that handles the update of positions and applies forces on each particle via Interactors
 
-  It takes care of creating the velocities and keep the positions updated.
+  It takes care of keeping the positions updated.
+
   The positions must be provided, they are not created by the module.
   Also takes care of writing to disk
-  
-  TODO:
-   Maybe the velocities should be outside the module, handled as the positions.
 
- */
+  This is an abstract class that should be derived to implement new integrators, Integrator itself cannot be instanciated.
+
+ Currently Implemented integrators:
+   1. Velocity Verlet
+   2. Brownian Dynamics Euler Maruyama (WIP)
+   2. Brownian Dynamics Euler Maruyama with Hydrodynamics (WIP)
+*/
+
 #include"Integrator.h"
 
-
+//Basic constructor
 Integrator::Integrator(){
   writeThread=NULL;
 
   steps = 0;
 }
 Integrator::~Integrator(){}
+
+//Constructor to be called in the initialization list of the derived class
 Integrator::Integrator(shared_ptr<Vector<float4>> pos,
 		       shared_ptr<Vector<float4>> force, uint N, float L, float dt):  
   pos(pos), force(force),

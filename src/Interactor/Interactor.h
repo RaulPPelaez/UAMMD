@@ -1,10 +1,14 @@
-/*
-Raul P. Pelaez 2016. Interactor class GPU wrapper, to use from CPU, handles GPU calls, interaction of particles.
+/*Raul P. Pelaez 2016. Interactor abstract class base implementation
 
-The idea is for this class to be use to compute only the forces, and integrate elsewhere.
-Like give me a pointer to positions and get a pointer to forces
+  Interactor is intended to be a module that computes and sums the forces acting on each particle
+    due to some interaction, like and external potential or a pair potential.
 
-See Interactor.cpp for additional info
+  The positions and forces must be provided, they are not created by the module.
+
+  This is an abstract class that should be derived to implement new interactors, Interactor itself cannot be instanciated.
+
+ Currently Implemented interactors:
+   1. Pair short range Forces using neighbour lists for an arbitrary potential
 
 TODO:
 90- Springs. Use Floren's algorithm from fluam.

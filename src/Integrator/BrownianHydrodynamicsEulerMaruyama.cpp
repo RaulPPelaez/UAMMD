@@ -1,15 +1,26 @@
-/*Raul P. Pelaez 2016. TwoStepVelVerlet Integrator derived class
+/*Raul P. Pelaez 2016. Brownian Euler Maruyama with hydrodynamics Integrator derived class implementation
 
-  Integrator is intended to be a separated module that handles the update of positions given the forces
+  An Integrator is intended to be a separated module that handles the update of positions given the forces
 
-  It takes care of creating the velocities and keep the positions updated.
+  It takes care of keeping the positions updated.
   The positions must be provided, they are not created by the module.
   Also takes care of writing to disk
+ 
   
-  TODO:
-   Maybe the velocities should be outside the module, handled as the positions.
+  Solves the following differential equation:
+      X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
+   Being:
+     X - Positions
+     D - Diffusion matrix
+     K - Shear matrix
+     dW- Noise vector
+     B - sqrt(D)
 
- */
+  Similar to Brownian Euler Maruyama, but now the Diffusion matrix has size 3Nx3N and is updated
+    each step according to the Rotne Prager method.
+*/
+
+
 #include "BrownianHydrodynamicsEulerMaruyama.h"
 
 

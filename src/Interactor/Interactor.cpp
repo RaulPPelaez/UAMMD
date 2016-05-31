@@ -1,4 +1,16 @@
+/*Raul P. Pelaez 2016. Interactor abstract class base implementation
 
+  Interactor is intended to be a module that computes and sums the forces acting on each particle
+    due to some interaction, like and external potential or a pair potential.
+
+  The positions and forces must be provided, they are not created by the module.
+
+  This is an abstract class that should be derived to implement new interactors, Interactor itself cannot be instanciated.
+
+ Currently Implemented interactors:
+   1. Pair short range Forces using neighbour lists for an arbitrary potential
+ 
+*/
 
 
 #include"Interactor.h"

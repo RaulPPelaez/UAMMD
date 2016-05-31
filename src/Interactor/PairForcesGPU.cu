@@ -1,10 +1,8 @@
-/*
-Raul P. Pelaez 2016. Interactor GPU kernels and callers.
+/*Raul P. Pelaez 2016. Short range pair forces Interactor GPU callers and kernels.
 
 Functions to compute the force acting on each particle
 
 Neighbour list GPU implementation using hash short with cell index as hash.
-
 
 References:
 http://docs.nvidia.com/cuda/samples/5_Simulations/particles/doc/particles.pdf
@@ -16,7 +14,6 @@ TODO:
 20- Write coalesced to forces, and use sorted version to integrate, reading sparse from pos and force and writeing coalesced to vel
 10- There is no need to reconstruct the neighbour list from scratch each step,
   although computing the force is 50 times as expensive as this right now.
-
 */
 
 #include<cub/cub/cub.cuh>

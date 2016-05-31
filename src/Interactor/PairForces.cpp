@@ -1,16 +1,13 @@
-/*
-Raul P. Pelaez 2016. Pair Forces Interactor class GPU wrapper, to use from CPU, handles GPU calls, interaction of particles via short range pair forces.
+/*Raul P. Pelaez 2016. Short range pair forces Interactor implementation.
 
-The idea is for this class to be use to compute only the forces, and integrate elsewhere.
-Like give me a pointer to positions and get a pointer to forces
+  Interactor is intended to be a module that computes and sums the forces acting on each particle
+    due to some interaction, like and external potential or a pair potential.
 
-TODO:
-100- Colors, this almost done, color can simply be encoded in pos.w, and additional parameters are needed in force fucntions/textures
-90- Springs. Use Floren's algorithm from fluam.
-90- Non cubic boxes, almost done, just be carefull in the constructor and use vector types.
+  The positions and forces must be provided, they are not created by the module.
 
-NOTES:
-Use update isntead of update_development to increase performance (update doesnt record time and doesnt sync device)
+  This module implements a Neighbour cell list search and computes the force between all neighbouring
+  particle pairs. 
+  The Neighbour search is implemented using hash short with cell index as hash.
 
 */
 #include"PairForces.h"
@@ -54,10 +51,10 @@ PairForces::~PairForces(){}
 //Initialize variables and upload them to GPU, init CUDA
 void PairForces::init(){
   cerr<<"Initializing...";
-
+  
+  /*Pre compute force, using force  function*/
   switch(forceSelector){
   case LJ:
-    /*Compute potential, using LJ function*/
     pot = Potential(forceLJ, 4096, params.rcut);
     break;
   case CUSTOM:

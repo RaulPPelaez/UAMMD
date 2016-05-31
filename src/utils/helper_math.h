@@ -18,7 +18,7 @@
  *
  *    Thanks to Linh Hah for additions and fixes.
  */
-/*Raul P. Pelaez 2016. I added some overloads to this file*/
+/*Raul P. Pelaez 2016. Warning, I added some overloads to this file*/
 
 #ifndef HELPER_MATH_H
 #define HELPER_MATH_H

@@ -1,14 +1,18 @@
-/*Raul P. Pelaez 2016. Integrator class
+/*Raul P. Pelaez 2016. Two step velocity Verlet Integrator derived class
 
-  Integrator is intended to be a separated module that handles the update of positions given the forces
+  An Integrator is intended to be a separated module that handles the update of positions given the forces
 
-  It takes care of creating the velocities and keep the positions updated.
+  It takes care of keeping the positions updated.
   The positions must be provided, they are not created by the module.
   Also takes care of writing to disk
+ 
   
-  TODO:
-   Maybe the velocities should be outside the module, handled as the positions.
+  Solves the following differential equation:
+      X[t+dt] = X[t] +v[t]·dt+0.5·a[t]·dt^2
+      v[t+dt] = v[t] +0.5·(a[t]+a[t+dt])·dt
 
+TODO:
+100- The initial velocities should be related with a temperature
 */
 #ifndef TWOSTEPVELVERLETINTEGRATOR_H
 #define TWOSTEPVELVERLETINTEGRATOR_H
@@ -24,9 +28,9 @@ public:
   ~TwoStepVelVerlet();
 
   void update() override;
-  //void updateSecondStep() override;
 
 private:
+  //The only additional information to store is the velocity
   Vector<float3> vel;
 };
 

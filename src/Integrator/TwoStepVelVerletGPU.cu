@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2016. Integrator GPU kernels and callers
+/*Raul P. Pelaez 2016. Two step velocity Verlet Integrator GPU callers 
 
   Functions to integrate movement. The integration is done via a functor wich creator
      takes a thrust::Tuple containing positions, velocities and forces on each particle. 
@@ -46,29 +46,6 @@ struct twoStepVelVerlet_functor{
     get<1>(t) = make_float3(vel);
   }
 };
-
-// struct brownianEulerMaruyama_functor{
-//   float dt;
-//   int step;
-//   bool dump;
-//   __host__ __device__ brownianEulerMaruyama_functor(float dt, int step, bool dump):
-//     dt(dt),step(step), dump(dump){}
-//   //The operation is performed on creation
-//   template <typename Tuple>
-//   __device__  void operator()(Tuple t){
-//     /*Retrive the data*/
-//     float4 pos = get<0>(t);
-//     float4 dW = make_float4(get<1>(t),0.0f);
-//     float4 force = get<2>(t);
-
-//     fori(0,3){
-//       pos.x +=  params.dt*(params.K[3*i+0]*pos.x + params.D[3*i+0]*force.x) + dW.x*params.B[3*i+0];    
-//       pos.y +=  params.dt*(params.K[3*i+1]*pos.y + params.D[3*i+1]*force.y) + dW.y*params.B[3*i+1];    
-//       pos.z +=  params.dt*(params.K[3*i+2]*pos.z + params.D[3*i+2]*force.z) + dW.z*params.B[3*i+2];
-//     }
-//   }
-// };
-
 
 //Update the positions
 void integrateTwoStepVelVerletGPU(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump){

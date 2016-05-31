@@ -1,17 +1,23 @@
-/*Raul P. Pelaez 2016. Integrator class
+/*Raul P. Pelaez 2016. Brownian Euler Maruyama Integrator derived class implementation
 
-  Integrator is intended to be a separated module that handles the update of positions given the forces
+  An Integrator is intended to be a separated module that handles the update of positions given the forces
 
-  It takes care of creating the velocities and keep the positions updated.
+  It takes care of keeping the positions updated.
   The positions must be provided, they are not created by the module.
   Also takes care of writing to disk
+ 
   
-  TODO:
-   Maybe the velocities should be outside the module, handled as the positions.
-
+  Solves the following differential equation:
+      X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
+   Being:
+     X - Positions
+     D - Diffusion matrix
+     K - Shear matrix
+     dW- Noise vector
+     B - sqrt(D)
 */
-#ifndef TWOSTEPVELVERLETINTEGRATOR_H
-#define TWOSTEPVELVERLETINTEGRATOR_H
+#ifndef BROWNIANEULERMARUYAMAINTEGRATOR_H
+#define BROWNIANEULERMARUYAMAINTEGRATOR_H
 #include "utils/utils.h"
 #include "Integrator.h"
 #include "BrownianEulerMaruyamaGPU.cuh"
@@ -22,6 +28,7 @@
 
 class BrownianEulerMaruyama: public Integrator{
 public:
+  //Constructor, you have to provide D and K.
   BrownianEulerMaruyama(shared_ptr<Vector<float4>> pos,
 			shared_ptr<Vector<float4>> force,
 			shared_ptr<Vector<float4>> D,

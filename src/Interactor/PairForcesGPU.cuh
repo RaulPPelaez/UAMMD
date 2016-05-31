@@ -1,5 +1,5 @@
 /*
-Raul P. Pelaez 2016. PairForces interactor GPU kernels and callers.
+/*Raul P. Pelaez 2016. Short range pair forces Interactor GPU callers and kernels.
 
 Functions to compute the pair, short range, force acting on each particle.
 

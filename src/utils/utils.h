@@ -1,6 +1,7 @@
 /*Raul P. Pelaez 2016. Some utils
 
 -A host vector class that holds GPU and CPU versions of the data
+-A host Matrix class that holds GPU and CPU versions of the data (derived from Vector, allows for [][] access)
 -A timer class
 -A Xorshift 128+ random number generator
 
@@ -71,7 +72,7 @@ public:
 template<class T>
 class Matrix: public Vector<T>{
 public:
-  T **M;
+  T **M;//Pointers to each column
   uint n, m;
   Matrix(uint n, uint m): n(n),m(m), Vector<T>(n*m){
     M = (T **)malloc(sizeof(T *)*n);

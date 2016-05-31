@@ -1,6 +1,6 @@
-/*Raul P. Pelaez 2016. Integrator GPU kernels and callers
+/*Raul P. Pelaez 2016. Brownian Euler Maruyama integrator GPU kernels and callers
 
-  Functions to integrate movement. The integration is done via a functor wich creator
+  Functions to integrate movement. The integration is done via a functor wich accesor ()
      takes a thrust::Tuple containing positions, velocities and forces on each particle. 
 */
 #include"utils/helper_math.h"

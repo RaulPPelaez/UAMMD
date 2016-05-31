@@ -2,14 +2,16 @@
 Raul P. Pelaez 2016. MD simulator using Interactor and Integrator, example of usage.
 
 NOTES:
-The idea is to use either Integrator or Interactor in another project as a module.
+The idea is to mix implementations of Integrator and Interactor to construct a simulation. 
+For example create a TwoStepVelVerlet integrator and add a PairForces interactor with LJ to create a lennard jonnes gas MD simulation.
+
 
 Once initialized this classes will perform a single task very fast as black boxes:
 
 Integrator uploads the positions according to the velocities, forces and current positions.
 Interactor computes the pair forces using the current positions according to the selected potential
 
-The idea is for Integrator to control the positions and velocities and for Interactor to control the forces. Communicating each variable when needed. So if you need the vel. in the force computing you can pass it when computing the force and modify the force function accordingly.
+The idea is for Integrator to control the positions and velocities and for Interactor to control the forces. Communicating each variable when needed. So if you need the vel. in the force computing you can pass it to your implementation of Interactor and use it in the force function accordingly.
 
 */
 
@@ -38,27 +40,24 @@ Driver::Driver(uint N, float L, float rcut, float dt): N(N){
   /*Integrator is an abstract virtual base clase that has to be overloaded for each new integrator
     . This mantains retrocompatibility, and allows for new integrators to be added without changes*/
   /*To use one or another, just instanciate them as in here. Using a two step velocity verlet integrator i.e.*/
+  /*Notice that each integrator can take different input parameters!, although pos and force will always be there*/
   integrator = make_shared<TwoStepVelVerlet>(make_shared<Vector<float4>>(pos),
 					     make_shared<Vector<float4>>(force), N, L, dt);
-  /*You can add several different interactors to an integrator*/
+  /*You can add several different interactors to an integrator as such*/
   integrator->addInteractor(interactor);
 
 }
   
 //Perform one step
 void Driver::update(){
-  /*First step of the integrator*/
   integrator->update();
-  // interactor->compute_force();
-  // /*This fucntion could be overloaded to do nothing if the integrator is only one step!*/
-  // integrator->updateSecondStep();
 }
 
 //Integrator handles the writing
 void Driver::write(bool block){
   integrator->write(block);
 }
-//Read an initial configuratio nfrom fileName, TODO
+//Read an initial configuration from fileName, TODO
 void Driver::read(const char *fileName){
   ifstream in(fileName);
   float r,c,l;
