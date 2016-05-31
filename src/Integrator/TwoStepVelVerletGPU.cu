@@ -2,17 +2,10 @@
 
   Functions to integrate movement. The integration is done via a functor wich creator
      takes a thrust::Tuple containing positions, velocities and forces on each particle. 
-  
-  Currently Implemented integrators:
-    1. Velocity Verlet
-
-TODO:
-100- Template somehow the integrator functor to allow selection of integrator from Integrator class
-100- Implement new integrators
 */
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
-#include"IntegratorGPU.cuh"
+#include "TwoStepVelVerletGPU.cuh"
 #include<thrust/device_ptr.h>
 #include<thrust/for_each.h>
 #include<thrust/iterator/zip_iterator.h>
@@ -54,8 +47,31 @@ struct twoStepVelVerlet_functor{
   }
 };
 
+// struct brownianEulerMaruyama_functor{
+//   float dt;
+//   int step;
+//   bool dump;
+//   __host__ __device__ brownianEulerMaruyama_functor(float dt, int step, bool dump):
+//     dt(dt),step(step), dump(dump){}
+//   //The operation is performed on creation
+//   template <typename Tuple>
+//   __device__  void operator()(Tuple t){
+//     /*Retrive the data*/
+//     float4 pos = get<0>(t);
+//     float4 dW = make_float4(get<1>(t),0.0f);
+//     float4 force = get<2>(t);
+
+//     fori(0,3){
+//       pos.x +=  params.dt*(params.K[3*i+0]*pos.x + params.D[3*i+0]*force.x) + dW.x*params.B[3*i+0];    
+//       pos.y +=  params.dt*(params.K[3*i+1]*pos.y + params.D[3*i+1]*force.y) + dW.y*params.B[3*i+1];    
+//       pos.z +=  params.dt*(params.K[3*i+2]*pos.z + params.D[3*i+2]*force.z) + dW.z*params.B[3*i+2];
+//     }
+//   }
+// };
+
+
 //Update the positions
-void integrate(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump){
+void integrateTwoStepVelVerletGPU(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump){
 
   device_ptr<float4> d_pos4(pos);
   device_ptr<float3> d_vel3(vel);

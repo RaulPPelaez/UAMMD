@@ -13,34 +13,19 @@
 #include"Integrator.h"
 
 
-Integrator::Integrator(Vector<float4> *pos, Vector<float4> *force, uint N, float L, float dt): 
-  pos(pos), force(force),
-  N(N), dt(dt), L(L){
+Integrator::Integrator(){
   writeThread=NULL;
 
   steps = 0;
-  /*Create velocities*/
-  vel   = Vector<float3>(N);
-  vel.fill_with(make_float3(0.0f));
-  fori(0,N){ 
-    vel[i].x = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
-    vel[i].y = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
-    vel[i].z = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
-  }
-  vel.upload();
 }
-
-
-//The integration process can have two steps
-void Integrator::updateFirstStep(){
-  steps++;
-  if(steps%500==0) cerr<<"\rComputing step: "<<steps<<"   ";
-  integrate(pos->d_m, vel, force->d_m, dt, N, 1);
+Integrator::~Integrator(){}
+Integrator::Integrator(shared_ptr<Vector<float4>> pos,
+		       shared_ptr<Vector<float4>> force, uint N, float L, float dt):  
+  pos(pos), force(force),
+  N(N), dt(dt), L(L){
+  writeThread=NULL;
+  steps = 0;
 }
-void Integrator::updateSecondStep(){
-  integrate(pos->d_m, vel, force->d_m, dt, N, 2);//, steps%10 ==0 && steps<10000 && steps>1000);
-}
-
 
 
 //Write a step to disk using a separate thread

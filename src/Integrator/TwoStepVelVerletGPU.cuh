@@ -6,9 +6,9 @@
   Currently Implemented integrators:
     1. Velocity Verlet
 */
-#ifndef INTEGRATORGPU_CUH
-#define INTEGRATORGPU_CUH
+#ifndef INTEGRATORTWOSTEPVELVERLETGPU_CUH
+#define INTEGRATORTWOSTEPVELVERLETGPU_CUH
 
-void integrate(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump=false);
+void integrateTwoStepVelVerletGPU(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump=false);
 
 #endif

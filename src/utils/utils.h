@@ -17,7 +17,7 @@
 #include<iostream>
 #include<sys/time.h>
 using namespace std;
-
+typedef uint32_t uint;
 #define fori(x,y) for(int i=x; i<y; i++)
 #define forj(x,y) for(int j=x; j<y; j++)
 
@@ -27,12 +27,12 @@ class Vector{
 public:
   T *data; //The data itself, stored aligned in memory
   T *d_m; //device pointer
-  int n; //size of the matrix
+  uint n; //size of the matrix
   bool pinned; //Flag to use pinned memory
-  Vector(){}
-  Vector(int n, bool pinned = false){
-    this->n = n;
-    this->pinned = pinned;
+  bool initialized;
+  Vector(){initialized = false;}
+  Vector(uint n, bool pinned = false): n(n), pinned(pinned){
+    initialized=true;
     //Pined memory is allocated by cuda
     if(pinned){ gpuErrchk(cudaMallocHost((void **)&data, sizeof(T)*n));}
     else       data = (T *)malloc(sizeof(T)*n); //C style memory management
@@ -40,7 +40,6 @@ public:
     gpuErrchk(cudaMalloc(&d_m, n*sizeof(T)));
   }
   void fill_with(T x){std::fill(data, data+n, x); }
-
   //Upload/Download from the GPU, ultra fast if is pinned memory
   inline void upload(){   gpuErrchk(cudaMemcpy(d_m, data, n*sizeof(T), cudaMemcpyHostToDevice)); }
   inline void download(){ gpuErrchk(cudaMemcpy(data, d_m, n*sizeof(T), cudaMemcpyDeviceToHost)); }
@@ -60,12 +59,28 @@ public:
     cout<<endl;
     
   }
+
+  //void operator =(const Vector<T> &a){fori(0,n) data[i] = a[i]; }
   //Access data with bracket operator
   T& operator [](const int &i){return data[i];}
   //Cast to float* returns the device pointer!
   operator T *&() {return d_m;}
   operator T *() const{return d_m;}
 };
+
+template<class T>
+class Matrix: public Vector<T>{
+public:
+  T **M;
+  uint n, m;
+  Matrix(uint n, uint m): n(n),m(m), Vector<T>(n*m){
+    M = (T **)malloc(sizeof(T *)*n);
+    for(int i=0; i<n; i++) M[i] = &(this->data)[i*m];
+  }
+  T*& operator [](const int &i){return M[i];}
+};
+
+
 
 /*A timer class to measure time, just use 
   t.tic to start and t.toc to get elapsed seconds*/

@@ -1,52 +1,39 @@
 /*
-Raul P. Pelaez 2016. Interactor class GPU wrapper, to use from CPU, handles GPU calls, integration and interaction of particles. Also keeps track of all the variables and writes/reads simulation to disk.
+Raul P. Pelaez 2016. Interactor class GPU wrapper, to use from CPU, handles GPU calls, interaction of particles.
 
 The idea is for this class to be use to compute only the forces, and integrate elsewhere.
 Like give me a pointer to positions and get a pointer to forces
 
 See Interactor.cpp for additional info
+
+TODO:
+90- Springs. Use Floren's algorithm from fluam.
  */
 
 #ifndef INTERACTOR_H
 #define INTERACTOR_H
 
 #include"utils/utils.h"
-#include"InteractorGPU.cuh"
 #include"misc/Potential.h"
 #include<cstdint>
+#include<memory>
 
-#define fori(x,y) for(int i=x; i<y; i++)
-#define forj(x,y) for(int j=x; j<y; j++)
-
-enum forceType{LJ,NONE};
-
-typedef uint32_t uint;
 class Interactor{
 public:
-  Interactor(int N, float L, float rcut,
-	     Vector<float4> *d_pos,
-	     forceType fs=LJ);
+  Interactor();
   ~Interactor();
 
-  void compute_force();
-  //  float4 *get_force(){return this->force.d_m;}
-  Vector<float4>* getForce(){return &force;}
-private:
-  Vector<float4> *d_pos, force, sortPos, sortForce;
-  Vector<float3> vel;
-  uint N;
-  void init();
+  virtual void sumForce() = 0;
 
-  uint ncells;
-  Vector<uint> cellIndex, particleIndex; 
-  Vector<uint> cellStart, cellEnd;
+  shared_ptr<Vector<float4>> getForce(){return force;}
 
-  float rcut, L, dt;
-
-  InteractorParams params;
+protected:
+  Interactor(uint N, float L, 
+	     shared_ptr<Vector<float4>> d_pos,
+	     shared_ptr<Vector<float4>> force);
   
-  forceType forceSelector;
-
-  Potential pot;
+  shared_ptr<Vector<float4>> d_pos, force;
+  uint N;
+  float L;
 };
 #endif

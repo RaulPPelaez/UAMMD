@@ -20,7 +20,7 @@ TODO:
 */
 
 #include<cub/cub/cub.cuh>
-#include"InteractorGPU.cuh"
+#include"PairForcesGPU.cuh"
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
 
@@ -37,7 +37,7 @@ using namespace thrust;
 using std::cerr;
 using std::endl;
 
-__constant__ InteractorParams params; //Simulation parameters in constant memory, super fast access
+__constant__ PairForcesParams pairForcesParamsGPU; //Simulation parameters in constant memory, super fast access
 
 //Texture references for scattered access
 texture<uint> texCellStart, texCellEnd, texParticleIndex;
@@ -50,14 +50,14 @@ uint GPU_Nthreads;
 
 
 //Initialize gpu variables 
-void initInteractorGPU(InteractorParams m_params, float *potData, size_t potSize,
+void initPairForcesGPU(PairForcesParams m_pairForcesParamsGPU, float *potData, size_t potSize,
 	     uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 	     float4 *sortPos, uint N){
 
   /*Precompute some inverses to save time later*/
-  m_params.invrc2 = 1.0f/(m_params.rcut*m_params.rcut);
-  m_params.invL = 1.0f/m_params.L;
-  m_params.invCellSize = 1.0f/m_params.cellSize;
+  m_pairForcesParamsGPU.invrc2 = 1.0f/(m_pairForcesParamsGPU.rcut*m_pairForcesParamsGPU.rcut);
+  m_pairForcesParamsGPU.invL = 1.0f/m_pairForcesParamsGPU.L;
+  m_pairForcesParamsGPU.invCellSize = 1.0f/m_pairForcesParamsGPU.cellSize;
 
   /*Texture bindings, these ones are accessed by element*/ 
   gpuErrchk(cudaBindTexture(NULL, texCellStart, cellStart, ncells*sizeof(uint)));
@@ -84,7 +84,7 @@ void initInteractorGPU(InteractorParams m_params, float *potData, size_t potSize
 
 
   /*Upload parameters to constant memory*/
-  gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(InteractorParams)));
+  gpuErrchk(cudaMemcpyToSymbol(pairForcesParamsGPU, &m_pairForcesParamsGPU, sizeof(PairForcesParams)));
 
   
   GPU_Nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
@@ -93,38 +93,38 @@ void initInteractorGPU(InteractorParams m_params, float *potData, size_t potSize
 
 //MIC algorithm
 inline __device__ void apply_pbc(float3 &r){
-  r -= floorf(r*params.invL+0.5f)*params.L; 
+  r -= floorf(r*pairForcesParamsGPU.invL+0.5f)*pairForcesParamsGPU.L; 
 }
 inline __device__ void apply_pbc(float4 &r){
-  r -= floorf(r*params.invL+0.5f)*params.L; //MIC algorithm
+  r -= floorf(r*pairForcesParamsGPU.invL+0.5f)*pairForcesParamsGPU.L; //MIC algorithm
 }
 
 //Get the 3D cell p is in, just pos in [0,L] divided by ncells(vector) .INT DANGER.
 inline __device__ int3 getCell(float3 p){
   apply_pbc(p); //Reduce to MIC
-  return make_int3( (p+0.5f*params.L)*params.invCellSize ); 
+  return make_int3( (p+0.5f*pairForcesParamsGPU.L)*pairForcesParamsGPU.invCellSize ); 
 }
 inline __device__ int3 getCell(float4 p){
   apply_pbc(p); //Reduce to MIC
-  return make_int3( (p+0.5f*params.L)*params.invCellSize ); 
+  return make_int3( (p+0.5f*pairForcesParamsGPU.L)*pairForcesParamsGPU.invCellSize ); 
 }
 
 //Apply pbc to a cell coordinates
 inline __device__ void pbc_cell(int3 &cell){
-  if(cell.x==-1) cell.x = params.xcells-1;
-  else if(cell.x==params.xcells) cell.x = 0;
+  if(cell.x==-1) cell.x = pairForcesParamsGPU.xcells-1;
+  else if(cell.x==pairForcesParamsGPU.xcells) cell.x = 0;
 
-  if(cell.y==-1) cell.y = params.ycells-1;
-  else if(cell.y==params.ycells) cell.y = 0;
+  if(cell.y==-1) cell.y = pairForcesParamsGPU.ycells-1;
+  else if(cell.y==pairForcesParamsGPU.ycells) cell.y = 0;
 
-  if(cell.z==-1) cell.z = params.zcells-1;
-  else if(cell.z==params.zcells) cell.z = 0;
+  if(cell.z==-1) cell.z = pairForcesParamsGPU.zcells-1;
+  else if(cell.z==pairForcesParamsGPU.zcells) cell.z = 0;
 }
 //Get linear index of a 3D cell
 inline __device__ uint getCellIndex(int3 gridPos){
   return gridPos.x+1
-    +gridPos.y*params.xcells
-    +gridPos.z*params.xcells*params.ycells;
+    +gridPos.y*pairForcesParamsGPU.xcells
+    +gridPos.z*pairForcesParamsGPU.xcells*pairForcesParamsGPU.ycells;
 }
 
 //Compute the icell of each particle
@@ -259,7 +259,7 @@ inline __device__ float4 forceij(const float4 &R1,const float4 &R2){
   apply_pbc(r12);
 
   /*Squared distance between 0 and 1*/
-  float r2 = dot(r12,r12)*params.invrc2;
+  float r2 = dot(r12,r12)*pairForcesParamsGPU.invrc2;
   /*Beyond rcut..*/
   if(r2>=1.0f) return make_float4(0.0f);
   /*Get the force from the texture*/
@@ -267,7 +267,7 @@ inline __device__ float4 forceij(const float4 &R1,const float4 &R2){
   return make_float4(fmod*r12);
 
   // float invr2 = (1.0f/dot(r12, r12));  
-  // if(invr2<params.invrc2) return make_float4(0.0f);
+  // if(invr2<pairForcesParamsGPU.invrc2) return make_float4(0.0f);
   
   // float invr6 = invr2*invr2*invr2;
   // float invr8 = invr6*invr2;
@@ -339,7 +339,7 @@ __global__ void computeForceD(float4* __restrict__ newForce,
 }
  
 //CPU kernel caller
-void computeForce(float4 *sortPos, float4 *force,
+void computePairForce(float4 *sortPos, float4 *force,
 		  uint *cellStart, uint *cellEnd,
 		  uint *particleIndex, 
 		  uint N){

@@ -38,7 +38,7 @@ int main(){
   float total_time = tim.toc();
   cerr<<"\nMean step time: "<<setprecision(5)<<(float)nsteps/total_time<<" FPS"<<endl;
   cerr<<"\nTotal time: "<<setprecision(5)<<total_time<<"s"<<endl;
-  psystem.write(true);
+  //psystem.write(true);
   cudaDeviceReset();
   return 0;
 }
