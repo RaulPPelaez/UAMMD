@@ -23,9 +23,9 @@ TwoStepVelVerlet::TwoStepVelVerlet(shared_ptr<Vector<float4>> pos,
   /*Create velocities*/
   vel.fill_with(make_float3(0.0f));
   fori(0,N){ 
-    vel[i].x = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
-    vel[i].y = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
-    vel[i].z = 0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+    vel[i].x = 0.0f;//0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+    vel[i].y = 0.0f;//0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+    vel[i].z = 0.0f;//0.1f*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
   }
   vel.upload();
 }

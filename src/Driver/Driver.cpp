@@ -22,7 +22,7 @@ Driver::Driver(uint N, float L, float rcut, float dt): N(N){
   /*Create the position array*/
   pos = Vector<float4>(N, true);
   /*Start in a cubic lattice*/
-  cubicLattice(pos.data, L, N);
+  cubicLattice2D(pos.data, 20, N);
   /*Once done upload to GPU*/
   pos.upload();
 

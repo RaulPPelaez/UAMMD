@@ -147,7 +147,7 @@ __global__ void calcCellIndexD(uint *cellIndex, uint *particleIndex,
 //CPU kernel caller
 void calcCellIndex(float4 *pos, uint *cellIndex, uint *particleIndex, uint N){
   calcCellIndexD<<<GPU_Nblocks, GPU_Nthreads>>>(cellIndex, particleIndex, pos, N);
-  //  cudaCheckErrors("Calc hash");					   
+  //cudaCheckErrors("Calc hash");					   
 }
 
 //Sort the particleIndex list by cell index,
@@ -200,7 +200,7 @@ void sortCellIndex(uint *&cellIndex, uint *&particleIndex, uint N){
    // 		      device_ptr<uint>(cellIndex+N),
    // 		      device_ptr<uint>(particleIndex));
 
-   //  cudaCheckErrors("Sort hash");					   
+   //cudaCheckErrors("Sort hash");					   
 }
 
 
@@ -250,7 +250,7 @@ void reorderAndFind(float4 *sortPos,
 						 cellIndex, particleIndex,
 						 cellStart, cellEnd,
 						 pos, N);
-  //  cudaCheckErrors("Reorder and find");					   
+  //cudaCheckErrors("Reorder and find");					   
 }
 
 //Computes the force between to positions
