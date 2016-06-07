@@ -133,4 +133,5 @@ public:
 
 //This function treats pos a s a float4 and puts the particles in a cubic lattice
 void cubicLattice(float4 *pos, float L, uint N);
+void cubicLattice2D(float4 *pos, float L, uint N);
 #endif

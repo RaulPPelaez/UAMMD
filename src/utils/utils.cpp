@@ -28,3 +28,28 @@ void cubicLattice(float4 *pos, float L, uint N){
 	  }
 
 }
+//Took from Fluam, adapted to use float4
+void cubicLattice2D(float4 *pos, float L, uint N){
+    float dx, dy;
+    int nx, ny, n;
+    int np = N;
+
+    nx = ny = 0;
+    while((nx*ny)<np){
+      if((nx*ny)<np) nx++;
+      if((nx*ny)<np) ny++;
+    }
+    dx = L/float(nx);
+    dy = L/float(ny);
+
+    n = 0;
+    for(int j=0;j<ny;j++)
+      for(int k=0;k<nx;k++)
+	if(n<np){
+	  n = n + 1;
+	  pos[(n-1)].x = (k + 0.5f) * dx - L/2.0f;
+	  pos[(n-1)].y = (j + 0.5f) * dy - L/2.0f;
+	  pos[(n-1)].z =  -L/4.0f;
+	}
+
+}

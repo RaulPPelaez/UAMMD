@@ -4,6 +4,7 @@
 Raul P. Pelaez 2016
 
 A CUDA Molecular Dynamics code made into modules for expandability and generality.
+It is coded into separated modules, with a Driver that can hold many modules in order to construct a simulation. For example, Driver could have a velocityVerlet module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
 
 There are two types of modules:
 
@@ -23,6 +24,10 @@ In order to do so it can hold any number of Interactors and use them to compute 
 ----------------
 
 These objects are abstract classes that can be derived to create all kinds of functionality and add new physics. Just create a new class that inherits Interactor or Integrator and override the virtual methods with the new functionality.
+
+
+Finally there is a Driver that puts them all together and controls the flow of the simulation.
+
 
 #Currently Implemented
 
@@ -72,3 +77,4 @@ Needs an NVIDIA GPU with compute capability sm_2.0+
 
 ------------
 	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5
+     - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5

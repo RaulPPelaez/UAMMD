@@ -3,12 +3,12 @@ CC=$(CXX)
 NVCC=nvcc
 
 #  -Ofast -march=native -pipe -funroll-loops
-CFLAGS= -pthread -std=c++11 -O3  -I/usr/local/cuda-7.5/targets/x86_64-linux/include/ -march=native -lpthread -I/usr/local/include -funroll-loops -m64 -I./
+CFLAGS= -pthread -std=c++11 -O3  -I/usr/local/cuda/include/ -march=native -lpthread -I/usr/local/include -funroll-loops -m64 -I./
 
 #CFLAGS= -std=c++11 -O3  -I/usr/local/cuda-7.5/include/ -march=native -g
 CXXFLAGS=$(CFLAGS) 
 
-NVFLAGS= -O3 -ccbin=g++ -lineinfo -m64 -arch=sm_52 -restrict -src-in-ptx  -I./
+NVFLAGS= -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 -arch=sm_52 -restrict -src-in-ptx  -I./
 
 #LDFLAGS= -L/usr/local/cuda-7.5/lib64 -L/usr/lib64/nvidia
 LDFLAGS= -L/usr/local/cuda-7.5/lib64 

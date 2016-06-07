@@ -13,7 +13,11 @@ Interactor computes the pair forces using the current positions according to the
 
 The idea is for Integrator to control the positions and velocities and for Interactor to control the forces. Communicating each variable when needed. So if you need the vel. in the force computing you can pass it to your implementation of Interactor and use it in the force function accordingly.
 
+The float4 forces contains fx, fy, fz, E. 
+The float4 pos contains x,y,z,type
+
 Several interactors can be added to an integrator, for example one interactor for pair forces, another for bonded forces..
+
 
 TODO:
 100- The force array should not be handled by the user

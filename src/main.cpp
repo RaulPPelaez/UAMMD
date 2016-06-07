@@ -15,6 +15,28 @@ Interactor computes the pair forces using the current positions according to the
 The idea is for Integrator to control the positions and velocities and for Interactor to control the forces. Communicating each variable when needed. So if you need the vel. in the force computing you can pass it when computing the force and modify the force function accordingly.
 -------
 To check physics try N= 2^14 and L = 32 and uncomment write calls
+------
+Current benchmark:
+GTX980 CUDA-7.5
+N = 2^20
+L = 128
+dt = 0.001f
+PairForces with rcut = 2.5 and no energy measure
+TwoStepVelverlet, no writing to disk
+---------------------HIGHSCORE-----------------------
+Number of cells: 51 51 51; Total cells: 132651
+Initializing...	DONE!!
+Initialization time: 0.16063s
+Computing step: 10000   
+Mean step time: 123.1 FPS
+
+Total time: 81.233s
+
+real	1m21.763s
+user	0m55.792s
+sys	0m25.972s
+---------------------------------------------------
+
 
 */
 #include<iomanip>
@@ -28,7 +50,7 @@ int main(){
   Driver psystem(N, 128, 2.5f, 0.001f);
 
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;  
-  int nsteps = 10000;
+  int nsteps = 100;
 
   tim.tic();
   fori(0,nsteps){
