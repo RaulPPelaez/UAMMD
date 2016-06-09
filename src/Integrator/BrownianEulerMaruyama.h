@@ -42,7 +42,8 @@ private:
   Vector<float3> noise;
   curandGenerator_t rng;
   BrownianEulerMaruyamaParameters params;
-  shared_ptr<Vector<float4>> D, K, B;
+  shared_ptr<Vector<float4>> D, K;
+  Vector<float4> B;
 };
 
 

@@ -35,12 +35,12 @@ Finally there is a Driver that puts them all together and controls the flow of t
 **Interactors:**
 
 	1.Pair Forces: Implements hash (cell index) sort neighbour list construction algorithm to evaluate pair forces given some potential function, LJ i.e. Ultra fast
-		
+	2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
 	
 **Integrators:**
 
 	1.Two step velocity verlet
-	2.Euler Maruyama Brownian dynamics (WIP)
+	2.Euler Maruyama Brownian dynamics
 	3.Euler Maruyama Brownian dynamics with hydrodynamic interactions via Rotne Prager (WIP)
 
 ##USAGE
@@ -67,6 +67,12 @@ Depends on:
 	2. thrust    (v1.8.2 bundled with CUDA used):   https://github.com/thrust/thrust
 	3. CUDA 6.5+ (v7.5 used)                    :   https://developer.nvidia.com/cuda-downloads
 
+This code makes use of the following CUDA packages:
+	
+	1. cuRAND
+	2. cuBLAS
+	3. cuSolver
+	
 
 ##REQUERIMENTS
 

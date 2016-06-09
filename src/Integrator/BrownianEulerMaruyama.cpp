@@ -19,6 +19,47 @@
 #include "BrownianEulerMaruyama.h"
 
 
+
+void cholesky(Vector<float4> Din, Vector<float4> &Bout){
+  int i, j, k; /* Indices */
+  float tmpsum; /* Temporary variable */
+
+  Matrix<float> B(3,3);
+  Matrix<float> D(3,3);
+
+  fori(0,3){
+    D[i][0] = Din[i].x;
+    D[i][1] = Din[i].y;
+    D[i][2] = Din[i].z;
+  }
+
+  /* Clear B matrix */
+  B.fill_with(0.0f);
+  Bout.fill_with(make_float4(0.0f));
+
+
+
+  for(j = 0; j < 3; j++) {
+    tmpsum = 0;
+    for(k = 0; k < j; k++)
+      tmpsum += B[j][k]*B[j][k];
+    B[j][j] = sqrt(D[j][j] - tmpsum);
+
+    for(i = j + 1; i < 3; i++) {
+      tmpsum = 0;
+      for(k = 0; k < j; k++)
+        tmpsum += B[i][k]*B[j][k];
+      B[i][j] = (D[i][j] - tmpsum)/B[j][j];
+    }
+  }
+
+  fori(0,3){
+    Bout[i].x = B[i][0];
+    Bout[i].y = B[i][1];
+    Bout[i].z = B[i][2];
+  }
+}
+
 BrownianEulerMaruyama::BrownianEulerMaruyama(shared_ptr<Vector<float4>> pos,
 					     shared_ptr<Vector<float4>> force,
 					     shared_ptr<Vector<float4>> D,
@@ -28,27 +69,38 @@ BrownianEulerMaruyama::BrownianEulerMaruyama(shared_ptr<Vector<float4>> pos,
   noise(N),
   Integrator(pos, force, N, L, dt){
 
-  params.sqrtdt = sqrt(dt);
+  
+  params.sqrtdt = sqrt(dt)*sqrt(2.0f);
 
   D->upload();
   params.D = D->d_m;
   K->upload();
   params.K = K->d_m;
 
-  //  B = D;
-  B->fill_with(make_float4(0.0f));
-  B->upload();
-  params.B = B->d_m;
+  B = Vector<float4>(4);
 
+  B.fill_with(make_float4(0.0f));
+  cholesky(*D, B);
+  B.upload();
+  params.B = B.d_m;
+  
   /*Create noise*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(rng, rand());
+  curandSetPseudoRandomGeneratorSeed(rng, time(NULL));
 
   noise.fill_with(make_float3(0.0f));
   noise.upload();
   //Curand fill with gaussian numbers with mean 0 and var 1
-  curandGenerateNormal(rng, (float*) noise.d_m, 3*N, 0.0f ,1.0f);
+  curandGenerateNormal(rng, (float*) noise.d_m, 3*N, 0.0f, 1.0f);
 
+  // noise.download();
+  // ofstream out("rand.dat");
+
+  // fori(0,N){
+  //   out<<noise[i].x<<" "<<noise[i].y<<" "<<noise[i].z<<"\n";
+  // }
+
+  
   initBrownianEulerMaruyamaGPU(params);
 
 }

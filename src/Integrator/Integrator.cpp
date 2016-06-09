@@ -52,7 +52,7 @@ void Integrator::write(bool block){
 void write_concurrent(float4 *pos, float L, uint N){
   cout<<"#L="<<L*0.5<<";\n";
   fori(0,N){
-    cout<<pos[i].x<<" "<<pos[i].y<<" "<<pos[i].z<<" 0.56 1\n";
+    cout<<pos[i].x<<" "<<pos[i].y<<" "<<pos[i].z<<" 0.56 "<<(int)(pos[i].w+1)<<"\n";
   }
 }
 

@@ -15,13 +15,15 @@ LDFLAGS= -L/usr/local/cuda-7.5/lib64
 LDLIBS= -lcuda -lcudart -lpthread -lcurand
 
 
-OBJS_INTERACTOR= Interactor/Interactor.o Interactor/PairForces.o
-OBS_INTEGRATOR= Integrator/Integrator.o Integrator/TwoStepVelVerlet.o Integrator/BrownianEulerMaruyama.o
+OBJS_INTERACTOR= Interactor.o PairForces.o BondedForces.o
+OBJS_INTEGRATOR= Integrator.o TwoStepVelVerlet.o BrownianEulerMaruyama.o
 
-CUOBJS= Interactor/PairForcesGPU.o Integrator/TwoStepVelVerletGPU.o Integrator/BrownianEulerMaruyamaGPU.o
+CUOBJS_INTERACTOR= PairForcesGPU.o  BondedForcesGPU.o 
+CUOBJS_INTEGRATOR= TwoStepVelVerletGPU.o BrownianEulerMaruyamaGPU.o
 
-OBJS= $(OBJS_INTERACTOR) $(OBS_INTEGRATOR)  utils/utils.o misc/Potential.o Driver/Driver.o
+OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))  utils/utils.o misc/Potential.o Driver/Driver.o
 
+CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR))
 
 all: main
 

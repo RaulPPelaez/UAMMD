@@ -2,6 +2,19 @@
 
   Functions to integrate movement. The integration is done via a functor wich accesor ()
      takes a thrust::Tuple containing positions, velocities and forces on each particle. 
+
+  Solves the following differential equation:
+      X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
+   Being:
+     X - Positions
+     D - Diffusion matrix
+     K - Shear matrix
+     dW- Noise vector
+     B - sqrt(D)
+
+
+TODO:
+100- Benchmark and optimize
 */
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
@@ -34,18 +47,19 @@ struct brownianEulerMaruyama_functor{
     float4 pos = get<0>(t);
     float4 dW = make_float4(get<1>(t),0.0f);
     float4 force = get<2>(t);
-
+    int c = pos.w;
+    pos.w = 0.0f;
     float4 *B = BEMParamsGPU.B;
     float4 *D = BEMParamsGPU.D;
     float4 *K = BEMParamsGPU.K;
     float sqrtdt = BEMParamsGPU.sqrtdt; 
-
-    for(int i=0; i<3; i++){
-      pos +=  dt*(K[i]*pos + D[i]*force) + sqrtdt*dW*B[i];    
-      // pos.y +=  dt*(K[3*i+1]*pos.y + D[3*i+1]*force.y) + sqrtdt*dW.y*B[3*i+1];    
-      // pos.z +=  dt*(K[3*i+2]*pos.z + D[3*i+2]*force.z) + sqrtdt*dW.z*B[3*i+2];
-    }
     
+    pos.x +=  dt*( dot(K[0],pos) +  dot(D[0],force)) + sqrtdt*dot(dW,B[0]);
+    pos.y +=  dt*( dot(K[1],pos) +  dot(D[1],force)) + sqrtdt*dot(dW,B[1]);
+    pos.z +=  dt*( dot(K[2],pos) +  dot(D[2],force)) + sqrtdt*dot(dW,B[2]);
+    
+
+    pos.w = c;
     get<2>(t) = make_float4(0.0f);
     get<0>(t) = pos;
   }
@@ -63,6 +77,6 @@ void integrateBrownianEulerMaruyamaGPU(float4 *pos, float3 *noise, float4 *force
 	   make_zip_iterator( make_tuple( d_pos4, d_noise3, d_force4)),
 	   make_zip_iterator( make_tuple( d_pos4 + N, d_noise3 + N, d_force4 +N)),
 	   brownianEulerMaruyama_functor(dt));
-  //cudaCheckErrors("Integrate");					   
+  //  cudaCheckErrors("Integrate");					   
 }
 

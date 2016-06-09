@@ -11,7 +11,7 @@
    1. Pair short range Forces using neighbour lists for an arbitrary potential
 
 TODO:
-90- Springs. Use Floren's algorithm from fluam.
+100- Create virtual function sumEnergy
  */
 
 #ifndef INTERACTOR_H

@@ -25,6 +25,7 @@ L = 128
 dt = 0.001f
 PairForces with rcut = 2.5 and no energy measure
 TwoStepVelverlet, no writing to disk
+Starting in a cubicLattice
 ---------------------HIGHSCORE-----------------------
 Number of cells: 51 51 51; Total cells: 132651
 Initializing...	DONE!!
@@ -38,7 +39,8 @@ real	1m21.763s
 user	0m55.792s
 sys	0m25.972s
 ---------------------------------------------------
-
+TODO:
+100- Read and construct simulation configuration from script
 
 */
 #include<iomanip>
@@ -52,17 +54,17 @@ int main(){
   Driver psystem(N, 30, 2.5f, 0.001f);
 
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;  
-  int nsteps = 1000000;
+  int nsteps = 10000;
 
   tim.tic();
   fori(0,nsteps){
     psystem.update(); //Prints timing information
-    if(i%500==0) psystem.write(); //Writing is done in parallel, is practically free if the interval is big enough
+    if(i%10==0) psystem.write(); //Writing is done in parallel, is practically free if the interval is big enough
   }
   float total_time = tim.toc();
   cerr<<"\nMean step time: "<<setprecision(5)<<(float)nsteps/total_time<<" FPS"<<endl;
   cerr<<"\nTotal time: "<<setprecision(5)<<total_time<<"s"<<endl;
-  //psystem.write(true);
+  psystem.write(true);
   cudaDeviceReset();
   return 0;
 }

@@ -35,12 +35,14 @@ TODO:
 class Driver{
 //Integrator and Interactor take care of the
 // updating of positions and computing the pair forces. You can do anything in between.
-  shared_ptr<Interactor> interactor;
+  //shared_ptr<Interactor> interactor;
   shared_ptr<Integrator> integrator;
 
+
+  
   uint N;
 //You are supposed to be in charge of the positions and forces, and initialize them before giving them to Integrator and Interactor.
-Vector<float4> pos, force;
+  Vector<float4> pos, force, D, K;
 public:
   //The constructor configures and initializes the simulation
   Driver(uint N, float L, float rcut, float dt);

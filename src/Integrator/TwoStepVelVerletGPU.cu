@@ -37,9 +37,10 @@ struct twoStepVelVerlet_functor{
       /*First velocity verlet step*/
     case 1: 
       vel += force*dt*0.5f;
+      vel.w = 0.0f; //Be careful not to overwrite the pos.w!!
       pos += vel*dt;
-      pos.w = 0.0f;
       get<0>(t) = pos;
+      get<2>(t) = make_float4(0.0f);
       break;
       /*Second velocity verlet step*/
     case 2:

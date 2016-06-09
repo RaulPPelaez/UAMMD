@@ -329,7 +329,7 @@ __global__ void computeForceD(float4* __restrict__ newForce,
 
   /*Write force with the original order*/
   uint pi = tex1Dfetch(texParticleIndex, index); 
-  newForce[pi] = force;
+  newForce[pi] += force;
 }
  
 //CPU kernel caller
