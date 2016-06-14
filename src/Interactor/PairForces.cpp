@@ -22,11 +22,22 @@ using namespace std;
 PairForces::PairForces(uint N, float L, float rcut,
 		       shared_ptr<Vector<float4>> d_pos,
 		       shared_ptr<Vector<float4>> force,
-		       pairForceType fs, std::function<float(float)> customForceFunction):
-  rcut(rcut),forceSelector(fs), customForceFunction(customForceFunction),  
-  Interactor(N, L, d_pos, force){
+		       pairForceType fs):
+  PairForces(N, L, rcut, d_pos, force, fs, nullForce, nullForce){}
 
-  /**Put parameters in Param struct**/
+
+PairForces::PairForces(uint N, float L, float rcut,
+		       shared_ptr<Vector<float4>> d_pos,
+		       shared_ptr<Vector<float4>> force,
+		       pairForceType fs,
+		       std::function<float(float)> cFFun,
+		       std::function<float(float)> cEFun):
+  customForceFunction(cFFun), customEnergyFunction(cEFun),
+  rcut(rcut), forceSelector(fs),
+  Interactor(N, L, d_pos, force)
+{
+
+    /**Put parameters in Param struct**/
   params.rcut = rcut;
 
   int xcells = int(L/rcut+0.5);
@@ -46,22 +57,24 @@ PairForces::PairForces(uint N, float L, float rcut,
 
   init();
 
+
 }
+
 PairForces::~PairForces(){}
 //Initialize variables and upload them to GPU, init CUDA
 void PairForces::init(){
   cerr<<"Initializing...";
   
-  /*Pre compute force, using force  function*/
+  /*Pre compute force and energy, using force  function*/
   switch(forceSelector){
   case LJ:
-    pot = Potential(forceLJ, 4096, params.rcut);
+    pot = Potential(forceLJ, energyLJ, 4096*params.rcut/2.5f, params.rcut);
     break;
   case CUSTOM:
-    pot = Potential(customForceFunction, 4096, params.rcut);
+    pot = Potential(customForceFunction, customEnergyFunction, 4096*params.rcut/2.5f, params.rcut);
     break;
   case NONE:
-    pot = Potential(nullForce, 2, params.rcut);
+    pot = Potential(nullForce, nullForce, 2, params.rcut);
     break;
   default:
     cerr<<"NON RECOGNIZED POTENTIAL SELECTED!!"<<endl;
@@ -70,18 +83,26 @@ void PairForces::init(){
 
   sortPos   = Vector<float4>(N); sortPos.fill_with(make_float4(0.0f)); sortPos.upload(); 
 
+  /*Temporal storage for the enrgy and virial per particle*/
+  energyArray = Vector<float>(N); energyArray.fill_with(0.0f); energyArray.upload();
+  virialArray = Vector<float>(N); virialArray.fill_with(0.0f); virialArray.upload();
+
+  
   cellIndex = Vector<uint>(N+1); cellIndex.upload();
   particleIndex= Vector<uint>(N+1); particleIndex.upload();
   cellStart        = Vector<uint>(ncells); cellStart.upload();
   cellEnd          = Vector<uint>(ncells); cellEnd.upload();
 
-  initPairForcesGPU(params, pot.getData(), pot.getSize(), cellStart, cellEnd, particleIndex, ncells, sortPos, N);
+  initPairForcesGPU(params,
+		    pot.getForceData(), pot.getEnergyData(), pot.getSize(),
+		    cellStart, cellEnd, particleIndex, ncells,
+		    sortPos, N);
 
   cerr<<"\tDONE!!"<<endl;
 }
-/*Perform an integration step*/
-void PairForces::sumForce(){
-  /*** CONSTRUCT NEIGHBOUR LIST ***/
+
+/*** CONSTRUCT NEIGHBOUR LIST ***/
+void PairForces::makeNeighbourList(){
   /*Compute cell id of each particle*/
   calcCellIndex(d_pos->d_m, cellIndex, particleIndex, N);
 
@@ -92,6 +113,12 @@ void PairForces::sumForce(){
 		 cellIndex, particleIndex,
 		 cellStart, cellEnd, params.ncells,
 		 d_pos->d_m, N); 
+}
+
+
+void PairForces::sumForce(){
+  /*** CONSTRUCT NEIGHBOUR LIST ***/
+  makeNeighbourList();
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   computePairForce(sortPos,
 	       force->d_m, 
@@ -99,6 +126,31 @@ void PairForces::sumForce(){
 	       particleIndex,
 	       N);
 }
+
+float PairForces::sumEnergy(){
+  /*** CONSTRUCT NEIGHBOUR LIST ***/
+  //makeNeighbourList();
+  /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
+  return computePairEnergy(sortPos,
+			   energyArray, 
+			   cellStart, cellEnd, 
+			   particleIndex,
+			   N);
+}
+float PairForces::sumVirial(){
+  /*** CONSTRUCT NEIGHBOUR LIST ***/
+  //makeNeighbourList();
+  /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
+  float v =  computePairVirial(sortPos,
+			       virialArray, 
+			       cellStart, cellEnd, 
+			       particleIndex,
+			       N);
+
+  return v/(3.0f*L*L*L);
+}
+
+
 
 
 //Force between two particles, depending on square distance between them
@@ -111,6 +163,13 @@ float forceLJ(float r2){
   float fmod = -48.0f*invr8*invr6+24.0f*invr8;
 
   return fmod;
+}
+float energyLJ(float r2){
+  float invr2 = 1.0f/r2;
+  float invr6 = invr2*invr2*invr2;
+  float E =  2.0f*invr6*(invr6-1.0f);
+
+  return E;
 }
 float nullForce(float r2){return 0.0f;}
 

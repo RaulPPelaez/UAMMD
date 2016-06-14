@@ -29,29 +29,38 @@ TODO:
 #include"Integrator/Integrator.h"
 #include"Integrator/TwoStepVelVerlet.h"
 #include"Integrator/BrownianEulerMaruyama.h"
+#include"Measurable/Measurable.h"
+#include"Measurable/EnergyMeasure.h"
 #include"utils/utils.h"
 #include<memory>
 
+struct SimConfig{
+
+  uint N = 16384;
+  float L = 32, rcut = 2.5f;
+  float dt = 0.001f;
+  uint print_every = 1000;
+  float T = 1.0f;
+};
+
 class Driver{
-//Integrator and Interactor take care of the
-// updating of positions and computing the pair forces. You can do anything in between.
-  //shared_ptr<Interactor> interactor;
+  //Interactors are added to an integrator
   shared_ptr<Integrator> integrator;
-
-
-  
-  uint N;
+  MeasurableArray measurables;
+  SimConfig conf;
 //You are supposed to be in charge of the positions and forces, and initialize them before giving them to Integrator and Interactor.
-  Vector<float4> pos, force, D, K;
+  Vector4 pos, force, D, K;
+
+  uint step;
 public:
   //The constructor configures and initializes the simulation
-  Driver(uint N, float L, float rcut, float dt);
+  Driver(SimConfig conf);
   //Move 1 dt forward in time
   void update();
 
   //Write the current positions to disk, concurrently if block is false or not given
   void write(bool block = false);
-  //Read an initial configuratio nfrom fileName, TODO
+  //Read an initial configuration from fileName, TODO
   void read(const char *fileName);
 
 };

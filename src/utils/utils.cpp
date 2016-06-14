@@ -1,5 +1,5 @@
 #include"utils.h"
-
+#include<stdlib.h>
 //Took from Fluam, adapted to use float4
 void cubicLattice(float4 *pos, float L, uint N){
     float dx, dy, dz;
@@ -52,4 +52,44 @@ void cubicLattice2D(float4 *pos, float L, uint N){
 	  pos[(n-1)].z =  -L/4.0f;
 	}
 
+}
+
+#define RANDESP (rand()/(float)RAND_MAX)
+#define RANDL2 (RANDESP-0.5f)
+
+bool randInitial(float4 *pos, float L, uint N){
+  srand(time(NULL));
+  pos[0] = make_float4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0f);
+  float4 tempos, rij;
+  bool accepted = true;
+  int trials = 0;
+  float r2;
+  fori(1,N){
+    tempos = make_float4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0f);
+    forj(0,i+1){
+      rij = tempos-pos[j];
+      rij -= floorf(rij/L+0.5f)*L; 
+      r2 = dot(rij, rij);
+      if(r2<1.0f){
+	accepted = false;
+	break;
+      }
+    }
+    if(!accepted){
+      i--;
+      trials++;
+      accepted = true;
+    }
+    else{
+      pos[i] = tempos;
+      trials = 0;
+    }
+    if(trials > N*1000){
+      return false;
+    }
+
+  }
+
+
+  return true;
 }

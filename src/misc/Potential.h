@@ -25,15 +25,20 @@ using std::ofstream;
 class Potential{
 public:
   Potential(){};
-  Potential(std::function<float(float)> foo, int N, float rc);
+  Potential(std::function<float(float)> Ffoo,
+	    std::function<float(float)> Efoo,
+	    int N, float rc);
   size_t getSize(){ return N*sizeof(float);}
-  float *getData(){ return F.data();}
+  float *getForceData(){ return F.data();}
+  float *getEnergyData(){ return F.data();}
   void print();
 private:
 
   vector<float> F;
+  vector<float> E;
   uint N;
   std::function<float(float)> forceFun;
+  std::function<float(float)> energyFun;
 };
 
 

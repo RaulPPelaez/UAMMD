@@ -10,9 +10,6 @@
   Solves the following differential equation:
       X[t+dt] = X[t] +v[t]·dt+0.5·a[t]·dt^2
       v[t+dt] = v[t] +0.5·(a[t]+a[t+dt])·dt
-
-TODO:
-100- The initial velocities should be related with a temperature
 */
 #ifndef TWOSTEPVELVERLETINTEGRATOR_H
 #define TWOSTEPVELVERLETINTEGRATOR_H
@@ -23,12 +20,15 @@ TODO:
 
 class TwoStepVelVerlet: public Integrator{
 public:
-  TwoStepVelVerlet(shared_ptr<Vector<float4>> pos,
-		   shared_ptr<Vector<float4>> force, uint N, float L, float dt);
+  TwoStepVelVerlet(Vector4Ptr pos,
+		   Vector4Ptr force, uint N, float L, float dt, float T);
   ~TwoStepVelVerlet();
 
   void update() override;
+  //Returns the kinetic energy
+  float sumEnergy() override;
 
+  void write(bool block);
 private:
   //The only additional information to store is the velocity
   Vector<float3> vel;

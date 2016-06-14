@@ -52,6 +52,8 @@ public:
   ~BondedForces();
 
   void sumForce() override;
+  float sumEnergy() override;
+  float sumVirial() override;
 private:
   void init();
   

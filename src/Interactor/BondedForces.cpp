@@ -13,6 +13,7 @@
 
 TODO:
 100- Finish the vector input of the bonds
+100- Write sumEnergy
 */
 
 #include"BondedForces.h"
@@ -57,7 +58,7 @@ BondedForces::BondedForces(uint N, float L,
 
 BondedForces::~BondedForces(){}
 
-//Crierion to sort bonds
+//Criterion to sort bonds
 bool bondComp(const Bond &a, const Bond &b){ return a.i<b.i;}
 
 //Initialize variables and upload them to GPU, init CUDA
@@ -118,4 +119,11 @@ void BondedForces::init(){
 /*Perform an integration step*/
 void BondedForces::sumForce(){
   computeBondedForce(force->d_m, d_pos->d_m, bondStart, bondEnd, bondList, N, nbonds);
+}
+
+float BondedForces::sumEnergy(){
+  return 0.0f;
+}
+float BondedForces::sumVirial(){
+  return 0.0f;
 }

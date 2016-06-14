@@ -6,10 +6,11 @@ Raul P. Pelaez 2016
 A CUDA Molecular Dynamics code made into modules for expandability and generality.
 It is coded into separated modules, with a Driver that can hold many modules in order to construct a simulation. For example, Driver could have a velocityVerlet module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
 
-There are two types of modules:
+There are three types of modules:
 
       1. Integrators
       2. Interactors
+	  3. Measurables
 
 **Interactors**
 
@@ -20,6 +21,11 @@ For example, an Interactor could compute the pair Lennard Jonnes forces between 
 
 An Integrator is an entity that has the ability of moving the particle positions to the next time step. 
 In order to do so it can hold any number of Interactors and use them to compute the forces at any time.
+
+**Measurables**
+
+A Measurable is any computation that has to be performed between steps of the simulation, it can be any magnitud that is calculated from the simulation state (positions, forces..).
+A measurable can compute the energy, the radial function distribution or any arbitrary computation that does not change the simulation state.
 
 ----------------
 
@@ -43,6 +49,10 @@ Finally there is a Driver that puts them all together and controls the flow of t
 	2.Euler Maruyama Brownian dynamics
 	3.Euler Maruyama Brownian dynamics with hydrodynamic interactions via Rotne Prager (WIP)
 
+**Measurables**
+	
+	1.Energy Measurable. Computes the total, potential and kinetic energy and the virial pressure of the system
+
 ##USAGE
 
 -------------------
@@ -51,8 +61,6 @@ The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only
 The Makefile expects to find cub in /usr/local/cub, but you can change it. CUB doesnt need to be compiled.
 
 Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver.cpp, set number of particles, size of the box, dt and time of the simulation in main.cpp.
-
-The particles will start in a cubic lattice unless an initial configuration is readed using psystem->write(fileName);
 
 Then compile with make and run
 
@@ -78,9 +86,10 @@ This code makes use of the following CUDA packages:
 
 --------------------
 Needs an NVIDIA GPU with compute capability sm_2.0+
+Needs g++ with full C++11 support, 4.8+ recommended
 
 ##TESTED ON
 
 ------------
-	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5
-     - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5
+	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5 and g++ 4.8
+     - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5 and g++ 5.3.1

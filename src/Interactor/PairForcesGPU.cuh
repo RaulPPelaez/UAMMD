@@ -23,9 +23,10 @@ struct PairForcesParams{
   float L, invL, rcut, invrc2;
 };
 
-void initPairForcesGPU(PairForcesParams m_params, float *potDevPtr, size_t potSize,
-	     uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
-	     float4 *sortPos, uint N);
+void initPairForcesGPU(PairForcesParams m_params,
+		       float *potForceData, float *potEnergyData, size_t potSize,
+		       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
+		       float4 *sortPos, uint N);
 
 
 void calcCellIndex(float4 *pos, uint *cellIndex, uint *particleIndex, uint N);
@@ -41,6 +42,15 @@ void computePairForce(float4 *sortPos, float4 *force,
 		      uint *cellStart, uint *cellEnd,
 		      uint *particleIndex, 
 		      uint N);
+
+float computePairEnergy(float4 *sortPos, float *energy,		  
+			uint *cellStart, uint *cellEnd,
+			uint *particleIndex, 
+			uint N);
+float computePairVirial(float4 *sortPos, float *virial,		  
+			uint *cellStart, uint *cellEnd,
+			uint *particleIndex, 
+			uint N);
 
 
 #endif

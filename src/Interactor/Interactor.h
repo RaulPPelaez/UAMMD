@@ -9,9 +9,6 @@
 
  Currently Implemented interactors:
    1. Pair short range Forces using neighbour lists for an arbitrary potential
-
-TODO:
-100- Create virtual function sumEnergy
  */
 
 #ifndef INTERACTOR_H
@@ -28,16 +25,19 @@ public:
   ~Interactor();
 
   virtual void sumForce() = 0;
+  virtual float sumEnergy() = 0;
+  virtual float sumVirial() = 0;
 
-  shared_ptr<Vector<float4>> getForce(){return force;}
+  Vector4Ptr getForce(){return force;}
 
 protected:
   Interactor(uint N, float L, 
-	     shared_ptr<Vector<float4>> d_pos,
-	     shared_ptr<Vector<float4>> force);
+	     Vector4Ptr d_pos,
+	     Vector4Ptr force);
   
-  shared_ptr<Vector<float4>> d_pos, force;
+  Vector4Ptr d_pos, force;
   uint N;
   float L;
 };
+typedef vector<shared_ptr<Interactor>> InteractorArray;
 #endif

@@ -37,7 +37,7 @@ public:
   ~BrownianEulerMaruyama();
 
   void update() override;
-
+  float sumEnergy() override;
 private:
   Vector<float3> noise;
   curandGenerator_t rng;

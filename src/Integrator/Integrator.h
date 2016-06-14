@@ -16,7 +16,6 @@
 
   TODO:
     90- Implement new integrators
-    80- Create measurables to keep track of things, like energy or gdr
 */
 
 
@@ -36,11 +35,16 @@ public:
   //This function forwards the simulation one dt in time, must be overrided in each new implementation!
   virtual void update() = 0;
 
-  void write(bool block = false);
+  //this function returns any contribution to the system energy the integrator provides, such as the kinecit energy in MD
+  virtual float sumEnergy() = 0;
+  virtual void write(bool block = false);
   
   //The interactors can be called at any time from the integrator to compute the forces when needed.
   void addInteractor(shared_ptr<Interactor> an_interactor){
     interactors.push_back(an_interactor);
+  }
+  vector<shared_ptr<Interactor>> getInteractors(){
+    return interactors;
   }
 protected:
   //Constructor to be called in the initialization list of the derived class

@@ -5,6 +5,8 @@
 -A timer class
 -A Xorshift 128+ random number generator
 
+-Several typedefs, defines and cast overloads to make things easier to read
+
  */
 #ifndef UTILS_H
 #define UTILS_H
@@ -17,11 +19,13 @@
 #include"helper_math.h"
 #include<iostream>
 #include<sys/time.h>
+#include<memory>
+
 using namespace std;
 typedef uint32_t uint;
+
 #define fori(x,y) for(int i=x; i<y; i++)
 #define forj(x,y) for(int j=x; j<y; j++)
-
 
 template<class T>
 class Vector{
@@ -40,7 +44,7 @@ public:
     //Allocate device memory
     gpuErrchk(cudaMalloc(&d_m, n*sizeof(T)));
   }
-  void fill_with(T x){std::fill(data, data+n, x); }
+  void fill_with(T x){std::fill(data, data+n, (T)x); }
   //Upload/Download from the GPU, ultra fast if is pinned memory
   inline void upload(){   gpuErrchk(cudaMemcpy(d_m, data, n*sizeof(T), cudaMemcpyHostToDevice)); }
   inline void download(){ gpuErrchk(cudaMemcpy(data, d_m, n*sizeof(T), cudaMemcpyDeviceToHost)); }
@@ -67,7 +71,13 @@ public:
   //Cast to float* returns the device pointer!
   operator T *&() {return d_m;}
   operator T *() const{return d_m;}
+  operator shared_ptr<Vector<T>>() {return make_shared<Vector<float4>>(*this);}
 };
+
+typedef Vector<float4> Vector4;
+typedef Vector<float3> Vector3;
+#define Vector4Ptr shared_ptr<Vector4> 
+#define Vector3Ptr shared_ptr<Vector3> 
 
 template<class T>
 class Matrix: public Vector<T>{
@@ -134,4 +144,7 @@ public:
 //This function treats pos a s a float4 and puts the particles in a cubic lattice
 void cubicLattice(float4 *pos, float L, uint N);
 void cubicLattice2D(float4 *pos, float L, uint N);
+
+bool randInitial(float4 *pos, float L, uint N);
+
 #endif

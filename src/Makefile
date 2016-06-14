@@ -17,11 +17,15 @@ LDLIBS= -lcuda -lcudart -lpthread -lcurand
 
 OBJS_INTERACTOR= Interactor.o PairForces.o BondedForces.o
 OBJS_INTEGRATOR= Integrator.o TwoStepVelVerlet.o BrownianEulerMaruyama.o
+OBJS_MEASURABLE= Measurable.o EnergyMeasure.o
+
 
 CUOBJS_INTERACTOR= PairForcesGPU.o  BondedForcesGPU.o 
 CUOBJS_INTEGRATOR= TwoStepVelVerletGPU.o BrownianEulerMaruyamaGPU.o
 
-OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))  utils/utils.o misc/Potential.o Driver/Driver.o
+OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))
+OBJS += $(addprefix Measurable/, $(OBJS_MEASURABLE))
+OBJS += utils/utils.o misc/Potential.o Driver/Driver.o
 
 CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR))
 

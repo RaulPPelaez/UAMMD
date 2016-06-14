@@ -116,3 +116,7 @@ void BrownianEulerMaruyama::update(){
   integrateBrownianEulerMaruyamaGPU(pos->d_m, noise, force->d_m, dt, N);
 
 }
+
+float BrownianEulerMaruyama::sumEnergy(){
+  return 0.0f;
+}

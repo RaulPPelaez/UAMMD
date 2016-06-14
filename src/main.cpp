@@ -24,7 +24,7 @@ N = 2^20
 L = 128
 dt = 0.001f
 PairForces with rcut = 2.5 and no energy measure
-TwoStepVelverlet, no writing to disk
+TwoStepVelverlet, no writing to disk, Tini = 0.03
 Starting in a cubicLattice
 ---------------------HIGHSCORE-----------------------
 Number of cells: 51 51 51; Total cells: 132651
@@ -41,30 +41,39 @@ sys	0m25.972s
 ---------------------------------------------------
 TODO:
 100- Read and construct simulation configuration from script
-
+100- There is a bug in the write function, you cannot call it with true before the start
 */
 #include<iomanip>
 #include"Driver/Driver.h"
 
-int main(){
+int main(int argc, char *argv[]){
 
   Timer tim;
-  uint N = 324;//pow(2,20);
   tim.tic();
-  Driver psystem(N, 30, 2.5f, 0.001f);
+   
+  SimConfig config; //Config is a struct in Driver.h, containing things like N and dt.
 
+  //  float dens =stod(argv[1], NULL);
+  config.T = 1.03f;//stod(argv[2], NULL);
+  config.N = pow(2,20);
+  config.L = 128;
+  
+  Driver psystem(config);
+
+  //psystem.write(true);
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;  
   int nsteps = 10000;
-
-  tim.tic();
+    tim.tic();  
   fori(0,nsteps){
-    psystem.update(); //Prints timing information
-    if(i%10==0) psystem.write(); //Writing is done in parallel, is practically free if the interval is big enough
+    psystem.update();
+    if(i%1000==0) psystem.write(); //Writing is done in parallel, is practically free if the interval is big enough
   }
   float total_time = tim.toc();
   cerr<<"\nMean step time: "<<setprecision(5)<<(float)nsteps/total_time<<" FPS"<<endl;
   cerr<<"\nTotal time: "<<setprecision(5)<<total_time<<"s"<<endl;
   psystem.write(true);
+  
+  cudaDeviceSynchronize();
   cudaDeviceReset();
   return 0;
 }

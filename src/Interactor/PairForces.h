@@ -16,7 +16,6 @@ TODO:
 100- Colors, this almost done, color can simply be encoded in pos.w, and additional parameters are needed in force fucntions/textures
 90- Non cubic boxes, almost done, just be carefull in the constructor and use vector types.
 100- PairForces should be a singleton or multiple PairForces should be possible somehow
-
  */
 
 #ifndef PAIRFORCES_H
@@ -35,6 +34,7 @@ TODO:
 enum pairForceType{LJ,NONE,CUSTOM};
 
 float forceLJ(float r2);
+float energyLJ(float r2);
 float nullForce(float r2);
 
 
@@ -43,15 +43,24 @@ public:
   PairForces(uint N, float L, float rcut,
 	     shared_ptr<Vector<float4>> d_pos,
 	     shared_ptr<Vector<float4>> force,
-	     pairForceType fs=LJ,
-	     std::function<float(float)> customForceFunction = nullForce);
+	     pairForceType fs = LJ);
+  PairForces(uint N, float L, float rcut,
+	     shared_ptr<Vector<float4>> d_pos,
+	     shared_ptr<Vector<float4>> force,
+	     pairForceType fs,
+	     std::function<float(float)> customForceFunction,
+  	     std::function<float(float)> customEnergyFunction);
   ~PairForces();
 
   void sumForce() override;
+  float sumEnergy() override;
+  float sumVirial() override;
+  
 private:
-  Vector<float4> sortPos;
+  Vector4 sortPos;
+  Vector<float> energyArray, virialArray;
   void init();
-
+  void makeNeighbourList();
   uint ncells;
   Vector<uint> cellIndex, particleIndex; 
   Vector<uint> cellStart, cellEnd;
@@ -64,5 +73,6 @@ private:
 
   Potential pot;
   std::function<float(float)> customForceFunction;
+  std::function<float(float)> customEnergyFunction;
 };
 #endif

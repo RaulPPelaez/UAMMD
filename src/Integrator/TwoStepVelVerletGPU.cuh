@@ -8,4 +8,7 @@
 
 void integrateTwoStepVelVerletGPU(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step, bool dump=false);
 
+
+float computeKineticEnergyTwoStepVelVerlet(float3 *vel, uint N);
+
 #endif
