@@ -31,7 +31,7 @@ public:
   void write(bool block);
 private:
   //The only additional information to store is the velocity
-  Vector<float3> vel;
+  Vector3 vel;
 };
 
 

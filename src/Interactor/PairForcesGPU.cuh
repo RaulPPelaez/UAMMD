@@ -21,6 +21,7 @@ struct PairForcesParams{
   int ncells;
   int ycells, xcells, zcells;  
   float L, invL, rcut, invrc2;
+  float getCellFactor;
 };
 
 void initPairForcesGPU(PairForcesParams m_params,

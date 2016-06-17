@@ -9,6 +9,9 @@
   particle pairs. 
   The Neighbour search is implemented using hash short with cell index as hash.
 
+TODO:
+100- Generalize for any dimensions
+
 */
 #include"PairForces.h"
 #include<thread>

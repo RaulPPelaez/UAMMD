@@ -10,31 +10,34 @@
   Solves the following differential equation:
       X[t+dt] = X[t] +v[t]·dt+0.5·a[t]·dt^2
       v[t+dt] = v[t] +0.5·(a[t]+a[t+dt])·dt
-
+TODO:
+100- Allow velocities from outside
 */
 #include "TwoStepVelVerlet.h"
 
 
 TwoStepVelVerlet::TwoStepVelVerlet(shared_ptr<Vector<float4>> pos,
-				   shared_ptr<Vector<float4>> force, uint N, float L, float dt, float T):
+				   shared_ptr<Vector<float4>> force,
+				   uint N, float L, float dt, float T):
   vel(N),
   Integrator(pos, force, N, L, dt){
 
   float vamp = sqrt(3.0f*T);
   /*Create velocities*/
   vel.fill_with(make_float3(0.0f));
-   fori(0,N){ 
+   fori(0,N){
      vel[i].x = vamp*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
      vel[i].y = vamp*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
      vel[i].z = vamp*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
    }
   vel.upload();
-  for(auto forceComp: interactors) forceComp->sumForce();
 }
+
 TwoStepVelVerlet::~TwoStepVelVerlet(){}
 
 //The integration process can have two steps
 void TwoStepVelVerlet::update(){
+  if(steps==0)   for(auto forceComp: interactors) forceComp->sumForce();
   
   steps++;
   if(steps%1000==0) cerr<<"\rComputing step: "<<steps<<"   ";
@@ -46,16 +49,6 @@ void TwoStepVelVerlet::update(){
 
   /**Second integration step**/
   integrateTwoStepVelVerletGPU(pos->d_m, vel, force->d_m, dt, N, 2);//, steps%10 ==0 && steps<10000 && steps>1000);
-
-  // if(steps%1000==0){
-  //   vel.download();
-  //   float v2t = 0.0f;
-  //   fori(0,N){
-  //     v2t += dot(vel[i],vel[i]);
-  //   }
-  //   cerr<<v2t/(3.0f*N)<<endl;
-
-  // }
 }
 
 
@@ -65,16 +58,4 @@ float TwoStepVelVerlet::sumEnergy(){
 
 void TwoStepVelVerlet::write(bool block){
   Integrator::write(block);
-
-  // static ofstream out("mom.dat");
-  // static ofstream out2("vel.dat");  
-  // vel.download();
-  // float3 Ptot = make_float3(0.0f);
-  // fori(0,N){
-  //   Ptot += vel[i];
-  //   out2<<vel[i].x<<" "<<vel[i].y<<" "<<vel[i].z<<"\n";
-  // }
-  // // out<<endl;
-  // Ptot/=N;
-  // out<<Ptot.x<<" "<<Ptot.y<<" "<<Ptot.z<<endl;
 }

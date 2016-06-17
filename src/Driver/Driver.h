@@ -35,11 +35,12 @@ TODO:
 #include<memory>
 
 struct SimConfig{
-
+  /*Default parameters*/
   uint N = 16384;
   float L = 32, rcut = 2.5f;
   float dt = 0.001f;
   uint print_every = 1000;
+  uint relaxation_steps = 10000;
   float T = 1.0f;
 };
 

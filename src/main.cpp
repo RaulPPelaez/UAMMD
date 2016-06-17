@@ -29,15 +29,15 @@ Starting in a cubicLattice
 ---------------------HIGHSCORE-----------------------
 Number of cells: 51 51 51; Total cells: 132651
 Initializing...	DONE!!
-Initialization time: 0.16063s
+Initialization time: 0.15172s
 Computing step: 10000   
-Mean step time: 123.1 FPS
+Mean step time: 127.33 FPS
 
-Total time: 81.233s
+Total time: 78.535s
 
-real	1m21.763s
-user	0m55.792s
-sys	0m25.972s
+real	1m19.039s
+user	0m53.772s
+sys	0m25.212s
 ---------------------------------------------------
 TODO:
 100- Read and construct simulation configuration from script
@@ -53,20 +53,21 @@ int main(int argc, char *argv[]){
    
   SimConfig config; //Config is a struct in Driver.h, containing things like N and dt.
 
-  //  float dens =stod(argv[1], NULL);
-  config.T = 1.03f;//stod(argv[2], NULL);
-  config.N = pow(2,20);
-  config.L = 128;
-  
+  //float dens = stod(argv[1], NULL);
+  config.T = 0.001f;//stod(argv[2], NULL);
+  config.L = 32;
+  //  float L = config.L;
+  config.N = pow(2,14.7);
+  config.dt = 0.001f;
   Driver psystem(config);
 
   //psystem.write(true);
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;  
-  int nsteps = 10000;
+  int nsteps = 80000;
     tim.tic();  
   fori(0,nsteps){
     psystem.update();
-    if(i%1000==0) psystem.write(); //Writing is done in parallel, is practically free if the interval is big enough
+    if(i%500==0) psystem.write(); //Writing is done in parallel, is practically free if the interval is big enough
   }
   float total_time = tim.toc();
   cerr<<"\nMean step time: "<<setprecision(5)<<(float)nsteps/total_time<<" FPS"<<endl;

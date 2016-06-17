@@ -41,7 +41,7 @@ c     &       coef_adia,cs,eta,thc,bulkv,sa)
 c      lrc = true => se inluyen correciones de largo alcanze a p y u
       ssr3=(sigma/rcutfluid)**3
       plrc=32.*pi*dens**2*(ssr3**3-1.5*ssr3)/9.0
-      ulrc=8.*pi*dens**2*(ssr3**3-3*ssr3)/9.0
+      ulrc=8.*pi*dens*(ssr3**3-3*ssr3)/9.0
       
 
 
@@ -163,7 +163,7 @@ c   calculate  internal energy=u, pressure = p
       u=u-ulrc
       p=p-plrc
       end if
-
+      u = u+1.5*t
 
 
       return

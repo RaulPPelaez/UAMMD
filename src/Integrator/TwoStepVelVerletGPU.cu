@@ -2,10 +2,8 @@
 
   Functions to integrate movement. The integration is done via a functor wich creator
      takes a thrust::Tuple containing positions, velocities and forces on each particle. 
-
 TODO:
-100- Sum the energy in force.w only, not all the other 3 components.
-
+100- K sum could be done better with some thrust magic
 */
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"

@@ -49,7 +49,7 @@ void cubicLattice2D(float4 *pos, float L, uint N){
 	  n = n + 1;
 	  pos[(n-1)].x = (k + 0.5f) * dx - L/2.0f;
 	  pos[(n-1)].y = (j + 0.5f) * dy - L/2.0f;
-	  pos[(n-1)].z =  -L/4.0f;
+	  pos[(n-1)].z =  0.0f;
 	}
 
 }

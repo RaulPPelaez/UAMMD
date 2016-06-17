@@ -12,12 +12,8 @@ TODO:
      neighbour cells
 90- Add support for particle types, encode in pos.w
 90- Make energy measure custom for each potential, currently only LJ, hardcoded.
-70- Try multiple particles per thread
-60- Virial and energy might be in a float2 array, and be reduced only once
 50- Try bindless textures again.
-50- Try several particles per thread
 40- pbc_cells could be done better, this could improve force compute
-40- getCell could be done better, this could improve force compute
 10- There is no need to reconstruct the neighbour list from scratch each step,
   although computing the force is 50 times as expensive as this right now.
 */
@@ -63,7 +59,8 @@ void initPairForcesGPU(PairForcesParams m_pairForcesParamsGPU,
   m_pairForcesParamsGPU.invrc2 = 1.0f/(m_pairForcesParamsGPU.rcut*m_pairForcesParamsGPU.rcut);
   m_pairForcesParamsGPU.invL = 1.0f/m_pairForcesParamsGPU.L;
   m_pairForcesParamsGPU.invCellSize = 1.0f/m_pairForcesParamsGPU.cellSize;
-
+  m_pairForcesParamsGPU.getCellFactor = 0.5f*m_pairForcesParamsGPU.L*m_pairForcesParamsGPU.invCellSize;
+  
   /*Texture bindings, these ones are accessed by element*/ 
   gpuErrchk(cudaBindTexture(NULL, texCellStart, cellStart, ncells*sizeof(uint)));
   gpuErrchk(cudaBindTexture(NULL, texCellEnd,   cellEnd,   ncells*sizeof(uint)));
@@ -118,11 +115,13 @@ inline __device__ void apply_pbc(float4 &r){
 //Get the 3D cell p is in, just pos in [0,L] divided by ncells(vector) .INT DANGER.
 inline __device__ int3 getCell(float3 p){
   apply_pbc(p); //Reduce to MIC
-  return make_int3( (p+0.5f*pairForcesParamsGPU.L)*pairForcesParamsGPU.invCellSize ); 
+  // return  int( (p+0.5L)/cellSize )
+  return make_int3( p*pairForcesParamsGPU.invCellSize + pairForcesParamsGPU.getCellFactor ); 
 }
 inline __device__ int3 getCell(float4 p){
   apply_pbc(p); //Reduce to MIC
-  return make_int3( (p+0.5f*pairForcesParamsGPU.L)*pairForcesParamsGPU.invCellSize ); 
+  // return  int( (p+0.5L)/cellSize )
+  return make_int3( p*pairForcesParamsGPU.invCellSize + pairForcesParamsGPU.getCellFactor ); 
 }
 
 //Apply pbc to a cell coordinates
@@ -287,9 +286,9 @@ inline __device__ float4 forceij(const float4 &R1,const float4 &R2){
   float r2 = dot(r12,r12);
   float r2c = r2*pairForcesParamsGPU.invrc2;
   /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
-  if(r2c==0.0f) return make_float4(0.0f);
+  //  if(r2c==0.0f) return make_float4(0.0f);  //Both cases handled in texForce
   /*Beyond rcut..*/
-  else if(r2c>=1.0f) return make_float4(0.0f);
+  //else if(r2c>=1.0f) return make_float4(0.0f);
   /*Get the force from the texture*/
   float fmod = tex1D(texForce, r2c);
    // float invr2 = 1.0f/r2;
@@ -309,17 +308,18 @@ __device__ float4 forceCell(const int3 &cell, const uint &index,
 
   float4 force = make_float4(0.0f);
   float4 posj;
-  /*If there are particles in this cell...*/
-  if(firstParticle != 0xffffffff){ //This produces branch diverengency
-    /*Index of the last particle in the cell's list*/
-    uint lastParticle = tex1Dfetch(texCellEnd, icell);
-    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/ 
-    for(uint j=firstParticle; j<lastParticle; j++){
-	/*Retrieve j pos*/
-	posj = tex1Dfetch(texSortPos, j);
-	/*Add force */
-	force += forceij(pos, posj);
-    }
+
+  /*Index of the last particle in the cell's list*/
+  uint lastParticle = tex1Dfetch(texCellEnd, icell);
+  /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
+  /*If there are no particles in the cell, firstParticle=0xffffffff, the loop is not computed*/
+  /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking
+    firstParticle before fetching*/
+  for(uint j=firstParticle; j<lastParticle; j++){
+    /*Retrieve j pos*/
+    posj = tex1Dfetch(texSortPos, j);
+    /*Add force, i==j is handled in forceij */
+    force += forceij(pos, posj);
   }
    
   return force;
@@ -331,30 +331,31 @@ __global__ void computeForceD(float4* __restrict__ newForce,
 			      const uint* __restrict__ particleIndex, 
 			      uint N){
   /*Travel the particles per sort order*/
-  uint index =  blockIdx.x*blockDim.x + threadIdx.x;
-  if(index>=N) return;
+  uint ii =  blockIdx.x*blockDim.x + threadIdx.x;
   
-  /*Compute force acting on particle particleIndex[index], index in the new order*/
-  float4 pos = tex1Dfetch(texSortPos, index);
+  //Grid-strid loop
+  for(int index = ii; index<N; index += blockDim.x * gridDim.x){
+    /*Compute force acting on particle particleIndex[index], index in the new order*/
+    float4 pos = tex1Dfetch(texSortPos, index);
   
-  float4 force = make_float4(0.0f);
-  int3 celli = getCell(pos);
+    float4 force = make_float4(0.0f);
+    int3 celli = getCell(pos);
 
-  int x,y,z;
-  int3 cellj;
-  /**Go through all neighbour cells**/
-  //For some reason unroll doesnt help here
-  for(z=-1; z<=1; z++)
-    for(y=-1; y<=1; y++)
-      for(x=-1; x<=1; x++){
-	cellj = celli+make_int3(x,y,z);
-	pbc_cell(cellj);	
-	force += forceCell(cellj, index, pos);
-      }
-
-  /*Write force with the original order*/
-  uint pi = tex1Dfetch(texParticleIndex, index); 
-  newForce[pi] += force;
+    int x,y,z;
+    int3 cellj;
+    /**Go through all neighbour cells**/
+    //For some reason unroll doesnt help here
+    for(z=-1; z<=1; z++)
+      for(y=-1; y<=1; y++)
+	for(x=-1; x<=1; x++){
+	  cellj = celli+make_int3(x,y,z);
+	  pbc_cell(cellj);	
+	  force += forceCell(cellj, index, pos);
+	}
+    /*Write force with the original order*/
+    uint pi = tex1Dfetch(texParticleIndex, index); 
+    newForce[pi] += force;
+   }
 }
 __global__ void computeForceDnaive(float4* __restrict__ newForce,
 				   const uint* __restrict__ particleIndex, 
@@ -377,16 +378,14 @@ __global__ void computeForceDnaive(float4* __restrict__ newForce,
   newForce[pi] += force;
 }
 
-
-
 //CPU kernel caller
 void computePairForce(float4 *sortPos, float4 *force,
 		  uint *cellStart, uint *cellEnd,
 		  uint *particleIndex, 
 		  uint N){
   computeForceD<<<GPU_Nblocks, GPU_Nthreads>>>(force,
-					       particleIndex,
-					       N);
+				particleIndex,
+				N);
   //cudaCheckErrors("computeForce");
 }
 
@@ -411,7 +410,7 @@ inline __device__ float energyij(const float4 &R1,const float4 &R2){
   //float r2c = r2*pairForcesParamsGPU.invrc2;
   /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
   if(r2==0.0f) return 0.0f;
-  //  else if(r2c>=1.0f) return 0.0f;
+  else if(r2*pairForcesParamsGPU.invrc2>=1.0f) return 0.0f;
   float invr2 = 1.0f/r2;
   float invr6 = invr2*invr2*invr2;
   float E =  2.0f*invr6*(invr6-1.0f);
@@ -428,19 +427,12 @@ __device__ float energyCell(const int3 &cell, const uint &index,
 
   float energy = 0.0f;
   float4 posj;
-  /*If there are particles in this cell...*/
-  if(firstParticle != 0xffffffff){ //This produces branch diverengency
-    /*Index of the last particle in the cell's list*/
-    uint lastParticle = tex1Dfetch(texCellEnd, icell);
-    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/ 
-    for(uint j=firstParticle; j<lastParticle; j++){
-	/*Retrieve j pos*/
-	posj = tex1Dfetch(texSortPos, j);
-	/*Add force */
-	energy += energyij(pos, posj);
-    }
+  /*Exact copy of forceCell*/
+  uint lastParticle = tex1Dfetch(texCellEnd, icell);
+  for(uint j=firstParticle; j<lastParticle; j++){
+    posj = tex1Dfetch(texSortPos, j);
+    energy += energyij(pos, posj);
   }
-   
   return energy;
 }
 
@@ -530,10 +522,9 @@ inline __device__ float virialij(const float4 &R1,const float4 &R2){
   /*Squared distance between 0 and 1*/
   float r2 = dot(r12,r12);
   float r2c = r2*pairForcesParamsGPU.invrc2;
-  /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
-  if(r2c==0.0f) return 0.0f;
+  //if(r2c==0.0f) return 0.0f; //No need to check i==j, tex1D(texForce, 0.0) = 0.0
   /*Beyond rcut..*/
-  else if(r2c>=1.0f) return 0.0f;
+  //if(r2c>=1.0f) return 0.0f; //Also 0 in texForce
   /*Get the force from the texture*/
   float fmod = tex1D(texForce, r2c);
   // P = rhoKT + (1/2dV)sum_ij( Fij·rij )
@@ -551,18 +542,13 @@ __device__ float virialCell(const int3 &cell, const uint &index,
 
   float virial = 0.0f;
   float4 posj;
-  /*If there are particles in this cell...*/
-  if(firstParticle != 0xffffffff){ //This produces branch diverengency
-    /*Index of the last particle in the cell's list*/
-    uint lastParticle = tex1Dfetch(texCellEnd, icell);
-    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/ 
-    for(uint j=firstParticle; j<lastParticle; j++){
-	/*Retrieve j pos*/
-	posj = tex1Dfetch(texSortPos, j);
-	/*Add force */
-	virial += virialij(pos, posj);
+
+  /*Exact copy of forceCell*/
+  uint lastParticle = tex1Dfetch(texCellEnd, icell);
+  for(uint j=firstParticle; j<lastParticle; j++){
+    posj = tex1Dfetch(texSortPos, j);
+    virial += virialij(pos, posj);
     }
-  }
    
   return virial;
 }
@@ -632,7 +618,7 @@ float computePairVirial(float4 *sortPos, float *virial,
   device_ptr<float> d_vir(virial);
   float sum;
   sum = thrust::reduce(d_vir, d_vir+N, 0.0f);
-  return (sum/(float)N);
+  return (sum/2.0f);
 
   //cudaCheckErrors("computeForce");
 }

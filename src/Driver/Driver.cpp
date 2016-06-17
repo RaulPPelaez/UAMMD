@@ -17,6 +17,7 @@ The idea is for Integrator to control the positions and velocities and for Inter
 
 #include "Driver.h"
 #include "Interactor/BondedForces.h"
+#include "Interactor/NBodyForces.h"
 #define RANDESP (rand()/(float)RAND_MAX)
 
 //#define BROWNIAN_EXAMPLE
@@ -33,7 +34,7 @@ Driver::Driver(SimConfig conf): conf(conf), step(0){
   pos.fill_with(make_float4(0.0f));
   /*Start in a cubic lattice*/
   cubicLattice(pos.data, L, N);
-
+  
  // if(!randInitial(pos.data, L, N)){
  //   cerr<<"Too many particles!"<<endl;
  //   exit(1);
@@ -55,7 +56,7 @@ Driver::Driver(SimConfig conf): conf(conf), step(0){
   force = Vector4(N); force.fill_with(make_float4(0.0f)); force.upload();
 
   /*Here there are two examples of simulation constructions, toggle them with the BROWNIAN DEFINE
-    First one with particles interacting via LJ pot and qith some of them joined by springs.
+    First one with particles interacting via LJ pot.
     The integrator is a two step vel verlet. */
   #ifndef BROWNIAN_EXAMPLE
   /****Initialize the modules*******/
@@ -64,26 +65,23 @@ Driver::Driver(SimConfig conf): conf(conf), step(0){
   /*Interactor needs the positions, the forces and any additional parameter
     particular to the interactor. In the case of PairForces, LJ is an enum for the force type,
    if set to CUSTOM, the next parameter is the name of a force function float(float r2)*/
-  auto interactor2 =  make_shared<PairForces>(N, L, rcut,
-					      pos,
-					      force, LJ);
+  auto interactor =  make_shared<PairForces>(N, L, rcut, pos, force, LJ);
+  
   /*In the case of BondedForces, only pos, force and the name
     of a file with the bond information is needed. Alternatively, 
     you can pass a vector<Bond> containing all the bonds*/
   
-  //auto interactor = make_shared<BondedForces>(N, L,
-  // 			      pos,
-  // 			      force, "p.bonds");
+  //auto interactor = make_shared<BondedForces>(N, L, pos, force, "p.bonds");
   
   /*Integrator needs the positions and forces addresses, N, L, dt and any additional
     parameter particular to the integrator. L must be passed even if the box is infinite, just pass 0 i.e.
-  /*Integrator is an abstract virtual base clase that has to be overloaded for each new integrator
+  /*Integrator is an abstract virtual base class that has to be overloaded for each new integrator
     . This mantains retrocompatibility, and allows for new integrators to be added without changes*/
   /*To use one or another, just instanciate them as in here. Using a two step velocity verlet integrator i.e.*/
   integrator = make_shared<TwoStepVelVerlet>(pos, force, N, L, dt, conf.T);
 
   /*You can add several interactors to an integrator as such*/
-  integrator->addInteractor(interactor2);
+  integrator->addInteractor(interactor);
   //integrator->addInteractor(interactor);
 
   /*A measurable is another type of module that computes some magnitude in the system. 
@@ -100,19 +98,9 @@ Driver::Driver(SimConfig conf): conf(conf), step(0){
 #ifdef BROWNIAN_EXAMPLE
   //set L=30 and N=324
   cubicLattice2D(pos.data, 20, 324);
-  // fori(0,N){
-  //   float x=1, y=1;
-  //   while(x*x+y*y > 1){
-  //     x = (RANDESP*2.0f-1.0f);
-  //     y = (RANDESP*2.0f-1.0f);
-  //   }
-  //   pos[i].x = x*L;
-  //   pos[i].y = y*L;
-  //   pos[i].z = 0.0f;
-  //  }
-
   pos.upload();
-  
+
+  /*Diffusion Matrix*/
   D = Vector4(4);
   D.fill_with(make_float4(0.0f));
   D[0].x = 1;
@@ -120,14 +108,13 @@ Driver::Driver(SimConfig conf): conf(conf), step(0){
   D[2].z = 1;
   D.upload();
   
-  
+  /*Shear Matrix*/
   K = Vector4(4);
   K.fill_with(make_float4(0.0f));
   K[0] = make_float4(0.0f, 1.0f, 0.0f, 0.0f);
   K.upload();
   
-  integrator = make_shared<BrownianEulerMaruyama>(pos, force, D, K,
-   						  N, L, dt);
+  integrator = make_shared<BrownianEulerMaruyama>(pos, force, D, K, N, L, dt);
 #endif  
   
   
@@ -137,7 +124,7 @@ Driver::Driver(SimConfig conf): conf(conf), step(0){
 void Driver::update(){
   step++;
   integrator->update();
-  if(step%conf.print_every==0)
+  if(step%conf.print_every==0 && step > conf.relaxation_steps)
     for(auto m: measurables)
       m->measure();
 }

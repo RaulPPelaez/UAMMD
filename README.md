@@ -42,6 +42,7 @@ Finally there is a Driver that puts them all together and controls the flow of t
 
 	1.Pair Forces: Implements hash (cell index) sort neighbour list construction algorithm to evaluate pair forces given some potential function, LJ i.e. Ultra fast
 	2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
+    3.NBody forces: All particles interact with every other via some potential. (WIP)
 	
 **Integrators:**
 

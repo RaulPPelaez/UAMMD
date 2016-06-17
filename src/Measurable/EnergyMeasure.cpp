@@ -37,16 +37,16 @@ void EnergyMeasure::measure(){
   U = 0.0f;
   P = 0.0f;
 
-  /*Compute kinetic energy*/
+  /*Compute kinetic energy per particle*/
   K = integrator->sumEnergy();
   
-  float T = K/3.0f; //Temperature
+  float T = 2.0f*K/3.0f; //Temperature
   
   for(auto i: interactors){
     U += i->sumEnergy(); //Compute potential energy
-    P += rho*T+i->sumVirial(); //Compute virial pressure
+    P += i->sumVirial(); //Compute virial pressure
   }
-    
+  P = rho*T-P;
 
   
   
