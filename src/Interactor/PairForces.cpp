@@ -22,24 +22,19 @@ TODO:
 #include<iomanip>
 using namespace std;
 
-PairForces::PairForces(uint N, float L, float rcut,
-		       shared_ptr<Vector<float4>> d_pos,
-		       shared_ptr<Vector<float4>> force,
-		       pairForceType fs):
-  PairForces(N, L, rcut, d_pos, force, fs, nullForce, nullForce){}
+PairForces::PairForces(pairForceType fs):
+  PairForces(fs, nullForce, nullForce){}
 
 
-PairForces::PairForces(uint N, float L, float rcut,
-		       shared_ptr<Vector<float4>> d_pos,
-		       shared_ptr<Vector<float4>> force,
-		       pairForceType fs,
+PairForces::PairForces(pairForceType fs,
 		       std::function<float(float)> cFFun,
 		       std::function<float(float)> cEFun):
   customForceFunction(cFFun), customEnergyFunction(cEFun),
-  rcut(rcut), forceSelector(fs),
-  Interactor(N, L, d_pos, force)
+  rcut(gcnf.rcut), forceSelector(fs),
+  Interactor()
 {
 
+  cerr<<"Initializing Pair Forces..."<<endl;
     /**Put parameters in Param struct**/
   params.rcut = rcut;
 
@@ -56,17 +51,17 @@ PairForces::PairForces(uint N, float L, float rcut,
 
   ncells = xcells*ycells*zcells;
   params.ncells = ncells;
-  cerr<<"Number of cells: "<<xcells<<" "<<ycells<<" "<<zcells<<"; Total cells: "<<ncells<<endl;
+  cerr<<"\tNumber of cells: "<<xcells<<" "<<ycells<<" "<<zcells<<"; Total cells: "<<ncells<<endl;
 
   init();
 
+  cerr<<"Pair Forces\t\tDONE!!\n\n";
 
 }
 
 PairForces::~PairForces(){}
 //Initialize variables and upload them to GPU, init CUDA
 void PairForces::init(){
-  cerr<<"Initializing...";
   
   /*Pre compute force and energy, using force  function*/
   switch(forceSelector){
@@ -101,7 +96,6 @@ void PairForces::init(){
 		    cellStart, cellEnd, particleIndex, ncells,
 		    sortPos, N);
 
-  cerr<<"\tDONE!!"<<endl;
 }
 
 /*** CONSTRUCT NEIGHBOUR LIST ***/
@@ -134,11 +128,12 @@ float PairForces::sumEnergy(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/
   //makeNeighbourList();
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
-  return computePairEnergy(sortPos,
-			   energyArray, 
-			   cellStart, cellEnd, 
-			   particleIndex,
-			   N);
+ return computePairEnergy(sortPos,
+			  energyArray, 
+			  cellStart, cellEnd, 
+			  particleIndex,
+			  N);
+
 }
 float PairForces::sumVirial(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/

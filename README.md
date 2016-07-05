@@ -4,7 +4,7 @@
 Raul P. Pelaez 2016
 
 A CUDA Molecular Dynamics code made into modules for expandability and generality.
-It is coded into separated modules, with a Driver that can hold many modules in order to construct a simulation. For example, Driver could have a velocityVerlet module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
+It is coded into separated modules, with a SimulationConfig driver that can hold many modules in order to construct a simulation. For example, the simulation could have a VerletNVT module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
 
 There are three types of modules:
 
@@ -24,15 +24,17 @@ In order to do so it can hold any number of Interactors and use them to compute 
 
 **Measurables**
 
-A Measurable is any computation that has to be performed between steps of the simulation, it can be any magnitud that is calculated from the simulation state (positions, forces..).
+A Measurable is any computation that has to be performed between steps of the simulation, it can be any magnitude that is calculated from the simulation state (positions, forces..).
 A measurable can compute the energy, the radial function distribution or any arbitrary computation that does not change the simulation state.
 
 ----------------
 
-These objects are abstract classes that can be derived to create all kinds of functionality and add new physics. Just create a new class that inherits Interactor or Integrator and override the virtual methods with the new functionality.
+These objects are abstract classes that can be derived to create all kinds of functionality and add new physics. Just create a new class that inherits Interactor, Integrator or Measurable and override the virtual methods with the new functionality.
 
 
 Finally there is a Driver that puts them all together and controls the flow of the simulation.
+
+The simulation construction is performed in Driver/SimulationConfig.cpp. Where the integrator, interactors and measurables are created and the initial conditions and parameters are set.
 
 
 #Currently Implemented
@@ -42,13 +44,15 @@ Finally there is a Driver that puts them all together and controls the flow of t
 
 	1.Pair Forces: Implements hash (cell index) sort neighbour list construction algorithm to evaluate pair forces given some potential function, LJ i.e. Ultra fast
 	2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
-    3.NBody forces: All particles interact with every other via some potential. (WIP)
+    3.NBody forces: All particles interact with every other via some potential.
+	4.External forces: A custom force function that will be applied to each particle individually.
 	
 **Integrators:**
 
-	1.Two step velocity verlet
-	2.Euler Maruyama Brownian dynamics
-	3.Euler Maruyama Brownian dynamics with hydrodynamic interactions via Rotne Prager (WIP)
+	1.Two step velocity verlet NVE
+	2.Two step velocity verlet NVT with BBK thermostat
+	3.Euler Maruyama Brownian dynamics
+	4.Euler Maruyama Brownian dynamics with hydrodynamic interactions via Rotne Prager
 
 **Measurables**
 	
@@ -94,3 +98,32 @@ Needs g++ with full C++11 support, 4.8+ recommended
 ------------
 	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5 and g++ 4.8
      - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5 and g++ 5.3.1
+
+##BENCHMARK
+
+------------
+
+Current benchmark:
+
+	GTX980 CUDA-7.5
+	N = 2^20
+	L = 128
+	dt = 0.001f
+	1e4 steps
+	PairForces with rcut = 2.5 and no energy measure
+	VerletNVT, no writing to disk, T = 0.1
+	Starting in a cubicLattice
+
+
+####------HIGHSCORE---------
+
+	Number of cells: 51 51 51; Total cells: 132651
+	Initializing...
+	DONE!!
+	Initialization time: 0.15172s
+	Computing step: 10000
+	Mean step time: 127.33 FPS
+	Total time: 78.535s
+	real 1m19.039s
+    user 0m53.772s
+	sys  0m25.212s

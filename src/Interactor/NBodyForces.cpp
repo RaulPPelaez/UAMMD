@@ -12,10 +12,8 @@
 
 using namespace std;
 
-NBodyForces::NBodyForces(uint N, float L,
-			 Vector4Ptr pos,
-			 Vector4Ptr force):
-  Interactor(N, L, pos, force){
+NBodyForces::NBodyForces():
+  Interactor(){
   //TODO
 
   init();

@@ -22,6 +22,7 @@ TODO:
 #define PAIRFORCES_H
 
 #include"utils/utils.h"
+#include"globals/globals.h"
 #include"Interactor.h"
 #include"PairForcesGPU.cuh"
 #include"misc/Potential.h"
@@ -40,14 +41,8 @@ float nullForce(float r2);
 
 class PairForces: public Interactor{
 public:
-  PairForces(uint N, float L, float rcut,
-	     shared_ptr<Vector<float4>> d_pos,
-	     shared_ptr<Vector<float4>> force,
-	     pairForceType fs = LJ);
-  PairForces(uint N, float L, float rcut,
-	     shared_ptr<Vector<float4>> d_pos,
-	     shared_ptr<Vector<float4>> force,
-	     pairForceType fs,
+  PairForces(pairForceType fs = LJ);
+  PairForces(pairForceType fs,
 	     std::function<float(float)> customForceFunction,
   	     std::function<float(float)> customEnergyFunction);
   ~PairForces();
@@ -59,18 +54,21 @@ public:
 private:
   Vector4 sortPos;
   Vector<float> energyArray, virialArray;
+  
   void init();
   void makeNeighbourList();
+  
   uint ncells;
   Vector<uint> cellIndex, particleIndex; 
   Vector<uint> cellStart, cellEnd;
 
   float rcut;
 
+  
   PairForcesParams params;
   
+  //These handle the selected force functions
   pairForceType forceSelector;
-
   Potential pot;
   std::function<float(float)> customForceFunction;
   std::function<float(float)> customEnergyFunction;

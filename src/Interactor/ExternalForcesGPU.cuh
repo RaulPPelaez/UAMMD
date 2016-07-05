@@ -10,35 +10,19 @@
 */
 
 
-#ifndef BONDEDFORCESGPU_CUH
-#define BONDEDFORCESGPU_CUH
+#ifndef EXTERNALFORCESGPU_CUH
+#define EXTERNALFORCESGPU_CUH
 
-struct Bond{
-  int i,j;
-  float r0,k;
-};
-
-struct BondFP{
-  int i;
-  float3 pos;
-  float r0,k;
-};
-
-struct BondedForcesParams{
+struct ExternalForcesParams{
   float L, invL;
 };
 
 
 //Stores some simulation parameters to upload as constant memory.
-void initBondedForcesGPU(BondedForcesParams m_params);
+void initExternalForcesGPU(ExternalForcesParams m_params);
 
 
-void computeBondedForce(float4* force, float4 *pos,
-			uint *bondStart, uint *bondEnd, Bond* bondList, uint N, uint nbonds);
-
-void computeBondedForceFixedPoint(float4* force, float4 *pos,
-				  uint *bondStartFP, uint *bondEndFP, BondFP* bondListFP, uint N, uint nbonds);
-
+void computeExternalForce(float4* force, float4 *pos, uint N);
 
 #endif
 

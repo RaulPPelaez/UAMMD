@@ -23,6 +23,7 @@ GTX980 CUDA-7.5
 N = 2^20
 L = 128
 dt = 0.001f
+1e4 steps
 PairForces with rcut = 2.5 and no energy measure
 TwoStepVelverlet, no writing to disk, Tini = 0.03
 Starting in a cubicLattice
@@ -44,35 +45,31 @@ TODO:
 100- There is a bug in the write function, you cannot call it with true before the start
 */
 #include<iomanip>
-#include"Driver/Driver.h"
+#include"globals/globals.h"
+#include"Driver/SimulationConfig.h"
+
+GlobalConfig gcnf;
 
 int main(int argc, char *argv[]){
-
+  
   Timer tim;
   tim.tic();
-   
-  SimConfig config; //Config is a struct in Driver.h, containing things like N and dt.
-
-  //float dens = stod(argv[1], NULL);
-  config.T = 0.001f;//stod(argv[2], NULL);
-  config.L = 32;
-  //  float L = config.L;
-  config.N = pow(2,14.7);
-  config.dt = 0.001f;
-  Driver psystem(config);
+  
+  SimulationConfig psystem;
 
   //psystem.write(true);
-  cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;  
-  int nsteps = 80000;
-    tim.tic();  
-  fori(0,nsteps){
-    psystem.update();
-    if(i%500==0) psystem.write(); //Writing is done in parallel, is practically free if the interval is big enough
-  }
+  cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;
+
+  
+  tim.tic();  
+  psystem.run();
+  
   float total_time = tim.toc();
-  cerr<<"\nMean step time: "<<setprecision(5)<<(float)nsteps/total_time<<" FPS"<<endl;
+  
+  cerr<<"\nMean step time: "<<setprecision(5)<<(float)gcnf.nsteps/total_time<<" FPS"<<endl;
   cerr<<"\nTotal time: "<<setprecision(5)<<total_time<<"s"<<endl;
-  psystem.write(true);
+  
+  if(gcnf.print_steps>0) psystem.write(true);
   
   cudaDeviceSynchronize();
   cudaDeviceReset();

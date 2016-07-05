@@ -8,13 +8,20 @@
   This is an abstract class that should be derived to implement new interactors, Interactor itself cannot be instanciated.
 
  Currently Implemented interactors:
-   1. Pair short range Forces using neighbour lists for an arbitrary potential
+    1.Pair Forces: Implements hash (cell index) sort neighbour list construction algorithm to evaluate pair forces given some potential function, LJ i.e. Ultra fast
+    2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
+    3.NBody forces: All particles interact with every other via some potential.
+    4.External forces: A custom force function that will be applied to each particle individually.
+
+TODO:
+100- Implement methods to change parameters during simulation, virtual SetNewConfig...
  */
 
 #ifndef INTERACTOR_H
 #define INTERACTOR_H
 
 #include"utils/utils.h"
+#include"globals/globals.h"
 #include"misc/Potential.h"
 #include<cstdint>
 #include<memory>
@@ -31,13 +38,11 @@ public:
   Vector4Ptr getForce(){return force;}
 
 protected:
-  Interactor(uint N, float L, 
-	     Vector4Ptr d_pos,
-	     Vector4Ptr force);
-  
   Vector4Ptr d_pos, force;
   uint N;
   float L;
+  string name;
 };
+
 typedef vector<shared_ptr<Interactor>> InteractorArray;
 #endif

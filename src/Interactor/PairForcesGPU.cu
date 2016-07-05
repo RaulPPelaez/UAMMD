@@ -384,8 +384,8 @@ void computePairForce(float4 *sortPos, float4 *force,
 		  uint *particleIndex, 
 		  uint N){
   computeForceD<<<GPU_Nblocks, GPU_Nthreads>>>(force,
-				particleIndex,
-				N);
+					       particleIndex,
+					       N);
   //cudaCheckErrors("computeForce");
 }
 

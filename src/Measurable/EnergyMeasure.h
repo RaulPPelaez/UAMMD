@@ -9,6 +9,7 @@ Writes the results to measurables.dat
 #ifndef ENERGYMEASURE_H
 #define ENERGYMEASURE_H
 #include"utils/utils.h"
+#include"globals/globals.h"
 #include"Interactor/Interactor.h"
 #include"Integrator/Integrator.h"
 #include"Measurable.h"

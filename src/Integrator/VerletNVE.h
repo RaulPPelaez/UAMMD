@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2016. Two step velocity Verlet Integrator derived class
+/*Raul P. Pelaez 2016. Two step velocity VerletNVE Integrator derived class
 
   An Integrator is intended to be a separated module that handles the update of positions given the forces
 
@@ -7,31 +7,30 @@
   Also takes care of writing to disk
  
   
-  Solves the following differential equation:
+  Solves the following differential equation using a two step velocity verlet algorithm:
       X[t+dt] = X[t] +v[t]·dt+0.5·a[t]·dt^2
       v[t+dt] = v[t] +0.5·(a[t]+a[t+dt])·dt
 */
-#ifndef TWOSTEPVELVERLETINTEGRATOR_H
-#define TWOSTEPVELVERLETINTEGRATOR_H
+#ifndef VERLETNVE_H
+#define VERLETNVE_H
 #include "utils/utils.h"
 #include "Integrator.h"
-#include "TwoStepVelVerletGPU.cuh"
-#include<thread>
+#include "VerletNVEGPU.cuh"
 
-class TwoStepVelVerlet: public Integrator{
+
+class VerletNVE: public Integrator{
 public:
-  TwoStepVelVerlet(Vector4Ptr pos,
-		   Vector4Ptr force, uint N, float L, float dt, float T);
-  ~TwoStepVelVerlet();
+  VerletNVE();
+  ~VerletNVE();
 
   void update() override;
   //Returns the kinetic energy
   float sumEnergy() override;
 
-  void write(bool block);
 private:
   //The only additional information to store is the velocity
   Vector3 vel;
+  float E;
 };
 
 

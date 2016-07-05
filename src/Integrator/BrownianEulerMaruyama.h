@@ -22,28 +22,24 @@
 #include "Integrator.h"
 #include "BrownianEulerMaruyamaGPU.cuh"
 #include<curand.h>
-#include<thread>
-
-
 
 class BrownianEulerMaruyama: public Integrator{
 public:
   //Constructor, you have to provide D and K.
-  BrownianEulerMaruyama(shared_ptr<Vector<float4>> pos,
-			shared_ptr<Vector<float4>> force,
-			shared_ptr<Vector<float4>> D,
-			shared_ptr<Vector<float4>> K,
-			uint N, float L, float dt);
+  BrownianEulerMaruyama(Vector4Ptr D,
+			Vector4Ptr K);
   ~BrownianEulerMaruyama();
 
   void update() override;
   float sumEnergy() override;
 private:
-  Vector<float3> noise;
+  Vector3 noise;
+  
   curandGenerator_t rng;
   BrownianEulerMaruyamaParameters params;
-  shared_ptr<Vector<float4>> D, K;
-  Vector<float4> B;
+  
+  Vector4Ptr D, K;
+  Vector4 B;
 };
 
 

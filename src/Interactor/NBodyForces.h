@@ -12,6 +12,7 @@ TODO:
 #define NBODYFORCES_H
 
 #include"utils/utils.h"
+#include"globals/globals.h"
 #include"Interactor.h"
 #include"NBodyForcesGPU.cuh"
 #include"misc/Potential.h"
@@ -23,9 +24,7 @@ TODO:
 
 class NBodyForces: public Interactor{
 public:
-  NBodyForces(uint N, float L,
-	       Vector4Ptr pos,
-	       Vector4Ptr force);
+  NBodyForces();
   
   ~NBodyForces();
 

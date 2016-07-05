@@ -12,20 +12,20 @@ NVFLAGS= -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 -arch=sm_52 -restrict -s
 
 #LDFLAGS= -L/usr/local/cuda-7.5/lib64 -L/usr/lib64/nvidia
 LDFLAGS= -L/usr/local/cuda-7.5/lib64 
-LDLIBS= -lcuda -lcudart -lpthread -lcurand
+LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas
 
 
-OBJS_INTERACTOR= Interactor.o PairForces.o BondedForces.o NBodyForces.o
-OBJS_INTEGRATOR= Integrator.o TwoStepVelVerlet.o BrownianEulerMaruyama.o
+OBJS_INTERACTOR= Interactor.o PairForces.o BondedForces.o NBodyForces.o ExternalForces.o
+OBJS_INTEGRATOR= Integrator.o VerletNVE.o VerletNVT.o BrownianEulerMaruyama.o BrownianHydrodynamicsEulerMaruyama.o
 OBJS_MEASURABLE= Measurable.o EnergyMeasure.o
 
 
-CUOBJS_INTERACTOR= PairForcesGPU.o  BondedForcesGPU.o NBodyForcesGPU.o
-CUOBJS_INTEGRATOR= TwoStepVelVerletGPU.o BrownianEulerMaruyamaGPU.o
+CUOBJS_INTERACTOR= PairForcesGPU.o BondedForcesGPU.o NBodyForcesGPU.o ExternalForcesGPU.o
+CUOBJS_INTEGRATOR= VerletNVEGPU.o VerletNVTGPU.o BrownianEulerMaruyamaGPU.o BrownianHydrodynamicsEulerMaruyamaGPU.o 
 
 OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))
 OBJS += $(addprefix Measurable/, $(OBJS_MEASURABLE))
-OBJS += utils/utils.o misc/Potential.o Driver/Driver.o
+OBJS += utils/utils.o misc/Potential.o Driver/Driver.o Driver/SimulationConfig.o
 
 CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR))
 

@@ -8,22 +8,20 @@
   This is an abstract class that should be derived to implement new interactors, Interactor itself cannot be instanciated.
 
  Currently Implemented interactors:
-   1. Pair short range Forces using neighbour lists for an arbitrary potential
+     1.Pair Forces: Implements hash (cell index) sort neighbour list construction algorithm to evaluate pair forces given some potential function, LJ i.e. Ultra fast
+     2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
+     3.NBody forces: All particles interact with every other via some potential.
+     4.External forces: A custom force function that will be applied to each particle individually.
  
 */
 
 
 #include"Interactor.h"
 
-Interactor::Interactor(){}
-
 Interactor::~Interactor(){}
 
 
-Interactor::Interactor(uint N, float L, 
-		       shared_ptr<Vector<float4>> d_pos,
-		       shared_ptr<Vector<float4>> force):
-  N(N),L(L), d_pos(d_pos), force(force){
-
+Interactor::Interactor():
+  N(gcnf.N),L(gcnf.L), d_pos(gcnf.pos), force(gcnf.force){
 
 }

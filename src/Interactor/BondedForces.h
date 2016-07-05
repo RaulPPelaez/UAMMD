@@ -23,6 +23,7 @@
 
 TODO:
 100- Allow for fluam like input (AKA check for repeated springs) ignore and print a message.
+100- Implement Three body springs
 */
 
 #ifndef BONDEDFORCES_H
@@ -32,6 +33,7 @@ TODO:
 #include"Interactor.h"
 #include"BondedForcesGPU.cuh"
 #include"misc/Potential.h"
+#include"globals/globals.h"
 
 #include<cstdint>
 #include<memory>
@@ -40,14 +42,8 @@ TODO:
 
 class BondedForces: public Interactor{
 public:
-  BondedForces(uint N, float L,
-	       shared_ptr<Vector<float4>> pos,
-	       shared_ptr<Vector<float4>> force,
-	       const std::vector<Bond> &bondList);
-  BondedForces(uint N, float L,
-	       shared_ptr<Vector<float4>> pos,
-	       shared_ptr<Vector<float4>> force,
-	       const char * readFile);
+  BondedForces(const std::vector<Bond> &bondList);
+  BondedForces(const char * readFile);
 
   ~BondedForces();
 
@@ -57,9 +53,14 @@ public:
 private:
   void init();
   
-  int nbonds;
+  uint nbonds;
   Vector<Bond> bondList;
   Vector<uint> bondStart, bondEnd;
+
+  uint nbondsFP; //Fixed Point
+  Vector<BondFP> bondListFP;
+  Vector<uint> bondStartFP, bondEndFP;
+
   BondedForcesParams params;
 };
 #endif

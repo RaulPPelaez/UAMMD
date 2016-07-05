@@ -51,8 +51,7 @@ void EnergyMeasure::measure(){
   
   
   out<<(U+K)<<"\t"<<K<<"\t"<<U<<"\t"<<P; //Print your measurables to out
-
   /*Include this two lines in your measurable*/
-  if(id==total_measurables) out<<"\n"; //All measurables are printed on the same line and file each step
+  if(id==total_measurables) out<<endl; //All measurables are printed on the same line and file each step
   else out<<"\t\t";
 }

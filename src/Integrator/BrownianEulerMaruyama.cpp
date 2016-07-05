@@ -60,14 +60,11 @@ void cholesky(Vector<float4> Din, Vector<float4> &Bout){
   }
 }
 
-BrownianEulerMaruyama::BrownianEulerMaruyama(shared_ptr<Vector<float4>> pos,
-					     shared_ptr<Vector<float4>> force,
-					     shared_ptr<Vector<float4>> D,
-					     shared_ptr<Vector<float4>> K,
-					     uint N, float L, float dt):
+BrownianEulerMaruyama::BrownianEulerMaruyama(Vector4Ptr D,
+					     Vector4Ptr K):
+  Integrator(),
   D(D),K(K),
-  noise(N),
-  Integrator(pos, force, N, L, dt){
+  noise(N){
 
   
   params.sqrtdt = sqrt(dt)*sqrt(2.0f);
@@ -92,29 +89,21 @@ BrownianEulerMaruyama::BrownianEulerMaruyama(shared_ptr<Vector<float4>> pos,
   noise.upload();
   //Curand fill with gaussian numbers with mean 0 and var 1
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N, 0.0f, 1.0f);
-
-  // noise.download();
-  // ofstream out("rand.dat");
-
-  // fori(0,N){
-  //   out<<noise[i].x<<" "<<noise[i].y<<" "<<noise[i].z<<"\n";
-  // }
-
   
   initBrownianEulerMaruyamaGPU(params);
-
 }
 BrownianEulerMaruyama::~BrownianEulerMaruyama(){}
 
 void BrownianEulerMaruyama::update(){
-    steps++;
+  steps++;
   if(steps%500==0) cerr<<"\rComputing step: "<<steps<<"   ";
 
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N, 0.0f, 1.0f);
+  
+  cudaMemset((float *)force->d_m, 0.0f, 4*N*sizeof(float));
   for(auto forceComp: interactors) forceComp->sumForce();
 
   integrateBrownianEulerMaruyamaGPU(pos->d_m, noise, force->d_m, dt, N);
-
 }
 
 float BrownianEulerMaruyama::sumEnergy(){

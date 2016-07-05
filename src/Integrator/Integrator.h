@@ -10,18 +10,22 @@
   This is an abstract class that should be derived to implement new integrators, Integrator itself cannot be instanciated.
 
  Currently Implemented integrators:
-   1. Velocity Verlet
-   2. Brownian Dynamics Euler Maruyama (WIP)
-   2. Brownian Dynamics Euler Maruyama with Hydrodynamics (WIP)
+   1. Velocity Verlet NVE
+   2. Velocity Verlet NVT with BBK thermostat
+   3. Brownian Dynamics Euler Maruyama
+   4. Brownian Dynamics Euler Maruyama with Hydrodynamics
 
   TODO:
     90- Implement new integrators
+    80- Make a write engine that allows a custom format, like "XYZ", "%.3f\t%.3f\t%.3f"
 */
 
 
 #ifndef INTEGRATOR_H
 #define INTEGRATOR_H
 #include "utils/utils.h"
+#include "globals/globals.h"
+
 #include "Interactor/Interactor.h"
 #include<thread>
 #include<memory>
@@ -29,6 +33,7 @@
 void write_concurrent(float4 *pos, float L, uint N);
 class Integrator{
 public:
+  //Constructor to be called in the initialization list of the derived class
   Integrator();
   ~Integrator();
   
@@ -47,17 +52,14 @@ public:
     return interactors;
   }
 protected:
-  //Constructor to be called in the initialization list of the derived class
-  Integrator(shared_ptr<Vector<float4>> pos,
-	     shared_ptr<Vector<float4>> force, uint N, float L, float dt);
-
   //Pos and force are handled outside
-  shared_ptr<Vector<float4>> pos, force;
+  Vector4Ptr pos, force;
   vector<shared_ptr<Interactor>> interactors;
   uint steps;
   uint N;
   float dt, L;
   std::thread *writeThread;
+  string name;
 };
 
 

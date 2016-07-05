@@ -24,46 +24,45 @@ TODO:
 */
 #ifndef DRIVER_H
 #define DRIVER_H
+
+#include"globals/globals.h"
+
 #include"Interactor/Interactor.h"
 #include"Interactor/PairForces.h"
 #include"Integrator/Integrator.h"
-#include"Integrator/TwoStepVelVerlet.h"
+#include"Integrator/VerletNVE.h"
+#include"Integrator/VerletNVT.h"
 #include"Integrator/BrownianEulerMaruyama.h"
+#include"Integrator/BrownianHydrodynamicsEulerMaruyama.h"
+#include "Interactor/BondedForces.h"
+#include "Interactor/NBodyForces.h"
+#include "Interactor/ExternalForces.h"
+
 #include"Measurable/Measurable.h"
 #include"Measurable/EnergyMeasure.h"
 #include"utils/utils.h"
 #include<memory>
 
-struct SimConfig{
-  /*Default parameters*/
-  uint N = 16384;
-  float L = 32, rcut = 2.5f;
-  float dt = 0.001f;
-  uint print_every = 1000;
-  uint relaxation_steps = 10000;
-  float T = 1.0f;
-};
 
 class Driver{
+protected:
   //Interactors are added to an integrator
   shared_ptr<Integrator> integrator;
   MeasurableArray measurables;
-  SimConfig conf;
-//You are supposed to be in charge of the positions and forces, and initialize them before giving them to Integrator and Interactor.
-  Vector4 pos, force, D, K;
-
+//You have to initialize pos and force before giving initializing the integrators/interactors.
+  Vector4 pos, force;
   uint step;
+  
 public:
   //The constructor configures and initializes the simulation
-  Driver(SimConfig conf);
-  //Move 1 dt forward in time
-  void update();
+  Driver();
+  //Move nsteps*dt forward in time
+  void run();
 
   //Write the current positions to disk, concurrently if block is false or not given
   void write(bool block = false);
   //Read an initial configuration from fileName, TODO
   void read(const char *fileName);
-
 };
 
 #endif

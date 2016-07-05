@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2016. Two step velocity Verlet Integrator GPU callers 
+/*Raul P. Pelaez 2016. Two step velocity VerletNVE Integrator GPU callers 
 
   Functions to integrate movement. The integration is done via a functor wich creator
      takes a thrust::Tuple containing positions, velocities and forces on each particle. 
@@ -7,7 +7,7 @@ TODO:
 */
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
-#include "TwoStepVelVerletGPU.cuh"
+#include "VerletNVEGPU.cuh"
 #include<thrust/device_ptr.h>
 #include<thrust/reduce.h>
 #include<thrust/transform_reduce.h>
@@ -19,12 +19,11 @@ using namespace thrust;
 //This struct is a thrust trick to perform an arbitrary transformation
 //In this case it performs a two step velocity verlet integration
 //Performs a two step velocity verlet integrator, pick with step
-struct twoStepVelVerlet_Integratefunctor{
+struct twoStepVelVerletNVE_Integratefunctor{
   float dt;
   int step;
-  bool dump;
-  __host__ __device__ twoStepVelVerlet_Integratefunctor(float dt, int step, bool dump):
-    dt(dt),step(step), dump(dump){}
+  __host__ __device__ twoStepVelVerletNVE_Integratefunctor(float dt, int step):
+    dt(dt),step(step){}
   //The operation is performed on creation
   template <typename Tuple>
   __device__  void operator()(Tuple t){
@@ -39,18 +38,13 @@ struct twoStepVelVerlet_Integratefunctor{
       vel.w = 0.0f; //Be careful not to overwrite the pos.w!!
       pos += vel*dt;
       get<0>(t) = pos;
-      get<2>(t) = make_float4(0.0f);
       break;
       /*Second velocity verlet step*/
     case 2:
       vel += force*dt*0.5f;
-      if(dump) vel *= 0.99f;
-      //Uncomment to sum kinetic energy
-      //force.w += 0.5f*dot(vel,vel); 
-      //get<2>(t).w = force.w;
       break;
     }
-    /*Write new vel and reset force*/
+    /*Write new vel*/
     get<1>(t) = make_float3(vel);
   }
 };
@@ -58,8 +52,8 @@ struct twoStepVelVerlet_Integratefunctor{
 
 
 //Update the positions
-void integrateTwoStepVelVerletGPU(float4 *pos, float3 *vel, float4 *force,
-				  float dt, uint N, int step, bool dump){
+void integrateVerletNVEGPU(float4 *pos, float3 *vel, float4 *force,
+				  float dt, uint N, int step){
 
   //Uncomment to sum total energy, you must compute it first in the interactors
    // static uint count = 0;
@@ -72,7 +66,7 @@ void integrateTwoStepVelVerletGPU(float4 *pos, float3 *vel, float4 *force,
   for_each(
 	   make_zip_iterator( make_tuple( d_pos4, d_vel3, d_force4)),
 	   make_zip_iterator( make_tuple( d_pos4 + N, d_vel3 + N, d_force4 +N)),
-	   twoStepVelVerlet_Integratefunctor(dt, step, dump));
+	   twoStepVelVerletNVE_Integratefunctor(dt, step));
   //cudaCheckErrors("Integrate");  
 }
 
@@ -83,7 +77,7 @@ struct dot_functor{
 
 };
 
-float computeKineticEnergyTwoStepVelVerlet(float3 *vel, uint N){
+float computeKineticEnergyVerletNVE(float3 *vel, uint N){
   device_ptr<float3> d_vel3(vel);
   float3 K;
   thrust::plus<float3> binary_op;
