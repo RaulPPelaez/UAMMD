@@ -23,11 +23,11 @@ struct GlobalConfig{
   uint relaxation_steps = 1000;
   uint measure_steps = -1;
 
-  //These addresses are set in Driver
-  Vector4Ptr pos, force;
-  
 };
 #endif
 
-//Everyone can access to gcnf, it initialized in main, before entering main().
+//Everyone can access to gcnf, its initialized in main, before entering main().
 extern GlobalConfig gcnf;
+//These addresses are set in Driver
+extern Vector4 pos, force;
+extern Vector3 vel;

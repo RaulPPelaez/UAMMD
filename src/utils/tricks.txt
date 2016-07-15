@@ -1,0 +1,7 @@
+
+
+To increase the printf limit of a kernel:
+
+    cudaDeviceGetLimit(size_t* size,cudaLimitPrintfFifoSize)
+    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t size)
+	

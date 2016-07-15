@@ -33,9 +33,11 @@ PairForces::PairForces(pairForceType fs,
   rcut(gcnf.rcut), forceSelector(fs),
   Interactor()
 {
+  pairForcesInstances++;
 
   cerr<<"Initializing Pair Forces..."<<endl;
     /**Put parameters in Param struct**/
+  if(pairForcesInstances>1){ cerr<<"ERROR: Only one PairForces instance is allowed!!!"<<endl; exit(1);}
   params.rcut = rcut;
 
   int xcells = int(L/rcut+0.5);
@@ -59,7 +61,17 @@ PairForces::PairForces(pairForceType fs,
 
 }
 
-PairForces::~PairForces(){}
+PairForces::~PairForces(){
+  /*It is a good idea to free all the memory used on destruction, at least on the GPU side.
+    CUDA appears to have some issues if you dont do it*/
+  sortPos.freeMem();
+  energyArray.freeMem();
+  virialArray.freeMem();
+  cellIndex.freeMem();
+  particleIndex.freeMem();
+  cellStart.freeMem();
+  cellEnd.freeMem(); 
+}
 //Initialize variables and upload them to GPU, init CUDA
 void PairForces::init(){
   
@@ -79,17 +91,17 @@ void PairForces::init(){
     exit(1);
   }
 
-  sortPos   = Vector<float4>(N); sortPos.fill_with(make_float4(0.0f)); sortPos.upload(); 
+  sortPos    = Vector<float4>(N); sortPos.fill_with(make_float4(0.0f)); sortPos.upload(); 
 
   /*Temporal storage for the enrgy and virial per particle*/
   energyArray = Vector<float>(N); energyArray.fill_with(0.0f); energyArray.upload();
   virialArray = Vector<float>(N); virialArray.fill_with(0.0f); virialArray.upload();
 
   
-  cellIndex = Vector<uint>(N+1); cellIndex.upload();
+  cellIndex    = Vector<uint>(N+1); cellIndex.upload();
   particleIndex= Vector<uint>(N+1); particleIndex.upload();
-  cellStart        = Vector<uint>(ncells); cellStart.upload();
-  cellEnd          = Vector<uint>(ncells); cellEnd.upload();
+  cellStart    = Vector<uint>(ncells); cellStart.upload();
+  cellEnd      = Vector<uint>(ncells); cellEnd.upload();
 
   initPairForcesGPU(params,
 		    pot.getForceData(), pot.getEnergyData(), pot.getSize(),
@@ -101,7 +113,7 @@ void PairForces::init(){
 /*** CONSTRUCT NEIGHBOUR LIST ***/
 void PairForces::makeNeighbourList(){
   /*Compute cell id of each particle*/
-  calcCellIndex(d_pos->d_m, cellIndex, particleIndex, N);
+  calcCellIndex(pos, cellIndex, particleIndex, N);
 
   /*Sort the particle indices by hash (cell index)*/
   sortCellIndex(cellIndex, particleIndex, N);
@@ -109,7 +121,7 @@ void PairForces::makeNeighbourList(){
   reorderAndFind(sortPos,
 		 cellIndex, particleIndex,
 		 cellStart, cellEnd, params.ncells,
-		 d_pos->d_m, N); 
+		 pos, N); 
 }
 
 
@@ -118,7 +130,7 @@ void PairForces::sumForce(){
   makeNeighbourList();
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   computePairForce(sortPos,
-	       force->d_m, 
+	       force, 
 	       cellStart, cellEnd, 
 	       particleIndex,
 	       N);
@@ -171,3 +183,4 @@ float energyLJ(float r2){
 }
 float nullForce(float r2){return 0.0f;}
 
+uint PairForces::pairForcesInstances = 0;

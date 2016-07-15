@@ -17,16 +17,7 @@ Interactor computes forces acting on each particle. For that it has default acce
 //Constructor
 Driver::Driver(): step(0){
   /*Initialize pos and force arrays*/
-  uint N = gcnf.N;
-  pos = Vector4(N, true);
-  pos.fill_with(make_float4(0.0f));
-  
-  force = Vector4(N);
-  force.fill_with(make_float4(0.0f));
-  force.upload();
-  /*Communicate the addresses to gcnf so everyone can use them*/
-  gcnf.pos = make_shared<Vector4>(pos);
-  gcnf.force = make_shared<Vector4>(force);    
+
 }
   
 //Perform the simulation steps
@@ -37,11 +28,12 @@ void Driver::run(){
   /*Simulation*/
   fori(0,gcnf.nsteps){
     step++;
-    integrator->update();
     
-    if(i%gcnf.print_steps==1)
+    integrator->update();
+    if(i%gcnf.print_steps==0 && gcnf.print_steps >= 0 )
       this->write(); //Writing is done in parallel, is practically free if the interval is big enough
-
+    
+	
     if(step%gcnf.measure_steps==1 && step > gcnf.relaxation_steps)
       for(auto m: measurables)
 	m->measure();
@@ -63,3 +55,11 @@ void Driver::read(const char *fileName){
   in.close();
   pos.upload();
 }
+
+
+Driver::~Driver(){
+  
+}
+
+
+

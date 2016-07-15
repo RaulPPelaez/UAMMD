@@ -18,10 +18,13 @@ TODO:
 /*Constructor, Dont forget to initialize the base class Integrator!*/
 /*You can use anything in gcnf at any time*/
 VerletNVE::VerletNVE():
-  vel(gcnf.N), E(gcnf.E),
+  E(gcnf.E),
   Integrator(){
   cerr<<"Initializing Verlet NVE Integrator..."<<endl;
 
+  /*Create the velocity if you need it*/
+  vel = Vector3(N); 
+  
   cerr<<"\tSet E="<<E<<endl;
   
   cerr<<"Verlet NVE Integrator\t\tDONE!!\n"<<endl;
@@ -42,7 +45,7 @@ void VerletNVE::update(){
     
     float K = abs(E-U);
     /*Distribute the velocities accordingly*/
-    float vamp = sqrt(2.0f*K);
+    float vamp = 0.0f*sqrt(2.0f*K);
     /*Create velocities*/
     vel.fill_with(make_float3(0.0f));
     fori(0,N){
@@ -56,19 +59,33 @@ void VerletNVE::update(){
   steps++;
   if(steps%1000==0) cerr<<"\rComputing step: "<<steps<<"   ";
   /**First integration step**/
-  integrateVerletNVEGPU(pos->d_m, vel, force->d_m, dt, N, 1);
+  integrateVerletNVEGPU(pos, vel, force, dt, N, 1);
   /**Reset the force**/
   /*The integrator is in charge of resetting the force when it needs, an interactor always sums to the current force*/
-  cudaMemset((float *)force->d_m, 0.0f, 4*N*sizeof(float));
+  cudaMemset((float *)force.d_m, 0.0f, 4*N*sizeof(float));
+
   /**Compute all the forces**/
   for(auto forceComp: interactors) forceComp->sumForce();
-  
   /**Second integration step**/
-  integrateVerletNVEGPU(pos->d_m, vel, force->d_m, dt, N, 2);
+  integrateVerletNVEGPU(pos, vel, force, dt, N, 2);
 }
 
 
 float VerletNVE::sumEnergy(){
   /*The only apportation to the energy is kinetic*/
   return computeKineticEnergyVerletNVE(vel, N);
+}
+
+
+void VerletNVE::write(bool block){
+  Integrator::write(false);
+   // vel.download();
+   // float3 res = make_float3(0.0f);
+   // fori(0,N){
+   //   res += vel[i];
+   // }
+
+   // cout<<(res.x/(float)N)<<" "<<res.y/(float)N<<" "<<res.z/(float)N<<endl;
+
+  
 }

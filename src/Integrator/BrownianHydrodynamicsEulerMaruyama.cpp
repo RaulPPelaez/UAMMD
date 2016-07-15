@@ -85,11 +85,11 @@ void BrownianHydrodynamicsEulerMaruyama::update(){
   float alpha = 1.0f, beta = 0.0f;
   if(steps%500==0) cerr<<"\rComputing step: "<<steps<<"   ";
   
-  cudaMemset((float *)force->d_m, 0.0f, 4*N*sizeof(float));
+  cudaMemset((float *)force.d_m, 0.0f, 4*N*sizeof(float));
   
   for(auto forceComp: interactors) forceComp->sumForce();
   
-  copy_pos(pos->d_m, pos3, force->d_m, force3, N);
+  copy_pos(pos, pos3, force, force3, N);
 
   
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
@@ -125,7 +125,7 @@ void BrownianHydrodynamicsEulerMaruyama::update(){
 	      (float*)noise.d_m, 1);
   
   cudaDeviceSynchronize();
-  integrateBrownianHydrodynamicsEulerMaruyamaGPU(pos->d_m, DF.d_m, noise.d_m, KR.d_m, dt, N);
+  integrateBrownianHydrodynamicsEulerMaruyamaGPU(pos, DF.d_m, noise.d_m, KR.d_m, dt, N);
 }
 
 float BrownianHydrodynamicsEulerMaruyama::sumEnergy(){

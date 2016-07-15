@@ -38,7 +38,6 @@ public:
   Vector4Ptr getForce(){return force;}
 
 protected:
-  Vector4Ptr d_pos, force;
   uint N;
   float L;
   string name;

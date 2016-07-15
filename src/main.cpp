@@ -42,7 +42,6 @@ sys	0m25.212s
 ---------------------------------------------------
 TODO:
 100- Read and construct simulation configuration from script
-100- There is a bug in the write function, you cannot call it with true before the start
 */
 #include<iomanip>
 #include"globals/globals.h"
@@ -50,8 +49,10 @@ TODO:
 
 GlobalConfig gcnf;
 
+Vector4 pos, force;
+Vector3 vel;
+
 int main(int argc, char *argv[]){
-  
   Timer tim;
   tim.tic();
   
@@ -70,9 +71,12 @@ int main(int argc, char *argv[]){
   cerr<<"\nTotal time: "<<setprecision(5)<<total_time<<"s"<<endl;
   
   if(gcnf.print_steps>0) psystem.write(true);
-  
+
   cudaDeviceSynchronize();
-  cudaDeviceReset();
+  pos.freeMem();
+  force.freeMem();
+  vel.freeMem();
+
   return 0;
 }
 

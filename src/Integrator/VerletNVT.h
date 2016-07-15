@@ -40,7 +40,7 @@ public:
     initVerletNVTGPU(params);
   }
 private:
-  Vector3 vel, noise;
+  Vector3 noise;
   
   float gamma; //Gamma is not stored in gcnf
   

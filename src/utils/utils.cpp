@@ -1,5 +1,6 @@
 #include"utils.h"
 #include<stdlib.h>
+#include<fstream>
 //Took from Fluam, adapted to use float4
 void cubicLattice(float4 *pos, float L, uint N){
     float dx, dy, dz;
@@ -53,6 +54,19 @@ void cubicLattice2D(float4 *pos, float L, uint N){
 	}
 
 }
+
+
+void readFile(Vector4 &pos, const char * fileName){
+  uint N;
+  ifstream in(fileName);
+  in>>N;
+  pos = Vector4(N, true);
+  fori(0,N){
+    in>>pos[i].x>>pos[i].y>>pos[i].z>>pos[i].w;
+  }
+}
+
+
 
 #define RANDESP (rand()/(float)RAND_MAX)
 #define RANDL2 (RANDESP-0.5f)

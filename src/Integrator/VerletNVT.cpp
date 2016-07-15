@@ -23,12 +23,13 @@ TODO:
 
 VerletNVT::VerletNVT():
   Integrator(), /*After initializing the base class, you have access to things like N, L...*/
-  noise(N +((3*N)%2)), vel(N)
+  noise(N +((3*N)%2))
 {
   cerr<<"Initializing Verlet NVT Integrator..."<<endl;
 
+  vel = Vector3(N);
   cerr<<"\tSet T="<<gcnf.T<<endl;
-  
+
   gamma = 0.1f;
 
   /*Set params and init GPU parameters*/
@@ -59,7 +60,10 @@ VerletNVT::VerletNVT():
   cerr<<"Verlet NVT Integrator\t\tDONE!!\n"<<endl;
 }
 
-VerletNVT::~VerletNVT(){}
+VerletNVT::~VerletNVT(){
+  curandDestroyGenerator(rng);
+  noise.freeMem();
+}
 
 //The integration process can have two steps
 void VerletNVT::update(){
@@ -72,17 +76,17 @@ void VerletNVT::update(){
   /**First integration step**/
   /*Gen noise*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
-  integrateVerletNVTGPU(pos->d_m, vel, force->d_m, noise, N, 1);
+  integrateVerletNVTGPU(pos, vel, force, noise, N, 1);
   /**Compute all the forces**/
   
   /*Reset forces*/
-  cudaMemset((float *)force->d_m, 0.0f, 4*N*sizeof(float));
+  cudaMemset((float *)force.d_m, 0.0f, 4*N*sizeof(float));
   for(auto forceComp: interactors) forceComp->sumForce();
   
   /**Second integration step**/
   /*Gen noise*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
-  integrateVerletNVTGPU(pos->d_m, vel, force->d_m, noise, N, 2);
+  integrateVerletNVTGPU(pos, vel, force, noise, N, 2);
 }
 
 

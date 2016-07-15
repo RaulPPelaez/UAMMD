@@ -16,6 +16,7 @@ TODO:
 100- Colors, this almost done, color can simply be encoded in pos.w, and additional parameters are needed in force fucntions/textures
 90- Non cubic boxes, almost done, just be carefull in the constructor and use vector types.
 100- PairForces should be a singleton or multiple PairForces should be possible somehow
+80- Change the handling of the potential to better allow inheritance, see DPD
  */
 
 #ifndef PAIRFORCES_H
@@ -51,7 +52,7 @@ public:
   float sumEnergy() override;
   float sumVirial() override;
   
-private:
+protected:
   Vector4 sortPos;
   Vector<float> energyArray, virialArray;
   
@@ -72,5 +73,7 @@ private:
   Potential pot;
   std::function<float(float)> customForceFunction;
   std::function<float(float)> customEnergyFunction;
+
+  static uint pairForcesInstances;
 };
 #endif

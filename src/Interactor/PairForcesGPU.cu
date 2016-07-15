@@ -16,9 +16,11 @@ TODO:
 40- pbc_cells could be done better, this could improve force compute
 10- There is no need to reconstruct the neighbour list from scratch each step,
   although computing the force is 50 times as expensive as this right now.
+10- Find a way to properly handle the alternate arrays in sortCellIntex
 */
 
 #include<cub/cub/cub.cuh>
+#include<curand_kernel.h>
 #include"PairForcesGPU.cuh"
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
@@ -36,7 +38,8 @@ using namespace thrust;
 using std::cerr;
 using std::endl;
 
-__constant__ PairForcesParams pairForcesParamsGPU; //Simulation parameters in constant memory, super fast access
+__constant__ PairForcesParams params; //Simulation parameters in constant memory, super fast access
+__constant__ PairForcesParamsDPD paramsDPD; //Simulation parameters in constant memory, super fast access
 
 //Texture references for scattered access
 texture<uint> texCellStart, texCellEnd, texParticleIndex;
@@ -50,16 +53,16 @@ uint GPU_Nthreads;
 
 
 //Initialize gpu variables 
-void initPairForcesGPU(PairForcesParams m_pairForcesParamsGPU,
+void initPairForcesGPU(PairForcesParams m_params,
 		       float *potForceData, float *potEnergyData, size_t potSize,
 		       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 		       float4 *sortPos, uint N){
 
   /*Precompute some inverses to save time later*/
-  m_pairForcesParamsGPU.invrc2 = 1.0f/(m_pairForcesParamsGPU.rcut*m_pairForcesParamsGPU.rcut);
-  m_pairForcesParamsGPU.invL = 1.0f/m_pairForcesParamsGPU.L;
-  m_pairForcesParamsGPU.invCellSize = 1.0f/m_pairForcesParamsGPU.cellSize;
-  m_pairForcesParamsGPU.getCellFactor = 0.5f*m_pairForcesParamsGPU.L*m_pairForcesParamsGPU.invCellSize;
+  m_params.invrc2 = 1.0f/(m_params.rcut*m_params.rcut);
+  m_params.invL = 1.0f/m_params.L;
+  m_params.invCellSize = 1.0f/m_params.cellSize;
+  m_params.getCellFactor = 0.5f*m_params.L*m_params.invCellSize;
   
   /*Texture bindings, these ones are accessed by element*/ 
   gpuErrchk(cudaBindTexture(NULL, texCellStart, cellStart, ncells*sizeof(uint)));
@@ -94,7 +97,7 @@ void initPairForcesGPU(PairForcesParams m_pairForcesParamsGPU,
 
 
   /*Upload parameters to constant memory*/
-  gpuErrchk(cudaMemcpyToSymbol(pairForcesParamsGPU, &m_pairForcesParamsGPU, sizeof(PairForcesParams)));
+  gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(PairForcesParams)));
 
 
 
@@ -103,43 +106,48 @@ void initPairForcesGPU(PairForcesParams m_pairForcesParamsGPU,
   GPU_Nblocks  =  N/GPU_Nthreads +  ((N%GPU_Nthreads!=0)?1:0); 
 }
 
+void initPairForcesDPDGPU(PairForcesParamsDPD m_params){
+
+  gpuErrchk(cudaMemcpyToSymbol(paramsDPD, &m_params, sizeof(PairForcesParamsDPD)));
+}
+
 /****************************HELPER FUNCTIONS*****************************************/
 //MIC algorithm
 inline __device__ void apply_pbc(float3 &r){
-  r -= floorf(r*pairForcesParamsGPU.invL+0.5f)*pairForcesParamsGPU.L; 
+  r -= floorf(r*params.invL+0.5f)*params.L; 
 }
 inline __device__ void apply_pbc(float4 &r){
-  r -= floorf(r*pairForcesParamsGPU.invL+0.5f)*pairForcesParamsGPU.L; //MIC algorithm
+  r -= floorf(r*params.invL+0.5f)*params.L; //MIC algorithm
 }
 
 //Get the 3D cell p is in, just pos in [0,L] divided by ncells(vector) .INT DANGER.
 inline __device__ int3 getCell(float3 p){
   apply_pbc(p); //Reduce to MIC
   // return  int( (p+0.5L)/cellSize )
-  return make_int3( p*pairForcesParamsGPU.invCellSize + pairForcesParamsGPU.getCellFactor ); 
+  return make_int3( p*params.invCellSize + params.getCellFactor ); 
 }
 inline __device__ int3 getCell(float4 p){
   apply_pbc(p); //Reduce to MIC
   // return  int( (p+0.5L)/cellSize )
-  return make_int3( p*pairForcesParamsGPU.invCellSize + pairForcesParamsGPU.getCellFactor ); 
+  return make_int3( p*params.invCellSize + params.getCellFactor ); 
 }
 
 //Apply pbc to a cell coordinates
 inline __device__ void pbc_cell(int3 &cell){
-  if(cell.x==-1) cell.x = pairForcesParamsGPU.xcells-1;
-  else if(cell.x==pairForcesParamsGPU.xcells) cell.x = 0;
+  if(cell.x==-1) cell.x = params.xcells-1;
+  else if(cell.x==params.xcells) cell.x = 0;
 
-  if(cell.y==-1) cell.y = pairForcesParamsGPU.ycells-1;
-  else if(cell.y==pairForcesParamsGPU.ycells) cell.y = 0;
+  if(cell.y==-1) cell.y = params.ycells-1;
+  else if(cell.y==params.ycells) cell.y = 0;
 
-  if(cell.z==-1) cell.z = pairForcesParamsGPU.zcells-1;
-  else if(cell.z==pairForcesParamsGPU.zcells) cell.z = 0;
+  if(cell.z==-1) cell.z = params.zcells-1;
+  else if(cell.z==params.zcells) cell.z = 0;
 }
 //Get linear index of a 3D cell, from 0 to ncells-1
 inline __device__ uint getCellIndex(int3 gridPos){
   return gridPos.x
-    +gridPos.y*pairForcesParamsGPU.xcells
-    +gridPos.z*pairForcesParamsGPU.xcells*pairForcesParamsGPU.ycells;
+    +gridPos.y*params.xcells
+    +gridPos.z*params.xcells*params.ycells;
 }
 
 
@@ -177,7 +185,7 @@ void sortCellIndex(uint *&cellIndex, uint *&particleIndex, uint N){
    static bool init = false;
    static void *d_temp_storage = NULL;
    static size_t temp_storage_bytes = 0; //Additional storage needed by cub
-   static uint *cellIndex_alt, *particleIndex_alt; //Additional key/value pair
+   static uint *cellIndex_alt = NULL, *particleIndex_alt = NULL; //Additional key/value pair
 
    static cub::DoubleBuffer<uint> d_keys;
    static cub::DoubleBuffer<uint> d_values;
@@ -284,7 +292,7 @@ inline __device__ float4 forceij(const float4 &R1,const float4 &R2){
 
   /*Squared distance between 0 and 1*/
   float r2 = dot(r12,r12);
-  float r2c = r2*pairForcesParamsGPU.invrc2;
+  float r2c = r2*params.invrc2;
   /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
   //  if(r2c==0.0f) return make_float4(0.0f);  //Both cases handled in texForce
   /*Beyond rcut..*/
@@ -407,10 +415,10 @@ inline __device__ float energyij(const float4 &R1,const float4 &R2){
 
   float r2 = dot(r12,r12);
   /*Squared distance between 0 and 1*/
-  //float r2c = r2*pairForcesParamsGPU.invrc2;
+  //float r2c = r2*params.invrc2;
   /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
   if(r2==0.0f) return 0.0f;
-  else if(r2*pairForcesParamsGPU.invrc2>=1.0f) return 0.0f;
+  else if(r2*params.invrc2>=1.0f) return 0.0f;
   float invr2 = 1.0f/r2;
   float invr6 = invr2*invr2*invr2;
   float E =  2.0f*invr6*(invr6-1.0f);
@@ -521,7 +529,7 @@ inline __device__ float virialij(const float4 &R1,const float4 &R2){
 
   /*Squared distance between 0 and 1*/
   float r2 = dot(r12,r12);
-  float r2c = r2*pairForcesParamsGPU.invrc2;
+  float r2c = r2*params.invrc2;
   //if(r2c==0.0f) return 0.0f; //No need to check i==j, tex1D(texForce, 0.0) = 0.0
   /*Beyond rcut..*/
   //if(r2c>=1.0f) return 0.0f; //Also 0 in texForce
@@ -622,4 +630,145 @@ float computePairVirial(float4 *sortPos, float *virial,
 
   //cudaCheckErrors("computeForce");
 }
+
+
+
+/*******************************************DPD********************************************/
+
+/***************************************FORCE*****************************/
+
+
+
+inline __device__ float randGPU(unsigned long long int seed, curandState *rng){
+  curand_init(seed, 0, 0, rng);
+
+  return curand_uniform(rng)*2.0f-1.0f;
+}
+
+
+//Computes the force between to positions
+inline __device__ float4 forceijDPD(const float4 &R1,const float4 &R2,
+				    const float3 &V1,const float3 &V2, const float &randij){
+  
+  float3 r12 = make_float3(R1-R2);
+  float3 v12 = V1-V2;
+  
+  apply_pbc(r12);
+
+  /*Squared distance between 0 and 1*/
+  float r2 = dot(r12,r12);
+  float r2c = r2*params.invrc2;
+  
+  float fmod= 0.0f;
+  
+  float w = 0.0f;
+  float r, rinv;
+  if(r2c<1.0f){
+    r = sqrt(r2);
+    rinv = 1.0f/r;
+    w = rinv-0.4f;
+    if(r==0.0f) return make_float4(0.0f);
+  }
+  else return make_float4(0.0f);
+  //fmod = paramsDPD.A*w/r;
+  //BROKEN
+  fmod -= tex1D(texForce, r2c);
+  fmod -= paramsDPD.gamma*w*w*dot(r12,v12);
+  fmod += paramsDPD.noiseAmp*randij*w;
+  return make_float4(fmod*r12);
+}
+
+//Computes the force acting on particle index from particles in cell cell
+__device__ float4 forceCellDPD(const int3 &cell, const uint &index,
+			       const float4 &pos, const float3* vel, const float3 &veli,
+			       uint N, curandState *rng, uint seed){
+  uint icell  = getCellIndex(cell);
+  /*Index of the first particle in the cell's list*/ 
+  uint firstParticle = tex1Dfetch(texCellStart, icell);
+
+  float4 force = make_float4(0.0f);
+  float4 posj;
+
+  /*Index of the last particle in the cell's list*/
+  uint lastParticle = tex1Dfetch(texCellEnd, icell);
+  /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
+  /*If there are no particles in the cell, firstParticle=0xffffffff, the loop is not computed*/
+  /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking
+    firstParticle before fetching*/
+  float randij;
+  uint i0, j0;
+  for(uint j=firstParticle; j<lastParticle; j++){
+    uint pj = tex1Dfetch(texParticleIndex, j);
+    /*Retrieve j pos*/
+    posj = tex1Dfetch(texSortPos, j);
+    float3 velj = vel[pj];
+
+    if(index<=pj){
+      i0=index;
+      j0=pj;
+    }
+    else{
+      i0=pj;
+      j0=index;
+    }
+
+    randij = randGPU(i0+N*j0 +seed, rng);
+    force += forceijDPD(pos, posj, veli, velj, randij);
+  }
+   
+  return force;
+}
+
+
+//Kernel to compute the force acting on all particles
+__global__ void computeForceDDPD(float4* __restrict__ newForce, const float3* __restrict__ vel,
+			      const uint* __restrict__ particleIndex, 
+				 uint N, uint step){
+  /*Travel the particles per sort order*/
+  uint ii =  blockIdx.x*blockDim.x + threadIdx.x;
+  curandState rng;
+
+  
+  //Grid-strid loop
+  for(int index = ii; index<N; index += blockDim.x * gridDim.x){
+    uint pi = tex1Dfetch(texParticleIndex, index); 
+    /*Compute force acting on particle particleIndex[index], index in the new order*/
+    float4 pos = tex1Dfetch(texSortPos, index);
+    float3 veli = vel[pi];
+    float4 force = make_float4(0.0f);
+    int3 celli = getCell(pos);
+
+    int x,y,z;
+    int3 cellj;
+    unsigned long long int seed = N*N*step+5654234ULL;
+    /**Go through all neighbour cells**/
+    //For some reason unroll doesnt help here
+    for(z=-1; z<=1; z++)
+      for(y=-1; y<=1; y++)
+	for(x=-1; x<=1; x++){
+	  cellj = celli+make_int3(x,y,z);
+	  pbc_cell(cellj);	
+	  force += forceCellDPD(cellj, pi, pos, vel, veli, N, &rng, seed);
+	}
+    /*Write force with the original order*/
+    newForce[pi] += force;
+   }
+}
+
+//CPU kernel caller
+void computePairForceDPD(float4 *sortPos, float4 *force, float3 *vel,
+			 uint *cellStart, uint *cellEnd,
+			 uint *particleIndex, 
+			 uint N){
+  static uint step = 0;
+  computeForceDDPD<<<GPU_Nblocks, GPU_Nthreads>>>(force, vel,
+						  particleIndex,
+						  N, step);
+  step++;
+  //cudaCheckErrors("computeForce");
+}
+
+
+
+
 

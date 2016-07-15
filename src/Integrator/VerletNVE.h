@@ -26,10 +26,8 @@ public:
   void update() override;
   //Returns the kinetic energy
   float sumEnergy() override;
-
+  void write(bool block);
 private:
-  //The only additional information to store is the velocity
-  Vector3 vel;
   float E;
 };
 

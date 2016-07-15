@@ -30,7 +30,7 @@ void NBodyForces::init(){
 
 void NBodyForces::sumForce(){
 
-  computeNBodyForce(force->d_m, d_pos->d_m, N);
+  computeNBodyForce(force, pos, N);
 }
 
 float NBodyForces::sumEnergy(){

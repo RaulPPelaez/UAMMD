@@ -28,7 +28,7 @@ void ExternalForces::init(){
 }
 /*Perform an integration step*/
 void ExternalForces::sumForce(){
-  computeExternalForce(force->d_m, d_pos->d_m, N);
+  computeExternalForce(force, pos, N);
 }
 
 float ExternalForces::sumEnergy(){

@@ -22,6 +22,6 @@ Interactor::~Interactor(){}
 
 
 Interactor::Interactor():
-  N(gcnf.N),L(gcnf.L), d_pos(gcnf.pos), force(gcnf.force){
+  N(gcnf.N),L(gcnf.L){
 
 }

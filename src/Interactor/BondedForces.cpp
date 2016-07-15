@@ -39,22 +39,26 @@ BondedForces::BondedForces(const char * readFile):
   cerr<<"Initializing Bonded Forces..."<<endl;
   params.L = L;
 
+  nbonds = nbondsFP = 0;
   /*If some bond type number is zero, the loop will simply not be entered, and no storage will be used*/
   /*Read the bond list from the file*/
   ifstream in(readFile);
   in>>nbonds;
-  bondList = Vector<Bond>(nbonds*2);//Allocate 2*nbonds, see init for explication
-  fori(0, nbonds){
-    in>>bondList[i].i>>bondList[i].j>>bondList[i].r0>>bondList[i].k;
+  if(nbonds>0){
+    bondList = Vector<Bond>(nbonds*2);//Allocate 2*nbonds, see init for explication
+    fori(0, nbonds){
+      in>>bondList[i].i>>bondList[i].j>>bondList[i].r0>>bondList[i].k;
+    }
   }
-
   /*Fixed point bonds*/
   in>>nbondsFP;
-  bondListFP = Vector<BondFP>(nbondsFP);
-  fori(0, nbondsFP){
-    in>>bondListFP[i].i;
-    in>>bondListFP[i].pos.x>>bondListFP[i].pos.y>>bondListFP[i].pos.z;
-    in>>bondListFP[i].r0>>bondListFP[i].k;
+  if(nbondsFP>0){
+    bondListFP = Vector<BondFP>(nbondsFP);
+    fori(0, nbondsFP){
+      in>>bondListFP[i].i;
+      in>>bondListFP[i].pos.x>>bondListFP[i].pos.y>>bondListFP[i].pos.z;
+      in>>bondListFP[i].r0>>bondListFP[i].k;
+    }
   }
 
   cerr<<"\tDetected: "<<nbonds<<" particle-particle bonds and "<<nbondsFP<<" Fixed Point bonds"<<endl;
@@ -166,10 +170,10 @@ void BondedForces::sumForce(){
   /*In principle these checks are not even measurable in CPU, so its fine to do it this way*/
   
   if(nbonds>0)
-    computeBondedForce(force->d_m, d_pos->d_m, bondStart, bondEnd, bondList, N, nbonds);
+    computeBondedForce(force, pos, bondStart, bondEnd, bondList, N, nbonds);
   
   if(nbondsFP>0)
-    computeBondedForceFixedPoint(force->d_m, d_pos->d_m,
+    computeBondedForceFixedPoint(force, pos,
 				 bondStartFP, bondEndFP, bondListFP, N, nbondsFP);
 }
 

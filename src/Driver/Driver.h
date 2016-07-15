@@ -29,6 +29,7 @@ TODO:
 
 #include"Interactor/Interactor.h"
 #include"Interactor/PairForces.h"
+#include"Interactor/PairForcesDPD.h"
 #include"Integrator/Integrator.h"
 #include"Integrator/VerletNVE.h"
 #include"Integrator/VerletNVT.h"
@@ -49,13 +50,12 @@ protected:
   //Interactors are added to an integrator
   shared_ptr<Integrator> integrator;
   MeasurableArray measurables;
-//You have to initialize pos and force before giving initializing the integrators/interactors.
-  Vector4 pos, force;
   uint step;
   
 public:
   //The constructor configures and initializes the simulation
   Driver();
+  ~Driver();
   //Move nsteps*dt forward in time
   void run();
 

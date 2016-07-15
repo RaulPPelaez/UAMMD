@@ -18,13 +18,18 @@
 
 #include"Integrator.h"
 
-Integrator::~Integrator(){}
+Integrator::~Integrator(){
+
+  if(writeThread){
+    if(writeThread->joinable())
+      writeThread->join();
+  }
+}
 
 //Constructor to be called in the initialization list of the derived class
 Integrator::Integrator():
-  pos(gcnf.pos), force(gcnf.force),
   N(gcnf.N), dt(gcnf.dt), L(gcnf.L){
-  writeThread=NULL;
+  writeThread=nullptr;
   steps = 0;
 }
 
@@ -32,21 +37,22 @@ Integrator::Integrator():
 //Write a step to disk using a separate thread
 void Integrator::write(bool block){
   /*Wait for the last write operation to finish*/
-  if(writeThread) writeThread->join();
+  if(writeThread && writeThread->joinable()) writeThread->join();
   /*Bring pos from GPU*/
-  pos->download();
+  pos.download();
   /*Wait for copy to finish*/
   cudaDeviceSynchronize();
   /*Query the write operation to another thread*/
-  writeThread = new std::thread(write_concurrent, pos->data, L, N);
-  if(block) writeThread->join();
+  writeThread = new std::thread(write_concurrent, pos.data, L, N);
+
+  if(block && writeThread && writeThread->joinable()) writeThread->join();
 }
 
 //This function writes a step to disk
 void write_concurrent(float4 *pos, float L, uint N){
      cout<<"#L="<<L*0.5<<";\n";
      fori(0,N){
-       cout<<pos[i].x<<" "<<pos[i].y<<" "<<pos[i].z<<" 0.56 "<<(int)(pos[i].w+1)<<"\n";
+       cout<<pos[i].x<<" "<<pos[i].y<<" "<<pos[i].z<<" 1.4 "<<(int)(pos[i].w+1)<<"\n";
      }
    
   // fori(0,N)

@@ -23,12 +23,16 @@ struct PairForcesParams{
   float L, invL, rcut, invrc2;
   float getCellFactor;
 };
+//Stores some simulation parameters to upload as constant memory.
+struct PairForcesParamsDPD{
+  float gamma, noiseAmp, A;
+};
 
 void initPairForcesGPU(PairForcesParams m_params,
 		       float *potForceData, float *potEnergyData, size_t potSize,
 		       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 		       float4 *sortPos, uint N);
-
+void initPairForcesDPDGPU(PairForcesParamsDPD m_params);
 
 void calcCellIndex(float4 *pos, uint *cellIndex, uint *particleIndex, uint N);
 
@@ -43,6 +47,13 @@ void computePairForce(float4 *sortPos, float4 *force,
 		      uint *cellStart, uint *cellEnd,
 		      uint *particleIndex, 
 		      uint N);
+
+void computePairForceDPD(float4 *sortPos, float4 *force, float3 *vel,
+			 uint *cellStart, uint *cellEnd,
+			 uint *particleIndex, 
+			 uint N);
+
+
 
 float computePairEnergy(float4 *sortPos, float *energy,		  
 			uint *cellStart, uint *cellEnd,

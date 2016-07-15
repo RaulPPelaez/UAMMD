@@ -100,10 +100,10 @@ void BrownianEulerMaruyama::update(){
 
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N, 0.0f, 1.0f);
   
-  cudaMemset((float *)force->d_m, 0.0f, 4*N*sizeof(float));
+  cudaMemset((float *)force.d_m, 0.0f, 4*N*sizeof(float));
   for(auto forceComp: interactors) forceComp->sumForce();
 
-  integrateBrownianEulerMaruyamaGPU(pos->d_m, noise, force->d_m, dt, N);
+  integrateBrownianEulerMaruyamaGPU(pos, noise, force, dt, N);
 }
 
 float BrownianEulerMaruyama::sumEnergy(){

@@ -53,7 +53,6 @@ public:
   }
 protected:
   //Pos and force are handled outside
-  Vector4Ptr pos, force;
   vector<shared_ptr<Interactor>> interactors;
   uint steps;
   uint N;
