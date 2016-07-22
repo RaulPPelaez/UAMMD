@@ -20,7 +20,7 @@
 
 
 
-void cholesky(Vector<float4> Din, Vector<float4> &Bout){
+void cholesky(Vector4 Din, Vector4 &Bout){
   int i, j, k; /* Indices */
   float tmpsum; /* Temporary variable */
 

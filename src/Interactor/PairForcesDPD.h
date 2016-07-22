@@ -8,18 +8,20 @@ class PairForcesDPD: public PairForces{
 public:
   PairForcesDPD();
   ~PairForcesDPD(){}
-
+  
+  void makeNeighbourListDPD();
+  
   void sumForce() override;
   float sumEnergy() override;
   float sumVirial() override;
   
 private:
   float gamma;
-
+  Vector4 sortVel;
+  
   PairForcesParamsDPD paramsDPD;
+  Xorshift128plus rngCPU;
+  unsigned long long int seed;
 };
-
-
-
 
 #endif

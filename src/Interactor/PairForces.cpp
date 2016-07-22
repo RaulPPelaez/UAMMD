@@ -25,7 +25,6 @@ using namespace std;
 PairForces::PairForces(pairForceType fs):
   PairForces(fs, nullForce, nullForce){}
 
-
 PairForces::PairForces(pairForceType fs,
 		       std::function<float(float)> cFFun,
 		       std::function<float(float)> cEFun):
@@ -130,10 +129,10 @@ void PairForces::sumForce(){
   makeNeighbourList();
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   computePairForce(sortPos,
-	       force, 
-	       cellStart, cellEnd, 
-	       particleIndex,
-	       N);
+		   force, 
+		   cellStart, cellEnd, 
+		   particleIndex,
+		   N);
 }
 
 float PairForces::sumEnergy(){

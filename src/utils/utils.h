@@ -46,9 +46,8 @@ public:
   }
 };
 
-#ifndef RANDOM_MAX
- #define RANDOM_MAX 18446744073709551615u
-#endif
+//2^64-1
+#define RANDOM_MAX 18446744073709551615ULL
 /* Pseudorandom number generation */
 class Xorshift128plus{
   uint64_t s[2]; /* PRNG state */
@@ -57,13 +56,17 @@ public:
   Xorshift128plus(uint64_t s0, uint64_t s1){
   s[0] = s0;  s[1] = s1;  
   }
+  Xorshift128plus(uint64_t s0){
+  s[0] = s0;  s[1] = s0+15438657923749336752ULL;  
+  }
+
   Xorshift128plus(){
     /* The PRNG state must be seeded so that it is not everywhere zero. */
-    s[0] = 12679825035178159220u;
-    s[1] = 15438657923749336752u;
+    s[0] = 12679825035178159220ULL;
+    s[1] = 15438657923749336752ULL;
   }
   /* 64-bit (pseudo)random integer */
-  uint64_t xorshift128plus(void){
+  uint64_t next(void){
     uint64_t x = s[0];
     uint64_t const y = s[1];
     s[0] = y;
@@ -75,7 +78,7 @@ public:
   }
   /* Random number from a uniform distribution */
   float uniform(float min, float max){
-    return min + (xorshift128plus()/((float) RANDOM_MAX))*(max - min);
+    return min + (next()/((float) RANDOM_MAX))*(max - min);
   }
 };
 

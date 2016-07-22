@@ -42,7 +42,7 @@ The simulation construction is performed in Driver/SimulationConfig.cpp. Where t
 -----------------------
 **Interactors:**
 
-	1.Pair Forces: Implements hash (cell index) sort neighbour list construction algorithm to evaluate pair forces given some potential function, LJ i.e. Ultra fast
+	1.Pair Forces: Implements hash (cell index) sort neighbour list construction algorithm to evaluate pair forces given some short range potential function, LJ i.e. Ultra fast
 	2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
     3.NBody forces: All particles interact with every other via some potential.
 	4.External forces: A custom force function that will be applied to each particle individually.

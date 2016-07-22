@@ -45,7 +45,7 @@ void VerletNVE::update(){
     
     float K = abs(E-U);
     /*Distribute the velocities accordingly*/
-    float vamp = 0.0f*sqrt(2.0f*K);
+    float vamp = sqrt(gcnf.T);//.0f*sqrt(2.0f*K);
     /*Create velocities*/
     vel.fill_with(make_float3(0.0f));
     fori(0,N){
@@ -78,7 +78,7 @@ float VerletNVE::sumEnergy(){
 
 
 void VerletNVE::write(bool block){
-  Integrator::write(false);
+  Integrator::write(block);
    // vel.download();
    // float3 res = make_float3(0.0f);
    // fori(0,N){

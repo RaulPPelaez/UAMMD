@@ -4,8 +4,6 @@
   Interactor is intended to be a module that computes and sums the forces acting on each particle
   due to some interaction, like and external potential or a pair potential.
 
-  The positions and forces must be provided, they are not created by the module.
-
   This module implements an algorithm to compute the force between particles joined by springs.
 */
 
@@ -32,9 +30,9 @@ struct BondedForcesParams{
 //Stores some simulation parameters to upload as constant memory.
 void initBondedForcesGPU(BondedForcesParams m_params);
 
-
-void computeBondedForce(float4* force, float4 *pos,
-			uint *bondStart, uint *bondEnd, Bond* bondList, uint N, uint nbonds);
+void computeBondedForce(float4 *force, float4 *pos,
+			uint *bondStart, uint *bondEnd, uint *bondedParticleIndex, 
+			Bond* bondList, uint N, uint Nparticles_with_bonds, uint nbonds);
 
 void computeBondedForceFixedPoint(float4* force, float4 *pos,
 				  uint *bondStartFP, uint *bondEndFP, BondFP* bondListFP, uint N, uint nbonds);

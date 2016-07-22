@@ -22,6 +22,7 @@ TODO:
 #include<iostream>
 #include<fstream>
 #include<algorithm>
+#include<set>
 
 using namespace std;
 
@@ -124,8 +125,17 @@ void BondedForces::init(){
     }
 
 
-  
+    
+    set<uint> particlesWithBonds;
+    fori(0, bondList.size()){
+      particlesWithBonds.insert(bondList[i].i);
+    }
+
+    bondParticleIndex.assign(particlesWithBonds.begin(), particlesWithBonds.end());
+    cerr<<"\t"<<bondParticleIndex.size()<<" particles have at least one bond"<<endl;
+
     /*Upload all to GPU*/
+    bondParticleIndex.upload();
     bondList.upload();
     bondStart.upload();
     bondEnd.upload();
@@ -170,7 +180,10 @@ void BondedForces::sumForce(){
   /*In principle these checks are not even measurable in CPU, so its fine to do it this way*/
   
   if(nbonds>0)
-    computeBondedForce(force, pos, bondStart, bondEnd, bondList, N, nbonds);
+    //computeBondedForce(force, pos, bondStart, bondEnd, bondList, N, nbonds);
+    computeBondedForce(force, pos, bondStart, bondEnd, bondParticleIndex,
+		       bondList, N, bondParticleIndex.size(), nbonds);
+
   
   if(nbondsFP>0)
     computeBondedForceFixedPoint(force, pos,

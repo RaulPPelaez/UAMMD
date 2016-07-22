@@ -6,14 +6,15 @@ Any module can use these parameters however they want. So the VerletNVT module w
 TODO:
 100- Construct the simulation via strings in GlobalConfig
 100- Implement a system to broadcast the change of one of the parameters. Maybe something like a global event vector
+100- Seed should change in every step acording to a xorshift128 generator, with seed gcnf.seed in the first step, updating it.
  */
 #ifndef GLOBALS_H
 #define GLOBALS_H
 #include "utils/utils.h"
 struct GlobalConfig{
   /*Default parameters*/
-  uint N = 16384;
-  float L = 32, rcut = 2.5f;
+  uint N = 0;
+  float L = 0.0f, rcut = 2.5f;
   float dt = 0.001f;
   float T = 0.0f;
   float E = 0.0f;
@@ -23,6 +24,8 @@ struct GlobalConfig{
   uint relaxation_steps = 1000;
   uint measure_steps = -1;
 
+  unsigned long long int seed = 12345678910111213141ULL;
+  
 };
 #endif
 

@@ -24,7 +24,7 @@ CUSTOM_CUOBJS=
 #############################################################################################################################
 
 
-CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -lpthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ -g
+CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ -g
 
 CXXFLAGS=$(CFLAGS) 
 

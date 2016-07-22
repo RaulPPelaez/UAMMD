@@ -30,7 +30,7 @@
 #include<thread>
 #include<memory>
 
-void write_concurrent(float4 *pos, float L, uint N);
+int write_concurrent( float4* posdata);
 class Integrator{
 public:
   //Constructor to be called in the initialization list of the derived class
@@ -57,7 +57,7 @@ protected:
   uint steps;
   uint N;
   float dt, L;
-  std::thread *writeThread;
+  std::thread writeThread;
   string name;
 };
 

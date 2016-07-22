@@ -32,7 +32,7 @@ void initPairForcesGPU(PairForcesParams m_params,
 		       float *potForceData, float *potEnergyData, size_t potSize,
 		       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 		       float4 *sortPos, uint N);
-void initPairForcesDPDGPU(PairForcesParamsDPD m_params);
+void initPairForcesDPDGPU(PairForcesParamsDPD m_params, float4* sortVel, uint N);
 
 void calcCellIndex(float4 *pos, uint *cellIndex, uint *particleIndex, uint N);
 
@@ -43,6 +43,12 @@ void reorderAndFind(float4 *sortPos,
 		    uint *cellStart, uint *cellEnd, uint ncells,
 		    float4 *pos, uint N);
 
+/*Identical to above, but reordering velocities also*/
+void reorderAndFindDPD(float4 *sortPos, float4 *sortVel,
+		       uint *cellIndex, uint *particleIndex, 
+		       uint *cellStart, uint *cellEnd, uint ncells,
+		       float4 *pos, float3* vel, uint N);
+
 void computePairForce(float4 *sortPos, float4 *force,
 		      uint *cellStart, uint *cellEnd,
 		      uint *particleIndex, 
@@ -51,7 +57,7 @@ void computePairForce(float4 *sortPos, float4 *force,
 void computePairForceDPD(float4 *sortPos, float4 *force, float3 *vel,
 			 uint *cellStart, uint *cellEnd,
 			 uint *particleIndex, 
-			 uint N);
+			 uint N, unsigned long long int seed);
 
 
 

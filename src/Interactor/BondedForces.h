@@ -56,7 +56,8 @@ private:
   uint nbonds;
   Vector<Bond> bondList;
   Vector<uint> bondStart, bondEnd;
-
+  Vector<uint> bondParticleIndex;
+  
   uint nbondsFP; //Fixed Point
   Vector<BondFP> bondListFP;
   Vector<uint> bondStartFP, bondEndFP;

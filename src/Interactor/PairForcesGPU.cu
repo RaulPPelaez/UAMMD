@@ -44,6 +44,7 @@ __constant__ PairForcesParamsDPD paramsDPD; //Simulation parameters in constant 
 //Texture references for scattered access
 texture<uint> texCellStart, texCellEnd, texParticleIndex;
 texture<float4> texSortPos;
+texture<float4> texSortVel; //For DPD
 texture<float,1 , cudaReadModeElementType> texForce; cudaArray *dF;
 //texture<float,1 , cudaReadModeElementType> texEnergy; cudaArray *dE;
 
@@ -106,9 +107,14 @@ void initPairForcesGPU(PairForcesParams m_params,
   GPU_Nblocks  =  N/GPU_Nthreads +  ((N%GPU_Nthreads!=0)?1:0); 
 }
 
-void initPairForcesDPDGPU(PairForcesParamsDPD m_params){
+
+
+void initPairForcesDPDGPU(PairForcesParamsDPD m_params, float4* sortVel, uint N){
 
   gpuErrchk(cudaMemcpyToSymbol(paramsDPD, &m_params, sizeof(PairForcesParamsDPD)));
+
+
+  gpuErrchk(cudaBindTexture(NULL, texSortVel, sortVel, N*sizeof(float4)));
 }
 
 /****************************HELPER FUNCTIONS*****************************************/
@@ -638,11 +644,62 @@ float computePairVirial(float4 *sortPos, float *virial,
 /***************************************FORCE*****************************/
 
 
+//Create CellStart and CellEnd, copy pos onto sortPos
+__global__ void reorderAndFindDDPD(float4 *sortPos, float4 *sortVel,
+				   uint *cellIndex, uint *particleIndex, 
+				   uint *cellStart, uint *cellEnd,
+				   const float4 *pos, const float3 *vel,
+				   uint N){
+  uint index = blockIdx.x*blockDim.x + threadIdx.x;
+  uint icell, icell2;
+
+  if(index<N){//If my particle is in range
+    icell = cellIndex[index]; //Get my icell
+    if(index>0)icell2 = cellIndex[index-1];//Get the previous part.'s icell
+    else icell2 = 0;
+    //If my particle is the first or is in a different cell than the previous
+    //my index is the start of a cell
+    if(index ==0 || icell != icell2){
+      //Then my particle is the first of my cell
+      cellStart[icell] = index;
+      //If my index is the start of a cell, it is also the end of the previous
+      //Except if I am the first one
+      if(index>0)
+	cellEnd[icell2] = index;
+    }
+    //If I am the last particle my cell ends 
+    if(index == N-1) cellEnd[icell] = index+1;
+
+    //Copy pos into sortPos
+    //uint sortIndex   = particleIndex[index];
+    uint sortIndex   = tex1Dfetch(texParticleIndex, index);
+    sortPos[index]   = pos[sortIndex];
+    sortVel[index]   = make_float4(vel[sortIndex]);
+  }
+
+}
+//CPU kernel caller
+void reorderAndFindDPD(float4 *sortPos, float4* sortVel,
+		       uint *cellIndex, uint *particleIndex, 
+		       uint *cellStart, uint *cellEnd, uint ncells,
+		       float4 *pos, float3* vel, uint N){
+  //Reset CellStart
+  cudaMemset(cellStart, 0xffffffff, ncells*sizeof(uint));
+  //CellEnd does not need reset, a cell with cellStart=0xffffff is not checked for a cellEnd
+  reorderAndFindDDPD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, sortVel,
+						 cellIndex, particleIndex,
+						 cellStart, cellEnd,
+						 pos, vel, N);
+  //cudaCheckErrors("Reorder and find");					   
+}
+
+
 
 inline __device__ float randGPU(unsigned long long int seed, curandState *rng){
   curand_init(seed, 0, 0, rng);
 
-  return curand_uniform(rng)*2.0f-1.0f;
+  curand_normal(rng);
+  return curand_normal(rng);
 }
 
 
@@ -680,8 +737,10 @@ inline __device__ float4 forceijDPD(const float4 &R1,const float4 &R2,
 
 //Computes the force acting on particle index from particles in cell cell
 __device__ float4 forceCellDPD(const int3 &cell, const uint &index,
-			       const float4 &pos, const float3* vel, const float3 &veli,
-			       uint N, curandState *rng, uint seed){
+			       const float4 &pos,
+			       const float3* __restrict__  vel, const float3 &veli,
+			       uint N,
+			       curandState &rng, unsigned long long int seed){
   uint icell  = getCellIndex(cell);
   /*Index of the first particle in the cell's list*/ 
   uint firstParticle = tex1Dfetch(texCellStart, icell);
@@ -696,13 +755,14 @@ __device__ float4 forceCellDPD(const int3 &cell, const uint &index,
   /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking
     firstParticle before fetching*/
   float randij;
-  uint i0, j0;
+  unsigned long long int i0, j0;
   for(uint j=firstParticle; j<lastParticle; j++){
-    uint pj = tex1Dfetch(texParticleIndex, j);
+    //uint pj = tex1Dfetch(texParticleIndex, j);
+    uint pj = j;
     /*Retrieve j pos*/
     posj = tex1Dfetch(texSortPos, j);
-    float3 velj = vel[pj];
-
+    float3 velj = make_float3(tex1Dfetch(texSortVel, j));
+    //float3 velj = vel[pj];
     if(index<=pj){
       i0=index;
       j0=pj;
@@ -712,7 +772,7 @@ __device__ float4 forceCellDPD(const int3 &cell, const uint &index,
       j0=index;
     }
 
-    randij = randGPU(i0+N*j0 +seed, rng);
+    randij = randGPU(i0+(unsigned long long int)N*j0 +seed, &rng);
     force += forceijDPD(pos, posj, veli, velj, randij);
   }
    
@@ -723,24 +783,25 @@ __device__ float4 forceCellDPD(const int3 &cell, const uint &index,
 //Kernel to compute the force acting on all particles
 __global__ void computeForceDDPD(float4* __restrict__ newForce, const float3* __restrict__ vel,
 			      const uint* __restrict__ particleIndex, 
-				 uint N, uint step){
+				 uint N, unsigned long long int step){
   /*Travel the particles per sort order*/
   uint ii =  blockIdx.x*blockDim.x + threadIdx.x;
   curandState rng;
 
+  unsigned long long int seed = step;
   
   //Grid-strid loop
   for(int index = ii; index<N; index += blockDim.x * gridDim.x){
     uint pi = tex1Dfetch(texParticleIndex, index); 
     /*Compute force acting on particle particleIndex[index], index in the new order*/
     float4 pos = tex1Dfetch(texSortPos, index);
-    float3 veli = vel[pi];
+    float3 veli = make_float3(tex1Dfetch(texSortVel, index));
+    //float3 veli = vel[pi];
     float4 force = make_float4(0.0f);
     int3 celli = getCell(pos);
 
     int x,y,z;
     int3 cellj;
-    unsigned long long int seed = N*N*step+5654234ULL;
     /**Go through all neighbour cells**/
     //For some reason unroll doesnt help here
     for(z=-1; z<=1; z++)
@@ -748,7 +809,7 @@ __global__ void computeForceDDPD(float4* __restrict__ newForce, const float3* __
 	for(x=-1; x<=1; x++){
 	  cellj = celli+make_int3(x,y,z);
 	  pbc_cell(cellj);	
-	  force += forceCellDPD(cellj, pi, pos, vel, veli, N, &rng, seed);
+	  force += forceCellDPD(cellj, index, pos, vel, veli, N, rng, seed);
 	}
     /*Write force with the original order*/
     newForce[pi] += force;
@@ -759,12 +820,10 @@ __global__ void computeForceDDPD(float4* __restrict__ newForce, const float3* __
 void computePairForceDPD(float4 *sortPos, float4 *force, float3 *vel,
 			 uint *cellStart, uint *cellEnd,
 			 uint *particleIndex, 
-			 uint N){
-  static uint step = 0;
+			 uint N, unsigned long long int seed){
   computeForceDDPD<<<GPU_Nblocks, GPU_Nthreads>>>(force, vel,
 						  particleIndex,
-						  N, step);
-  step++;
+						  N, seed);
   //cudaCheckErrors("computeForce");
 }
 
