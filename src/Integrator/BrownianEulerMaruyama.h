@@ -26,20 +26,20 @@
 class BrownianEulerMaruyama: public Integrator{
 public:
   //Constructor, you have to provide D and K.
-  BrownianEulerMaruyama(Vector4Ptr D,
-			Vector4Ptr K);
+  BrownianEulerMaruyama(Matrixf D, Matrixf K);
   ~BrownianEulerMaruyama();
 
   void update() override;
   float sumEnergy() override;
 private:
+  Matrixf D, K, B;
   Vector3 noise;
   
   curandGenerator_t rng;
   BrownianEulerMaruyamaParameters params;
   
-  Vector4Ptr D, K;
-  Vector4 B;
+
+
 };
 
 

@@ -42,7 +42,7 @@ VerletNVT::VerletNVT():
   
   /*Init rng*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(rng, 1234ULL);  //WARNING, THE SEED!!!
+  curandSetPseudoRandomGeneratorSeed(rng, gcnf.seed);
   /*This shit is obscure, curand will only work with an even number of elements*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
   
@@ -62,7 +62,6 @@ VerletNVT::VerletNVT():
 
 VerletNVT::~VerletNVT(){
   curandDestroyGenerator(rng);
-  noise.freeMem();
 }
 
 //The integration process can have two steps

@@ -46,7 +46,7 @@ The simulation construction is performed in Driver/SimulationConfig.cpp. Where t
 	2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
     3.NBody forces: All particles interact with every other via some potential.
 	4.External forces: A custom force function that will be applied to each particle individually.
-	5.Pair Forces DPD: A thermostat that uses the Pair Forces module to compute the interactions given by dissipative particle dynamics. (WIP)
+	5.Pair Forces DPD: A thermostat that uses the Pair Forces module to compute the interactions given by dissipative particle dynamics.
 	
 **Integrators:**
 
@@ -134,7 +134,7 @@ Current benchmark:
 
 The procedure to implement a new module is the following:
 
-	1. Inherit one of the parents (Interactor, Integrator, Measurable...) and overload the virtual methods. It is advised to create 4 files, Header and declarations for the CPU side, and header and declarations for the GPU callers and kernels.
+	1. Create a new class that inherits from one of the parents (Interactor, Integrator, Measurable...) and overload the virtual methods. It is advised to create 4 files, Header and declarations for the CPU side, and header and declarations for the GPU callers and kernels. But you can code it and compile it anyway you want as long as the virtual methods are overloaded.
 	2. Include the new CPU header in Driver/Driver.h
 	3. Add the new sources in the Makefile.
 	4. Initialize them as needed in driver/SimulationConfig.cpp as in the examples.
@@ -143,10 +143,10 @@ The procedure to implement a new module is the following:
 Keep in mind that the compilation process is separated between CPU and GPU code, so any GPU code in a .cpp file will cause a compilation error. See any of the available modules for a guideline.
 
 -------------------------------
-In globals/globals.h are the definitions of some variables that will be available throughout the entire CPU side of the project. These are mainly parameters.
+In globals/globals.h are the definitions of some variables that will be available throughout the entire CPU side of the project. These are mainly parameters. It also contains the position, force and an optional velocity arrays.
 
 In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from global when available. Things like the number of particles, the temperature or more importantly, the Vectors storing the positions, forces and velocities of each particle (again, when needed). These Vectors start with zero size.
 
-Currently the code expects you to initialize pos, force and vel Vectors. Pos and force should be initialized in SimulationConfig.cpp, after setting gcnf.N and before initializing any modules. Vel should be initialized in the constructor of any module that needs it, see VerletNVT for an example.
+Currently the code initializes pos and force Vectors in Driver.cpp, after the parameters are set. Vel should be initialized in the constructor of any module that needs it, see VerletNVT for an example.
 
 ------------------------------------------

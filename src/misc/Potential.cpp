@@ -16,12 +16,9 @@ TODO:
 Potential::Potential(std::function<float(float)> Ffoo,
 		     std::function<float(float)> Efoo,
 		     int N, float rc):
-  forceFun(Ffoo), energyFun(Efoo), N(N)
+  N(N), F(N), E(N),
+  forceFun(Ffoo), energyFun(Efoo)
 {
-
-  F.resize(N);
-  E.resize(N);
-
   float dr2 = rc*rc/(float)N;
   float r2 = 0.5f*dr2;
 

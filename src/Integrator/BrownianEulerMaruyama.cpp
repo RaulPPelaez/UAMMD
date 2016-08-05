@@ -3,7 +3,8 @@
   An Integrator is intended to be a separated module that handles the update of positions given the forces
 
   It takes care of keeping the positions updated.
-  The positions must be provided, they are not created by the module.
+  The positions must be provided as a global object,
+     they are not created by the module.
   Also takes care of writing to disk
  
   
@@ -19,91 +20,92 @@
 #include "BrownianEulerMaruyama.h"
 
 
-
-void cholesky(Vector4 Din, Vector4 &Bout){
-  int i, j, k; /* Indices */
+/*Performs the cholesky decomposition of a matrix*/
+Matrixf cholesky(Matrixf Din){
+  //Doesnt check for positive definite
+  //Super slow, use only in initialization
+  uint i, j, k; /* Indices */
   float tmpsum; /* Temporary variable */
-
-  Matrix<float> B(3,3);
-  Matrix<float> D(3,3);
-
-  fori(0,3){
-    D[i][0] = Din[i].x;
-    D[i][1] = Din[i].y;
-    D[i][2] = Din[i].z;
+  if(!Din.isSquare()){
+    cerr<<"Cholesky: Not a square matrix!!!"<<endl;
   }
+  uint dim = Din.size().x;
 
+  Matrixf B(dim, dim);
+  Matrixf D = Din;
   /* Clear B matrix */
   B.fill_with(0.0f);
-  Bout.fill_with(make_float4(0.0f));
-
-
-
-  for(j = 0; j < 3; j++) {
+  
+  for(j = 0; j < dim; j++) {
     tmpsum = 0;
     for(k = 0; k < j; k++)
       tmpsum += B[j][k]*B[j][k];
     B[j][j] = sqrt(D[j][j] - tmpsum);
 
-    for(i = j + 1; i < 3; i++) {
+    for(i = j + 1; i < dim; i++) {
       tmpsum = 0;
       for(k = 0; k < j; k++)
         tmpsum += B[i][k]*B[j][k];
       B[i][j] = (D[i][j] - tmpsum)/B[j][j];
     }
   }
-
-  fori(0,3){
-    Bout[i].x = B[i][0];
-    Bout[i].y = B[i][1];
-    Bout[i].z = B[i][2];
-  }
+  
+  return B;
 }
 
-BrownianEulerMaruyama::BrownianEulerMaruyama(Vector4Ptr D,
-					     Vector4Ptr K):
+BrownianEulerMaruyama::BrownianEulerMaruyama(Matrixf Din,
+					     Matrixf Kin):
   Integrator(),
-  D(D),K(K),
-  noise(N){
+  D(Din), K(Kin),
+  noise( N + ((3*N)%2) ){
+  
+  cerr<<"Initializing Brownian Euler Maruyama Integrator..."<<endl;
+  if(Din.size().x!=3 || Kin.size().x!=3 ||
+     !Din.isSquare() || !Kin.isSquare()){
+    cerr<<"ERROR!, K and D must be 3x3!!"<<endl;
+    exit(1);
+  }
 
+  /*Set GPU parameters*/
   
   params.sqrtdt = sqrt(dt)*sqrt(2.0f);
+  params.dt = dt;
 
-  D->upload();
-  params.D = D->d_m;
-  K->upload();
-  params.K = K->d_m;
 
-  B = Vector<float4>(4);
+  D.upload();
+  K.upload();
+  params.D = (float3 *)D.d_m;
+  params.K = (float3* )K.d_m;
 
-  B.fill_with(make_float4(0.0f));
-  cholesky(*D, B);
+  B = cholesky(D);
   B.upload();
-  params.B = B.d_m;
-  
+  params.B = (float3* )B.d_m;
+
   /*Create noise*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(rng, time(NULL));
+  curandSetPseudoRandomGeneratorSeed(rng, gcnf.seed);
 
   noise.fill_with(make_float3(0.0f));
   noise.upload();
-  //Curand fill with gaussian numbers with mean 0 and var 1
-  curandGenerateNormal(rng, (float*) noise.d_m, 3*N, 0.0f, 1.0f);
+  //Curand fill with gaussian numbers with mean 0 and var 1, you have to ask for an even number of them
+  curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
   
   initBrownianEulerMaruyamaGPU(params);
+  cerr<<"Brownian Euler Maruyama Integrator\t\tDONE!!\n\n"<<endl;
 }
 BrownianEulerMaruyama::~BrownianEulerMaruyama(){}
 
 void BrownianEulerMaruyama::update(){
   steps++;
   if(steps%500==0) cerr<<"\rComputing step: "<<steps<<"   ";
-
-  curandGenerateNormal(rng, (float*) noise.d_m, 3*N, 0.0f, 1.0f);
-  
-  cudaMemset((float *)force.d_m, 0.0f, 4*N*sizeof(float));
+  /*Generate noise*/
+  curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
+  /*Reset force*/
+  cudaMemset(force.d_m, 0.0f, N*sizeof(float4));
+  /*Compute new forces*/
   for(auto forceComp: interactors) forceComp->sumForce();
-
-  integrateBrownianEulerMaruyamaGPU(pos, noise, force, dt, N);
+  /*Update positions*/
+  integrateBrownianEulerMaruyamaGPU(pos, noise, force, N);
 }
 
 float BrownianEulerMaruyama::sumEnergy(){

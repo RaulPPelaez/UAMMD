@@ -24,6 +24,8 @@ ofstream Measurable::out = ofstream("measurables.dat");
 Measurable::Measurable(){
   total_measurables++;
   this->id = total_measurables;
+  this-> N = gcnf.N;
+  this-> L = gcnf.L;
   // if(id==0){
   //   out.close();
   //   out.open("measurable.dat");

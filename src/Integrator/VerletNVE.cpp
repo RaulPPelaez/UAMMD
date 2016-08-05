@@ -12,18 +12,18 @@
       v[t+dt] = v[t] +0.5·(a[t]+a[t+dt])·dt
 TODO:
 100- Allow velocities from outside
+100- Allow to set the initial velocity instead of the energy
 */
 #include "VerletNVE.h"
 
 /*Constructor, Dont forget to initialize the base class Integrator!*/
 /*You can use anything in gcnf at any time*/
 VerletNVE::VerletNVE():
-  E(gcnf.E),
-  Integrator(){
+  Integrator(), E(gcnf.E){
   cerr<<"Initializing Verlet NVE Integrator..."<<endl;
 
   /*Create the velocity if you need it*/
-  vel = Vector3(N); 
+  vel = Vector3(N);  vel.fill_with(make_float3(0.0f));  vel.upload();
   
   cerr<<"\tSet E="<<E<<endl;
   
@@ -45,7 +45,7 @@ void VerletNVE::update(){
     
     float K = abs(E-U);
     /*Distribute the velocities accordingly*/
-    float vamp = sqrt(gcnf.T);//.0f*sqrt(2.0f*K);
+    float vamp = sqrt(2.0f*K);
     /*Create velocities*/
     vel.fill_with(make_float3(0.0f));
     fori(0,N){
@@ -62,7 +62,7 @@ void VerletNVE::update(){
   integrateVerletNVEGPU(pos, vel, force, dt, N, 1);
   /**Reset the force**/
   /*The integrator is in charge of resetting the force when it needs, an interactor always sums to the current force*/
-  cudaMemset((float *)force.d_m, 0.0f, 4*N*sizeof(float));
+  cudaMemset(force.d_m, 0.0f, N*sizeof(float4));
 
   /**Compute all the forces**/
   for(auto forceComp: interactors) forceComp->sumForce();
@@ -76,7 +76,8 @@ float VerletNVE::sumEnergy(){
   return computeKineticEnergyVerletNVE(vel, N);
 }
 
-
+/*You can hijack the writing to disk process like this and perform a custom write,
+  maybe to add something or to completly change the process*/
 void VerletNVE::write(bool block){
   Integrator::write(block);
    // vel.download();

@@ -29,7 +29,7 @@ TODO:
 class Interactor{
 public:
   Interactor();
-  ~Interactor();
+  virtual ~Interactor();
 
   virtual void sumForce() = 0;
   virtual float sumEnergy() = 0;

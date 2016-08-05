@@ -25,11 +25,16 @@
 
 using namespace std;
 typedef uint32_t uint;
+typedef unsigned long long int ullint;
 
-#define fori(x,y) for(int i=x; i<y; i++)
-#define forj(x,y) for(int j=x; j<y; j++)
+#define fori(x,y) for(int i=x; i<int(y); i++)
+#define forj(x,y) for(int j=x; j<int(y); j++)
 
 #include "Vector.h"
+
+//Returns an identity matrix of size n
+Matrixf eye(uint n);
+
 
 
 /*A timer class to measure time, just use 
@@ -37,7 +42,9 @@ typedef uint32_t uint;
 class Timer{
   struct timeval start, end;
 public:
-  Timer(){}
+  Timer():
+    start((struct timeval){0}),
+    end((struct timeval){0}){}
   void tic(){ gettimeofday(&start, NULL); }
   float toc(){
     gettimeofday(&end, NULL);
@@ -47,7 +54,7 @@ public:
 };
 
 //2^64-1
-#define RANDOM_MAX 18446744073709551615ULL
+#define RANDOM_MAX 0xFFffFFffFFffFFffULL
 /* Pseudorandom number generation */
 class Xorshift128plus{
   uint64_t s[2]; /* PRNG state */
@@ -87,7 +94,7 @@ public:
 void cubicLattice(float4 *pos, float L, uint N);
 void cubicLattice2D(float4 *pos, float L, uint N);
 
-void readFile(Vector4 &pos, const char * fileName);
+Vector4 readFile(const char * fileName);
 
 bool randInitial(float4 *pos, float L, uint N);
 

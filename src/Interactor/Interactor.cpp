@@ -22,6 +22,6 @@ Interactor::~Interactor(){}
 
 
 Interactor::Interactor():
-  N(gcnf.N),L(gcnf.L){
+  N(gcnf.N),L(gcnf.L), name(""){
 
 }

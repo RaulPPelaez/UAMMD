@@ -14,10 +14,6 @@ Interactor computes the pair forces using the current positions according to the
 
 The idea is for Integrator to control the positions and velocities and for Interactor to control the forces. Communicating each variable when needed. So if you need the vel. in the force computing you can pass it when computing the force and modify the force function accordingly.
 -------
-To check physics try N= 2^14 and L = 32 and uncomment write calls
-
-Or try N= 324 and L = 30 and uncomment write calls, in Driver put initial conditions in a cubicLattice2D with L=20
-------
 Current benchmark:
 GTX980 CUDA-7.5
 N = 2^20
@@ -47,18 +43,20 @@ TODO:
 #include"globals/globals.h"
 #include"Driver/SimulationConfig.h"
 
-GlobalConfig gcnf;
 
+/*Declaration of extern variables in globals.h*/
+GlobalConfig gcnf;
 Vector4 pos, force;
 Vector3 vel;
+
 
 int main(int argc, char *argv[]){
   Timer tim;
   tim.tic();
-  
+
+  /*The simulation handler*/
   SimulationConfig psystem;
 
-  //psystem.write(true);
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;
 
   
@@ -73,6 +71,8 @@ int main(int argc, char *argv[]){
   if(gcnf.print_steps>0) psystem.write(true);
 
   cudaDeviceSynchronize();
+  
+  /*Free the global arrays manually*/
   pos.freeMem();
   force.freeMem();
   vel.freeMem();

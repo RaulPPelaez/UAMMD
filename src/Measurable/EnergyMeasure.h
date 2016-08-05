@@ -17,7 +17,7 @@ Writes the results to measurables.dat
 class EnergyMeasure: public Measurable{
 public:
   EnergyMeasure(InteractorArray interactors,
-		shared_ptr<Integrator> integrator, uint N, float L);
+		shared_ptr<Integrator> integrator);
   ~EnergyMeasure();
 
   void measure() override;
@@ -28,9 +28,9 @@ private:
   //Needs to know all the interactors and integrators in the system.
   InteractorArray interactors;
   shared_ptr<Integrator> integrator;
-  
+  uint step;  
   float K, U, P, rho;
-  uint step;
+
 };
 
 

@@ -1,6 +1,16 @@
 #include"utils.h"
 #include<stdlib.h>
 #include<fstream>
+
+Matrixf eye(uint n){
+  Matrixf A(n,n);
+  A.fill_with(0.0f);
+  fori(0,n)
+    A[i][i] = 1.0f;
+  return A;
+}
+
+
 //Took from Fluam, adapted to use float4
 void cubicLattice(float4 *pos, float L, uint N){
     float dx, dy, dz;
@@ -56,14 +66,15 @@ void cubicLattice2D(float4 *pos, float L, uint N){
 }
 
 
-void readFile(Vector4 &pos, const char * fileName){
+Vector4 readFile(const char * fileName){
   uint N;
   ifstream in(fileName);
   in>>N;
-  pos = Vector4(N, true);
+  Vector4 p = Vector4(N);
   fori(0,N){
-    in>>pos[i].x>>pos[i].y>>pos[i].z>>pos[i].w;
+    in>>p[i].x>>p[i].y>>p[i].z>>p[i].w;
   }
+  return p;
 }
 
 
@@ -76,7 +87,7 @@ bool randInitial(float4 *pos, float L, uint N){
   pos[0] = make_float4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0f);
   float4 tempos, rij;
   bool accepted = true;
-  int trials = 0;
+  uint trials = 0;
   float r2;
   fori(1,N){
     tempos = make_float4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0f);
@@ -107,3 +118,7 @@ bool randInitial(float4 *pos, float L, uint N){
 
   return true;
 }
+
+
+
+

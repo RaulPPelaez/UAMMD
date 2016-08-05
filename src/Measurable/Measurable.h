@@ -16,6 +16,7 @@ Each Measurable has an id that can be used to know the order of the calls.
 #ifndef MEASURABLE_H
 #define MEASURABLE_H
 #include "utils/utils.h"
+#include"globals/globals.h"
 #include<fstream>
 using namespace std;
 class Measurable{

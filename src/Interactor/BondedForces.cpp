@@ -108,7 +108,7 @@ void BondedForces::init(){
 
     /*Construct bondStart and bondEnd*/
     uint b, bprev = 0;
-    fori(0,nbonds){
+    for(uint i = 0; i<nbonds; i++){
       b = bondList[i].i; //Get my particle i
       if(i>0) bprev = bondList[i-1].i; //Get the previous's bond particle i
 
@@ -148,7 +148,7 @@ void BondedForces::init(){
 
     /*Construct bondStart and bondEnd*/
     uint b, bprev = 0;
-    fori(0,nbondsFP){
+    for(uint i = 0; i<nbondsFP; i++){
       b = bondListFP[i].i; //Get my particle i
       if(i>0) bprev = bondListFP[i-1].i; //Get the previous's bond particle i
 

@@ -22,15 +22,15 @@ TODO:
 #include<iomanip>
 using namespace std;
 
-PairForces::PairForces(pairForceType fs):
-  PairForces(fs, nullForce, nullForce){}
 
 PairForces::PairForces(pairForceType fs,
 		       std::function<float(float)> cFFun,
 		       std::function<float(float)> cEFun):
+  Interactor(),
+  sortPos(N), cellIndex(N+1), particleIndex(N+1),
+  energyArray(N), virialArray(N),
   customForceFunction(cFFun), customEnergyFunction(cEFun),
-  rcut(gcnf.rcut), forceSelector(fs),
-  Interactor()
+  rcut(gcnf.rcut), forceSelector(fs)
 {
   pairForcesInstances++;
 
@@ -90,17 +90,17 @@ void PairForces::init(){
     exit(1);
   }
 
-  sortPos    = Vector<float4>(N); sortPos.fill_with(make_float4(0.0f)); sortPos.upload(); 
+  sortPos.fill_with(make_float4(0.0f)); sortPos.upload(); 
 
   /*Temporal storage for the enrgy and virial per particle*/
-  energyArray = Vector<float>(N); energyArray.fill_with(0.0f); energyArray.upload();
-  virialArray = Vector<float>(N); virialArray.fill_with(0.0f); virialArray.upload();
+  energyArray.fill_with(0.0f); energyArray.upload();
+  virialArray.fill_with(0.0f); virialArray.upload();
 
   
-  cellIndex    = Vector<uint>(N+1); cellIndex.upload();
-  particleIndex= Vector<uint>(N+1); particleIndex.upload();
-  cellStart    = Vector<uint>(ncells); cellStart.upload();
-  cellEnd      = Vector<uint>(ncells); cellEnd.upload();
+  cellIndex.fill_with(0);     cellIndex.upload();
+  particleIndex.fill_with(0); particleIndex.upload();
+  cellStart    = Vector<uint>(ncells); cellStart.fill_with(0);     cellStart.upload();
+  cellEnd      = Vector<uint>(ncells); cellEnd.fill_with(0);       cellEnd.upload();
 
   initPairForcesGPU(params,
 		    pot.getForceData(), pot.getEnergyData(), pot.getSize(),

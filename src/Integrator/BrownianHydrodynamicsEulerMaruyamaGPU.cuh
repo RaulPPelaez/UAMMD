@@ -10,20 +10,21 @@
 #include<thrust/device_vector.h>
 struct BrownianHydrodynamicsEulerMaruyamaParameters{
   float sqrtdt;
+  float dt;
   float sqrt2dt;
+  float4* K;
 };
 
 
-void copy_pos(float4 *pos, float3* pos3, float4 *force, float3* force3, uint N);
+void copy_pos(float4 *force, float3* force3, uint N);
 
-void rodne_call(float *d_D, float3 *d_R, cudaStream_t stream, uint N);
+void rodne_call(float *d_D, float4 *d_R, cudaStream_t stream, uint N);
 
-void fix_B_call(float *B, uint N, cudaStream_t stream);
+//void fix_B_call(float *B, uint N, cudaStream_t stream);
 
 
 void initBrownianHydrodynamicsEulerMaruyamaGPU(BrownianHydrodynamicsEulerMaruyamaParameters m_params);
 
-void integrateBrownianHydrodynamicsEulerMaruyamaGPU(float4 *pos, float3* DF, float3* BdW, float3* KR,
-						    float dt, uint N);
+void integrateBrownianHydrodynamicsEulerMaruyamaGPU(float4 *pos, float3* DF, float3* BdW, uint N);
 
 #endif

@@ -42,10 +42,10 @@ float nullForce(float r2);
 
 class PairForces: public Interactor{
 public:
-  PairForces(pairForceType fs = LJ);
-  PairForces(pairForceType fs,
-	     std::function<float(float)> customForceFunction,
-  	     std::function<float(float)> customEnergyFunction);
+  //PairForces(pairForceType fs = LJ);
+  PairForces(pairForceType fs = LJ,
+	     std::function<float(float)> customForceFunction = nullForce,
+  	     std::function<float(float)> customEnergyFunction = nullForce);
   ~PairForces();
 
   void sumForce() override;
@@ -53,27 +53,30 @@ public:
   float sumVirial() override;
   
 protected:
+  uint ncells;
   Vector4 sortPos;
-  Vector<float> energyArray, virialArray;
   
   void init();
   void makeNeighbourList();
   
-  uint ncells;
   Vector<uint> cellIndex, particleIndex; 
   Vector<uint> cellStart, cellEnd;
 
-  float rcut;
-
+ 
+  Vector<float> energyArray, virialArray;
   
   PairForcesParams params;
   
   //These handle the selected force functions
-  pairForceType forceSelector;
+  
   Potential pot;
   std::function<float(float)> customForceFunction;
   std::function<float(float)> customEnergyFunction;
-
+  
+  float rcut;
+  
+  pairForceType forceSelector;
+  
   static uint pairForcesInstances;
 };
 #endif

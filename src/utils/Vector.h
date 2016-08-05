@@ -2,8 +2,7 @@
 
 
 TODO:
-100- Look for a way to make the clean up automatically without using the destructor.
-100-Fix the rule of five for Matrix
+
 */
 #ifndef VECTOR_H
 #define VECTOR_H
@@ -16,12 +15,13 @@ template<class T>
 class Vector{
   typedef T* iterator;
 public:
-  T *data; //The data itself, stored aligned in memory
-  T *d_m; //device pointer
   uint n; //size of the matrix
   bool pinned; //Flag to use pinned memory
   bool initialized;
   bool uploaded;
+  T *data; //The data itself, stored aligned in memory
+  T *d_m; //device pointer
+
   //Free the CPU version of the Vector
   void freeCPU(){
     if(!initialized) return;
@@ -50,8 +50,9 @@ public:
   /********RULE OF FIVE******************/
   
   /*Default constructor*/
-  Vector():initialized(false),uploaded(false), pinned(false),
-	   n(0), data(nullptr), d_m(nullptr){}
+  Vector():n(0), pinned(false),
+	   initialized(false),uploaded(false),
+	   data(nullptr), d_m(nullptr){}
   /*Destructor*/
   ~Vector() noexcept{
     /*Using the destructor messes real bad with the CUDA enviroment when using global variables, so you have to call freeMem manually for any global Vector...*/
@@ -192,21 +193,73 @@ typedef Vector<float3> Vector3;
 template<class T>
 class Matrix: public Vector<T>{
 public:
-  T **M;//Pointers to each column
   uint nr, nc;
-  Matrix(uint nc, uint nr): nr(nr),nc(nc), Vector<T>(nr*nc){
+  T **M;//Pointers to each column
+  Matrix(): Vector<T>(0),
+            nr(0), nc(0),
+            M(nullptr){}
+  Matrix(uint nc, uint nr): Vector<T>(nr*nc),
+                            nr(nr),nc(nc),
+                            M(nullptr){
     M = (T **)malloc(sizeof(T *)*nr);
-    for(int i=0; i<nr; i++) M[i] = this->data + i*nc;
+    for(uint i=0; i<nr; i++) M[i] = this->data + i*nc;
   }
+  /*Copy Constructor*/
+  Matrix(const Matrix<T>& other) noexcept:				 
+    Vector<T>(other), nr(other.nr), nc(other.nc), M(nullptr){
+    M = (T **)malloc(sizeof(T *)*nr);
+    for(uint i=0; i<nr; i++) M[i] = this->data + i*nc;
+  }
+  /*Move constructor*/
+  Matrix(Matrix<T>&& other) noexcept:
+    Vector<T>(std::move(other)),
+    nr(other.nr), nc(other.nc),
+    M(std::move(other.M)){
+    
+    other.nc = 0;
+    other.nr = 0;
+    other.M = nullptr;
+  }
+  /*Copy assignement operator*/
+  Matrix<T>& operator=(const Matrix<T>& other){
+    Matrix<T> tmp(other);
+    *this = std::move(tmp);
+    return *this;
+  }
+  /*Move assignement operator*/
+  Matrix<T>& operator= (Matrix<T>&& other) noexcept{
+    Vector<T>::operator=(std::move(other));
+
+    this->nc = other.nc;
+    this->nr = other.nr;
+    this->M = other.M;
+
+    other.nc = 0;
+    other.nr = 0;
+    other.M = nullptr;
+    
+    return *this;
+
+  }
+
+    
   ~Matrix() noexcept{
-    if(this->initialized)
-      free(M);
+    if(M) free(M);
     nr = 0;
     nc = 0;
+    M = nullptr;
   }
   int2 size() const{return make_int2(this->nr, this->nc);}
+  bool isSquare(){ return nr==nc;}
+  void print(){
+    fori(0,nr){
+      forj(0, nc) cout<<M[i][j]<<"\t";
+      cout<<endl;
+    }
+  }
   T*& operator [](const int &i){return M[i];}
 };
 
+typedef Matrix<float> Matrixf;
 
 #endif

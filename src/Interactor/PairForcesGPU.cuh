@@ -1,4 +1,3 @@
-/*
 /*Raul P. Pelaez 2016. Short range pair forces Interactor GPU callers and kernels.
 
 Functions to compute the pair, short range, force acting on each particle.
@@ -20,7 +19,7 @@ struct PairForcesParams{
   float cellSize, invCellSize;
   int ncells;
   int ycells, xcells, zcells;  
-  float L, invL, rcut, invrc2;
+  float L, invL, rcut, invrc, invrc2;
   float getCellFactor;
 };
 //Stores some simulation parameters to upload as constant memory.
@@ -54,9 +53,7 @@ void computePairForce(float4 *sortPos, float4 *force,
 		      uint *particleIndex, 
 		      uint N);
 
-void computePairForceDPD(float4 *sortPos, float4 *force, float3 *vel,
-			 uint *cellStart, uint *cellEnd,
-			 uint *particleIndex, 
+void computePairForceDPD(float4 *force,
 			 uint N, unsigned long long int seed);
 
 

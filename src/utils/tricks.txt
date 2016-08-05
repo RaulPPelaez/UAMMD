@@ -5,3 +5,28 @@ To increase the printf limit of a kernel:
     cudaDeviceGetLimit(size_t* size,cudaLimitPrintfFifoSize)
     cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t size)
 	
+
+
+
+
+If the code seems to crash or give strange behavior without a clear pattern
+between runs (i.e. different results when running the same code, a dependency
+of the code working or not depending of a previous run (which should be
+independent obviously)) the problem usually comes from using a non
+initialized array in a kernel.
+EXPLANATION:
+As the array gets allocated in a certain position in memory without
+initialization, sometimes it might be filled with zeros (but most probably
+will be filled with NaNs) and you are probably in luck and the code will
+produce logical output.
+When the correctness of the output appears to depend on a previous run
+of the code (maybe with a certain set of parameters). Maybe, if the section
+of memory happens to fall in a region initialized by a previous run the
+non-initialized array is more likely to be in a somewhat
+consistent state, probably filled with zeros. But it also might be filled with giberish!
+
+
+
+
+CUDA doesnt like very much NaN or Inf, and the errors arising from performing
+operations with them propagate in very unexpected and strange ways.

@@ -19,7 +19,22 @@ Driver::Driver(): step(0){
   /*Initialize pos and force arrays*/
 
 }
+
+void Driver::setParameters(){
+
+  uint N = gcnf.N;
+  pos = Vector4(N);
+  pos.fill_with(make_float4(0.0f));
+  pos.upload();
   
+  
+  force = Vector4(N);
+  force.fill_with(make_float4(0.0f));
+  force.upload();
+
+
+}
+
 //Perform the simulation steps
 void Driver::run(){
   /*Relaxation*/

@@ -1,17 +1,19 @@
 #include"PairForcesDPD.h"
 
 
-
+/*PairForcesDPD inherits from PairForces*/
 PairForcesDPD::PairForcesDPD(): PairForces(LJ), rngCPU(gcnf.seed){
 
   cerr<<"Initializing DPD Submodule..."<<endl;
-  gamma = 10.0f;
+
+  gamma = gcnf.gamma;
   paramsDPD.gamma = gamma;
   paramsDPD.noiseAmp = sqrt(2.0f*gamma*gcnf.T/gcnf.dt);
 
 
   sortVel = Vector4(N); sortVel.fill_with(make_float4(0.0f)); sortVel.upload();
-  
+
+  /*Pass sortVel to bind it to a texture reference*/
   initPairForcesDPDGPU(paramsDPD, sortVel, N);
 
   /*Warmup rng*/
@@ -26,7 +28,6 @@ PairForcesDPD::PairForcesDPD(): PairForces(LJ), rngCPU(gcnf.seed){
 void PairForcesDPD::makeNeighbourListDPD(){
   /*Compute cell id of each particle*/
   calcCellIndex(pos, cellIndex, particleIndex, N);
-
   /*Sort the particle indices by hash (cell index)*/
   sortCellIndex(cellIndex, particleIndex, N);
   /*Reorder positions and velocities by cell index and construct cellStart and cellEnd*/
@@ -45,10 +46,7 @@ void PairForcesDPD::sumForce(){
   seed = rngCPU.next();
   
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
-  computePairForceDPD(sortPos, force, vel,
-		      cellStart, cellEnd, 
-		      particleIndex,
-		      N, seed);
+  computePairForceDPD(force, N, seed);
 }
 
 

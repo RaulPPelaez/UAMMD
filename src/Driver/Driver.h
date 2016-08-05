@@ -51,6 +51,14 @@ protected:
   shared_ptr<Integrator> integrator;
   MeasurableArray measurables;
   uint step;
+
+  //Call this once you have
+  //set all the parameters needed by the simulation.
+  //It initialices some arrays and does some work
+  //that can only be done after the parameters are known.
+  //Any change of parameters after a call to this function will produce
+  //undefined behavior.
+  void setParameters(); 
   
 public:
   //The constructor configures and initializes the simulation

@@ -28,7 +28,7 @@ CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CU
 
 CXXFLAGS=$(CFLAGS) 
 
-NVFLAGS= -g -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 -arch=sm_52 -restrict -src-in-ptx  -I./
+NVFLAGS= -g -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 -gencode arch=compute_52,code=sm_52 -src-in-ptx  -I./
 
 LDFLAGS= -L$(CUDA_LIBS)
 LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas

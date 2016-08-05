@@ -8,13 +8,13 @@
 
 
 struct BrownianEulerMaruyamaParameters{
-  float sqrtdt;
-  float4 *B, *D, *K;
+  float sqrtdt, dt;
+  float3 *B, *D, *K;
 };
 
 void initBrownianEulerMaruyamaGPU(BrownianEulerMaruyamaParameters m_params);
 
 void integrateBrownianEulerMaruyamaGPU(float4 *pos, float3 *vel, float4 *force,
-				       float dt, uint N);
+				       uint N);
 
 #endif

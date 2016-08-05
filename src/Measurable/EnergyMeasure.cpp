@@ -9,15 +9,13 @@ Writes the results to measurables.dat
 #include"EnergyMeasure.h"
 
 EnergyMeasure::EnergyMeasure(InteractorArray interactors,
-			     shared_ptr<Integrator> integrator, uint N, float L):
+			     shared_ptr<Integrator> integrator):
+  Measurable(),
   interactors(interactors),
   integrator(integrator),
-  Measurable()
-{
+  step(0),
+  K(0.0f), U(0.0f), P(0.0f){
   
-  step = 0;
-  K = U = 0.0f;
-
   rho = N/(L*L*L);
 
   //Each measurable should print a header informing of what it is going to print

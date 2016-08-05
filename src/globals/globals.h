@@ -17,6 +17,7 @@ struct GlobalConfig{
   float L = 0.0f, rcut = 2.5f;
   float dt = 0.001f;
   float T = 0.0f;
+  float gamma = 1.0f; //General damping factor for a thermostat
   float E = 0.0f;
 
   uint nsteps = 10000;
@@ -24,13 +25,14 @@ struct GlobalConfig{
   uint relaxation_steps = 1000;
   uint measure_steps = -1;
 
-  unsigned long long int seed = 12345678910111213141ULL;
+  ullint seed = 0xf31337Bada55D00d;
   
 };
+
 #endif
 
 //Everyone can access to gcnf, its initialized in main, before entering main().
 extern GlobalConfig gcnf;
-//These addresses are set in Driver
+//These Arrays are declared in main.cpp and initialized in Driver.cpp
 extern Vector4 pos, force;
 extern Vector3 vel;

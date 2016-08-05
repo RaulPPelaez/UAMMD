@@ -8,16 +8,14 @@ Takes a function to compute the force, a number of sampling points and a
 TODO:
 100- Use texture objects instead of creating and binding the texture in 
      initGPU.
-
+100- This class is very bad written
  */
 #ifndef POTENTIAL_H
 #define POTENTIAL_H
 #include<vector>
 #include<fstream>
 #include<functional>
-
-#define fori(x,y) for(int i=x; i<y; i++)
-#define forj(x,y) for(int j=x; j<y; j++)
+#include"utils/utils.h"
 using std::vector;
 using std::ofstream;
 
@@ -34,9 +32,10 @@ public:
   void print();
 private:
 
+  uint N;
   vector<float> F;
   vector<float> E;
-  uint N;
+
   std::function<float(float)> forceFun;
   std::function<float(float)> energyFun;
 };
