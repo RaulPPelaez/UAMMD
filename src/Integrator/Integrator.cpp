@@ -59,9 +59,11 @@ int write_concurrent(float4* posdata){
     cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" 0.56 "<<(int)(posdata[i].w+1)<<"\n";
   }
   
-  return 0;
-  // fori(0,N)
-  //   printf("%f\t%f\t%f\t", pos[i].x+ 2.5f*( (i==0)?1.0f:-1.0f), pos[i].y, pos[i].z);
-  // printf("\n");
+
+   // fori(0,N)
+   //   printf("%f\t%f\t%f\t",
+   // 	    posdata[i].x, posdata[i].y, posdata[i].z);
+   // printf("\n");
+   return 0;
 }
 

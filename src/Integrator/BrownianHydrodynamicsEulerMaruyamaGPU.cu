@@ -108,10 +108,9 @@ __global__ void rotneGPU_prev(float *D, float4 *R, uint N){
     /*Get the pair*/
     int j = id/N;
     int i = id%N;
-
   
     /*Fix the Diagonal boxes of D*/
-    float D0 = 1.0f;
+    float D0 = BEMParamsGPU.D0;
     if(i >= N || j>=N ||  j<i) continue;
     else if(j==i){
       for(int k = 0; k < 3; k++)
@@ -123,11 +122,13 @@ __global__ void rotneGPU_prev(float *D, float4 *R, uint N){
       D[3*i + 2 + n*(3*i + 2)] = D0;
       continue;
     }
-    float rh = 1;
+    float rh = BEMParamsGPU.rh;
 
   
     float4 rij;
-    float r;
+    float *rijp = &(rij.x);
+    
+
     float c1, c2;
   
     rij = R[j] - R[i];
@@ -135,25 +136,26 @@ __global__ void rotneGPU_prev(float *D, float4 *R, uint N){
   
     float invr2 = 1.0f/dot(rij, rij);
 
-    float *rijp = &(rij.x);
     float invr = sqrt(invr2);
-  
-    r = 1.0f/invr;
+    float r = 1.0f/invr;
+   
+    /*Rotne-Prager-Yamakawa tensor */
+      // if(r>=2.0f*rh){
+      //   c1 = 0.75f*rh*invr*(1.0f + 2.0f*invr2*rh*rh/3.0f);
+      //   c2 = 0.75f*rh*invr*(1.0f - 2.0f*rh*rh*invr2);
+      // }
+      // else{
+      //   c1 = 1.0f - 9.0f*r/(32.0f*rh);
+      //   c2 = 3.0f*r/(32.0f*rh);
+      // }
 
-    /*Rotne-Prager Algorithm*/
-    if(r>=2*rh){
-      c1 = 0.75*rh*invr*(1.0f + 2.0f*invr2*rh*rh/3.0f);
-      c2 = 0.75*rh*invr*(1.0f - 2.0f*rh*rh*invr2);
-    }
-    else{
-      c1 = 1.0f - 9.0f*r/(32.0f*rh);
-      c2 = 3.0f*r/(32.0f*rh);
-    }
+    /*Oseen tensor*/
+    c1 = 0.75f*invr*rh;
+    c2 = c1;
 
-  
     for(int k = 0; k < 3; k++)
       for(int l = 0; l < 3; l++)
-	D[3*i + k + n*(3*j + l)] = c2*rijp[k]*rijp[l]*invr2;
+	D[3*i + k + n*(3*j + l)] = D0*c2*rijp[k]*rijp[l]*invr2;
 
     for(int k = 0; k<3; k++)  D[3*i + k + n*(3*j + k)] += D0*c1;
 

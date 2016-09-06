@@ -12,7 +12,7 @@
 
 class SimulationConfig: public Driver{
 public:
-  SimulationConfig();
+  SimulationConfig(int argc, char* argv[]);
   ~SimulationConfig(){}
 
 };

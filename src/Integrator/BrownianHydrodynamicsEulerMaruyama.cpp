@@ -32,6 +32,8 @@ BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama():
   
   params.sqrtdt = sqrt(dt);
   params.dt = dt;
+  params.D0 = 1.0f;
+  params.rh = 1.0f;
   
   cudaStreamCreate(&stream);
   cudaStreamCreate(&stream2);
@@ -47,7 +49,7 @@ BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama():
   
   status = cublasCreate(&handle);
   
-  float shear = 0.0f;
+  float shear = 5.0f;
   K.fill_with(0.0f);
   K[0][1] = shear; 
   K.upload();
@@ -147,6 +149,7 @@ void BrownianHydrodynamicsEulerMaruyama::chol(){
   static bool first_time = true;
   static int h_work_size;
   static float *d_work;
+  static int *d_info;
 
   if(first_time){
     cusolverDnCreate(&solver_handle);
@@ -154,14 +157,17 @@ void BrownianHydrodynamicsEulerMaruyama::chol(){
     cusolverDnSpotrf_bufferSize(solver_handle, 
 				CUBLAS_FILL_MODE_UPPER, 3*N, D.d_m, 3*N, &h_work_size);
     cudaMalloc(&d_work, h_work_size*sizeof(float));
+    cudaMalloc(&d_info, sizeof(int));
     first_time = false;
   }
   /*Query the cholesky decomposition*/
-  int *d_info = nullptr;
 
   cusolverDnSetStream(solver_handle, stream);
   cusolverDnSpotrf(solver_handle, CUBLAS_FILL_MODE_UPPER,
 		   3*N, D.d_m, 3*N, d_work, h_work_size, d_info);
+  // int m_info;
+  // cudaMemcpy(&m_info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
+  // cerr<<" "<<m_info<<endl;
   
 }
 

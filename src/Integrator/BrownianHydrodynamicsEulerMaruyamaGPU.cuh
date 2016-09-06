@@ -13,6 +13,7 @@ struct BrownianHydrodynamicsEulerMaruyamaParameters{
   float dt;
   float sqrt2dt;
   float4* K;
+  float D0, rh;
 };
 
 

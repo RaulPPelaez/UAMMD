@@ -158,7 +158,6 @@ inline __device__ uint getCellIndex(int3 gridPos){
     +gridPos.z*params.xcells*params.ycells;
 }
 
-
 /****************************************************************************************/
 
 

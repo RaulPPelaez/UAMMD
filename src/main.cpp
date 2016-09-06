@@ -55,7 +55,7 @@ int main(int argc, char *argv[]){
   tim.tic();
 
   /*The simulation handler*/
-  SimulationConfig psystem;
+  SimulationConfig psystem(argc, argv);
 
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;
 

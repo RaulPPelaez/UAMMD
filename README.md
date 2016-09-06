@@ -3,7 +3,7 @@
 -----------------
 Raul P. Pelaez 2016
 
-A CUDA Molecular Dynamics code made into modules for expandability and generality.
+A fast generic multiscale CUDA Molecular Dynamics code made into modules for expandability and generality.
 It is coded into separated modules, with a SimulationConfig driver that can hold many modules in order to construct a simulation. For example, the simulation could have a VerletNVT module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
 
 There are three types of modules:
