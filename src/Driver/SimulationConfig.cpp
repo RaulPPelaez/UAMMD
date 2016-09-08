@@ -4,23 +4,23 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
 
   /***********************Set all the parameters needed**********************/
   gcnf.E = 0.0f;
-  gcnf.T = 0.1f;
+  gcnf.T = 3.1f;
   gcnf.gamma = 1.0f;
   
 
-  gcnf.N = pow(2,14);
+  gcnf.N = pow(2,20);
   //float dens = 1; //stod(argv[2], NULL);
-  gcnf.L = 32;//cbrt(gcnf.N/dens);
+  gcnf.L = 128;//cbrt(gcnf.N/dens);
   cerr<<"Box size: "<<gcnf.L<<endl;
   cerr<<"Number of particles: "<<gcnf.N<<endl;
   gcnf.dt = 0.01f;
   
   gcnf.rcut = 2.5f;// 1.12246204830937f; //WCA
   
-  gcnf.nsteps = 10000;
+  gcnf.nsteps = 500;
   gcnf.print_steps = -1;
   gcnf.measure_steps = -1;
-  gcnf.relaxation_steps = 0;
+  gcnf.relaxation_steps = -1;
 
   gcnf.seed = 0xffaffbfDEADBULL;
 

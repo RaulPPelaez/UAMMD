@@ -113,26 +113,27 @@ void PairForces::init(){
 void PairForces::makeNeighbourList(){
   /*Compute cell id of each particle*/
   calcCellIndex(pos, cellIndex, particleIndex, N);
-
   /*Sort the particle indices by hash (cell index)*/
   sortCellIndex(cellIndex, particleIndex, N);
   /*Reorder positions by cell index and construct cellStart and cellEnd*/
   reorderAndFind(sortPos,
 		 cellIndex, particleIndex,
 		 cellStart, cellEnd, params.ncells,
-		 pos, N); 
+		 pos, N);
 }
 
 
 void PairForces::sumForce(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/
   makeNeighbourList();
+
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   computePairForce(sortPos,
 		   force, 
 		   cellStart, cellEnd, 
 		   particleIndex,
 		   N);
+
 }
 
 float PairForces::sumEnergy(){

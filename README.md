@@ -4,7 +4,7 @@
 Raul P. Pelaez 2016
 
 A fast generic multiscale CUDA Molecular Dynamics code made into modules for expandability and generality.
-It is coded into separated modules, with a SimulationConfig driver that can hold many modules in order to construct a simulation. For example, the simulation could have a VerletNVT module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
+It is coded into separated modules, with a SimulationConfig driver in C++ that can hold many modules in order to construct a simulation. For example, the simulation could have a VerletNVT module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
 
 There are three types of modules:
 
@@ -150,3 +150,7 @@ In the creation of a new module (Interactor or Integrator) for interoperability 
 Currently the code initializes pos and force Vectors in Driver.cpp, after the parameters are set. Vel should be initialized in the constructor of any module that needs it, see VerletNVT for an example.
 
 ------------------------------------------
+
+##ACKNOWLEDGMENTS
+
+Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research.

@@ -89,7 +89,9 @@ bool randInitial(float4 *pos, float L, uint N){
   bool accepted = true;
   uint trials = 0;
   float r2;
+  cerr<<endl;
   fori(1,N){
+    cerr<<"\rIntroducing "<<i<<"     ";
     tempos = make_float4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0f);
     forj(0,i+1){
       rij = tempos-pos[j];
@@ -115,7 +117,7 @@ bool randInitial(float4 *pos, float L, uint N){
 
   }
 
-
+  cerr<<endl;
   return true;
 }
 

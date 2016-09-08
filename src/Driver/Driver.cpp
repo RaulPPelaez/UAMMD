@@ -40,6 +40,8 @@ void Driver::run(){
   /*Relaxation*/
   fori(0,gcnf.relaxation_steps)
     integrator->update();
+  Timer tim;
+  tim.tic();
   /*Simulation*/
   fori(0,gcnf.nsteps){
     step++;
@@ -53,6 +55,7 @@ void Driver::run(){
       for(auto m: measurables)
 	m->measure();
   }
+  cerr<<tim.toc()<<endl;
 }
 
 //Integrator handles the writing
