@@ -10,33 +10,44 @@
 
 #ifndef BONDEDFORCESGPU_CUH
 #define BONDEDFORCESGPU_CUH
+namespace bonded_forces_ns{
+  struct Bond{
+    int i,j;
+    float r0,k;
+  };
 
-struct Bond{
-  int i,j;
-  float r0,k;
-};
+  struct BondFP{
+    int i;
+    float3 pos;
+    float r0,k;
+  };
 
-struct BondFP{
-  int i;
-  float3 pos;
-  float r0,k;
-};
-
-struct BondedForcesParams{
-  float L, invL;
-};
+  struct ThreeBond{
+    int i,j,k;
+    float r0,kspring,ang;
+  };
 
 
-//Stores some simulation parameters to upload as constant memory.
-void initBondedForcesGPU(BondedForcesParams m_params);
+  struct Params{
+    float L, invL;
+  };
 
-void computeBondedForce(float4 *force, float4 *pos,
-			uint *bondStart, uint *bondEnd, uint *bondedParticleIndex, 
-			Bond* bondList, uint N, uint Nparticles_with_bonds, uint nbonds);
 
-void computeBondedForceFixedPoint(float4* force, float4 *pos,
-				  uint *bondStartFP, uint *bondEndFP, BondFP* bondListFP, uint N, uint nbonds);
+  //Stores some simulation parameters to upload as constant memory.
+  void initBondedForcesGPU(Params m_params);
 
+  void computeBondedForce(float4 *force, float4 *pos,
+			  uint *bondStart, uint *bondEnd, uint *bondedParticleIndex, 
+			  Bond* bondList, uint N, uint Nparticles_with_bonds, uint nbonds);
+
+  void computeBondedForceFixedPoint(float4* force, float4 *pos,
+				    uint *bondStartFP, uint *bondEndFP, BondFP* bondListFP, uint N, uint nbonds);
+
+
+  void computeThreeBondedForce(float4 *force, float4 *pos,
+			       uint *bondStart, uint *bondEnd, uint *bondedParticleIndex, 
+			       ThreeBond* bondList, uint N, uint Nparticles_with_bonds, uint nbonds);
+}
 
 #endif
 

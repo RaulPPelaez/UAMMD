@@ -25,6 +25,7 @@ TODO:
 #include<set>
 
 using namespace std;
+using namespace bonded_forces_ns;
 
 BondedForces::BondedForces(const std::vector<Bond> &bondList):
   Interactor(){
@@ -194,5 +195,121 @@ float BondedForces::sumEnergy(){
   return 0.0f;
 }
 float BondedForces::sumVirial(){
+  return 0.0f;
+}
+
+/********************************THREE BONDED FORCES**********************************/
+
+
+
+
+ThreeBondedForces::ThreeBondedForces(const std::vector<ThreeBond> &bondList):
+  Interactor(){
+
+
+}
+
+ThreeBondedForces::~ThreeBondedForces(){}
+
+ThreeBondedForces::ThreeBondedForces(const char * readFile):
+  Interactor(){
+
+  cerr<<"Initializing Three Bonded Forces..."<<endl;
+  params.L = L;
+
+  nbonds = 0;
+  /*Read the bond list from the file*/
+  ifstream in(readFile);
+  vector<vector<uint>> isInBonds(N);
+  in>>nbonds;
+  vector<ThreeBond> blst(nbonds); //Temporal storage for the bonds in the file
+
+  
+  cerr<<"\tDetected: "<<nbonds<<" particle-particle-particle bonds"<<endl;
+  if(nbonds>0){
+    
+    for(int b=0; b<nbonds; b++){
+      int i, j, k;
+      in>>i>>j>>k;
+      
+      isInBonds[i].push_back(b);
+      isInBonds[j].push_back(b);
+      isInBonds[k].push_back(b);
+
+      blst[b].i = i;
+      blst[b].j = j;
+      blst[b].k = k;
+      in>>blst[b].kspring>>blst[b].r0>>blst[b].ang;
+
+      if(blst[b].r0>=0.5f*L){
+	cerr<<"The equilibrium distance of bond "<<b<<" is too large!!"<<endl;
+	cerr<<"\t This will cause unexpected behavior when computing distance using PBC!"<<endl;
+      }
+    }
+  }
+
+
+  bondList  = Vector<ThreeBond>(nbonds*3);//Allocate 3*nbonds
+  bondStart = Vector<uint>(N); bondStart.fill_with(0xffFFffFF);
+  bondEnd   = Vector<uint>(N); bondEnd.fill_with(0);
+
+  
+  fori(0,N){
+    int nbondsi;
+    nbondsi = isInBonds[i].size();
+    if(nbondsi==0) continue;
+    
+    int offset;
+    if(i>0)
+      offset = bondEnd[i-1];
+    else
+      offset = 0;
+    
+    forj(0,nbondsi){
+      bondList[offset+j] = blst[isInBonds[i][j]];
+    }
+    bondEnd[i] = offset+nbondsi;
+    bondStart[i] = offset;
+  }
+
+  vector<uint> pwb; //Particles with bonds
+  fori(0,N){
+    if(bondStart[i]!=0xffFFffFF){
+      pwb.push_back(i);
+    }
+  }
+
+  bondParticleIndex.assign(pwb.begin(), pwb.end());
+  
+  nbonds *= 3; //We store all the bonds in which every particle is involved, per particle.
+
+
+  bondList.upload();
+  bondStart.upload();
+  bondEnd.upload();
+  bondParticleIndex.upload();
+  
+  initBondedForcesGPU(params);
+  
+  cerr<<pwb.size()<<" particles are involved in at least one bond."<<endl;
+  
+  cerr<<"Three Bonded Forces\t\tDONE!!\n\n";
+
+
+}
+
+void ThreeBondedForces::sumForce(){
+  if(nbonds>0)
+    computeThreeBondedForce(force, pos, bondStart, bondEnd, bondParticleIndex,
+			    bondList, N, bondParticleIndex.size(), nbonds);
+  cudaDeviceSynchronize();
+}
+
+
+float ThreeBondedForces::sumEnergy(){
+  return 0.0f;
+}
+
+float ThreeBondedForces::sumVirial(){
   return 0.0f;
 }
