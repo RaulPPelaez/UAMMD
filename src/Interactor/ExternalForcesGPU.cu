@@ -31,14 +31,15 @@ struct externalForces_functor{
     float4 force = get<1>(t);
 
 
-    float L = 15.0f;
-    float z = (pos.z+2.0f*L);
-    float f;
-    if(abs(z)<1.0f) f = 100000.0f*pow(1-z*z,4);
-    else f=0.0f;
+    // float L = 15.0f;
+    // float z = (pos.z+2.0f*L);
+    // float f;
+    // if(abs(z)<1.0f) f = 100000.0f*pow(1-z*z,4);
+    // else f=0.0f;
       
-    force += make_float4(0.0f, 0.0f, f - 2.5f, 0.0f);
+    // force += make_float4(0.0f, 0.0f, f - 2.5f, 0.0f);
 
+    force += make_float4(0.0f, 0.0f, -1000.0f*pos.z, 0.0f);
     
     get<1>(t) = force;
   }

@@ -313,7 +313,7 @@ namespace pair_forces_ns{
   /*Same as above, but reordering vel aswell*/
   __global__ void reorderPosVelD(float4 *sortPos,
 				 cudaTextureObject_t texPos,
-				 float3* sortVel,
+				 float4* sortVel,
 				 float3 * vel,
 				 uint* particleIndex, uint N){
     uint i = blockIdx.x*blockDim.x + threadIdx.x;
@@ -323,7 +323,7 @@ namespace pair_forces_ns{
 
     sortPos[i] = tex1Dfetch<float4>(texPos, sort_index);
     //    sortVel[i] = tex1Dfetch<float4>(texVel, sort_index);
-    sortVel[i] = vel[sort_index];
+    sortVel[i] = make_float4(vel[sort_index]);
   }
   
   /*Fill CellStart and CellEnd*/
@@ -384,7 +384,7 @@ namespace pair_forces_ns{
     fillCellListD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, cellStart, cellEnd, N);
     
   }
-  void makeCellListDPD(float4 *pos, float3* vel,  float4 *sortPos, float3 *sortVel,
+  void makeCellListDPD(float4 *pos, float3* vel,  float4 *sortPos, float4 *sortVel,
 		       uint *&particleIndex, uint *&particleHash,
 		       uint *cellStart, uint *cellEnd,
 		       uint N, uint ncells){

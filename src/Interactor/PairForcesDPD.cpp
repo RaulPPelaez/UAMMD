@@ -27,17 +27,8 @@ PairForcesDPD::PairForcesDPD(): PairForces(LJ), rngCPU(gcnf.seed){
 /*** CONSTRUCT NEIGHBOUR LIST ***/
 void PairForcesDPD::makeNeighbourListDPD(){
 
-  makeCellListDPD(pos, vel, sortPos, sortVel, particleIndex, cellHash, cellStart, cellEnd, N, ncells);
+  makeCellListDPD(pos, vel, sortPos, sortVel, particleIndex, particleHash, cellStart, cellEnd, N, ncells);
   
-  // /*Compute cell id of each particle*/
-  // calcCellIndex(pos, cellIndex, particleIndex, N);
-  // /*Sort the particle indices by hash (cell index)*/
-  // sortCellIndex(cellIndex, particleIndex, N);
-  // /*Reorder positions and velocities by cell index and construct cellStart and cellEnd*/
-  // reorderAndFindDPD(sortPos, sortVel,
-  //  		    cellIndex, particleIndex,
-  //  		    cellStart, cellEnd, params.ncells,
-  //  		    pos, vel, N); 
 }
 
 void PairForcesDPD::sumForce(){
@@ -49,7 +40,7 @@ void PairForcesDPD::sumForce(){
   seed = rngCPU.next();
   
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
-  computePairForceDPD(force, N, seed);
+  computePairForceDPD(force, particleIndex, N, seed);
 }
 
 

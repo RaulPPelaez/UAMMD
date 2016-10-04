@@ -34,7 +34,7 @@ namespace pair_forces_ns{
 			 uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 			 float4 *sortPos, float4 *pos, uint N);
   
-  void initPairForcesDPDGPU(ParamsDPD m_params, float4* sortVel, uint N);
+  void initPairForcesDPDGPU(ParamsDPD &m_params, float4* sortVel, uint N);
 
 
   void updateParams(Params m_params);
@@ -44,7 +44,7 @@ namespace pair_forces_ns{
 		    uint *cellStart, uint *cellEnd,
 		    uint N, uint ncells);
   
-  void makeCellListDPD(float4 *pos, float3* vel,  float4 *sortPos, float3 *sortVel,
+  void makeCellListDPD(float4 *pos, float3* vel,  float4 *sortPos, float4 *sortVel,
 		       uint *&particleIndex, uint *&particleHash,
 		       uint *cellStart, uint *cellEnd,
 		       uint N, uint ncells);
@@ -56,6 +56,7 @@ namespace pair_forces_ns{
 			uint N);
 
   void computePairForceDPD(float4 *force,
+			   uint *particleIndex,
 			   uint N, unsigned long long int seed);
 
 

@@ -42,7 +42,7 @@ TODO:
 
 class BondedForces: public Interactor{
 public:
-  BondedForces(const std::vector<Bond> &bondList);
+  BondedForces(const std::vector<bonded_forces_ns::Bond> &bondList);
   BondedForces(const char * readFile);
 
   ~BondedForces();
@@ -54,14 +54,37 @@ private:
   void init();
   
   uint nbonds;
-  Vector<Bond> bondList;
+  Vector<bonded_forces_ns::Bond> bondList;
   Vector<uint> bondStart, bondEnd;
   Vector<uint> bondParticleIndex;
   
   uint nbondsFP; //Fixed Point
-  Vector<BondFP> bondListFP;
+  Vector<bonded_forces_ns::BondFP> bondListFP;
   Vector<uint> bondStartFP, bondEndFP;
 
-  BondedForcesParams params;
+  bonded_forces_ns::Params params;
 };
+
+class ThreeBondedForces: public Interactor{
+public:
+  ThreeBondedForces(const std::vector<bonded_forces_ns::ThreeBond> &bondList);
+  ThreeBondedForces(const char * readFile);
+
+  ~ThreeBondedForces();
+  
+  void sumForce() override;
+  float sumEnergy() override;
+  float sumVirial() override;
+  
+private:
+  
+  uint nbonds;
+  Vector<bonded_forces_ns::ThreeBond> bondList;
+  Vector<uint> bondStart, bondEnd;
+  Vector<uint> bondParticleIndex; //Particles with bonds
+
+  
+  bonded_forces_ns::Params params;
+};
+
 #endif

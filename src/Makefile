@@ -3,6 +3,7 @@ CC=$(CXX)
 NVCC=nvcc
 
 #EXPERIMENTAL=1  #Uncomment to compile with experimental modules
+
 ###############################Put here your system configuration:#####################################
 
 #the code will look here for the cuda and thrust sources
@@ -12,6 +13,7 @@ CUDA_LIBS=/usr/local/cuda/lib64
 #The code will look for a folder named cub here, you can create a symlink if you have a folder i.e. cub-1.5.2
 CUB_INCLUDE=/usr/local/include
 
+ARCH ?= 20 52
 
 #You can place your custom files either here or below in the diferent OBJS_*/CUOBJS_* variables. Dont forget the folders if you put it here!
 #These will be compiled with $(CXX)
@@ -30,18 +32,29 @@ ifdef EXPERIMENTAL
 CFLAGS += -DEXPERIMENTAL
 endif
 
+
+ifdef EXPERIMENTAL
+CFLAGS += -DEXPERIMENTAL
+endif   
+
+
 CXXFLAGS=$(CFLAGS) 
 
-NVFLAGS= -g -std=c++11 -O3 -D_FORCE_INLINES --compiler-options -O3 -ccbin=g++ -lineinfo -m64 -gencode arch=compute_52,code=sm_52 -src-in-ptx  -I./ -Xptxas -dlcm=ca 
+
+$(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
+
+NVFLAGS= -g -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
 
 LDFLAGS= -L$(CUDA_LIBS)
 LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas
 
 
 OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
-CUOBJS_INTERACTOR_EXPERIMENTAL= PairForcesAltGPU.o
+CUOBJS_INTERACTOR_EXPERIMENTAL= PairForcesAltGPU.o 
 
-OBJS_INTERACTOR= Interactor.o PairForces.o  BondedForces.o NBodyForces.o ExternalForces.o 
+
+OBJS_INTERACTOR= Interactor.o PairForces.o PairForcesDPD.o BondedForces.o NBodyForces.o ExternalForces.o 
+
 OBJS_INTEGRATOR= Integrator.o VerletNVE.o VerletNVT.o BrownianEulerMaruyama.o BrownianHydrodynamicsEulerMaruyama.o
 OBJS_MEASURABLE= Measurable.o EnergyMeasure.o
 
@@ -55,12 +68,11 @@ OBJS += utils/utils.o misc/Potential.o Driver/Driver.o Driver/SimulationConfig.o
 
 CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS)
 
+
 ifdef EXPERIMENTAL
 OBJS += $(addprefix Interactor/Experimental/, $(OBJS_INTERACTOR_EXPERIMENTAL))
 CUOBJS += $(addprefix Interactor/Experimental/, $(CUOBJS_INTERACTOR_EXPERIMENTAL))
 endif
-
-
 
 all: main
 
