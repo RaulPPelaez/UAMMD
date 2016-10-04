@@ -1,11 +1,11 @@
-
+---------------------------------
 
 To increase the printf limit of a kernel:
 
     cudaDeviceGetLimit(size_t* size,cudaLimitPrintfFifoSize)
     cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size_t size)
 	
-
+-------------------------------------------
 
 
 
@@ -25,8 +25,20 @@ of memory happens to fall in a region initialized by a previous run the
 non-initialized array is more likely to be in a somewhat
 consistent state, probably filled with zeros. But it also might be filled with giberish!
 
-
+--------------------------------------------------
 
 
 CUDA doesnt like very much NaN or Inf, and the errors arising from performing
 operations with them propagate in very unexpected and strange ways.
+
+CUDA threads throw exceptions but the cuda core doesnt do anything about it until something explicitly tells it to. Like a thrust call or maybe a cudaDeviceSynchronize call. So if a kernel thros an exception and later in the code there is a thrust call. The error will appear to originate in the thrust code.
+
+
+-------------------------------------------------------------
+
+
+Be careful with the conversions between floats and ints. They are super tricky.
+The precision of floating point values is very low (~7 digits) and this will cause you
+headaches when trying to round them to integers in some extreme cases.
+
+---------------------------------------------------------------

@@ -1,7 +1,6 @@
 /*Raul P. Pelaez 2016. Two step velocity VerletNVT Integrator GPU callers 
 
-  Functions to integrate movement. The integration is done via a functor wich creator
-     takes a thrust::Tuple containing positions, velocities and forces on each particle. 
+  Functions to integrate movement.
 
   Uses a two step velocity verlet algorithm with a BBK thermostat.
 
@@ -17,94 +16,70 @@ TODO:
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
 #include "VerletNVTGPU.cuh"
+#include<iostream>
 #include<thrust/device_ptr.h>
-#include<thrust/reduce.h>
+//#include<thrust/reduce.h>
 #include<thrust/transform_reduce.h>
-#include<thrust/for_each.h>
-#include<thrust/iterator/zip_iterator.h>
 
+//Threads per block
+#define TPB 128
 
-__constant__ VNVTparams params;
+/*All functions and variables are always englobed in a namespace*/
+namespace verlet_nvt_ns{
+  /*Parameters in constant memory*/
+  __constant__ Params params;
 
-
-void initVerletNVTGPU(VNVTparams m_params){
-  gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(VNVTparams)));
-}
-
-
-using namespace thrust;
-//This struct is a thrust trick to perform an arbitrary transformation
-//In this case it performs a two step velocity verlet integration
-//Performs a two step velocity verlet integrator, pick with step
-struct twoStepVelVerletNVT_Integratefunctor{
-  int step;
-  __host__ __device__ twoStepVelVerletNVT_Integratefunctor(int step):
-    step(step){}
-  //The operation is performed on creation
-  template <typename Tuple>
-  __device__  void operator()(Tuple t){
-    /*Retrive the data*/
-    float4 pos = get<0>(t);
-    float4 vel = make_float4(get<1>(t),0.0f);
-    float4 force = get<2>(t);
-    float4 noise = make_float4(get<3>(t));
-    
-    float dt = params.dt;
-    float gamma = params.gamma;
-    float noiseAmp = params.noiseAmp;
-    
-    switch(step){
-      /*First velocity verlet step*/
-    case 1: 
-      vel += (force-gamma*vel)*dt*0.5f  + noiseAmp*noise; 
-      vel.w = 0.0f; //Be careful not to overwrite the pos.w!!
-      pos += vel*dt;
-      get<0>(t) = pos;
-      break;
-      /*Second velocity verlet step*/
-    case 2:
-      vel += (force-gamma*vel)*dt*0.5f  + noiseAmp*noise; 
-      break;
-    }
-    /*Write new vel*/
-    get<1>(t) = make_float3(vel);
+  /*Initialize all necesary things on GPU*/
+  void initVerletNVTGPU(Params m_params){
+    /*Upload params to constant memory*/
+    gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
   }
-};
 
 
+  /*Integrate the movement*/
+  __global__ void integrateD(float4 *pos, float3 *vel, float4 *force, float3* noise,
+			     uint N, int step){
+    uint i = blockIdx.x*blockDim.x+threadIdx.x;
+    if(i>=N) return;
+    /*Half step velocity*/
+    vel[i] += (make_float3(force[i])-params.gamma*vel[i])*params.dt*0.5f + params.noiseAmp*noise[i];
 
-//Update the positions
-void integrateVerletNVTGPU(float4 *pos, float3 *vel, float4 *force, float3* noise,
-			   uint N, int step){
-  
-  device_ptr<float4> d_pos4(pos);
-  device_ptr<float3> d_vel3(vel);
-  device_ptr<float3> d_noise3(noise);
-  device_ptr<float4> d_force4(force);
-  /**Thrust black magic to perform a triple transformation, see the functor description**/
-  for_each(
-	   make_zip_iterator( make_tuple( d_pos4, d_vel3, d_force4, d_noise3)),
-	   make_zip_iterator( make_tuple( d_pos4 + N, d_vel3 + N, d_force4 + N, d_noise3 + N)),
-	   twoStepVelVerletNVT_Integratefunctor(step));
-  //cudaCheckErrors("Integrate");
+    /*In the first step, upload positions*/
+    if(step==1)
+      pos[i] += make_float4(vel[i])*params.dt;    
+    
+  }
 
-  
-}
+  /*CPU kernel caller*/
+  void integrateVerletNVTGPU(float4 *pos, float3 *vel, float4 *force, float3* noise,
+			     uint N, int step){
+    uint nthreads = TPB<N?TPB:N;
+    uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0); 
+    integrateD<<<nblocks, nthreads>>>(pos, vel, force, noise, N, step);
+  }
 
-struct dot_functor{
+  /*Returns the squared of each element in a float3*/
+  struct dot_functor{
     __device__ float3 operator()(float3 &a){
-    return a*a;
+      return a*a;
+    }
+
+  };
+
+  /*Compute the kinetic energy from the velocities*/
+  float computeKineticEnergyVerletNVT(float3 *vel, uint N){
+    thrust::device_ptr<float3> d_vel3(vel);
+    float3 K;
+    thrust::plus<float3> binary_op;
+  
+    K = thrust::transform_reduce(d_vel3, d_vel3 + N,
+				 dot_functor(), make_float3(0.0f), binary_op);
+
+    //float3 Ptot = thrust::reduce(d_vel3, d_vel3+N, make_float3(0.0f));
+    
+    //std::cout<<Ptot.x<< " "<<Ptot.y<<" "<<Ptot.z<<std::endl;
+    
+    return 0.5f*(K.x+K.y+K.z)/(float)N;
   }
-
-};
-
-float computeKineticEnergyVerletNVT(float3 *vel, uint N){
-  device_ptr<float3> d_vel3(vel);
-  float3 K;
-  thrust::plus<float3> binary_op;
   
-  K = thrust::transform_reduce(d_vel3, d_vel3 + N,
-			       dot_functor(), make_float3(0.0f), binary_op);
-  
-  return 0.5f*(K.x+K.y+K.z)/(float)N;
 }

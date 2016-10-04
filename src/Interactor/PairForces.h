@@ -8,7 +8,15 @@ Raul P. Pelaez 2016. Short range pair forces Interactor implementation.
 
   This module implements a Neighbour cell list search and computes the force between all neighbouring
   particle pairs. 
-  The Neighbour search is implemented using hash short with cell index as hash.
+  The Neighbour search is implemented using hash short with a 30 bit morton code (from the cell coordinates) as hash.
+
+  The Neighbour list is constructed as follows:
+  
+  1-Compute a hash for each particle based on its cell. Store in particleHash, also fill particleIndex with the index of each particle (particleIndex[i] = i)
+  2-Sort particleIndex based on particleHash (sort by key). This way the particles in a same cell are one after the other in particleIndex. The Morton hash also improves the memory acces patter in the GPU.
+  3-Fill cellStart and cellEnd with the indices of particleIndex in which a cell starts and ends. This allows to identify where all the [indices of] particles in a cell are in particleIndex, again, one after the other.
+  
+  The transversal of this cell list is done by transversing, for each particle, the 27 neighbour cells of that particle's cell.
   
   Force is evaluated using table lookups (with texture memory)
   
@@ -59,13 +67,12 @@ protected:
   void init();
   void makeNeighbourList();
   
-  Vector<uint> cellIndex, particleIndex; 
+  Vector<uint> particleHash, particleIndex; 
   Vector<uint> cellStart, cellEnd;
-
  
   Vector<float> energyArray, virialArray;
   
-  PairForcesParams params;
+  pair_forces_ns::Params params;
   
   //These handle the selected force functions
   

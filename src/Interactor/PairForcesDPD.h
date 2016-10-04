@@ -4,6 +4,7 @@
 
 #include"PairForces.h"
 
+
 class PairForcesDPD: public PairForces{
 public:
   PairForcesDPD();
@@ -19,7 +20,7 @@ private:
   float gamma;
   Vector4 sortVel;
   
-  PairForcesParamsDPD paramsDPD;
+  pair_forces_ns::ParamsDPD paramsDPD;
   Xorshift128plus rngCPU;
   unsigned long long int seed;
 };

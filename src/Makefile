@@ -2,7 +2,7 @@ CXX=g++
 CC=$(CXX)
 NVCC=nvcc
 
-
+#EXPERIMENTAL=1  #Uncomment to compile with experimental modules
 ###############################Put here your system configuration:#####################################
 
 #the code will look here for the cuda and thrust sources
@@ -24,16 +24,24 @@ CUSTOM_CUOBJS=
 #############################################################################################################################
 
 
-CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ -g
+CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ -g -Wall
+
+ifdef EXPERIMENTAL
+CFLAGS += -DEXPERIMENTAL
+endif
 
 CXXFLAGS=$(CFLAGS) 
 
-NVFLAGS= -g -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 -gencode arch=compute_52,code=sm_52 -src-in-ptx  -I./
+NVFLAGS= -g -std=c++11 -O3 -D_FORCE_INLINES --compiler-options -O3 -ccbin=g++ -lineinfo -m64 -gencode arch=compute_52,code=sm_52 -src-in-ptx  -I./ -Xptxas -dlcm=ca 
 
 LDFLAGS= -L$(CUDA_LIBS)
 LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas
 
-OBJS_INTERACTOR= Interactor.o PairForces.o PairForcesDPD.o BondedForces.o NBodyForces.o ExternalForces.o 
+
+OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
+CUOBJS_INTERACTOR_EXPERIMENTAL= PairForcesAltGPU.o
+
+OBJS_INTERACTOR= Interactor.o PairForces.o  BondedForces.o NBodyForces.o ExternalForces.o 
 OBJS_INTEGRATOR= Integrator.o VerletNVE.o VerletNVT.o BrownianEulerMaruyama.o BrownianHydrodynamicsEulerMaruyama.o
 OBJS_MEASURABLE= Measurable.o EnergyMeasure.o
 
@@ -46,6 +54,13 @@ OBJS += $(addprefix Measurable/, $(OBJS_MEASURABLE))
 OBJS += utils/utils.o misc/Potential.o Driver/Driver.o Driver/SimulationConfig.o $(CUSTOM_OBJS)
 
 CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS)
+
+ifdef EXPERIMENTAL
+OBJS += $(addprefix Interactor/Experimental/, $(OBJS_INTERACTOR_EXPERIMENTAL))
+CUOBJS += $(addprefix Interactor/Experimental/, $(CUOBJS_INTERACTOR_EXPERIMENTAL))
+endif
+
+
 
 all: main
 

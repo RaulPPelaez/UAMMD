@@ -37,6 +37,7 @@ void Integrator::write(bool block){
   if(this->writeThread.joinable()){
     this->writeThread.join();
   }
+  cudaDeviceSynchronize();
   /*Bring pos from GPU*/
   pos.download();
   /*Wait for copy to finish*/

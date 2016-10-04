@@ -6,9 +6,12 @@
 #ifndef VERLETNVEGPU_CUH
 #define VERLETNVEGPU_CUH
 
-void integrateVerletNVEGPU(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step);
+namespace verlet_nve_ns{
+  
+  void integrateVerletNVEGPU(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step);
+  
 
+  float computeKineticEnergyVerletNVE(float3 *vel, uint N);
 
-float computeKineticEnergyVerletNVE(float3 *vel, uint N);
-
+}
 #endif

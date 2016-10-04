@@ -54,6 +54,10 @@ int main(int argc, char *argv[]){
   Timer tim;
   tim.tic();
 
+  size_t size;
+  cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
+  cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*1000);
+
   /*The simulation handler*/
   SimulationConfig psystem(argc, argv);
 

@@ -20,6 +20,8 @@ TODO:
 */
 #include "VerletNVT.h"
 
+/*Each module should have its own namespace*/
+using namespace verlet_nvt_ns;
 
 VerletNVT::VerletNVT():
   Integrator(), /*After initializing the base class, you have access to things like N, L...*/
@@ -30,7 +32,7 @@ VerletNVT::VerletNVT():
   vel = Vector3(N);
   cerr<<"\tSet T="<<gcnf.T<<endl;
 
-  gamma = 0.1f;
+  gamma = gcnf.gamma;
 
   /*Set params and init GPU parameters*/
   params.gamma = gamma;
@@ -45,15 +47,14 @@ VerletNVT::VerletNVT():
   curandSetPseudoRandomGeneratorSeed(rng, gcnf.seed);
   /*This shit is obscure, curand will only work with an even number of elements*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
-  
+
+  noise.download();
   /*Distribute the velocities according to the temperature*/
   float vamp = sqrt(3.0f*params.T);
   /*Create velocities*/
   vel.fill_with(make_float3(0.0f));
   fori(0,N){
-    vel[i].x = vamp*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
-    vel[i].y = vamp*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
-    vel[i].z = vamp*(2.0f*(rand()/(float)RAND_MAX)-1.0f);
+    vel[i] = vamp*noise[i];
   }
   vel.upload();
   
@@ -79,14 +80,17 @@ void VerletNVT::update(){
   /**Compute all the forces**/
   
   /*Reset forces*/
-  cudaMemset((float *)force.d_m, 0.0f, 4*N*sizeof(float));
+  cudaMemset((void *)force.d_m, 0, N*sizeof(float4));
   for(auto forceComp: interactors) forceComp->sumForce();
   
   /**Second integration step**/
   /*Gen noise*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
   integrateVerletNVTGPU(pos, vel, force, noise, N, 2);
-}
+  
+
+  
+ }
 
 
 float VerletNVT::sumEnergy(){

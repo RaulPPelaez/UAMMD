@@ -44,7 +44,7 @@ private:
   
   float gamma; //Gamma is not stored in gcnf
   
-  VNVTparams params;
+  verlet_nvt_ns::Params params;
   curandGenerator_t rng;
 };
 

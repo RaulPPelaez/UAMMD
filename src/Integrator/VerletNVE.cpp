@@ -16,6 +16,8 @@ TODO:
 */
 #include "VerletNVE.h"
 
+using namespace verlet_nve_ns;
+
 /*Constructor, Dont forget to initialize the base class Integrator!*/
 /*You can use anything in gcnf at any time*/
 VerletNVE::VerletNVE():
@@ -45,7 +47,7 @@ void VerletNVE::update(){
     
     float K = abs(E-U);
     /*Distribute the velocities accordingly*/
-    float vamp = sqrt(2.0f*K);
+    float vamp =  sqrt(0.0f*2.0f*K);
     /*Create velocities*/
     vel.fill_with(make_float3(0.0f));
     fori(0,N){

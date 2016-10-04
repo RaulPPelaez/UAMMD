@@ -167,7 +167,19 @@ public:
       gpuErrchk(cudaMemcpy(data, d_m, n*sizeof(T), cudaMemcpyDeviceToHost));
   }
 
-  void print() const{
+  inline void GPUfill_with(T x){
+    uploaded= true;
+    gpuErrchk(cudaMemset(d_m, x, n*sizeof(T)));
+  }
+  inline bool GPUcopy_from(const Vector<T> &other){
+    if(other.uploaded && this->n == other.n){
+      this->uploaded = true;
+      gpuErrchk(cudaMemcpy(d_m, other.d_m, n*sizeof(T), cudaMemcpyDeviceToDevice));
+      return true;
+    }
+    return false;
+  }
+  void print(){
     download();
     for(int i=0; i<n; i++)
       cout<<data[i]<<" ";

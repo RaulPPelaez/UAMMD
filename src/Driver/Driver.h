@@ -29,7 +29,6 @@ TODO:
 
 #include"Interactor/Interactor.h"
 #include"Interactor/PairForces.h"
-#include"Interactor/PairForcesDPD.h"
 #include"Integrator/Integrator.h"
 #include"Integrator/VerletNVE.h"
 #include"Integrator/VerletNVT.h"
@@ -43,6 +42,10 @@ TODO:
 #include"Measurable/EnergyMeasure.h"
 #include"utils/utils.h"
 #include<memory>
+
+#ifdef EXPERIMENTAL
+#include"Interactor/Experimental/PairForcesAlt.h"
+#endif
 
 
 class Driver{

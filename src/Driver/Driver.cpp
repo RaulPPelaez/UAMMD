@@ -51,7 +51,7 @@ void Driver::run(){
       this->write(); //Writing is done in parallel, is practically free if the interval is big enough
     
 	
-    if(step%gcnf.measure_steps==1 && step > gcnf.relaxation_steps)
+    if(i%gcnf.measure_steps==0 && gcnf.measure_steps>0)
       for(auto m: measurables)
 	m->measure();
   }

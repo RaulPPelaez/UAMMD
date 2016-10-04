@@ -6,22 +6,22 @@
 #ifndef VERLETNVTGPU_CUH
 #define VERLETNVTGPU_CUH
 
+/*Each module should have its own namespace*/
+namespace verlet_nvt_ns{
 
+  struct Params{
+    float dt;
+    float gamma;
+    float T;
+    float noiseAmp;
+  };
 
-struct VNVTparams{
-  float dt;
-  float gamma;
-  float T;
-  float noiseAmp;
-};
+  void initVerletNVTGPU(Params m_params);
 
-void initVerletNVTGPU(VNVTparams m_params);
+  /*Step controls the integration step, 1 or 2 in verlet*/
+  void integrateVerletNVTGPU(float4 *pos, float3 *vel, float4 *force, float3 *noise,
+			     uint N, int step);
 
-
-void integrateVerletNVTGPU(float4 *pos, float3 *vel, float4 *force, float3 *noise,
-			   uint N, int step);
-
-
-float computeKineticEnergyVerletNVT(float3 *vel, uint N);
-
+  float computeKineticEnergyVerletNVT(float3 *vel, uint N);
+}
 #endif
