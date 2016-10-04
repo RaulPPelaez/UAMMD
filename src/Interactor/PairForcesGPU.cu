@@ -18,7 +18,7 @@ TODO:
 10- Find a way to properly handle the alternate arrays in sortCellIntex
 */
 
-#include<cub/cub/cub.cuh>
+#include<cub/cub.cuh>
 #include<curand_kernel.h>
 #include"PairForcesGPU.cuh"
 #include"utils/helper_math.h"
