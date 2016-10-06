@@ -12,24 +12,70 @@ TODO:
  */
 #include"Potential.h"
 #include<fstream>
+#include<cstring>
 
 Potential::Potential(std::function<float(float)> Ffoo,
 		     std::function<float(float)> Efoo,
 		     int N, float rc):
   N(N), F(N), E(N),
+  FGPU(nullptr), EGPU(nullptr),
+  texForce(0),texEnergy(0),
   forceFun(Ffoo), energyFun(Efoo)
 {
+  F[0] = 0;
+  E[0] = 0;
+
   float dr2 = rc*rc/(float)N;
   float r2 = 0.5f*dr2;
-
-  fori(0,N){
+  fori(1,N){
     F[i] = forceFun(r2);
     E[i] = energyFun(r2);
     r2 += dr2;
   }
-  //F[0] = 0xffffff;
   F[N-1] = 0.0f;
   E[N-1] = 0.0f;
+
+
+
+  cudaChannelFormatDesc channelDesc;
+  channelDesc = cudaCreateChannelDesc(32, 0,0,0, cudaChannelFormatKindFloat);
+
+  
+  gpuErrchk(cudaMallocArray(&FGPU,
+			    &channelDesc,
+			    N,1));
+  gpuErrchk(cudaMallocArray(&EGPU,
+			    &channelDesc,
+			    N,1));
+  
+  gpuErrchk(cudaMemcpyToArray(FGPU, 0,0, F.data(), N*sizeof(float), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToArray(EGPU, 0,0, E.data(), N*sizeof(float), cudaMemcpyHostToDevice));
+
+
+
+  cudaResourceDesc resDesc;
+  memset(&resDesc, 0, sizeof(resDesc));
+  resDesc.resType = cudaResourceTypeArray;
+
+    
+  cudaTextureDesc texDesc;
+  memset(&texDesc, 0, sizeof(texDesc));
+  texDesc.readMode = cudaReadModeElementType;
+  texDesc.addressMode[0]   = cudaAddressModeClamp;
+  texDesc.addressMode[1]   = cudaAddressModeClamp;
+  texDesc.filterMode       = cudaFilterModeLinear;
+  texDesc.normalizedCoords = 1;
+
+  resDesc.res.array.array = FGPU;
+  gpuErrchk(cudaCreateTextureObject(&texForce, &resDesc, &texDesc, NULL));
+  resDesc.res.array.array = EGPU;
+  gpuErrchk(cudaCreateTextureObject(&texEnergy, &resDesc, &texDesc, NULL));
+    
+  if(!texForce || !texEnergy ||
+     !FGPU || !EGPU){
+    cerr<<"Error in potential creation!!!"<<endl;
+    exit(1);
+  }
   
 }
 

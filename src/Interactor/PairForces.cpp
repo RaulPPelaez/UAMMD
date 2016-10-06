@@ -105,28 +105,27 @@ void PairForces::init(){
   virialArray.fill_with(0.0f); virialArray.upload();
 
   
-  particleHash.fill_with(0);     particleHash.upload();
+  particleHash.fill_with(0);  particleHash.upload();
   particleIndex.fill_with(0); particleIndex.upload();
   cellStart    = Vector<uint>(ncells); cellStart.fill_with(0);     cellStart.upload();
   cellEnd      = Vector<uint>(ncells); cellEnd.fill_with(0);       cellEnd.upload();
   
   initPairForcesGPU(params,
-		    pot.getForceData(), pot.getEnergyData(), pot.getSize(),
+		    pot.getForceTexture(), pot.getEnergyTexture(),
 		    cellStart, cellEnd, particleIndex, ncells,
 		    sortPos, pos, N);
-
+  
+  cudaDeviceSynchronize();
 }
 
 /*** CONSTRUCT NEIGHBOUR LIST ***/
 void PairForces::makeNeighbourList(){
-
   makeCellList(pos, sortPos, particleIndex, particleHash, cellStart, cellEnd, N, ncells);
 }
 
 
 void PairForces::sumForce(){
   static int steps = 0;
-  
   steps++;
 
   /*** CONSTRUCT NEIGHBOUR LIST ***/
@@ -139,6 +138,10 @@ void PairForces::sumForce(){
 		   particleIndex,
 		   N);
 
+   // force.download();
+   // float4 sumforce = std::accumulate(force.begin(), force.end(), make_float4(0));
+
+   // cout<<sumforce.x<<" "<<sumforce.y<<" "<<sumforce.z<<endl; 
 }
 
 float PairForces::sumEnergy(){

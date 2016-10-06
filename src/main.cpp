@@ -51,12 +51,17 @@ Vector3 vel;
 
 
 int main(int argc, char *argv[]){
+
+  fori(1,argc)
+    if(strcmp("--device", argv[i])==0)
+      cudaSetDevice(atoi(argv[i+1]));
+  
   Timer tim;
   tim.tic();
 
-  size_t size;
-  cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
-  cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*1000);
+  // size_t size;
+  // cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
+  // cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*1000);
 
   /*The simulation handler*/
   SimulationConfig psystem(argc, argv);

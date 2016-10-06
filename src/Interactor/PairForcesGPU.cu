@@ -50,7 +50,7 @@ namespace pair_forces_ns{
   __constant__ Params params; //Simulation parameters in constant memory, super fast access
   __constant__ ParamsDPD paramsDPD; //Simulation parameters in constant memory, super fast access
   
-  texture<float, 1, cudaReadModeElementType> texForce; cudaArray *dF;
+  //  texture<float, 1, cudaReadModeElementType> texForce; cudaArray *dF;
 
   cudaTextureObject_t h_texPos=0, h_texSortPos=0;
   cudaTextureObject_t h_texCellStart=0, h_texCellEnd=0;
@@ -58,14 +58,13 @@ namespace pair_forces_ns{
   
   uint GPU_Nblocks;
   uint GPU_Nthreads;
-
   
   //Initialize gpu variables 
   void initPairForcesGPU(Params &m_params,
-			 float *potForceData, float *potEnergyData, size_t potSize,
+			 cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
 			 uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
 			 float4 *sortPos, float4 *pos, uint N){
-
+    
     /*Precompute some inverses to save time later*/
     m_params.invrc2 = 1.0f/(m_params.rcut*m_params.rcut);
     m_params.invrc = 1.0f/(m_params.rcut);
@@ -102,38 +101,13 @@ namespace pair_forces_ns{
 
     resDesc.res.linear.devPtr = cellEnd;
     cudaCreateTextureObject(&h_texCellEnd, &resDesc, &texDesc, NULL);
+        
+    m_params.texForce =  texForce;
+    m_params.texEnergy =  texEnergy;
     
-
-    /*Create and bind force texture, this needs interpolation*/
-    cudaChannelFormatDesc channelDesc;
-    channelDesc = cudaCreateChannelDesc(32, 0,0,0, cudaChannelFormatKindFloat);
-
-    gpuErrchk(cudaMallocArray(&dF,
-			      &channelDesc,
-			      potSize/sizeof(float),1));
-
-    gpuErrchk(cudaMemcpyToArray(dF, 0,0, potForceData, potSize, cudaMemcpyHostToDevice));
-
-    texForce.normalized = true; //The values are fetched between 0 and 1
-    texForce.addressMode[0] = cudaAddressModeClamp; //0 outside [0,1]
-    texForce.filterMode = cudaFilterModeLinear; //Linear filtering
-
-    /*Texture binding*/
-    gpuErrchk(cudaBindTextureToArray(texForce, dF, channelDesc));
-  
-    /**SAME WITH THE ENERGY**/
-    // gpuErrchk(cudaMallocArray(&dE,
-    // 			    &channelDesc,
-    // 			    potSize/sizeof(float),1));
-    // gpuErrchk(cudaMemcpyToArray(dE, 0,0, potEnergyData, potSize, cudaMemcpyHostToDevice));
-    // /*Texture binding*/
-    // gpuErrchk(cudaBindTextureToArray(texEnergy, dE, channelDesc));
-
-
     /*Upload parameters to constant memory*/
     gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
-
-
+    
     /*Each particle is asigned a thread*/
     GPU_Nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
     GPU_Nblocks  =  N/GPU_Nthreads +  ((N%GPU_Nthreads!=0)?1:0); 
@@ -486,7 +460,8 @@ namespace pair_forces_ns{
   class forceTransversable{
   public:
     /*I need the device pointer to force*/
-    forceTransversable(float4 *newForce):newForce(newForce){ };
+    forceTransversable(float4 *newForce):newForce(newForce){
+    };
     /*Compute the force between two positions*/
     inline __device__ float4 compute(const float4 &R1,const float4 &R2){
       
@@ -503,7 +478,8 @@ namespace pair_forces_ns{
       /*Beyond rcut..*/
       //else if(r2c>=1.0f) return make_float4(0.0f);
       /*Get the force from the texture*/
-      float fmod = tex1D(texForce, r2c);
+      //float fmod = tex1D(texForce, r2c);
+      float fmod = tex1D<float>(params.texForce, r2c);
       // float invr2 = 1.0f/r2;
       // float invr6 = invr2*invr2*invr2;
       // float invr8 = invr6*invr2;
@@ -512,7 +488,7 @@ namespace pair_forces_ns{
       return  make_float4(fmod*r12);
     }
     /*Update the force acting on particle pi, pi is in the normal order*/
-    inline __device__ void set(uint pi, float4 totalForce){
+    inline __device__ void set(uint pi, const float4 &totalForce){
       newForce[pi] += totalForce;
     }
     /*Initial value of the force, this is a trick to allow the template in transverseList
@@ -523,7 +499,6 @@ namespace pair_forces_ns{
     }
   private:
     float4* newForce;
-
   };
 
 
@@ -560,15 +535,16 @@ namespace pair_forces_ns{
       /*Squared distance between 0 and 1*/
       float r2c = r2*params.invrc2;
       /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
-      if(r2c==0.0f) return 0.0f;  //Both cases handled in texForce
+      //if(r2c==0.0f) return 0.0f;  //Both cases handled in texForce
       /*Beyond rcut..*/
-      else if(r2c>=1.0f) return 0.0f;
+      //else if(r2c>=1.0f) return 0.0f;
       /*Get the force from the texture*/
       //float fmod = tex1D(texForce, r2c);
-      float invr2 = 1.0f/r2;
-      float invr6 = invr2*invr2*invr2;
+      //float invr2 = 1.0f/r2;
+      //float invr6 = invr2*invr2*invr2;
       //TODO take from a texture*/
-      float E =  2.0f*invr6*(invr6-1.0f);
+      //float E =  2.0f*invr6*(invr6-1.0f);
+      float E = tex1D<float>(params.texEnergy, r2c);
       
       return E;
     }
@@ -620,7 +596,7 @@ namespace pair_forces_ns{
       /*Beyond rcut..*/
       //if(r2c>=1.0f) return 0.0f; //Also 0 in texForce
       /*Get the force from the texture*/
-      float fmod = tex1D(texForce, r2c);
+      float fmod = tex1D<float>(params.texForce, r2c);
       // P = rhoKT + (1/2dV)sum_ij( Fij·rij ) //Compute only the Fij·rij, the rest is done outside
       return dot(fmod*r12,r12);
     }
@@ -696,7 +672,7 @@ namespace pair_forces_ns{
     else return make_float4(0.0f);
     //fmod = paramsDPD.A*w; //Soft force
   
-    fmod -= tex1D(texForce, r2c); //Conservative force
+    fmod -= tex1D<float>(params.texForce, r2c); //Conservative force
     fmod -= paramsDPD.gamma*w*w*dot(r12,v12); //Damping
     fmod += paramsDPD.noiseAmp*randij*w; //Random force
     return make_float4(fmod*r12);

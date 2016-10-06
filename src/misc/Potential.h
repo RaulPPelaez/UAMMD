@@ -15,6 +15,8 @@ TODO:
 #include<vector>
 #include<fstream>
 #include<functional>
+#include<cuda.h>
+
 #include"utils/utils.h"
 using std::vector;
 using std::ofstream;
@@ -26,16 +28,22 @@ public:
   Potential(std::function<float(float)> Ffoo,
 	    std::function<float(float)> Efoo,
 	    int N, float rc);
-  size_t getSize(){ return N*sizeof(float);}
+  size_t getSize(){ return N;}
   float *getForceData(){ return F.data();}
-  float *getEnergyData(){ return F.data();}
+  float *getEnergyData(){ return E.data();}
+  cudaTextureObject_t getForceTexture(){ return this->texForce;}
+  cudaTextureObject_t getEnergyTexture(){ return this->texEnergy;}
+  
   void print();
-private:
 
   uint N;
   vector<float> F;
   vector<float> E;
 
+  cudaArray *FGPU, *EGPU;
+
+  cudaTextureObject_t texForce, texEnergy;
+  
   std::function<float(float)> forceFun;
   std::function<float(float)> energyFun;
 };

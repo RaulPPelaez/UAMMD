@@ -13,7 +13,7 @@ CUDA_LIBS=/usr/local/cuda/lib64
 #The code will look for a folder named cub here, you can create a symlink if you have a folder i.e. cub-1.5.2
 CUB_INCLUDE=/usr/local/include
 
-ARCH ?= 20 52
+ARCH ?= 52
 
 #You can place your custom files either here or below in the diferent OBJS_*/CUOBJS_* variables. Dont forget the folders if you put it here!
 #These will be compiled with $(CXX)
@@ -25,8 +25,9 @@ CUSTOM_CUOBJS=
 
 #############################################################################################################################
 
+DEBUG= -g
 
-CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ -g -Wall
+CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ $(DEBUG) -Wall
 
 ifdef EXPERIMENTAL
 CFLAGS += -DEXPERIMENTAL
@@ -43,7 +44,7 @@ CXXFLAGS=$(CFLAGS)
 
 $(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 
-NVFLAGS= -g -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
+NVFLAGS= $(DEBUG) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
 
 LDFLAGS= -L$(CUDA_LIBS)
 LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas
