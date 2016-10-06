@@ -11,6 +11,9 @@
 
   Force is evaluated using table lookups (with texture memory)
 
+  Throughout this file, all __device__ and __global__ functions have access to the params and, in the case of DPD, paramsDPD structs in constant memory. See PairForcesGPU.cuh for a list of the available information in this structures.
+
+  You can add new information to constant params by declaring it in PairForcesGPU.cuh and initializing it either in the initGPU function  before uploading or in the PairForces constructor, before calling initGPU.
 
   References:
   http://docs.nvidia.com/cuda/samples/5_Simulations/particles/doc/particles.pdf
@@ -19,7 +22,6 @@
   100- Implement many threads per particle in force compute
   100- Make number of blocks and threads to autotune
   100- Improve the transversing of the 27 neighbour cells
-  90- Make energy measure custom for each potential, currently only LJ, hardcoded.
   90- Implement energy and virial compute in PairForcesDPD, maybe take it to another file
   80- General functions like apply_pbc should be made global to ease development.
   10- Find a way to properly handle the alternate arrays in sortCellIntex
@@ -38,8 +40,6 @@
 #include<iostream>
 
 
-typedef unsigned long long int ullint;
-
 #define BLOCKSIZE 128
 
 using namespace thrust;
@@ -49,22 +49,13 @@ using std::endl;
 namespace pair_forces_ns{
   __constant__ Params params; //Simulation parameters in constant memory, super fast access
   __constant__ ParamsDPD paramsDPD; //Simulation parameters in constant memory, super fast access
-  
-  //  texture<float, 1, cudaReadModeElementType> texForce; cudaArray *dF;
-
-  cudaTextureObject_t h_texPos=0, h_texSortPos=0;
-  cudaTextureObject_t h_texCellStart=0, h_texCellEnd=0;
-  cudaTextureObject_t h_texVel=0, h_texSortVel=0;
+  __constant__ ullint seedGPU; //seed of the rng for DPD
   
   uint GPU_Nblocks;
   uint GPU_Nthreads;
   
   //Initialize gpu variables 
-  void initPairForcesGPU(Params &m_params,
-			 cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
-			 uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
-			 float4 *sortPos, float4 *pos, uint N){
-    
+  void initGPU(Params &m_params, uint ncells, uint N){    
     /*Precompute some inverses to save time later*/
     m_params.invrc2 = 1.0f/(m_params.rcut*m_params.rcut);
     m_params.invrc = 1.0f/(m_params.rcut);
@@ -74,40 +65,17 @@ namespace pair_forces_ns{
     m_params.gridPos2CellIndex = make_int3( 1,
 					    m_params.cellDim.x,
 					    m_params.cellDim.x*m_params.cellDim.y);
+    m_params.N = N;
     
-    /*Create texture objects*/
-    cudaResourceDesc resDesc;
-    memset(&resDesc, 0, sizeof(resDesc));
-    resDesc.resType = cudaResourceTypeLinear;
-    resDesc.res.linear.devPtr = pos;
-    resDesc.res.linear.desc = cudaCreateChannelDesc<float4>();
-    resDesc.res.linear.sizeInBytes = N*sizeof(float4);
+    if(!m_params.texPos || !m_params.texSortPos || !m_params.texCellStart ||
+       !m_params.texCellEnd || !m_params.texForce || !m_params.texEnergy){
+      cerr<<"Problem setting up textures!!"<<endl;
+      exit(1);
 
-    cudaTextureDesc texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
-    texDesc.readMode = cudaReadModeElementType;
-
-    cudaCreateTextureObject(&h_texPos, &resDesc, &texDesc, NULL);
-
-
-    resDesc.res.linear.devPtr = sortPos;
-    cudaCreateTextureObject(&h_texSortPos, &resDesc, &texDesc, NULL);
-
-    resDesc.res.linear.devPtr = cellStart;
-    resDesc.res.linear.desc = cudaCreateChannelDesc<uint>();
-    resDesc.res.linear.sizeInBytes = ncells*sizeof(uint);
-    
-    cudaCreateTextureObject(&h_texCellStart, &resDesc, &texDesc, NULL);
-
-    resDesc.res.linear.devPtr = cellEnd;
-    cudaCreateTextureObject(&h_texCellEnd, &resDesc, &texDesc, NULL);
-        
-    m_params.texForce =  texForce;
-    m_params.texEnergy =  texEnergy;
-    
+    }
     /*Upload parameters to constant memory*/
     gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
-    
+
     /*Each particle is asigned a thread*/
     GPU_Nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
     GPU_Nblocks  =  N/GPU_Nthreads +  ((N%GPU_Nthreads!=0)?1:0); 
@@ -115,27 +83,8 @@ namespace pair_forces_ns{
 
 
   
-  void initPairForcesDPDGPU(ParamsDPD &m_params, float4* sortVel, uint N){
-
+  void initDPDGPU(ParamsDPD &m_params){
     gpuErrchk(cudaMemcpyToSymbol(paramsDPD, &m_params, sizeof(ParamsDPD)));
-
-
-    /*Create texture obsjects*/
-    cudaResourceDesc resDesc;
-    memset(&resDesc, 0, sizeof(resDesc));
-    resDesc.resType = cudaResourceTypeLinear;
-    resDesc.res.linear.devPtr = sortVel;
-    resDesc.res.linear.desc = cudaCreateChannelDesc<float4>();
-    resDesc.res.linear.sizeInBytes = N*sizeof(float4);
-
-    cudaTextureDesc texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
-    texDesc.readMode = cudaReadModeElementType;
-
-    cudaCreateTextureObject(&h_texSortVel, &resDesc, &texDesc, NULL);
-
-
-    //gpuErrchk(cudaBindTexture(NULL, texSortVel, sortVel, N*sizeof(float4)));
   }
 
   /****************************HELPER FUNCTIONS*****************************************/
@@ -275,18 +224,16 @@ namespace pair_forces_ns{
 
   /*This kernel fills sortPos with the positions in pos, acording to the indices in particleIndex*/
   __global__ void reorderPosD(float4 *sortPos,
-			      cudaTextureObject_t texPos,
 			      const uint* __restrict__ particleIndex, uint N){
     uint i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i>=N) return;
 
     uint sort_index = particleIndex[i]; //Coalesced
 
-    sortPos[i] = tex1Dfetch<float4>(texPos, sort_index);
+    sortPos[i] = tex1Dfetch<float4>(params.texPos, sort_index);
   }
   /*Same as above, but reordering vel aswell*/
   __global__ void reorderPosVelD(float4 *sortPos,
-				 cudaTextureObject_t texPos,
 				 float4* sortVel,
 				 float3 * vel,
 				 uint* particleIndex, uint N){
@@ -295,8 +242,7 @@ namespace pair_forces_ns{
 
     uint sort_index = particleIndex[i]; //Coalesced
 
-    sortPos[i] = tex1Dfetch<float4>(texPos, sort_index);
-    //    sortVel[i] = tex1Dfetch<float4>(texVel, sort_index);
+    sortPos[i] = tex1Dfetch<float4>(params.texPos, sort_index);
     sortVel[i] = make_float4(vel[sort_index]);
   }
   
@@ -352,12 +298,13 @@ namespace pair_forces_ns{
     
     sortCellHash(particleHash, particleIndex, N);
 
-    reorderPosD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, h_texPos, particleIndex, N);
+    reorderPosD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, particleIndex, N);
 
     /*This fills cellStart and cellEnd*/
     fillCellListD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, cellStart, cellEnd, N);
     
   }
+  
   void makeCellListDPD(float4 *pos, float3* vel,  float4 *sortPos, float4 *sortVel,
 		       uint *&particleIndex, uint *&particleHash,
 		       uint *cellStart, uint *cellEnd,
@@ -369,15 +316,11 @@ namespace pair_forces_ns{
     
     sortCellHash(particleHash, particleIndex, N);
 
-    reorderPosVelD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, h_texPos, sortVel, vel, particleIndex, N);
+    reorderPosVelD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, sortVel, vel, particleIndex, N);
 
     fillCellListD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, cellStart, cellEnd, N);
     
   }
-		    
-		    
-
-
 
   //TODO The naming and explanation of this function
   /*Transverses all the neighbour particles of each particle using the cell list and computes a quantity as implemented by Transversable. Each thread goes through all the neighbours of a certain particle(s)(index), transversing its 27 neighbour cells*/
@@ -391,25 +334,25 @@ namespace pair_forces_ns{
     */
   template<class Transversable>
   __global__ void transverseListD(Transversable T, 
-				  cudaTextureObject_t texSortPos,
 				  const uint* __restrict__ particleIndex,
-				  cudaTextureObject_t texCellStart, cudaTextureObject_t texCellEnd,
 				  uint N){
     uint ii =  blockIdx.x*blockDim.x + threadIdx.x;
 
     //Grid-stride loop
     for(int index = ii; index<N; index += blockDim.x * gridDim.x){
       /*Compute force acting on particle particleIndex[index], index in the new order*/
-      float4 pos = tex1Dfetch<float4>(texSortPos, index);
+      //float4 pos = tex1Dfetch<float4>(texSortPos, index);
+
+      auto pinfoi = T.getInfo(index);//tex1Dfetch<float4>(texSortPos, index);
 
       /*Initial value of the quantity*/
       auto quantity = T.zero();
       
-      int3 celli = getCell(pos);
+      int3 celli = getCell(pinfoi.pos);
 
       int x,y,z;
       int3 cellj;
-      float4 posj;
+      //      float4 posj;
       /**Go through all neighbour cells**/
       //For some reason unroll doesnt help here
       for(z=-1; z<=1; z++)
@@ -420,21 +363,21 @@ namespace pair_forces_ns{
 
 	    uint icell  = getCellIndex(cellj);
 	    /*Index of the first particle in the cell's list*/ 
-	    uint firstParticle = tex1Dfetch<uint>(texCellStart, icell);
+	    uint firstParticle = tex1Dfetch<uint>(params.texCellStart, icell);
+	    if(firstParticle ==0xffFFffFF) continue;
 	    /*Index of the last particle in the cell's list*/
-	    uint lastParticle = lastParticle=tex1Dfetch<uint>(texCellEnd, icell);
-	    // if(firstParticle!=0xffFFffFF)  
-	    // else continue;
+	    uint lastParticle = lastParticle=tex1Dfetch<uint>(params.texCellEnd, icell);
 	    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
 	    /*If there are no particles in the cell, firstParticle=0xffffffff, the loop is not computed*/
-	    /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking
-	      firstParticle before fetching*/
-	    
+	    /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking firstParticle before fetching*/	    
 	    for(uint j=firstParticle; j<lastParticle; j++){
 	      /*Retrieve j pos*/
-	      posj = tex1Dfetch<float4>(texSortPos, j);
+	      //posj = tex1Dfetch<float4>(texSortPos, j);
+	      auto pinfoj = T.getInfo(j);
 	      /*Add force, i==j is handled in forceij */
-	      quantity += T.compute(pos, posj);      
+	      //quantity += T.compute(pos, posj);
+	      quantity += T.compute(pinfoi, pinfoj);
+
 	    }
 	    
 	  }
@@ -459,15 +402,18 @@ namespace pair_forces_ns{
     but with any desired type, instead of float4 as in this case*/
   class forceTransversable{
   public:
+    struct ParticleInfo{
+      float4 pos;
+    };
+
     /*I need the device pointer to force*/
     forceTransversable(float4 *newForce):newForce(newForce){
     };
     /*Compute the force between two positions*/
-    inline __device__ float4 compute(const float4 &R1,const float4 &R2){
-      
-      float3 r12 = make_float3(R2-R1);
-      apply_pbc(r12);
+    inline __device__ float4 compute(const ParticleInfo &R1,const ParticleInfo &R2){
 
+      float3 r12 = make_float3(R2.pos-R1.pos);
+      apply_pbc(r12);
       /*Squared distance*/
       float r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
@@ -497,6 +443,10 @@ namespace pair_forces_ns{
     inline __device__ float4 zero(){
       return make_float4(0.0f);
     }
+
+    inline __device__ ParticleInfo getInfo(uint index){      
+      return {tex1Dfetch<float4>(params.texSortPos, index)};
+    }
   private:
     float4* newForce;
   };
@@ -511,9 +461,8 @@ namespace pair_forces_ns{
     /*An instance of the class that holds the function that computes the force*/
     forceTransversable ft(force); //It needs the addres of the force in device memory
     /*Transverse the neighbour list for each particle, using ft to compute the force in each pair*/
-    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft, h_texSortPos,
+    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft,
 						   particleIndex,
-						   h_texCellStart, h_texCellEnd,
 						   N);
     //cudaCheckErrors("computeForce");
   }
@@ -524,10 +473,14 @@ namespace pair_forces_ns{
   //tags: energy compute energyij
   class energyTransversable{
   public:
+    struct ParticleInfo{
+      float4 pos;
+    };
+
     energyTransversable(float *Energy):Energy(Energy){ };
     /*Returns the energy between two positions*/
-    inline __device__ float compute(const float4 &R1,const float4 &R2){
-      float3 r12 = make_float3(R2-R1);
+    inline __device__ float compute(const ParticleInfo &R1,const ParticleInfo &R2){
+      float3 r12 = make_float3(R2.pos-R1.pos);
 
       apply_pbc(r12);
 
@@ -554,6 +507,10 @@ namespace pair_forces_ns{
     inline __device__ float zero(){
       return 0.0f;
     }
+    inline __device__ ParticleInfo getInfo(uint index){
+      return {tex1Dfetch<float4>(params.texSortPos, index)};
+    }
+
   private:
     float *Energy;
   };
@@ -566,9 +523,8 @@ namespace pair_forces_ns{
 
     /*Analogous to computeForce, see for reference*/
     energyTransversable et(energy);
-    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(et, h_texSortPos,
+    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(et,
 						   particleIndex,
-						   h_texCellStart, h_texCellEnd,
 						   N);
     device_ptr<float> d_e(energy);
     float sum;
@@ -584,9 +540,13 @@ namespace pair_forces_ns{
   //tags: virial compute virialij
   class virialTransversable{
   public:
+    struct ParticleInfo{
+      float4 pos;
+    };
+
     virialTransversable(float *virial):Virial(virial){ };
-    inline __device__ float compute(const float4 &R1,const float4 &R2){
-      float3 r12 = make_float3(R2-R1);
+    inline __device__ float compute(const ParticleInfo &R1,const ParticleInfo &R2){
+      float3 r12 = make_float3(R2.pos-R1.pos);
       apply_pbc(r12);
 
       float r2 = dot(r12,r12);
@@ -606,6 +566,11 @@ namespace pair_forces_ns{
     inline __device__ float zero(){
       return 0.0f;
     }
+
+    inline __device__ ParticleInfo getInfo(uint index){
+      return {tex1Dfetch<float4>(params.texSortPos, index)};
+    }
+
   private:
     float *Virial;
   };
@@ -620,9 +585,8 @@ namespace pair_forces_ns{
 			  uint N){
 
     virialTransversable ft(virial);
-    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft, h_texSortPos,
+    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft,
 						   particleIndex,
-						   h_texCellStart, h_texCellEnd,
 						   N);
     device_ptr<float> d_vir(virial);
     float sum;
@@ -640,137 +604,107 @@ namespace pair_forces_ns{
 
 
   //Random number, the seed is used to recover a certain number in the random stream
+  //TODO: This is a bit awkward, probably it will be best to manually generate the number
   inline __device__ float randGPU(const ullint &seed, curandState *rng){
     curand_init(seed, 0, 0, rng);
     return curand_normal(rng);
   }
 
+  /*Very similar to forceTransversable, but now the force depends on the velocity aswell!*/
+  //tags: forceijDPD forceDPDij
+  class forceDPDTransversable{
+  public:
+    /*A struct with all the information the force compute needs*/
+    struct ParticleInfo{      
+      float4 pos; //Pos has to be the first element always!
+      uint pi;
+    };
 
-  //Computes the force between to positions
-  inline __device__ float4 forceijDPD(const float4 &R1,const float4 &R2,
-				      const float4 &V1,const float4 &V2, const float &randij){
-  
-    float3 r12 = make_float3(R1-R2);
-    float3 v12 = make_float3(V1-V2);
-  
-    apply_pbc(r12);
+    /*I need the device pointer to force*/
+    forceDPDTransversable(float4 *newForce):newForce(newForce){};
+    
+    /*Compute the force between two particles*/
+    /*As in all this file, the __device__ function has access to all the parameters in params and,
+      in this case, paramsDPD. See PairForcesGPU.cuh*/
+    
+    inline __device__ float4 compute(const ParticleInfo &R1,const ParticleInfo &R2){
+      float3 r12 = make_float3(R1.pos-R2.pos);  
+      apply_pbc(r12);
 
-    float r2 = dot(r12,r12);
-    /*Squared distance between 0 and 1*/
-    float r2c = r2*params.invrc2;
-  
-    float fmod= 0.0f;
-  
-    float w = 0.0f; //The intensity of the DPD thermostat 
-    float rinv = 0.0f;
-    if(r2c<1.0f){
-      if(r2c==0.0f) return make_float4(0.0f);
-      //w = r-rc -> linear
-      rinv = rsqrt(r2);
-      w = rinv-params.invrc;
-    }
-    else return make_float4(0.0f);
-    //fmod = paramsDPD.A*w; //Soft force
-  
-    fmod -= tex1D<float>(params.texForce, r2c); //Conservative force
-    fmod -= paramsDPD.gamma*w*w*dot(r12,v12); //Damping
-    fmod += paramsDPD.noiseAmp*randij*w; //Random force
-    return make_float4(fmod*r12);
-  }
+      float r2 = dot(r12,r12);
+      /*Squared distance between 0 and 1*/
+      float r2c = r2*params.invrc2;
+    
+      float w = 0.0f; //The intensity of the DPD thermostat 
+      float rinv = 0.0f;
+      if(r2c<1.0f){
+	if(r2c==0.0f) return make_float4(0.0f);
+	//w = r-rc -> linear
+	rinv = rsqrt(r2);
+	w = rinv-params.invrc;
+      }
+      else return make_float4(0.0f);
+      
 
-  //Computes the force acting on particle index from particles in cell cell
-  inline __device__ float4 forceCellDPD(const int3 &cell, const uint &index,
-					const float4 &pos, cudaTextureObject_t texSortPos,
-					const float4 &veli, cudaTextureObject_t texSortVel,
-					uint N,
-					curandState &rng, const ullint &seed,
-					cudaTextureObject_t texCellStart,cudaTextureObject_t texCellEnd){
-    uint icell  = getCellIndex(cell);
-    /*Index of the first particle in the cell's list*/ 
-    uint firstParticle = tex1Dfetch<uint>(texCellStart, icell);
 
-    float4 force = make_float4(0.0f);
-    float4 posj, velj;
-  
-    /*Index of the last particle in the cell's list*/
-    uint lastParticle = tex1Dfetch<uint>(texCellEnd, icell);
-    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
-    /*If there are no particles in the cell, firstParticle=0xffffffff, the loop is not computed*/
-    /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking
-      firstParticle before fetching*/
-    float randij;
-    ullint i0, j0;
-    for(uint j=firstParticle; j<lastParticle; j++){
-      /*Retrieve j pos and vel*/
-      posj = tex1Dfetch<float4>(texSortPos, j);
-      velj = tex1Dfetch<float4>(texSortVel, j);
+      uint i0 = R1.pi;
+      uint j0 = R2.pi;
+
+      float4 V1=tex1Dfetch<float4>(paramsDPD.texSortVel, i0);
+      float4 V2=tex1Dfetch<float4>(paramsDPD.texSortVel, j0);
+      
+      float3 v12 = make_float3(V1-V2);      
       /*Prepare the seed for the RNG, it must be the same seed
 	for pair ij and ji!*/
-      if(index<j){
-	i0=index;
-	j0=j;
-      }
-      else{
-	i0=j;
-	j0=index;
-      }
-      /*Get the random number*/
-      randij = randGPU(i0+(ullint)N*j0 +seed, &rng);
-      /*Sum the force*/
-      force += forceijDPD(pos, posj, veli, velj, randij);
-    }
+      if(i0>j0)
+	swap(i0,j0);
+      
+      curandState rng;
+      float randij = randGPU(i0+(ullint)params.N*j0 + seedGPU, &rng);
+
+      //fmod = paramsDPD.A*w; //Soft force
   
-    return force;
-  }
-
-
-  //Kernel to compute the force acting on all particles
-  __global__ void computeForceDDPD(cudaTextureObject_t texSortPos, cudaTextureObject_t texSortVel,
-				   const uint __restrict__ *particleIndex,
-				   cudaTextureObject_t texCellStart, cudaTextureObject_t texCellEnd,
-				   float4* __restrict__ newForce,
-				   uint N, ullint seed){
-    /*Travel the particles per sort order*/
-    uint ii =  blockIdx.x*blockDim.x + threadIdx.x;
-    curandState rng;
-  
-    //Grid-stride loop
-    for(int index = ii; index<N; index += blockDim.x * gridDim.x){
-      /*Compute force acting on particle particleIndex[index], index in the new order*/
-      float4 pos = tex1Dfetch<float4>(texSortPos, index);
-      float4 veli= tex1Dfetch<float4>(texSortVel, index);
-      //float3 veli = vel[pi];
-      float4 force = make_float4(0.0f);
-      int3 celli = getCell(pos);
-
-      int x,y,z;
-      int3 cellj;
-      /**Go through all neighbour cells**/
-      //For some reason unroll doesnt help here
-      for(z=-1; z<=1; z++)
-	for(y=-1; y<=1; y++)
-	  for(x=-1; x<=1; x++){
-	    cellj = celli+make_int3(x,y,z);
-	    pbc_cell(cellj);	
-	    force += forceCellDPD(cellj, index, pos, texSortPos, veli, texSortVel, N, rng, seed, texCellStart, texCellEnd);
-	  }
-      /*Write force with the original order*/
-      uint pi = particleIndex[index]; 
-      newForce[pi] += force;
+      float fmod = -tex1D<float>(params.texForce, r2c); //Conservative force
+      fmod -= paramsDPD.gamma*w*w*dot(r12,v12); //Damping
+      fmod += paramsDPD.noiseAmp*randij*w; //Random force
+      return make_float4(fmod*r12);
     }
-  }
+    /*Update the force acting on particle pi, pi is in the normal order*/
+    inline __device__ void set(uint pi, const float4 &totalForce){
+      newForce[pi] += totalForce;
+    }
+    /*Initial value of the force, this is a trick to allow the template in transverseList
+      to guess the type of my quantity, a float4 in this case. Just set it to the 0 value of 
+    the type of your quantity (0.0f for a float i.e)*/
+    inline __device__ float4 zero(){
+      return make_float4(0.0f);
+    }
 
+    inline __device__ ParticleInfo getInfo(uint index){
+      // ParticleInfo kk;
+      // kk.pos = tex1Dfetch<float4>(params.texSortPos, index);
+      // kk.vel = tex1Dfetch<float4>(paramsDPD.texSortVel, index);
+      // kk.pi = index;
+      
+      return {tex1Dfetch<float4>(params.texSortPos, index),
+	      index};
+    }
+  private:
+    float4* newForce;
+  };
+  
   //CPU kernel caller
   void computePairForceDPD(float4 *force,
 			   uint *particleIndex,
 			   uint N, ullint seed){
-    computeForceDDPD<<<GPU_Nblocks, GPU_Nthreads>>>(h_texSortPos, h_texSortVel,
-						    particleIndex,
-						    h_texCellStart,h_texCellEnd,
-      
-						    force,
-						    N, seed);
-
+    //TODO: This should not be needed somehow
+    gpuErrchk(cudaMemcpyToSymbol(seedGPU, &seed, sizeof(seedGPU)));
+    
+    forceDPDTransversable ft(force);
+    
+    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft, 
+     						   particleIndex,
+     						   N);
     //cudaCheckErrors("computeForce");
   }
 

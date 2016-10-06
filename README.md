@@ -67,7 +67,8 @@ If you dont have cub (thrust comes bundled with the CUDA installation) clone or 
 The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.
 The Makefile expects to find cub in /usr/local/cub, but you can change it. CUB doesnt need to be compiled.
 
-Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver.cpp, set number of particles, size of the box, dt and time of the simulation in main.cpp.
+Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp, set number of particles, size of the box, dt and time of the simulation in main.cpp.
+You can change the integrator at any time during the execution of the simulation, see Driver/SimulationConfig.cpp.
 
 Then compile with make and run
 

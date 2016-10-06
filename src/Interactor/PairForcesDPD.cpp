@@ -13,8 +13,10 @@ PairForcesDPD::PairForcesDPD(): PairForces(LJ), rngCPU(gcnf.seed){
 
   sortVel = Vector4(N); sortVel.fill_with(make_float4(0.0f)); sortVel.upload();
 
-  /*Pass sortVel to bind it to a texture reference*/
-  initPairForcesDPDGPU(paramsDPD, sortVel, N);
+  /*Get texture object from sortVel*/
+  paramsDPD.texSortVel = sortVel.getTexture();
+  /*Upload parameters to GPU*/
+  initDPDGPU(paramsDPD);
 
   /*Warmup rng*/
   fori(0, 1000) seed = rngCPU.next();

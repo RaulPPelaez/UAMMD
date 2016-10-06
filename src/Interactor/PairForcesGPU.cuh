@@ -13,8 +13,10 @@ More info in the .cu
 
 #ifndef PAIRFORCESGPU_CUH
 #define PAIRFORCESGPU_CUH
+typedef unsigned long long int ullint;
 
 namespace pair_forces_ns{
+  
   //Stores some simulation parameters to upload as constant memory.
   struct Params{
     float cellSize, invCellSize;
@@ -24,18 +26,22 @@ namespace pair_forces_ns{
     float3 getCellFactor;
     int3 gridPos2CellIndex;
     cudaTextureObject_t texForce, texEnergy;
+    cudaTextureObject_t texSortPos, texPos;
+    cudaTextureObject_t texCellStart, texCellEnd;
+    uint N;
   };
   //Stores some simulation parameters to upload as constant memory, the rest are available in Params.
   struct ParamsDPD{
     float gamma, noiseAmp, A;
+    cudaTextureObject_t texSortVel;
   };
 
-  void initPairForcesGPU(Params &m_params,
-			 cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
-			 uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
-			 float4 *sortPos, float4 *pos, uint N);
-  
-  void initPairForcesDPDGPU(ParamsDPD &m_params, float4* sortVel, uint N);
+  // void initGPU(Params &m_params,
+  // 	       cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
+  // 	       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
+  // 	       float4 *sortPos, float4 *pos, uint N);
+  void initGPU(Params &m_params, uint ncells, uint N);  
+  void initDPDGPU(ParamsDPD &m_params);
 
 
   void updateParams(Params m_params);

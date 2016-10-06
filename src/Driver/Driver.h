@@ -29,6 +29,7 @@ TODO:
 
 #include"Interactor/Interactor.h"
 #include"Interactor/PairForces.h"
+#include"Interactor/PairForcesDPD.h"
 #include"Integrator/Integrator.h"
 #include"Integrator/VerletNVE.h"
 #include"Integrator/VerletNVT.h"
@@ -68,7 +69,7 @@ public:
   Driver();
   ~Driver();
   //Move nsteps*dt forward in time
-  void run();
+  void run(uint nsteps, bool relax = false);
 
   //Write the current positions to disk, concurrently if block is false or not given
   void write(bool block = false);

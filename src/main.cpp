@@ -56,9 +56,6 @@ int main(int argc, char *argv[]){
     if(strcmp("--device", argv[i])==0)
       cudaSetDevice(atoi(argv[i+1]));
   
-  Timer tim;
-  tim.tic();
-
   // size_t size;
   // cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
   // cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*1000);
@@ -66,16 +63,7 @@ int main(int argc, char *argv[]){
   /*The simulation handler*/
   SimulationConfig psystem(argc, argv);
 
-  cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;
-
   
-  tim.tic();  
-  psystem.run();
-  
-  float total_time = tim.toc();
-  
-  cerr<<"\nMean step time: "<<setprecision(5)<<(float)gcnf.nsteps/total_time<<" FPS"<<endl;
-  cerr<<"\nTotal time: "<<setprecision(5)<<total_time<<"s"<<endl;
   
   if(gcnf.print_steps>0) psystem.write(true);
 

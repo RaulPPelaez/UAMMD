@@ -228,8 +228,8 @@ ThreeBondedForces::ThreeBondedForces(const char * readFile):
   cerr<<"\tDetected: "<<nbonds<<" particle-particle-particle bonds"<<endl;
   if(nbonds>0){
     
-    for(int b=0; b<nbonds; b++){
-      int i, j, k;
+    for(uint b=0; b<nbonds; b++){
+      uint i, j, k;
       in>>i>>j>>k;
       
       isInBonds[i].push_back(b);

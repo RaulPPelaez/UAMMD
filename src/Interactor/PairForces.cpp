@@ -109,11 +109,19 @@ void PairForces::init(){
   particleIndex.fill_with(0); particleIndex.upload();
   cellStart    = Vector<uint>(ncells); cellStart.fill_with(0);     cellStart.upload();
   cellEnd      = Vector<uint>(ncells); cellEnd.fill_with(0);       cellEnd.upload();
-  
-  initPairForcesGPU(params,
-		    pot.getForceTexture(), pot.getEnergyTexture(),
-		    cellStart, cellEnd, particleIndex, ncells,
-		    sortPos, pos, N);
+
+
+  /*Set texture references in params for constant memory*/
+  params.texForce = pot.getForceTexture();
+  params.texEnergy = pot.getEnergyTexture();
+
+  params.texPos = pos.getTexture();
+  params.texSortPos = sortPos.getTexture();
+  params.texCellStart = cellStart.getTexture();
+  params.texCellEnd = cellEnd.getTexture();
+
+  /*Upload parameters to GPU*/
+  initGPU(params, ncells, N);
   
   cudaDeviceSynchronize();
 }
@@ -137,7 +145,7 @@ void PairForces::sumForce(){
 		   cellStart, cellEnd, 
 		   particleIndex,
 		   N);
-
+  cudaDeviceSynchronize();
    // force.download();
    // float4 sumforce = std::accumulate(force.begin(), force.end(), make_float4(0));
 
@@ -175,19 +183,30 @@ float PairForces::sumVirial(){
 // this function is only called on construction, so it doesnt need to be optimized at all
 float forceLJ(float r2){
   float invr2 = 1.0f/(r2);
-  float invr6 = invr2*invr2*invr2;		 
-  float invr8 = invr6*invr2;		 
-  
-  float fmod = -48.0f*invr8*invr6+24.0f*invr8;
+  float invr = 1.0f/sqrt(r2);
+  float invr6 = invr2*invr2*invr2;
+  float invr8 = invr6*invr2;
 
-  return fmod;
+  float invrc13 = pow(1.0f/gcnf.rcut, 13);
+  float invrc7 = pow(1.0f/gcnf.rcut, 7);
+  
+  float fmod = -48.0f*invr8*invr6 + 24.0f*invr8;
+  float fmodcorr = 48.0f*invr*invrc13 - 24.0f*invr*invrc7;
+  
+  //f(r)-f(rcut)
+  return fmod+fmodcorr;
 }
 float energyLJ(float r2){
+  float r = sqrt(r2);
   float invr2 = 1.0f/r2;
   float invr6 = invr2*invr2*invr2;
-  float E =  2.0f*invr6*(invr6-1.0f);
-
-  return E;
+  //float E =  2.0f*invr6*(invr6-1.0f);
+  //potential as u(r)-(r-rcut)*f(rcut)-r(rcut) 
+  float E = 2.0f*(invr6*(invr6-1.0f));
+  float Ecorr = 2.0f*(
+		      -(r-gcnf.rcut)*(-24.0f*pow(1.0f/gcnf.rcut, 13)+12.0f*pow(1.0f/gcnf.rcut, 7))
+		      -pow(1.0f/gcnf.rcut, 6)*(pow(1.0f/gcnf.rcut, 6)-1.0f));
+  return E+Ecorr;
 }
 float nullForce(float r2){return 0.0f;}
 

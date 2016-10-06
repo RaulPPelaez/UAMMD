@@ -25,9 +25,9 @@ CUSTOM_CUOBJS=
 
 #############################################################################################################################
 
-DEBUG= -g
+#DEBUG
 
-CFLAGS= -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ $(DEBUG) -Wall
+CFLAGS= -g -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ $(DEBUG) -Wall
 
 ifdef EXPERIMENTAL
 CFLAGS += -DEXPERIMENTAL
@@ -44,7 +44,10 @@ CXXFLAGS=$(CFLAGS)
 
 $(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 
-NVFLAGS= $(DEBUG) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
+ifdef DEBUG
+DEBUGGPU= -G
+endif
+NVFLAGS= -g $(DEBUGGPU) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
 
 LDFLAGS= -L$(CUDA_LIBS)
 LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas

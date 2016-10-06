@@ -6,9 +6,7 @@ TODO:
 */
 #ifndef VECTOR_H
 #define VECTOR_H
-
-
-
+#include<cstring>
 
 /*Pinned memory is a little broken, it doesnt really help to make writes to disk faster, apparently pinned memory makes a CPU array accesible from the GPU, so it is not needed to download. The problem is taht writing to disk in parallel is incompatible with this, so it is better to just keep a separate CPU and GPU copies and download manually when needed*/
 template<class T>
@@ -22,6 +20,7 @@ public:
   T *data; //The data itself, stored aligned in memory
   T *d_m; //device pointer
 
+  cudaTextureObject_t tex;
   //Free the CPU version of the Vector
   void freeCPU(){
     if(!initialized) return;
@@ -33,10 +32,14 @@ public:
     data = nullptr;
   }
   //Free the device memory
-  void freeGPU(){
-    if(this->initialized)
-      if(!pinned && d_m){gpuErrchk(cudaFree(d_m)); d_m = nullptr;}
-  }
+void freeGPU(){
+if(this->initialized){
+if(!pinned && d_m){gpuErrchk(cudaFree(d_m)); d_m = nullptr;}
+if(tex!=0)
+      gpuErrchk(cudaDestroyTextureObject(tex));
+}
+
+}
   void freeMem(){
     freeCPU();
     freeGPU();
@@ -46,23 +49,22 @@ public:
     uploaded = false;
   }
 
-
   /********RULE OF FIVE******************/
   
   /*Default constructor*/
   Vector():n(0), pinned(false),
 	   initialized(false),uploaded(false),
-	   data(nullptr), d_m(nullptr){}
+	   data(nullptr), d_m(nullptr), tex(0){}
   /*Destructor*/
   ~Vector() noexcept{
-    /*Using the destructor messes real bad with the CUDA enviroment when using global variables, so you have to call freeMem manually for any global Vector...*/
+    /*Using the destructor messes real bad with the CUDA enviroment when using global variables, so you have to call freeMem manually for any global Vector before main exits...*/
     freeMem();
   }
   /*Initializer Constructor*/
   Vector(uint n, bool pinned = false):
     n(n), pinned(pinned),
     initialized(false), uploaded(false),
-    data(nullptr), d_m(nullptr)
+    data(nullptr), d_m(nullptr), tex(0)
   {
     if(n>0){
       this->initialized = true;
@@ -140,6 +142,28 @@ public:
   }
 
   /*************************************************************/
+
+  cudaTextureObject_t getTexture(){
+if(!initialized) return 0;
+    if(tex!=0) return tex;
+    if(n==0 || d_m == nullptr) return 0;
+          
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeLinear;
+    resDesc.res.linear.devPtr = d_m;
+    resDesc.res.linear.desc = cudaCreateChannelDesc<T>();
+    resDesc.res.linear.sizeInBytes = n*sizeof(T);
+
+    cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.readMode = cudaReadModeElementType;
+
+    gpuErrchk(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
+
+    return tex;
+  }
+  
   iterator begin(){ return this->data;}
   iterator end(){ return this->data+n;}
 
@@ -167,7 +191,7 @@ public:
       gpuErrchk(cudaMemcpy(data, d_m, n*sizeof(T), cudaMemcpyDeviceToHost));
   }
 
-  inline void GPUfill_with(T x){
+  inline void GPUmemset(T x){
     uploaded= true;
     gpuErrchk(cudaMemset(d_m, x, n*sizeof(T)));
   }
@@ -195,6 +219,7 @@ public:
   operator T *&() {return d_m;}
   operator T *() const{return d_m;}
   operator shared_ptr<Vector<T>>() {return make_shared<Vector<T>>(*this);}
+  operator cudaTextureObject_t(){ return this->getTexture(); }
 };
 
 typedef Vector<float4> Vector4;

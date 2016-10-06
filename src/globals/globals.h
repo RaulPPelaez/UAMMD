@@ -21,12 +21,13 @@ struct GlobalConfig{
   float E = 0.0f;
 
   uint nsteps = 10000;
+  uint nsteps1 = 10000;
+  uint nsteps2 = 10000;
   int print_steps=-1;
   uint relaxation_steps = 1000;
   uint measure_steps = -1;
 
-  ullint seed = 0xf31337Bada55D00d;
-  
+  ullint seed = 0xf31337Bada55D00d;  
 };
 
 #endif

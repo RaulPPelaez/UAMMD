@@ -47,7 +47,7 @@ void VerletNVE::update(){
     
     float K = abs(E-U);
     /*Distribute the velocities accordingly*/
-    float vamp =  sqrt(0.0f*2.0f*K);
+    float vamp =  sqrt(2.0f*K);
     /*Create velocities*/
     vel.fill_with(make_float3(0.0f));
     fori(0,N){

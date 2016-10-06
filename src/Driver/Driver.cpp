@@ -23,10 +23,11 @@ Driver::Driver(): step(0){
 void Driver::setParameters(){
 
   uint N = gcnf.N;
-  pos = Vector4(N);
-  pos.fill_with(make_float4(0.0f));
-  pos.upload();
-  
+  if(pos.size() != N){
+    pos = Vector4(N);
+    pos.fill_with(make_float4(0.0f));
+    pos.upload();
+  }
   
   force = Vector4(N);
   force.fill_with(make_float4(0.0f));
@@ -36,24 +37,24 @@ void Driver::setParameters(){
 }
 
 //Perform the simulation steps
-void Driver::run(){
-  /*Relaxation*/
-  fori(0,gcnf.relaxation_steps)
-    integrator->update();
+void Driver::run(uint nsteps, bool relax){
+
   Timer tim;
   tim.tic();
   /*Simulation*/
-  fori(0,gcnf.nsteps){
+  fori(0,nsteps){
     step++;
     
     integrator->update();
-    if(i%gcnf.print_steps==0 && gcnf.print_steps >= 0 )
-      this->write(); //Writing is done in parallel, is practically free if the interval is big enough
-    
-	
-    if(i%gcnf.measure_steps==0 && gcnf.measure_steps>0)
-      for(auto m: measurables)
-	m->measure();
+    if(!relax){
+      if(i%gcnf.print_steps==0 && gcnf.print_steps >= 0 )
+	this->write(); //Writing is done in parallel, is practically free if the interval is big enough
+      
+      
+      if(i%gcnf.measure_steps==0 && gcnf.measure_steps>0)
+	for(auto m: measurables)
+	  m->measure();
+    }
   }
   cerr<<tim.toc()<<endl;
 }
