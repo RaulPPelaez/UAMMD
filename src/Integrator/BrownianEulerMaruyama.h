@@ -34,9 +34,11 @@ public:
 private:
   Matrixf D, K, B;
   Vector3 noise;
+
+  
   
   curandGenerator_t rng;
-  BrownianEulerMaruyamaParameters params;
+  brownian_euler_maruyama_ns::Params params;
   
 
 

@@ -47,20 +47,20 @@ PairForces::PairForces(pairForceType fs,
   if(pairForcesInstances>1){ cerr<<"ERROR: Only one PairForces instance is allowed!!!"<<endl; exit(1);}
   params.rcut = rcut;
 
-  int xcells = int(L/rcut+0.5);
-  int ycells = xcells, zcells= xcells;
-
+  int3 cellDim = make_int3(L/rcut);
+  
   params.L = L;
+  params.N = N;
+  
+  params.cellSize = L/make_float3(cellDim);
 
-  params.cellSize = L/(float)xcells;
+  cerr<<params.cellSize<<endl;
+  params.cellDim = cellDim;
 
-  params.cellDim.x = xcells;
-  params.cellDim.y = ycells;
-  params.cellDim.z = zcells;
 
-  ncells = xcells*ycells*zcells;
+  ncells = cellDim.x*cellDim.y*cellDim.z;
   params.ncells = ncells;
-  cerr<<"\tNumber of cells: "<<xcells<<" "<<ycells<<" "<<zcells<<"; Total cells: "<<ncells<<endl;
+  cerr<<"\tNumber of cells: "<<cellDim.x<<" "<<cellDim.y<<" "<<cellDim.z<<"; Total cells: "<<ncells<<endl;
 
   init();
 
@@ -121,7 +121,7 @@ void PairForces::init(){
   params.texCellEnd = cellEnd.getTexture();
 
   /*Upload parameters to GPU*/
-  initGPU(params, ncells, N);
+  initGPU(params, N);
   
   cudaDeviceSynchronize();
 }
@@ -145,16 +145,15 @@ void PairForces::sumForce(){
 		   cellStart, cellEnd, 
 		   particleIndex,
 		   N);
-  cudaDeviceSynchronize();
-   // force.download();
-   // float4 sumforce = std::accumulate(force.begin(), force.end(), make_float4(0));
-
-   // cout<<sumforce.x<<" "<<sumforce.y<<" "<<sumforce.z<<endl; 
+  
+  // force.download();
+  // float4 sumforce = std::accumulate(force.begin(), force.end(), make_float4(0));
+  //  cerr<<sumforce.x<<" "<<sumforce.y<<" "<<sumforce.z<<endl; 
 }
 
 float PairForces::sumEnergy(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/
-  //makeNeighbourList();
+  makeNeighbourList();
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
  return computePairEnergy(sortPos,
 			  energyArray, 
@@ -165,7 +164,7 @@ float PairForces::sumEnergy(){
 }
 float PairForces::sumVirial(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/
-  //makeNeighbourList();
+  makeNeighbourList();
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   float v =  computePairVirial(sortPos,
 			       virialArray, 
@@ -173,7 +172,7 @@ float PairForces::sumVirial(){
 			       particleIndex,
 			       N);
 
-  return v/(3.0f*L*L*L);
+  return v/(3.0f*L.x*L.y*L.z);
 }
 
 

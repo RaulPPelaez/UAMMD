@@ -27,7 +27,7 @@ public:
   
 protected:
   uint N;
-  float L;
+  float3 L;
   int id;
   static ofstream out;
   static int total_measurables;

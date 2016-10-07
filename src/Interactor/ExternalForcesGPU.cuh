@@ -13,23 +13,16 @@
 #ifndef EXTERNALFORCESGPU_CUH
 #define EXTERNALFORCESGPU_CUH
 
-struct ExternalForcesParams{
-  float L, invL;
-};
+namespace external_forces_ns{
+  struct Params{
+    float3 L, invL;
+  };
 
 
-//Stores some simulation parameters to upload as constant memory.
-void initExternalForcesGPU(ExternalForcesParams m_params);
+  //Stores some simulation parameters to upload as constant memory.
+  void initGPU(Params m_params);
 
 
-void computeExternalForce(float4* force, float4 *pos, uint N);
-
+  void computeExternalForce(float4* force, float4 *pos, uint N);
+}
 #endif
-
-
-
-
-
-
-
-

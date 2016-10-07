@@ -8,10 +8,17 @@
 
 namespace verlet_nve_ns{
   
-  void integrateVerletNVEGPU(float4 *pos, float3 *vel, float4 *force, float dt, uint N, int step);
+  struct Params{
+    float dt;
+    uint N;
+    float3 L;
+  };
+
+  void initGPU(Params params);
+  void integrateGPU(float4 *pos, float3 *vel, float4 *force, uint N, int step);
   
 
-  float computeKineticEnergyVerletNVE(float3 *vel, uint N);
+  float computeKineticEnergyGPU(float3 *vel, uint N);
 
 }
 #endif

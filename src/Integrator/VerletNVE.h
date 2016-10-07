@@ -29,6 +29,7 @@ public:
   void write(bool block);
 private:
   float E;
+  verlet_nve_ns::Params params;
 };
 
 

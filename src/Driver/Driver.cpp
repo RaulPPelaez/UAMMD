@@ -28,11 +28,13 @@ void Driver::setParameters(){
     pos.fill_with(make_float4(0.0f));
     pos.upload();
   }
-  
-  force = Vector4(N);
-  force.fill_with(make_float4(0.0f));
-  force.upload();
+  if(force.size()!=N){
+    force = Vector4(N);
+    force.fill_with(make_float4(0.0f));
+    force.upload();
+  }
 
+  grng = Xorshift128plus(gcnf.seed);
 
 }
 
@@ -56,7 +58,8 @@ void Driver::run(uint nsteps, bool relax){
 	  m->measure();
     }
   }
-  cerr<<tim.toc()<<endl;
+  cerr<<tim.toc()<<"s"<<endl;
+  gcnf.nsteps += nsteps;
 }
 
 //Integrator handles the writing
@@ -77,7 +80,11 @@ void Driver::read(const char *fileName){
 
 
 Driver::~Driver(){
-  
+  cudaDeviceSynchronize();
+  /*Free the global arrays manually*/
+  pos.freeMem();
+  force.freeMem();
+  vel.freeMem(); 
 }
 
 

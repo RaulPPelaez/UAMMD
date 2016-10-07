@@ -173,7 +173,7 @@ void BondedForces::init(){
 
   /***********************************************************************************************/
   /*Init GPU side variables*/
-  initBondedForcesGPU(params);
+  initGPU(params);
 
 }
 /*Perform an integration step*/
@@ -241,7 +241,7 @@ ThreeBondedForces::ThreeBondedForces(const char * readFile):
       blst[b].k = k;
       in>>blst[b].kspring>>blst[b].r0>>blst[b].ang;
 
-      if(blst[b].r0>=0.5f*L){
+      if(blst[b].r0>=0.5f*L.x || blst[b].r0>=0.5f*L.y || blst[b].r0>=0.5f*L.z){
 	cerr<<"The equilibrium distance of bond "<<b<<" is too large!!"<<endl;
 	cerr<<"\t This will cause unexpected behavior when computing distance using PBC!"<<endl;
       }
@@ -289,7 +289,7 @@ ThreeBondedForces::ThreeBondedForces(const char * readFile):
   bondEnd.upload();
   bondParticleIndex.upload();
   
-  initBondedForcesGPU(params);
+  initGPU(params);
   
   cerr<<pwb.size()<<" particles are involved in at least one bond."<<endl;
   

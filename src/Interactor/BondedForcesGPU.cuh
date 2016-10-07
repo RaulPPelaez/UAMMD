@@ -29,12 +29,12 @@ namespace bonded_forces_ns{
 
 
   struct Params{
-    float L, invL;
+    float3 L, invL;
   };
 
 
   //Stores some simulation parameters to upload as constant memory.
-  void initBondedForcesGPU(Params m_params);
+  void initGPU(Params m_params);
 
   void computeBondedForce(float4 *force, float4 *pos,
 			  uint *bondStart, uint *bondEnd, uint *bondedParticleIndex, 

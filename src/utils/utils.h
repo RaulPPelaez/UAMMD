@@ -30,7 +30,12 @@ typedef unsigned long long int ullint;
 #define fori(x,y) for(int i=x; i<int(y); i++)
 #define forj(x,y) for(int j=x; j<int(y); j++)
 
+std::ostream& operator<<(std::ostream& out, const float3 &f);
+std::ostream& operator<<(std::ostream& out, const float4 &f);
+
 #include "Vector.h"
+
+
 
 //Returns an identity matrix of size n
 Matrixf eye(uint n);
@@ -64,7 +69,7 @@ public:
   s[0] = s0;  s[1] = s1;  
   }
   Xorshift128plus(uint64_t s0){
-  s[0] = s0;  s[1] = s0+15438657923749336752ULL;  
+    s[0] = s0;  s[1] = (s0+15438657923749336752ULL)%RANDOM_MAX;  
   }
 
   Xorshift128plus(){
@@ -91,8 +96,9 @@ public:
 
 
 //This function treats pos a s a float4 and puts the particles in a cubic lattice
-void cubicLattice(float4 *pos, float L, uint N);
-void cubicLattice2D(float4 *pos, float L, uint N);
+Vector4 cubicLattice(float3 L, uint N);
+
+//Vector4 cubicLattice2D(float L, uint N);
 
 Vector4 readFile(const char * fileName);
 

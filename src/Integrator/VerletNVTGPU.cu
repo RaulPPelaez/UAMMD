@@ -30,20 +30,23 @@ namespace verlet_nvt_ns{
   __constant__ Params params;
 
   /*Initialize all necesary things on GPU*/
-  void initVerletNVTGPU(Params m_params){
+  void initGPU(Params m_params){
     /*Upload params to constant memory*/
     gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
   }
 
 
   /*Integrate the movement*/
-  __global__ void integrateD(float4 *pos, float3 *vel, float4 *force, float3* noise,
-			     uint N, int step){
+  __global__ void integrateGPUD(float4 __restrict__  *pos,
+				float3 __restrict__ *vel,
+				const float4 __restrict__  *force,
+				const float3 __restrict__ *noise,
+				int step){
     uint i = blockIdx.x*blockDim.x+threadIdx.x;
-    if(i>=N) return;
+    if(i>=params.N) return;
     /*Half step velocity*/
     vel[i] += (make_float3(force[i])-params.gamma*vel[i])*params.dt*0.5f + params.noiseAmp*noise[i];
-
+    if(params.L.z==0.0f) vel[i].z = 0.0f;
     /*In the first step, upload positions*/
     if(step==1)
       pos[i] += make_float4(vel[i])*params.dt;    
@@ -51,11 +54,11 @@ namespace verlet_nvt_ns{
   }
 
   /*CPU kernel caller*/
-  void integrateVerletNVTGPU(float4 *pos, float3 *vel, float4 *force, float3* noise,
-			     uint N, int step){
+  void integrateGPU(float4 *pos, float3 *vel, float4 *force, float3* noise, uint N,
+		    int step){
     uint nthreads = TPB<N?TPB:N;
     uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0); 
-    integrateD<<<nblocks, nthreads>>>(pos, vel, force, noise, N, step);
+    integrateGPUD<<<nblocks, nthreads>>>(pos, vel, force, noise, step);
   }
 
   /*Returns the squared of each element in a float3*/
@@ -67,7 +70,7 @@ namespace verlet_nvt_ns{
   };
 
   /*Compute the kinetic energy from the velocities*/
-  float computeKineticEnergyVerletNVT(float3 *vel, uint N){
+  float computeKineticEnergyGPU(float3 *vel, uint N){
     thrust::device_ptr<float3> d_vel3(vel);
     float3 K;
     thrust::plus<float3> binary_op;

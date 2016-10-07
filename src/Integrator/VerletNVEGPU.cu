@@ -11,62 +11,48 @@ TODO:
 #include<thrust/device_ptr.h>
 #include<thrust/reduce.h>
 #include<thrust/transform_reduce.h>
-#include<thrust/for_each.h>
-#include<thrust/iterator/zip_iterator.h>
+#include<iostream>
+using namespace std;
+using namespace thrust;
+#define TPB 128
 
 namespace verlet_nve_ns{
-  using namespace thrust;
-  //This struct is a thrust trick to perform an arbitrary transformation
-  //In this case it performs a two step velocity verlet integration
-  //Performs a two step velocity verlet integrator, pick with step
-  struct twoStepVelVerletNVE_Integratefunctor{
-    float dt;
-    int step;
-    __host__ __device__ twoStepVelVerletNVE_Integratefunctor(float dt, int step):
-      dt(dt),step(step){}
-    //The operation is performed on creation
-    template <typename Tuple>
-    __device__  void operator()(Tuple t){
-      /*Retrive the data*/
-      float4 pos = get<0>(t);
-      float4 vel = make_float4(get<1>(t),0.0f);
-      float4 force = get<2>(t);
-      switch(step){
-	/*First velocity verlet step*/
-      case 1: 
-	vel += force*dt*0.5f;
-	vel.w = 0.0f; //Be careful not to overwrite the pos.w!!
-	pos += vel*dt;
-	get<0>(t) = pos;
-	break;
-	/*Second velocity verlet step*/
-      case 2:
-	vel += force*dt*0.5f;
-	break;
-      }
-      /*Write new vel*/
-      get<1>(t) = make_float3(vel);
-    }
-  };
+  __constant__ Params params;
+  
+  void initGPU(Params m_params){
+    gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
+  }
+
+
+  /*Integrate the movement*/
+  //All the parameters in Params struct are available here
+  __global__ void integrateGPUD(float4 __restrict__  *pos,
+				float3 __restrict__ *vel,
+				const float4 __restrict__  *force,
+				int step){
+    uint i = blockIdx.x*blockDim.x+threadIdx.x;
+    if(i>=params.N) return;
+
+    /*Half step velocity*/
+    vel[i] += make_float3(force[i])*params.dt*0.5f;
+    
+    if(params.L.z==0.0f) vel[i].z = 0.0f; //2D
+    
+    /*In the first step, upload positions*/
+    if(step==1)
+      pos[i] += make_float4(vel[i])*params.dt;
+    
+    
+  }
 
 
 
   //Update the positions
-  void integrateVerletNVEGPU(float4 *pos, float3 *vel, float4 *force,
-			     float dt, uint N, int step){
-
-    //Uncomment to sum total energy, you must compute it first in the interactors
-    // static uint count = 0;
-    // count++; 
-    device_ptr<float4> d_pos4(pos);
-    device_ptr<float3> d_vel3(vel);
-    device_ptr<float4> d_force4(force);
-
-    /**Thrust black magic to perform a triple transformation, see the functor description**/
-    for_each(
-	     make_zip_iterator( make_tuple( d_pos4, d_vel3, d_force4)),
-	     make_zip_iterator( make_tuple( d_pos4 + N, d_vel3 + N, d_force4 +N)),
-	     twoStepVelVerletNVE_Integratefunctor(dt, step));
+  void integrateGPU(float4 *pos, float3 *vel, float4 *force, uint N, int step){
+    
+    uint nthreads = TPB<N?TPB:N;
+    uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0);
+    integrateGPUD<<<nblocks, nthreads>>>(pos, vel, force, step);
     //cudaCheckErrors("Integrate");  
   }
 
@@ -77,7 +63,7 @@ namespace verlet_nve_ns{
 
   };
 
-  float computeKineticEnergyVerletNVE(float3 *vel, uint N){
+  float computeKineticEnergyGPU(float3 *vel, uint N){
     device_ptr<float3> d_vel3(vel);
     float3 K;
     thrust::plus<float3> binary_op;

@@ -7,14 +7,16 @@
 #define INTEGRATORBROWNIANEULERMARUYAMAGPU_CUH
 
 
-struct BrownianEulerMaruyamaParameters{
-  float sqrtdt, dt;
-  float3 *B, *D, *K;
-};
+namespace brownian_euler_maruyama_ns{
+  struct Params{
+    float sqrtdt, dt;
+    float3 *B, *D, *K;
+    float3 L;
+    uint N;
+  };
 
-void initBrownianEulerMaruyamaGPU(BrownianEulerMaruyamaParameters m_params);
+  void initGPU(Params m_params);
 
-void integrateBrownianEulerMaruyamaGPU(float4 *pos, float3 *vel, float4 *force,
-				       uint N);
-
+  void integrateGPU(float4 *pos, float3 *noise, float4 *force, uint N);
+}
 #endif

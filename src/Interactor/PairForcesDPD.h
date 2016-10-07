@@ -21,7 +21,6 @@ private:
   Vector4 sortVel;
   
   pair_forces_ns::ParamsDPD paramsDPD;
-  Xorshift128plus rngCPU;
   unsigned long long int seed;
 };
 

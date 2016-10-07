@@ -14,14 +14,16 @@ namespace verlet_nvt_ns{
     float gamma;
     float T;
     float noiseAmp;
+    float3 L;
+    uint N;
   };
 
-  void initVerletNVTGPU(Params m_params);
+  void initGPU(Params m_params);
 
   /*Step controls the integration step, 1 or 2 in verlet*/
-  void integrateVerletNVTGPU(float4 *pos, float3 *vel, float4 *force, float3 *noise,
-			     uint N, int step);
+  void integrateGPU(float4 *pos, float3 *vel, float4 *force, float3 *noise, uint N,
+		    int step);
 
-  float computeKineticEnergyVerletNVT(float3 *vel, uint N);
+  float computeKineticEnergyGPU(float3 *vel, uint N);
 }
 #endif

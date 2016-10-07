@@ -19,16 +19,18 @@ namespace pair_forces_ns{
   
   //Stores some simulation parameters to upload as constant memory.
   struct Params{
-    float cellSize, invCellSize;
+    float3 cellSize, invCellSize;
     int ncells;
     int3 cellDim;
-    float L, invL, rcut, invrc, invrc2;
+    float rcut, invrc, invrc2;
     float3 getCellFactor;
     int3 gridPos2CellIndex;
+    
     cudaTextureObject_t texForce, texEnergy;
     cudaTextureObject_t texSortPos, texPos;
     cudaTextureObject_t texCellStart, texCellEnd;
     uint N;
+    float3 L, invL;
   };
   //Stores some simulation parameters to upload as constant memory, the rest are available in Params.
   struct ParamsDPD{
@@ -40,7 +42,7 @@ namespace pair_forces_ns{
   // 	       cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
   // 	       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
   // 	       float4 *sortPos, float4 *pos, uint N);
-  void initGPU(Params &m_params, uint ncells, uint N);  
+  void initGPU(Params &m_params, uint N);  
   void initDPDGPU(ParamsDPD &m_params);
 
 

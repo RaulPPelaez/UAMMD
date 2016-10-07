@@ -42,3 +42,6 @@ The precision of floating point values is very low (~7 digits) and this will cau
 headaches when trying to round them to integers in some extreme cases.
 
 ---------------------------------------------------------------
+
+
+Uninitialized constant memory data defaults to zero!

@@ -11,6 +11,7 @@
 #include<algorithm>
 
 using namespace std;
+using namespace nbody_ns;
 
 NBodyForces::NBodyForces():
   Interactor(){

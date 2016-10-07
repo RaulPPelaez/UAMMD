@@ -1,6 +1,7 @@
 #include"utils.h"
 #include<stdlib.h>
 #include<fstream>
+#include"third_party/bravais/bravais.h"
 
 Matrixf eye(uint n){
   Matrixf A(n,n);
@@ -10,63 +11,36 @@ Matrixf eye(uint n){
   return A;
 }
 
-
-//Took from Fluam, adapted to use float4
-void cubicLattice(float4 *pos, float L, uint N){
-    float dx, dy, dz;
-    int nx, ny, nz, n;
-    int np = N;
-
-    nx = ny = nz = 1;
-    while((nx*ny*nz)<np){
-      if((nx*ny*nz)<np) nx++;
-      if((nx*ny*nz)<np) ny++;
-      if((nx*ny*nz)<np) nz++;
-    }
-    dx = L/float(nx);
-    dy = L/float(ny);
-    dz = L/float(nz);
-
-    n = 0;
-    for (int i=0;i<nz;i++)
-      for(int j=0;j<ny;j++)
-	for(int k=0;k<nx;k++)
-	  if(n<np){
-	    n = n + 1;
-	    pos[(n-1)].x = (k + 0.5f) * dx - L/2.0f;
-	    pos[(n-1)].y = (j + 0.5f) * dy - L/2.0f;
-	    pos[(n-1)].z = (i + 0.5f) * dz - L/2.0f;
-	  }
-
+std::ostream& operator<<(std::ostream& out, const float3 &f){
+  return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
-//Took from Fluam, adapted to use float4
-void cubicLattice2D(float4 *pos, float L, uint N){
-    float dx, dy;
-    int nx, ny, n;
-    int np = N;
+std::ostream& operator<<(std::ostream& out, const float4 &f){
+  return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
+}
 
-    nx = ny = 0;
-    while((nx*ny)<np){
-      if((nx*ny)<np) nx++;
-      if((nx*ny)<np) ny++;
-    }
-    dx = L/float(nx);
-    dy = L/float(ny);
+//typedef enum {sc, bcc, fcc, dia, hcp, sq, tri} lattice;
 
-    n = 0;
-    for(int j=0;j<ny;j++)
-      for(int k=0;k<nx;k++)
-	if(n<np){
-	  n = n + 1;
-	  pos[(n-1)].x = (k + 0.5f) * dx - L/2.0f;
-	  pos[(n-1)].y = (j + 0.5f) * dy - L/2.0f;
-	  pos[(n-1)].z =  0.0f;
-	}
+Vector4 cubicLattice(float3 L, uint N){
+  cerr<<"Starting in a cubic Lattice...";
+  Vector4 pos(N);
+  pos.fill_with(make_float4(0.0f));
 
+  Bravais((float *) pos.data,
+	  sc,/*Simple Cubic*/
+	  N,
+	  L.x, L.y, L.z,
+	  0.0f, /*Color*/
+	  NULL, NULL, /*Basis and vector files*/
+	  true); /*Keep aspect ratio*/
+  fori(0,N)
+    pos[i] += make_float4(0.5f, 0.5f, 0.5f, 0.0f);
+  
+  return pos;
 }
 
 
 Vector4 readFile(const char * fileName){
+  cerr<<"Reading initial positions from file...";
   uint N;
   ifstream in(fileName);
   in>>N;
@@ -74,6 +48,7 @@ Vector4 readFile(const char * fileName){
   fori(0,N){
     in>>p[i].x>>p[i].y>>p[i].z>>p[i].w;
   }
+  cerr<<"\tDONE!"<<endl;
   return p;
 }
 

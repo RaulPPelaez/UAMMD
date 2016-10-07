@@ -56,7 +56,8 @@ protected:
   vector<shared_ptr<Interactor>> interactors;
   uint steps;
   uint N;
-  float dt, L;
+  float dt;
+  float3 L;
   std::thread writeThread;
   string name;
 };

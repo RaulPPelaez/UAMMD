@@ -55,17 +55,16 @@ namespace pair_forces_ns{
   uint GPU_Nthreads;
   
   //Initialize gpu variables 
-  void initGPU(Params &m_params, uint ncells, uint N){    
+  void initGPU(Params &m_params, uint N){    
     /*Precompute some inverses to save time later*/
     m_params.invrc2 = 1.0f/(m_params.rcut*m_params.rcut);
     m_params.invrc = 1.0f/(m_params.rcut);
     m_params.invL = 1.0f/m_params.L;
     m_params.invCellSize = 1.0f/m_params.cellSize;
-    m_params.getCellFactor = make_float3(0.5f*m_params.L*m_params.invCellSize);
+    m_params.getCellFactor = 0.5f*m_params.L*m_params.invCellSize;
     m_params.gridPos2CellIndex = make_int3( 1,
 					    m_params.cellDim.x,
 					    m_params.cellDim.x*m_params.cellDim.y);
-    m_params.N = N;
     
     if(!m_params.texPos || !m_params.texSortPos || !m_params.texCellStart ||
        !m_params.texCellEnd || !m_params.texForce || !m_params.texEnergy){
@@ -89,17 +88,32 @@ namespace pair_forces_ns{
 
   /****************************HELPER FUNCTIONS*****************************************/
   //MIC algorithm
-  template<typename vecType>
-  inline __device__ void apply_pbc(vecType &r){
+  // template<typename vecType>
+  // inline __device__ void apply_pbc(vecType &r){
+  //   float3 r3 = make_float3(r.x, r.y, r.z);
+  //   float3 shift = (floorf(r3*params.invL+0.5f)*params.L); //MIC Algorithm
+  //   r.x -= shift.x;
+  //   r.y -= shift.y;
+  //   r.z -= shift.z;    
+  // }
+
+  inline __device__ void apply_pbc(float4 &r){
+    
+    r -= make_float4(floorf(make_float3(r)*params.invL+0.5f)*params.L); //MIC Algorithm
+  }
+  inline __device__ void apply_pbc(float3 &r){
+    
     r -= floorf(r*params.invL+0.5f)*params.L; //MIC Algorithm
   }
-
+  
+  
   //Get the 3D cell p is in, just pos in [0,L] divided by ncells(vector) .INT DANGER.
   template<typename vecType>
   inline __device__ int3 getCell(vecType p){
-    apply_pbc(p); //Reduce to MIC
+    float3 r = make_float3(p);
+    apply_pbc(r); //Reduce to MIC
     // return  int( (p+0.5L)/cellSize )
-    int3 cell = make_int3((p+0.5f*params.L)*params.invCellSize);
+    int3 cell = make_int3((r+0.5f*params.L)*params.invCellSize);
     //Anti-Traquinazo guard, you need to explicitly handle the case where a particle
     // is exactly at the box limit, AKA -L/2. This is due to the precision loss when
     // casting int from floats, which gives non-correct results very near the cell borders.
@@ -223,7 +237,7 @@ namespace pair_forces_ns{
   }
 
   /*This kernel fills sortPos with the positions in pos, acording to the indices in particleIndex*/
-  __global__ void reorderPosD(float4 *sortPos,
+  __global__ void reorderPosD(float4 __restrict__ *sortPos,
 			      const uint* __restrict__ particleIndex, uint N){
     uint i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i>=N) return;

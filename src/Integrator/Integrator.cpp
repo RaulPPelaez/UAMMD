@@ -53,18 +53,12 @@ void Integrator::write(bool block){
 
 //This function writes a step to disk
 int write_concurrent(float4* posdata){
-  float L = gcnf.L;
+  float3 L = gcnf.L;
   uint N = gcnf.N;
-  cout<<"#L="<<L*0.5<<";\n";
+  cout<<"#Lx="<<L.x*0.5f<<";Ly="<<L.y*0.5f<<";Lz="<<L.z*0.5f<<";\n";
   fori(0,N){
-    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" 0.56 "<<(int)(posdata[i].w+1)<<"\n";
+    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" 0.56 "<<(int)(posdata[i].w+0.5f)<<"\n";
   }
-  
-
-   // fori(0,N)
-   //   printf("%f\t%f\t%f\t",
-   // 	    posdata[i].x, posdata[i].y, posdata[i].z);
-   // printf("\n");
    return 0;
 }
 

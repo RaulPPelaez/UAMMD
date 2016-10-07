@@ -33,6 +33,6 @@ public:
   float sumVirial() override;
 private:
   void init();
-  ExternalForcesParams params;
+  external_forces_ns::Params params;
 };
 #endif

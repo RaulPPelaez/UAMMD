@@ -22,6 +22,8 @@ TODO:
 #include "BrownianHydrodynamicsEulerMaruyama.h"
 
 
+using namespace brownian_hy_euler_maruyama_ns;
+
 BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama():
   Integrator(),
   force3(N),
@@ -34,13 +36,15 @@ BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama():
   params.dt = dt;
   params.D0 = 1.0f;
   params.rh = 1.0f;
+  params.N = N;
+  params.L = L;
   
   cudaStreamCreate(&stream);
   cudaStreamCreate(&stream2);
   
   /*Create noise*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(rng, gcnf.seed);
+  curandSetPseudoRandomGeneratorSeed(rng, grng.next());
   
   //Curand fill with gaussian numbers with mean 0 and var 1    
   noise.fill_with(make_float3(0.0f));
@@ -73,11 +77,17 @@ BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama():
   
   DF.fill_with  (make_float3(0.0f)); DF.upload();
 
-  initBrownianHydrodynamicsEulerMaruyamaGPU(params);
+  initGPU(params);
   
   cerr<<"Brownian Dynamics with Hydrodynamics (Euler Maruyama)\t\tDONE!!\n\n";
 }
-BrownianHydrodynamicsEulerMaruyama::~BrownianHydrodynamicsEulerMaruyama(){}
+BrownianHydrodynamicsEulerMaruyama::~BrownianHydrodynamicsEulerMaruyama(){
+  curandDestroyGenerator(rng);
+  gpuErrchk(cudaStreamDestroy(stream));
+  gpuErrchk(cudaStreamDestroy(stream2));
+  cublasDestroy(handle);
+  //cusolverSpDestroy(solver_handle);
+}
 
 void BrownianHydrodynamicsEulerMaruyama::update(){
   steps++; 
@@ -91,10 +101,10 @@ void BrownianHydrodynamicsEulerMaruyama::update(){
   for(auto forceComp: interactors) forceComp->sumForce();
 
   /*Update D according to the positions*/
-  rodne_call(D, pos, stream, N);
+  rodne_callGPU(D, pos, stream, N);
   
   /*Copy force array into a float3 array to multiply by D using cublas*/
-  copy_pos(force, force3, N);
+  float4_to_float3GPU(force, force3, N);
 
     
   /*Generate new noise*/
@@ -102,7 +112,6 @@ void BrownianHydrodynamicsEulerMaruyama::update(){
   
   alpha = dt;
   
-  //cublasSetStream(handle, stream2);
   // cublasSgemv(handle, CUBLAS_OP_T,
   // 	      3*N, 3*N,
   // 	      &alpha,
@@ -139,7 +148,7 @@ void BrownianHydrodynamicsEulerMaruyama::update(){
   
   cudaDeviceSynchronize();
   /*Update the positions*/
-  integrateBrownianHydrodynamicsEulerMaruyamaGPU(pos, DF.d_m, noise.d_m, N);
+  integrateGPU(pos, DF.d_m, noise.d_m, (float4 *)K.d_m, N);
 }
 
 float BrownianHydrodynamicsEulerMaruyama::sumEnergy(){

@@ -10,6 +10,7 @@
   This module implements an algorithm to compute the force between particles joined by springs.
 
 TODO:
+100- Set TPB to mean number of bonds per particle with bond
 100- Grid stride computeBondedForceD
 100- Implement FP without thrust
 */
@@ -27,23 +28,26 @@ namespace bonded_forces_ns{
   //Parameters in constant memory, super fast access
   __constant__ Params params; 
 
-  void initBondedForcesGPU(Params m_params){
+  void initGPU(Params m_params){
     m_params.invL = 1.0f/m_params.L;
     /*Upload parameters to constant memory*/
     gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
   }
 
 
-
-
-  inline __device__ void apply_pbc(float3 &r){
-    r -= floorf(r*params.invL+0.5f)*params.L; //MIC algorithm
+  //MIC algorithm
+  template<typename vecType>
+  inline __device__ void apply_pbc(vecType &r){
+    float3 r3 = make_float3(r.x, r.y, r.z);
+    float3 shift = (floorf(r3*params.invL+0.5f)*params.L); //MIC Algorithm
+    r.x -= shift.x;
+    r.y -= shift.y;
+    r.z -= shift.z;
   }
-  inline __device__ void apply_pbc(float4 &r){
-    r -= floorf(r*params.invL+0.5f)*params.L; //MIC algorithm
-  }
+
 
 #define TPB 64
+
   //Custom kernel to compute and sum the force
   __global__ void computeBondedForceD(float4* __restrict__ force, const float4* __restrict__ pos,
 				      const uint* __restrict__ bondStart,
@@ -298,22 +302,26 @@ namespace bonded_forces_ns{
       if(p==i){
 	f += make_float4(a11*rij + a12*rkj); //Angular spring
 	
-	f += make_float4(-kspring*(1.0f - r0*invsqrij)*rij ); //Harmonic spring	
+	//f += make_float4(-kspring*(1.0f - r0*invsqrij)*rij ); //Harmonic spring
+	f += make_float4((-kspring/(1.0f-rij2/(r0*r0)))*rij); //fene spring
       }
       else if(p==j){
 	//Angular spring
 	f -= make_float4(a11*rij + a12*rkj + a22*rkj + a12*rij);
 	
-	//First harmonic spring
-	f += make_float4(kspring*(1.0f - r0*invsqrij)*rij);
-	// //Second harmonic spring
-	f += make_float4(kspring*(1.0f - r0*invsqrkj)*rkj);
+
+	// f += make_float4(kspring*(1.0f - r0*invsqrij)*rij); //First harmonic spring
+	// f += make_float4(kspring*(1.0f - r0*invsqrkj)*rkj); //Second harmonic spring
+
+	f -= make_float4((-kspring/(1.0f-rij2/(r0*r0)))*rij); // first fene spring
+	f -= make_float4((-kspring/(1.0f-rkj2/(r0*r0)))*rkj); //second fene spring
       }
       else if(p==k){
 	//Angular spring
 	f += make_float4(a22*rkj + a12*rij);
 	//Harmonic spring
-	f += make_float4(-kspring*(1.0f-r0*invsqrkj)*rkj);
+	//f += make_float4(-kspring*(1.0f-r0*invsqrkj)*rkj);
+	f += make_float4((-kspring/(1.0f-rkj2/(r0*r0)))*rkj); //fene spring
       }
     }
 

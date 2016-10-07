@@ -20,7 +20,8 @@
 #include "BrownianEulerMaruyama.h"
 
 
-/*Performs the cholesky decomposition of a matrix*/
+using namespace brownian_euler_maruyama_ns;
+/*Performs the cholesky decomposition of a matrix, in CPU*/
 Matrixf cholesky(Matrixf Din){
   //Doesnt check for positive definite
   //Super slow, use only in initialization
@@ -70,7 +71,8 @@ BrownianEulerMaruyama::BrownianEulerMaruyama(Matrixf Din,
   
   params.sqrtdt = sqrt(dt)*sqrt(2.0f);
   params.dt = dt;
-
+  params.L = L;
+  params.N = N;
 
   D.upload();
   K.upload();
@@ -83,14 +85,14 @@ BrownianEulerMaruyama::BrownianEulerMaruyama(Matrixf Din,
 
   /*Create noise*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(rng, gcnf.seed);
+  curandSetPseudoRandomGeneratorSeed(rng, grng.next());
 
   noise.fill_with(make_float3(0.0f));
   noise.upload();
   //Curand fill with gaussian numbers with mean 0 and var 1, you have to ask for an even number of them
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
   
-  initBrownianEulerMaruyamaGPU(params);
+  initGPU(params);
   cerr<<"Brownian Euler Maruyama Integrator\t\tDONE!!\n\n"<<endl;
 }
 BrownianEulerMaruyama::~BrownianEulerMaruyama(){}
@@ -104,8 +106,8 @@ void BrownianEulerMaruyama::update(){
   cudaMemset(force.d_m, 0.0f, N*sizeof(float4));
   /*Compute new forces*/
   for(auto forceComp: interactors) forceComp->sumForce();
-  /*Update positions*/
-  integrateBrownianEulerMaruyamaGPU(pos, noise, force, N);
+   /*Update positions*/
+  integrateGPU(pos, noise, force, N);
 }
 
 float BrownianEulerMaruyama::sumEnergy(){

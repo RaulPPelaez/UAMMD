@@ -16,7 +16,6 @@ EnergyMeasure::EnergyMeasure(InteractorArray interactors,
   step(0),
   K(0.0f), U(0.0f), P(0.0f){
   
-  rho = N/(L*L*L);
 
   //Each measurable should print a header informing of what it is going to print
   out<<"#E\tK\tU\t\tP";
@@ -39,6 +38,7 @@ void EnergyMeasure::measure(){
   K = integrator->sumEnergy();
   
   float T = 2.0f*K/3.0f; //Temperature
+  rho = N/(L.x*L.y*L.z);
   
   for(auto i: interactors){
     U += i->sumEnergy(); //Compute potential energy

@@ -57,6 +57,8 @@ OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
 CUOBJS_INTERACTOR_EXPERIMENTAL= PairForcesAltGPU.o 
 
 
+THIRD_PARTY_OBJS= bravais.o
+
 OBJS_INTERACTOR= Interactor.o PairForces.o PairForcesDPD.o BondedForces.o NBodyForces.o ExternalForces.o 
 
 OBJS_INTEGRATOR= Integrator.o VerletNVE.o VerletNVT.o BrownianEulerMaruyama.o BrownianHydrodynamicsEulerMaruyama.o
@@ -72,6 +74,8 @@ OBJS += utils/utils.o misc/Potential.o Driver/Driver.o Driver/SimulationConfig.o
 
 CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS)
 
+THIRD_PARTY_OBJSS = $(addprefix third_party/, $(THIRD_PARTY_OBJS))
+
 
 ifdef EXPERIMENTAL
 OBJS += $(addprefix Interactor/Experimental/, $(OBJS_INTERACTOR_EXPERIMENTAL))
@@ -80,7 +84,10 @@ endif
 
 all: main
 
-main:  $(OBJS) $(CUOBJS)
+$(THIRD_PARTY_OBJSS):
+	$(MAKE) -C third_party/
+
+main:  $(OBJS) $(CUOBJS) $(THIRD_PARTY_OBJSS)
 
 %.o:%.cu
 	$(NVCC) $(NVFLAGS) -c $< -o $@
@@ -88,7 +95,7 @@ main:  $(OBJS) $(CUOBJS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(CUOBJS) $(OBJS) main
+	rm -f $(CUOBJS) $(OBJS) $(THIRD_PARTY_OBJSS) main
 
 cleanCPU:
 	rm -f $(OBJS) main	

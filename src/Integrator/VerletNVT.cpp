@@ -29,7 +29,7 @@ VerletNVT::VerletNVT():
 {
   cerr<<"Initializing Verlet NVT Integrator..."<<endl;
 
-  vel = Vector3(N);
+
   cerr<<"\tSet T="<<gcnf.T<<endl;
 
   gamma = gcnf.gamma;
@@ -39,25 +39,29 @@ VerletNVT::VerletNVT():
   params.dt = dt;
   params.T = gcnf.T;
   params.noiseAmp = sqrt(dt*0.5f)*sqrt(2.0f*gamma*params.T);
-  initVerletNVTGPU(params);
-
+  params.N = N;
+  params.L = L;
   
   /*Init rng*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(rng, gcnf.seed);
+  curandSetPseudoRandomGeneratorSeed(rng, grng.next());
   /*This shit is obscure, curand will only work with an even number of elements*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
-
-  noise.download();
-  /*Distribute the velocities according to the temperature*/
-  float vamp = sqrt(3.0f*params.T);
-  /*Create velocities*/
-  vel.fill_with(make_float3(0.0f));
-  fori(0,N){
-    vel[i] = vamp*noise[i];
+  if(vel.size()!=N){
+    vel = Vector3(N);
+    noise.download();
+    /*Distribute the velocities according to the temperature*/
+    float vamp = sqrt(3.0f*params.T);
+    /*Create velocities*/
+    vel.fill_with(make_float3(0.0f));
+    fori(0,N){
+      vel[i] = vamp*noise[i];
+    }
+    vel.upload();
+    curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
   }
-  vel.upload();
   
+  initGPU(params);
   cerr<<"Verlet NVT Integrator\t\tDONE!!\n"<<endl;
 }
 
@@ -76,7 +80,7 @@ void VerletNVT::update(){
   /**First integration step**/
   /*Gen noise*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
-  integrateVerletNVTGPU(pos, vel, force, noise, N, 1);
+  integrateGPU(pos, vel, force, noise, N, 1);
   /**Compute all the forces**/
   
   /*Reset forces*/
@@ -86,7 +90,7 @@ void VerletNVT::update(){
   /**Second integration step**/
   /*Gen noise*/
   curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
-  integrateVerletNVTGPU(pos, vel, force, noise, N, 2);
+  integrateGPU(pos, vel, force, noise, N, 2);
   
 
   
@@ -94,6 +98,6 @@ void VerletNVT::update(){
 
 
 float VerletNVT::sumEnergy(){
-  return computeKineticEnergyVerletNVT(vel, N);
+  return computeKineticEnergyGPU(vel, N);
 }
 

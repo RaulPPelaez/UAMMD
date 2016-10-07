@@ -8,6 +8,7 @@
 #include<iostream>
 
 using namespace std;
+using namespace external_forces_ns;
 
 ExternalForces::ExternalForces():
   Interactor(){
@@ -24,7 +25,7 @@ ExternalForces::~ExternalForces(){}
 void ExternalForces::init(){
   
   params.L = L;
-  initExternalForcesGPU(params);
+  initGPU(params);
 }
 /*Perform an integration step*/
 void ExternalForces::sumForce(){

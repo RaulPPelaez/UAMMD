@@ -39,7 +39,7 @@ public:
 
 protected:
   uint N;
-  float L;
+  float3 L;
   string name;
 };
 

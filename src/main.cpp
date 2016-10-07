@@ -48,14 +48,15 @@ TODO:
 GlobalConfig gcnf;
 Vector4 pos, force;
 Vector3 vel;
-
+Xorshift128plus grng;
 
 int main(int argc, char *argv[]){
 
   fori(1,argc)
     if(strcmp("--device", argv[i])==0)
       cudaSetDevice(atoi(argv[i+1]));
-  
+
+  /*To increase the size of the printf buffer inside kernels, default is 4096 lines I think*/
   // size_t size;
   // cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
   // cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*1000);
@@ -69,11 +70,6 @@ int main(int argc, char *argv[]){
 
   cudaDeviceSynchronize();
   
-  /*Free the global arrays manually*/
-  pos.freeMem();
-  force.freeMem();
-  vel.freeMem();
-
   return 0;
 }
 

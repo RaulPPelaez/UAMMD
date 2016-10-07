@@ -43,7 +43,7 @@ private:
   Matrixf D, K;
   
   curandGenerator_t rng;
-  BrownianHydrodynamicsEulerMaruyamaParameters params;
+  brownian_hy_euler_maruyama_ns::Params params;
   
   cudaStream_t stream, stream2;
 

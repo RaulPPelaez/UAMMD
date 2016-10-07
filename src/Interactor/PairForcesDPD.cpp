@@ -2,7 +2,7 @@
 
 using namespace pair_forces_ns;
 /*PairForcesDPD inherits from PairForces*/
-PairForcesDPD::PairForcesDPD(): PairForces(LJ), rngCPU(gcnf.seed){
+PairForcesDPD::PairForcesDPD(): PairForces(LJ){
 
   cerr<<"Initializing DPD Submodule..."<<endl;
 
@@ -19,7 +19,7 @@ PairForcesDPD::PairForcesDPD(): PairForces(LJ), rngCPU(gcnf.seed){
   initDPDGPU(paramsDPD);
 
   /*Warmup rng*/
-  fori(0, 1000) seed = rngCPU.next();
+  fori(0, 1000) seed = grng.next();
 
 
   cerr<<"DPD Submodule\tDONE!!"<<endl;
@@ -39,7 +39,7 @@ void PairForcesDPD::sumForce(){
   makeNeighbourListDPD();
 
   /*Move the seed to the next step*/
-  seed = rngCPU.next();
+  seed = grng.next();
   
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   computePairForceDPD(force, particleIndex, N, seed);

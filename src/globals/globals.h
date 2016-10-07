@@ -11,16 +11,18 @@ TODO:
 #ifndef GLOBALS_H
 #define GLOBALS_H
 #include "utils/utils.h"
+
 struct GlobalConfig{
   /*Default parameters*/
   uint N = 0;
-  float L = 0.0f, rcut = 2.5f;
+  float3 L = {0.0f, 0.0f, 0.0f};
+  float rcut = 2.5f;
   float dt = 0.001f;
   float T = 0.0f;
   float gamma = 1.0f; //General damping factor for a thermostat
   float E = 0.0f;
 
-  uint nsteps = 10000;
+  uint nsteps = 0;
   uint nsteps1 = 10000;
   uint nsteps2 = 10000;
   int print_steps=-1;
@@ -37,3 +39,4 @@ extern GlobalConfig gcnf;
 //These Arrays are declared in main.cpp and initialized in Driver.cpp
 extern Vector4 pos, force;
 extern Vector3 vel;
+extern Xorshift128plus grng;

@@ -37,7 +37,7 @@ public:
   void setTemp(float Tnew){
     params.T = Tnew;
     params.noiseAmp = sqrt(dt*0.5f)*sqrt(2.0f*gamma*Tnew);
-    initVerletNVTGPU(params);
+    verlet_nvt_ns::initGPU(params);
   }
 private:
   Vector3 noise;
