@@ -5,25 +5,25 @@
 */
 #ifndef VERLETNVTGPU_CUH
 #define VERLETNVTGPU_CUH
-
+#include"globals/defines.h"
 /*Each module should have its own namespace*/
 namespace verlet_nvt_ns{
 
   struct Params{
-    float dt;
-    float gamma;
-    float T;
-    float noiseAmp;
-    float3 L;
+    real dt;
+    real gamma;
+    real T;
+    real noiseAmp;
+    real3 L;
     uint N;
   };
 
   void initGPU(Params m_params);
 
   /*Step controls the integration step, 1 or 2 in verlet*/
-  void integrateGPU(float4 *pos, float3 *vel, float4 *force, float3 *noise, uint N,
+  void integrateGPU(real4 *pos, real3 *vel, real4 *force, real3 *noise, uint N,
 		    int step);
 
-  float computeKineticEnergyGPU(float3 *vel, uint N);
+  real computeKineticEnergyGPU(real3 *vel, uint N);
 }
 #endif

@@ -13,6 +13,7 @@
 */
 #ifndef VERLETNVE_H
 #define VERLETNVE_H
+#include "globals/defines.h"
 #include "utils/utils.h"
 #include "Integrator.h"
 #include "VerletNVEGPU.cuh"
@@ -25,10 +26,10 @@ public:
 
   void update() override;
   //Returns the kinetic energy
-  float sumEnergy() override;
-  void write(bool block);
+  real sumEnergy() override;
+  void write(bool block) override;
 private:
-  float E;
+  real E;
   verlet_nve_ns::Params params;
 };
 

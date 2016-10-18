@@ -8,6 +8,7 @@
 #ifndef SIMULATIONCONFIG_H
 #define SIMULATIONCONFIG_H
 
+#include"globals/defines.h"
 #include "Driver.h"
 
 class SimulationConfig: public Driver{

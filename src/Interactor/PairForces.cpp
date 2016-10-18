@@ -32,8 +32,8 @@ using namespace std;
 using namespace pair_forces_ns;
 
 PairForces::PairForces(pairForceType fs,
-		       std::function<float(float)> cFFun,
-		       std::function<float(float)> cEFun):
+		       std::function<real(real)> cFFun,
+		       std::function<real(real)> cEFun):
   Interactor(),
   sortPos(N), particleHash(N), particleIndex(N),
   energyArray(N), virialArray(N),
@@ -48,13 +48,14 @@ PairForces::PairForces(pairForceType fs,
   params.rcut = rcut;
 
   int3 cellDim = make_int3(L/rcut);
+
+  if(L.z==real(0.0)) cellDim.z = 1;
   
   params.L = L;
   params.N = N;
   
-  params.cellSize = L/make_float3(cellDim);
+  params.cellSize = L/make_real3(cellDim);
 
-  cerr<<params.cellSize<<endl;
   params.cellDim = cellDim;
 
 
@@ -85,10 +86,10 @@ void PairForces::init(){
   /*Pre compute force and energy, using force  function*/
   switch(forceSelector){
   case LJ:
-    pot = Potential(forceLJ, energyLJ, 4096*params.rcut/2.5f, params.rcut);
+    pot = Potential(forceLJ, energyLJ, 4096*params.rcut/real(2.5), params.rcut);
     break;
   case CUSTOM:
-    pot = Potential(customForceFunction, customEnergyFunction, 4096*params.rcut/2.5f, params.rcut);
+    pot = Potential(customForceFunction, customEnergyFunction, 4096*params.rcut/real(2.5), params.rcut);
     break;
   case NONE:
     pot = Potential(nullForce, nullForce, 2, params.rcut);
@@ -98,11 +99,11 @@ void PairForces::init(){
     exit(1);
   }
 
-  sortPos.fill_with(make_float4(0.0f)); sortPos.upload();
+  sortPos.fill_with(make_real4(0.0)); sortPos.upload();
 
   /*Temporal storage for the enrgy and virial per particle*/
-  energyArray.fill_with(0.0f); energyArray.upload();
-  virialArray.fill_with(0.0f); virialArray.upload();
+  energyArray.fill_with(0.0); energyArray.upload();
+  virialArray.fill_with(0.0); virialArray.upload();
 
   
   particleHash.fill_with(0);  particleHash.upload();
@@ -135,25 +136,37 @@ void PairForces::makeNeighbourList(){
 void PairForces::sumForce(){
   static int steps = 0;
   steps++;
-
   /*** CONSTRUCT NEIGHBOUR LIST ***/
   makeNeighbourList();
 
+ 
+
+  
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
   computePairForce(sortPos,
 		   force, 
 		   cellStart, cellEnd, 
 		   particleIndex,
 		   N);
-  
-  // force.download();
-  // float4 sumforce = std::accumulate(force.begin(), force.end(), make_float4(0));
-  //  cerr<<sumforce.x<<" "<<sumforce.y<<" "<<sumforce.z<<endl; 
+  // if(steps%100==0){
+  //  force.download();
+  //  double4 sumforced = make_double4(0,0,0,0);
+
+
+  //  fori(0,N){
+  //    sumforced.x += (double)force[i].x;
+  //    sumforced.y += (double)force[i].y;
+  //    sumforced.z += (double)force[i].z;
+  //  }
+  //  //real4 sumforce = std::accumulate(force.begin(), force.end(), make_real4(0));
+  //  cerr<<sumforced.x<<" "<<sumforced.y<<" "<<sumforced.z<<endl;
+  // }
 }
 
-float PairForces::sumEnergy(){
+real PairForces::sumEnergy(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/
   makeNeighbourList();
+
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
  return computePairEnergy(sortPos,
 			  energyArray, 
@@ -162,17 +175,17 @@ float PairForces::sumEnergy(){
 			  N);
 
 }
-float PairForces::sumVirial(){
+real PairForces::sumVirial(){
   /*** CONSTRUCT NEIGHBOUR LIST ***/
   makeNeighbourList();
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
-  float v =  computePairVirial(sortPos,
+  real v =  computePairVirial(sortPos,
 			       virialArray, 
 			       cellStart, cellEnd, 
 			       particleIndex,
 			       N);
 
-  return v/(3.0f*L.x*L.y*L.z);
+  return v/(real(3.0)*L.x*L.y*L.z);
 }
 
 
@@ -180,33 +193,33 @@ float PairForces::sumVirial(){
 
 //Force between two particles, depending on square distance between them
 // this function is only called on construction, so it doesnt need to be optimized at all
-float forceLJ(float r2){
-  float invr2 = 1.0f/(r2);
-  float invr = 1.0f/sqrt(r2);
-  float invr6 = invr2*invr2*invr2;
-  float invr8 = invr6*invr2;
+real forceLJ(real r2){
+  real invr2 = 1.0/(r2);
+  real invr = 1.0/sqrt(r2);
+  real invr6 = invr2*invr2*invr2;
+  real invr8 = invr6*invr2;
 
-  float invrc13 = pow(1.0f/gcnf.rcut, 13);
-  float invrc7 = pow(1.0f/gcnf.rcut, 7);
+  real invrc13 = pow(1.0/gcnf.rcut, 13);
+  real invrc7 = pow(1.0/gcnf.rcut, 7);
   
-  float fmod = -48.0f*invr8*invr6 + 24.0f*invr8;
-  float fmodcorr = 48.0f*invr*invrc13 - 24.0f*invr*invrc7;
+  real fmod = -48.0*invr8*invr6 + 24.0*invr8;
+  real fmodcorr = 48.0*invr*invrc13 - 24.0*invr*invrc7;
   
-  //f(r)-f(rcut)
+  //(f(r)-f(rcut))/r
   return fmod+fmodcorr;
 }
-float energyLJ(float r2){
-  float r = sqrt(r2);
-  float invr2 = 1.0f/r2;
-  float invr6 = invr2*invr2*invr2;
-  //float E =  2.0f*invr6*(invr6-1.0f);
+real energyLJ(real r2){
+  real r = sqrt(r2);
+  real invr2 = 1.0/r2;
+  real invr6 = invr2*invr2*invr2;
+  //real E =  2.0f*invr6*(invr6-1.0f);
   //potential as u(r)-(r-rcut)*f(rcut)-r(rcut) 
-  float E = 2.0f*(invr6*(invr6-1.0f));
-  float Ecorr = 2.0f*(
-		      -(r-gcnf.rcut)*(-24.0f*pow(1.0f/gcnf.rcut, 13)+12.0f*pow(1.0f/gcnf.rcut, 7))
-		      -pow(1.0f/gcnf.rcut, 6)*(pow(1.0f/gcnf.rcut, 6)-1.0f));
+  real E = 2.0*(invr6*(invr6-1.0));
+  real Ecorr = 2.0*(
+		      -(r-gcnf.rcut)*(-24.0*pow(1.0/gcnf.rcut, 13)+12.0*pow(1.0/gcnf.rcut, 7))
+		      -pow(1.0/gcnf.rcut, 6)*(pow(1.0/gcnf.rcut, 6)-1.0));
   return E+Ecorr;
 }
-float nullForce(float r2){return 0.0f;}
+real nullForce(real r2){return 0.0;}
 
 uint PairForces::pairForcesInstances = 0;

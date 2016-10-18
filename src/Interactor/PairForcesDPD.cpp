@@ -8,10 +8,10 @@ PairForcesDPD::PairForcesDPD(): PairForces(LJ){
 
   gamma = gcnf.gamma;
   paramsDPD.gamma = gamma;
-  paramsDPD.noiseAmp = sqrt(2.0f*gamma*gcnf.T/gcnf.dt);
+  paramsDPD.noiseAmp = sqrt(2.0*gamma*gcnf.T/gcnf.dt);
 
 
-  sortVel = Vector4(N); sortVel.fill_with(make_float4(0.0f)); sortVel.upload();
+  sortVel = Vector4(N); sortVel.fill_with(make_real4(0.0)); sortVel.upload();
 
   /*Get texture object from sortVel*/
   paramsDPD.texSortVel = sortVel.getTexture();
@@ -29,7 +29,10 @@ PairForcesDPD::PairForcesDPD(): PairForces(LJ){
 /*** CONSTRUCT NEIGHBOUR LIST ***/
 void PairForcesDPD::makeNeighbourListDPD(){
 
-  makeCellListDPD(pos, vel, sortPos, sortVel, particleIndex, particleHash, cellStart, cellEnd, N, ncells);
+  makeCellListDPD(pos, vel, sortPos, sortVel,
+		  particleIndex, particleHash,
+		  cellStart, cellEnd,
+		  N, ncells);
   
 }
 
@@ -42,9 +45,9 @@ void PairForcesDPD::sumForce(){
   seed = grng.next();
   
   /*** COMPUTE FORCES USING THE NEIGHBOUR LIST***/
-  computePairForceDPD(force, particleIndex, N, seed);
+  computePairForceDPD(force, particleIndex, cellStart, cellEnd, N, seed);
 }
 
 
-float PairForcesDPD::sumEnergy(){ return 0.0f;}
-float PairForcesDPD::sumVirial(){ return 0.0f;}
+real PairForcesDPD::sumEnergy(){ return 0.0;}
+real PairForcesDPD::sumVirial(){ return 0.0;}

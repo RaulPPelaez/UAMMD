@@ -13,6 +13,7 @@ TODO:
 #ifndef EXTERNALFORCES_H
 #define EXTERNALFORCES_H
 
+#include"globals/defines.h"
 #include"utils/utils.h"
 #include"globals/globals.h"
 #include"Interactor.h"
@@ -29,8 +30,8 @@ public:
   ~ExternalForces();
 
   void sumForce() override;
-  float sumEnergy() override;
-  float sumVirial() override;
+  real sumEnergy() override;
+  real sumVirial() override;
 private:
   void init();
   external_forces_ns::Params params;

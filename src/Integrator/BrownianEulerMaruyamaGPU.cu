@@ -41,31 +41,31 @@ namespace brownian_euler_maruyama_ns{
 
 
   /*Integrate the movement*/
-  __global__ void integrateGPUD(float4 __restrict__  *pos,
-				const float4 __restrict__  *force,
-				const float3 __restrict__ *dW){
+  __global__ void integrateGPUD(real4 __restrict__  *pos,
+				const real4 __restrict__  *force,
+				const real3 __restrict__ *dW){
     uint i = blockIdx.x*blockDim.x+threadIdx.x;
     if(i>=params.N) return;
     /*Half step velocity*/
 
-    float3 *B = params.B;
-    float3 *D = params.D;
-    float3 *K = params.K;
-    float sqrtdt = params.sqrtdt;
-    float dt = params.dt; 
-    float3 p = make_float3(pos[i]);
-    float3 f = make_float3(force[i]);
+    real3 *B = params.B;
+    real3 *D = params.D;
+    real3 *K = params.K;
+    real sqrtdt = params.sqrtdt;
+    real dt = params.dt; 
+    real3 p = make_real3(pos[i]);
+    real3 f = make_real3(force[i]);
     // X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
     p.x =  dt*( dot(K[0],p) +  dot(D[0],f)) + sqrtdt*dot(dW[i],B[0]);
     p.y =  dt*( dot(K[1],p) +  dot(D[1],f)) + sqrtdt*dot(dW[i],B[1]);
-    if(params.L.z!=0.0f)//If 3D
+    if(params.L.z!=real(0.0))//If 3D
       p.z =  dt*( dot(K[2],p) +  dot(D[2],f)) + sqrtdt*dot(dW[i],B[2]);
 
-    pos[i] += make_float4(p);
+    pos[i] += make_real4(p);
   }
 
   //Update the positions
-  void integrateGPU(float4 *pos, float3 *noise, float4 *force,
+  void integrateGPU(real4 *pos, real3 *noise, real4 *force,
 		    uint N){
     uint nthreads = TPB<N?TPB:N;
     uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0); 

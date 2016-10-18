@@ -14,7 +14,7 @@ TODO:
 100- Grid stride computeBondedForceD
 100- Implement FP without thrust
 */
-
+#include"globals/defines.h"
 #include"BondedForcesGPU.cuh"
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
@@ -29,7 +29,7 @@ namespace bonded_forces_ns{
   __constant__ Params params; 
 
   void initGPU(Params m_params){
-    m_params.invL = 1.0f/m_params.L;
+    m_params.invL = 1.0/m_params.L;
     /*Upload parameters to constant memory*/
     gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
   }
@@ -38,8 +38,8 @@ namespace bonded_forces_ns{
   //MIC algorithm
   template<typename vecType>
   inline __device__ void apply_pbc(vecType &r){
-    float3 r3 = make_float3(r.x, r.y, r.z);
-    float3 shift = (floorf(r3*params.invL+0.5f)*params.L); //MIC Algorithm
+    real3 r3 = make_real3(r.x, r.y, r.z);
+    real3 shift = (floorf(r3*params.invL+real(0.5))*params.L); //MIC Algorithm
     r.x -= shift.x;
     r.y -= shift.y;
     r.z -= shift.z;
@@ -49,32 +49,32 @@ namespace bonded_forces_ns{
 #define TPB 64
 
   //Custom kernel to compute and sum the force
-  __global__ void computeBondedForceD(float4* __restrict__ force, const float4* __restrict__ pos,
+  __global__ void computeBondedForceD(real4* __restrict__ force, const real4* __restrict__ pos,
 				      const uint* __restrict__ bondStart,
 				      const uint* __restrict__ bondEnd,
 				      const uint* __restrict__ bondedParticleIndex,
 				      const Bond* __restrict__ bondList){
-    __shared__ float4 forceTotal[TPB]; /*Each thread
+    __shared__ real4 forceTotal[TPB]; /*Each thread
     /*A block per particle*/
     /*Instead of launching a thread per particle and discarding those without any bond,
       I store an additional array of size N_particles_with_bonds that contains the indices
       of the particles that are involved in at least one bond. And only launch N_particles_with_bonds blocks*/
     /*Each thread in a block computes the force on particle p due to one (or several) bonds*/
     uint p = bondedParticleIndex[blockIdx.x]; //This block handles particle p
-    float4 posi = pos[p]; //Get position
+    real4 posi = pos[p]; //Get position
 
     /*First and last bond indices of p in bondList*/
     uint first = bondStart[p]; 
     uint last = bondEnd[p];
    
-    float4 f = make_float4(0.0f);
+    real4 f = make_real4(real(0.0));
 
     Bond bond; //The current bond
     
-    int j; float4 posj; //The other particle
-    float r0, k; //The bond info
+    int j; real4 posj; //The other particle
+    real r0, k; //The bond info
       
-    float3 r12;
+    real3 r12;
 
     
     for(int b = first+threadIdx.x; b<last; b+=blockDim.x){
@@ -87,14 +87,14 @@ namespace bonded_forces_ns{
       posj = pos[j];
     
       /*Compute force*/
-      r12 =  make_float3(posi-posj);
+      r12 =  make_real3(posi-posj);
       apply_pbc(r12);
     
-      float invr = rsqrt(dot(r12, r12));
+      real invr = rsqrt(dot(r12, r12));
     
-      float fmod = -k*(1.0f-r0*invr); //F = -k·(r-r0)·rvec/r
+      real fmod = -k*(real(1.0)-r0*invr); //F = -k·(r-r0)·rvec/r
       
-      f += make_float4(fmod*r12);
+      f += make_real4(fmod*r12);
     }
 
     /*The first thread sums all the contributions*/
@@ -102,7 +102,7 @@ namespace bonded_forces_ns{
     __syncthreads();
     //TODO Implement a warp reduction
     if(threadIdx.x==0){
-      float4 ft = make_float4(0.0f);
+      real4 ft = make_real4(0.0f);
       for(int i=0; i<TPB; i++){
 	ft += forceTotal[i];
       }
@@ -113,7 +113,7 @@ namespace bonded_forces_ns{
   }
 
 
-  void computeBondedForce(float4 *force, float4 *pos,
+  void computeBondedForce(real4 *force, real4 *pos,
 			  uint *bondStart, uint *bondEnd, uint *bondedParticleIndex, 
 			  Bond* bondList, uint N, uint Nparticles_with_bonds, uint nbonds){
     computeBondedForceD<<<Nparticles_with_bonds, TPB>>>(force, pos,
@@ -132,8 +132,8 @@ namespace bonded_forces_ns{
     template <typename Tuple>
     __device__  void operator()(Tuple t){
       /*Retrive the data*/
-      float4 pos = get<0>(t);
-      float4 force = get<1>(t);
+      real4 pos = get<0>(t);
+      real4 force = get<1>(t);
       uint first = get<2>(t); //bondStart
       uint last = get<3>(t);  //bondEnd
 
@@ -141,27 +141,27 @@ namespace bonded_forces_ns{
       if(first!=0xffffffff){
 
 	BondFP bond;
-	float4 posFP; //The other particle
-	float r0, k; //The bond info
+	real4 posFP; //The other particle
+	real r0, k; //The bond info
       
-	float3 r12;
+	real3 r12;
 	/*For all particles connected to me*/
 	for(int b = first; b<last; b++){
 	  /*Retrieve bond*/
 	  bond = bondListFP[b];
 	  r0 = bond.r0;
 	  k = bond.k;
-	  posFP = make_float4(bond.pos);
+	  posFP = make_real4(bond.pos);
 
 	  /*Compute force*/
-	  r12 =  make_float3(pos-posFP);
+	  r12 =  make_real3(pos-posFP);
 	  apply_pbc(r12);
 
-	  float invr = 0.0f;
-	  if(r0!=0.0f) invr = rsqrt(dot(r12, r12));
+	  real invr = real(0.0);
+	  if(r0!=real(0.0)) invr = rsqrt(dot(r12, r12));
 	
-	  float fmod = -k*(1.0f-r0*invr); //F = -k·(r-r0)·rvec/r
-	  force += make_float4(fmod*r12);
+	  real fmod = -k*(real(1.0)-r0*invr); //F = -k·(r-r0)·rvec/r
+	  force += make_real4(fmod*r12);
 	}
       }
       get<1>(t) = force;
@@ -170,12 +170,12 @@ namespace bonded_forces_ns{
 
 
 
-  void computeBondedForceFixedPoint(float4 *force, float4 *pos,
+  void computeBondedForceFixedPoint(real4 *force, real4 *pos,
 				    uint *bondStartFP, uint *bondEndFP, BondFP* bondListFP,
 				    uint N, uint nbonds){
 
-    device_ptr<float4> d_pos4(pos);
-    device_ptr<float4> d_force4(force);
+    device_ptr<real4> d_pos4(pos);
+    device_ptr<real4> d_force4(force);
     device_ptr<uint> d_bondStart(bondStartFP);
     device_ptr<uint> d_bondEnd(bondEndFP);
 
@@ -197,40 +197,40 @@ namespace bonded_forces_ns{
     Computes the potential: V(theta) = 0.5 K(theta-theta_0)^2
     F(\vec{ri}) = d(V(theta))/d(cos(theta))·d(cos(theta))/d(\vec{ri})
    */
-  __global__ void computeThreeBondedForceD(float4* __restrict__ force, const float4* __restrict__ pos,
+  __global__ void computeThreeBondedForceD(real4* __restrict__ force, const real4* __restrict__ pos,
 					   const uint* __restrict__ bondStart,
 					   const uint* __restrict__ bondEnd,
 					   const uint* __restrict__ bondedParticleIndex,
 					   const ThreeBond* __restrict__ bondList){
-    __shared__ float4 forceTotal[TPB];
+    __shared__ real4 forceTotal[TPB];
     /*A block per particle, as in computeBondedForcesD*/
     uint p = bondedParticleIndex[blockIdx.x];
   
-    float4 posp = pos[p];
+    real4 posp = pos[p];
   
     uint first = bondStart[p];
     uint last = bondEnd[p];
    
-    float4 f = make_float4(0.0f);
+    real4 f = make_real4(real(0.0));
 
     ThreeBond bond;//The current bond
     uint i,j,k;             //The bond indices
-    float4 posi,posj, posk; //The bond particles
-    float r0, kspring, ang0; //The bond info
+    real4 posi,posj, posk; //The bond particles
+    real r0, kspring, ang0; //The bond info
 
     /*         i -------- j -------- k*/
     /*             rij->      <-rkj  */
     
-    float3 rij, rkj; //rij = ri - rj
+    real3 rij, rkj; //rij = ri - rj
   
-    float invsqrij, invsqrkj; //1/|rij|
-    float rij2, rkj2;  //|rij|^2
+    real invsqrij, invsqrkj; //1/|rij|
+    real rij2, rkj2;  //|rij|^2
 
     
-    float a2; 
-    float cijk, sijk;
-    float a, a11, a12, a22;
-    float ampli;
+    real a2; 
+    real cijk, sijk;
+    real a, a11, a12, a22;
+    real ampli;
 
     /*Go through my bonds*/
     for(int b = first+threadIdx.x; b<last; b+=blockDim.x){
@@ -267,12 +267,12 @@ namespace bonded_forces_ns{
 
       /*Compute distances and vectors*/
       /***rij***/
-      rij =  make_float3(posi-posj);
+      rij =  make_real3(posi-posj);
       apply_pbc(rij);
       rij2 = dot(rij, rij);
       invsqrij = rsqrt(rij2);
       /***rkj***/
-      rkj =  make_float3(posk-posj);
+      rkj =  make_real3(posk-posj);
       apply_pbc(rkj);
       rkj2 = dot(rkj, rkj);
       invsqrkj = rsqrt(rkj2);
@@ -282,14 +282,14 @@ namespace bonded_forces_ns{
       cijk = dot(rij, rkj)*a2; //cijk = cos (theta) = rij*rkj / mod(rij)*mod(rkj)
 
       /*Cos must stay in range*/
-      if(cijk>1.0f) cijk = 1.0f;
-      else if (cijk<-1.0f) cijk = -1.0f;
+      if(cijk>1.0f) cijk = real(1.0);
+      else if (cijk<-1.0f) cijk = -real(1.0);
       
-      sijk = sqrt(1.0f-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
+      sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
       /*sijk cant be zero to avoid division by zero*/
-      if(sijk<0.000001f) sijk = 0.000001f;
+      if(sijk<real(0.000001)) sijk = real(0.000001);
 
-      ampli = -kspring * (acos(cijk) - ang0); //The force amplitude -k·(theta-theta_0)
+      ampli = -real(100.0)*kspring * (acos(cijk) - ang0); //The force amplitude -k·(theta-theta_0)
 
       //Magical trigonometric relations to infere the direction of the force
       a = ampli/sijk;
@@ -300,28 +300,48 @@ namespace bonded_forces_ns{
       /*Sum according to my position in the bond*/
       // i ----- j ------ k
       if(p==i){
-	f += make_float4(a11*rij + a12*rkj); //Angular spring
+	f += make_real4(a11*rij + a12*rkj); //Angular spring
+
+	f += make_real4(-kspring*(real(1.0) - r0*invsqrij)*rij ); //Harmonic spring
 	
-	//f += make_float4(-kspring*(1.0f - r0*invsqrij)*rij ); //Harmonic spring
-	f += make_float4((-kspring/(1.0f-rij2/(r0*r0)))*rij); //fene spring
+	// real rep = 0;
+	// if(1.0f/invsqrij >= pow(2.0f,1.0f/6.0f))
+	//   rep = -48.0f*pow(invsqrij,14) + 24.0f*pow(invsqrij,8);
+	//f += make_real4((-kspring/(1.0f-rij2/(r0*r0)) )*rij); //fene spring
       }
       else if(p==j){
 	//Angular spring
-	f -= make_float4(a11*rij + a12*rkj + a22*rkj + a12*rij);
+	f -= make_real4(a11*rij + a12*rkj + a22*rkj + a12*rij);
 	
 
-	// f += make_float4(kspring*(1.0f - r0*invsqrij)*rij); //First harmonic spring
-	// f += make_float4(kspring*(1.0f - r0*invsqrkj)*rkj); //Second harmonic spring
+	f += make_real4(kspring*(real(1.0) - r0*invsqrij)*rij); //First harmonic spring
+	f += make_real4(kspring*(real(1.0) - r0*invsqrkj)*rkj); //Second harmonic spring
 
-	f -= make_float4((-kspring/(1.0f-rij2/(r0*r0)))*rij); // first fene spring
-	f -= make_float4((-kspring/(1.0f-rkj2/(r0*r0)))*rkj); //second fene spring
+	// real rep = 0;
+	// if(1.0f/invsqrij >= pow(2.0f,1.0f/6.0f))
+	//   rep = -48.0f*pow(invsqrij,14) + 24.0f*pow(invsqrij,8);
+	// f -= make_real4((-kspring/(1.0f-rij2/(r0*r0)) + rep)*rij); //fene spring
+
+	// if(1.0f/invsqrkj >= pow(2.0f,1.0f/6.0f))
+	//   rep = -48.0f*pow(invsqrkj,14) + 24.0f*pow(invsqrkj,8);
+	// f -= make_real4((-kspring/(1.0f-rkj2/(r0*r0)) + rep)*rkj); //fene spring
+
+
+	
+	// f -= make_real4((-kspring/(1.0f-rij2/(r0*r0)))*rij); // first fene spring
+	//f -= make_real4((-kspring/(1.0f-rkj2/(r0*r0)))*rkj); //second fene spring
       }
       else if(p==k){
 	//Angular spring
-	f += make_float4(a22*rkj + a12*rij);
+	f += make_real4(a22*rkj + a12*rij);
 	//Harmonic spring
-	//f += make_float4(-kspring*(1.0f-r0*invsqrkj)*rkj);
-	f += make_float4((-kspring/(1.0f-rkj2/(r0*r0)))*rkj); //fene spring
+	f += make_real4(-kspring*(real(1.0)-r0*invsqrkj)*rkj);
+
+	// real rep = 0;
+	// if(1.0f/invsqrkj >= pow(2.0f,1.0f/6.0f))
+	//   rep = -48.0f*pow(invsqrkj,14) + 24.0f*pow(invsqrkj,8);
+
+	//f += make_real4((-kspring/(1.0f-rkj2/(r0*r0)))*rkj); //fene spring
       }
     }
 
@@ -330,7 +350,7 @@ namespace bonded_forces_ns{
     __syncthreads();
     //TODO Implement a warp reduction
     if(threadIdx.x==0){
-      float4 ft = make_float4(0.0f);
+      real4 ft = make_real4(real(0.0));
       for(int i=0; i<TPB; i++){
 	ft += forceTotal[i];
       }
@@ -346,7 +366,7 @@ namespace bonded_forces_ns{
 
 
 
-  void computeThreeBondedForce(float4 *force, float4 *pos,
+  void computeThreeBondedForce(real4 *force, real4 *pos,
 			       uint *bondStart, uint *bondEnd, uint *bondedParticleIndex, 
 			       ThreeBond* bondList, uint N, uint Nparticles_with_bonds, uint nbonds){
   

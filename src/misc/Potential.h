@@ -16,7 +16,7 @@ TODO:
 #include<fstream>
 #include<functional>
 #include<cuda.h>
-
+#include"globals/defines.h"
 #include"utils/utils.h"
 using std::vector;
 using std::ofstream;
@@ -25,9 +25,9 @@ using std::ofstream;
 class Potential{
 public:
   Potential(){};
-  Potential(std::function<float(float)> Ffoo,
-	    std::function<float(float)> Efoo,
-	    int N, float rc);
+  Potential(std::function<real(real)> Ffoo,
+	    std::function<real(real)> Efoo,
+	    int N, real rc);
   size_t getSize(){ return N;}
   float *getForceData(){ return F.data();}
   float *getEnergyData(){ return E.data();}
@@ -44,8 +44,8 @@ public:
 
   cudaTextureObject_t texForce, texEnergy;
   
-  std::function<float(float)> forceFun;
-  std::function<float(float)> energyFun;
+  std::function<real(real)> forceFun;
+  std::function<real(real)> energyFun;
 };
 
 

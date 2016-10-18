@@ -14,7 +14,7 @@ EnergyMeasure::EnergyMeasure(InteractorArray interactors,
   interactors(interactors),
   integrator(integrator),
   step(0),
-  K(0.0f), U(0.0f), P(0.0f){
+  K(0.0), U(0.0), P(0.0){
   
 
   //Each measurable should print a header informing of what it is going to print
@@ -30,15 +30,18 @@ EnergyMeasure::~EnergyMeasure(){}
 
 void EnergyMeasure::measure(){
   step++;
-  K = 0.0f;
-  U = 0.0f;
-  P = 0.0f;
+  K = 0.0;
+  U = 0.0;
+  P = 0.0;
 
   /*Compute kinetic energy per particle*/
   K = integrator->sumEnergy();
   
-  float T = 2.0f*K/3.0f; //Temperature
-  rho = N/(L.x*L.y*L.z);
+  real T = 2.0*K/3.0; //Temperature
+  if(L.z == real(0.0))
+    rho = N/(L.x*L.y);
+  else
+    rho = N/(L.x*L.y*L.z);
   
   for(auto i: interactors){
     U += i->sumEnergy(); //Compute potential energy

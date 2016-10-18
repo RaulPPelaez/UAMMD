@@ -11,23 +11,23 @@ TODO:
 #ifndef GLOBALS_H
 #define GLOBALS_H
 #include "utils/utils.h"
+#include "globals/defines.h"
 
 struct GlobalConfig{
   /*Default parameters*/
   uint N = 0;
-  float3 L = {0.0f, 0.0f, 0.0f};
-  float rcut = 2.5f;
-  float dt = 0.001f;
-  float T = 0.0f;
-  float gamma = 1.0f; //General damping factor for a thermostat
-  float E = 0.0f;
+  real3 L = {0.0, 0.0, 0.0};
+  real rcut = 2.5;
+  real dt = 0.001;
+  real T = 0.0;
+  real gamma = 1.0; //General damping factor for a thermostat
+  real E = 0.0;
 
   uint nsteps = 0;
   uint nsteps1 = 10000;
   uint nsteps2 = 10000;
   int print_steps=-1;
-  uint relaxation_steps = 1000;
-  uint measure_steps = -1;
+  int measure_steps = -1;
 
   ullint seed = 0xf31337Bada55D00d;  
 };

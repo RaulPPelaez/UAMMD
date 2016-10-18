@@ -34,9 +34,9 @@ void NBodyForces::sumForce(){
   computeNBodyForce(force, pos, N);
 }
 
-float NBodyForces::sumEnergy(){
-  return 0.0f;
+real NBodyForces::sumEnergy(){
+  return 0.0;
 }
-float NBodyForces::sumVirial(){
-  return 0.0f;
+real NBodyForces::sumVirial(){
+  return 0.0;
 }

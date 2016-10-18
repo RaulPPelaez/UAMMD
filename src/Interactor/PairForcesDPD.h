@@ -2,6 +2,7 @@
 #ifndef PAIRFORCESDPD_H
 #define PAIRFORCESDPD_H
 
+#include"globals/defines.h"
 #include"PairForces.h"
 
 
@@ -13,11 +14,11 @@ public:
   void makeNeighbourListDPD();
   
   void sumForce() override;
-  float sumEnergy() override;
-  float sumVirial() override;
+  real sumEnergy() override;
+  real sumVirial() override;
   
 private:
-  float gamma;
+  real gamma;
   Vector4 sortVel;
   
   pair_forces_ns::ParamsDPD paramsDPD;

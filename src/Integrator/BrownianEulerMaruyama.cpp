@@ -26,7 +26,7 @@ Matrixf cholesky(Matrixf Din){
   //Doesnt check for positive definite
   //Super slow, use only in initialization
   uint i, j, k; /* Indices */
-  float tmpsum; /* Temporary variable */
+  real tmpsum; /* Temporary variable */
   if(!Din.isSquare()){
     cerr<<"Cholesky: Not a square matrix!!!"<<endl;
   }
@@ -35,7 +35,7 @@ Matrixf cholesky(Matrixf Din){
   Matrixf B(dim, dim);
   Matrixf D = Din;
   /* Clear B matrix */
-  B.fill_with(0.0f);
+  B.fill_with(0.0);
   
   for(j = 0; j < dim; j++) {
     tmpsum = 0;
@@ -69,28 +69,28 @@ BrownianEulerMaruyama::BrownianEulerMaruyama(Matrixf Din,
 
   /*Set GPU parameters*/
   
-  params.sqrtdt = sqrt(dt)*sqrt(2.0f);
+  params.sqrtdt = sqrt(dt)*sqrt(2.0);
   params.dt = dt;
   params.L = L;
   params.N = N;
 
   D.upload();
   K.upload();
-  params.D = (float3 *)D.d_m;
-  params.K = (float3* )K.d_m;
+  params.D = (real3 *)D.d_m;
+  params.K = (real3* )K.d_m;
 
   B = cholesky(D);
   B.upload();
-  params.B = (float3* )B.d_m;
+  params.B = (real3* )B.d_m;
 
   /*Create noise*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
   curandSetPseudoRandomGeneratorSeed(rng, grng.next());
 
-  noise.fill_with(make_float3(0.0f));
+  noise.fill_with(make_real3(0.0));
   noise.upload();
   //Curand fill with gaussian numbers with mean 0 and var 1, you have to ask for an even number of them
-  curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
+  curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), 0.0, 1.0);
   
   initGPU(params);
   cerr<<"Brownian Euler Maruyama Integrator\t\tDONE!!\n\n"<<endl;
@@ -101,15 +101,15 @@ void BrownianEulerMaruyama::update(){
   steps++;
   if(steps%500==0) cerr<<"\rComputing step: "<<steps<<"   ";
   /*Generate noise*/
-  curandGenerateNormal(rng, (float*) noise.d_m, 3*N + ((3*N)%2), 0.0f, 1.0f);
+  curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), real(1.0));
   /*Reset force*/
-  cudaMemset(force.d_m, 0.0f, N*sizeof(float4));
+  cudaMemset(force.d_m, 0, N*sizeof(real4));
   /*Compute new forces*/
   for(auto forceComp: interactors) forceComp->sumForce();
    /*Update positions*/
   integrateGPU(pos, noise, force, N);
 }
 
-float BrownianEulerMaruyama::sumEnergy(){
-  return 0.0f;
+real BrownianEulerMaruyama::sumEnergy(){
+  return 0.0;
 }

@@ -153,19 +153,18 @@ void Bravais(float * pos,  /* Pointer to positions array */
   /* Unit cells on the side of the box */
   if(type == sq || type == tri) { /* 2D lattices */
     nx = ceil(sqrt(ncells/V)*L[0]);
-    ny = ceil(sqrt(ncells/V)*L[1]);
+    ny = ceil(ncells/(1.0f*nx));
     nz = 1;
   }
   else { /* 3D lattices */
-    nx = ceil(pow(ncells/V,1/3.)*L[0]);
-    ny = ceil(pow(ncells/V,1/3.)*L[1]);
-    nz = ceil(pow(ncells/V,1/3.)*L[2]);
+    nx = ceil(pow(ncells/V, 1/3.)*L[0]);
+    ny = ceil(pow(ncells/V, 1/3.)*L[1]);
+    nz = ceil(ncells/(1.0f*nx*ny));
   }
-
   /* Stretch factors */
   stretchfactor[0] = L[0]/(nx*e[0][0]);
   stretchfactor[1] = L[1]/(ny*e[1][1]);
-  stretchfactor[2] = L[2]/(nz*e[1][1]);
+  stretchfactor[2] = L[2]/(nz*e[2][2]);
 
   if(keepaspect) {
     minstretch = (stretchfactor[0] < stretchfactor[1])?
@@ -178,6 +177,12 @@ void Bravais(float * pos,  /* Pointer to positions array */
       for(i = 0; i < 3; i++) stretchfactor[i] = minstretch;
   }
 
+
+  // printf("%d %d %d %.3f %.3f %.3f\n", nx,ny, nz, pow(ncells/V, 1/3.)*L[0], pow(ncells/V, 1/3.)*L[1], pow(ncells/V, 1/3.)*L[2]);
+
+  //     printf("%.3f %.3f %.3f\n", stretchfactor[0], stretchfactor[1],stretchfactor[2]);
+
+  
   /* Positions in the Bravais lattice */
   for(i = 0; i < nx; i++) {
     for(j = 0; j < ny; j++) {
@@ -186,7 +191,7 @@ void Bravais(float * pos,  /* Pointer to positions array */
           if(node >= N) return;
           for(d = 0; d < 3; d++) { /* Loop over dimensions */
             r[d] = -L[d]/2. + stretchfactor[d]*(i*e[0][d] + j*e[1][d]
-                                                + k*e[2][d] + basis[l][d]);
+                                              + k*e[2][d] + basis[l][d]);
           }
 
           /* Wrap-around (triangular and hexagonal closed-packed lattices) */

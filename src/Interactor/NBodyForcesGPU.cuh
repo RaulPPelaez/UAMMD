@@ -7,9 +7,9 @@
 
 #ifndef NBODYFORCESGPU_CUH
 #define NBODYFORCESGPU_CUH
-
+#include"globals/defines.h"
 namespace nbody_ns{
-  void computeNBodyForce(float4* force, float4 *pos, uint N);
+  void computeNBodyForce(real4* force, real4 *pos, uint N);
 }
 
 #endif

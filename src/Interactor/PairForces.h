@@ -29,7 +29,7 @@ TODO:
 
 #ifndef PAIRFORCES_H
 #define PAIRFORCES_H
-
+#include"globals/defines.h"
 #include"utils/utils.h"
 #include"globals/globals.h"
 #include"Interactor.h"
@@ -43,22 +43,22 @@ TODO:
 //The currently implemented forces, custom allows for an arbitrary function tu be used as force function
 enum pairForceType{LJ,NONE,CUSTOM};
 
-float forceLJ(float r2);
-float energyLJ(float r2);
-float nullForce(float r2);
+real forceLJ(real r2);
+real energyLJ(real r2);
+real nullForce(real r2);
 
 
 class PairForces: public Interactor{
 public:
   //PairForces(pairForceType fs = LJ);
   PairForces(pairForceType fs = LJ,
-	     std::function<float(float)> customForceFunction = nullForce,
-  	     std::function<float(float)> customEnergyFunction = nullForce);
+	     std::function<real(real)> customForceFunction = nullForce,
+  	     std::function<real(real)> customEnergyFunction = nullForce);
   ~PairForces();
 
   void sumForce() override;
-  float sumEnergy() override;
-  float sumVirial() override;
+  real sumEnergy() override;
+  real sumVirial() override;
   
 protected:
   uint ncells;
@@ -70,17 +70,17 @@ protected:
   Vector<uint> particleHash, particleIndex; 
   Vector<uint> cellStart, cellEnd;
  
-  Vector<float> energyArray, virialArray;
+  Vector<real> energyArray, virialArray;
   
   pair_forces_ns::Params params;
   
   //These handle the selected force functions
   
   Potential pot;
-  std::function<float(float)> customForceFunction;
-  std::function<float(float)> customEnergyFunction;
+  std::function<real(real)> customForceFunction;
+  std::function<real(real)> customEnergyFunction;
   
-  float rcut;
+  real rcut;
   
   pairForceType forceSelector;
   

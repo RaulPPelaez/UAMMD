@@ -29,12 +29,13 @@ void ExternalForces::init(){
 }
 /*Perform an integration step*/
 void ExternalForces::sumForce(){
-  computeExternalForce(force, pos, N);
+  pos.download();
+  computeExternalForce(force, pos, N, pos.data);
 }
 
-float ExternalForces::sumEnergy(){
-  return 0.0f;
+real ExternalForces::sumEnergy(){
+  return 0.0;
 }
-float ExternalForces::sumVirial(){
-  return 0.0f;
+real ExternalForces::sumVirial(){
+  return 0.0;
 }

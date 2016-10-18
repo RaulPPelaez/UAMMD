@@ -5,20 +5,20 @@
 */
 #ifndef VERLETNVEGPU_CUH
 #define VERLETNVEGPU_CUH
-
+#include "globals/defines.h"
 namespace verlet_nve_ns{
   
   struct Params{
-    float dt;
+    real dt;
     uint N;
-    float3 L;
+    real3 L;
   };
 
   void initGPU(Params params);
-  void integrateGPU(float4 *pos, float3 *vel, float4 *force, uint N, int step);
+  void integrateGPU(real4 *pos, real3 *vel, real4 *force, uint N, int step);
   
 
-  float computeKineticEnergyGPU(float3 *vel, uint N);
+  real computeKineticEnergyGPU(real3 *vel, uint N);
 
 }
 #endif

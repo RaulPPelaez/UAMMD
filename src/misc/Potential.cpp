@@ -14,26 +14,26 @@ TODO:
 #include<fstream>
 #include<cstring>
 
-Potential::Potential(std::function<float(float)> Ffoo,
-		     std::function<float(float)> Efoo,
-		     int N, float rc):
+Potential::Potential(std::function<real(real)> Ffoo,
+		     std::function<real(real)> Efoo,
+		     int N, real rc):
   N(N), F(N), E(N),
   FGPU(nullptr), EGPU(nullptr),
   texForce(0),texEnergy(0),
   forceFun(Ffoo), energyFun(Efoo)
 {
-  F[0] = 0;
-  E[0] = 0;
+  F[0] = 0.0;
+  E[0] = 0.0;
 
-  float dr2 = rc*rc/(float)N;
-  float r2 = 0.5f*dr2;
+  real dr2 = rc*rc/(real)N;
+  real r2 = 0.5*dr2;
   fori(1,N){
-    F[i] = forceFun(r2);
-    E[i] = energyFun(r2);
     r2 += dr2;
+    F[i] =(float) forceFun(r2);
+    E[i] =(float) energyFun(r2);
   }
-  F[N-1] = 0.0f;
-  E[N-1] = 0.0f;
+  F[N-1] = 0.0;
+  E[N-1] = 0.0;
 
 
 

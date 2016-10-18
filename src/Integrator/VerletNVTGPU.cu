@@ -37,52 +37,52 @@ namespace verlet_nvt_ns{
 
 
   /*Integrate the movement*/
-  __global__ void integrateGPUD(float4 __restrict__  *pos,
-				float3 __restrict__ *vel,
-				const float4 __restrict__  *force,
-				const float3 __restrict__ *noise,
+  __global__ void integrateGPUD(real4 __restrict__  *pos,
+				real3 __restrict__ *vel,
+				const real4 __restrict__  *force,
+				const real3 __restrict__ *noise,
 				int step){
     uint i = blockIdx.x*blockDim.x+threadIdx.x;
     if(i>=params.N) return;
     /*Half step velocity*/
-    vel[i] += (make_float3(force[i])-params.gamma*vel[i])*params.dt*0.5f + params.noiseAmp*noise[i];
-    if(params.L.z==0.0f) vel[i].z = 0.0f;
+    vel[i] += (make_real3(force[i])-params.gamma*vel[i])*params.dt*real(0.5) + params.noiseAmp*noise[i];
+    if(params.L.z==real(0.0)) vel[i].z = real(0.0);
     /*In the first step, upload positions*/
     if(step==1)
-      pos[i] += make_float4(vel[i])*params.dt;    
+      pos[i] += make_real4(vel[i])*params.dt;    
     
   }
 
   /*CPU kernel caller*/
-  void integrateGPU(float4 *pos, float3 *vel, float4 *force, float3* noise, uint N,
+  void integrateGPU(real4 *pos, real3 *vel, real4 *force, real3* noise, uint N,
 		    int step){
     uint nthreads = TPB<N?TPB:N;
     uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0); 
     integrateGPUD<<<nblocks, nthreads>>>(pos, vel, force, noise, step);
   }
 
-  /*Returns the squared of each element in a float3*/
+  /*Returns the squared of each element in a real3*/
   struct dot_functor{
-    __device__ float3 operator()(float3 &a){
+    __device__ real3 operator()(real3 &a){
       return a*a;
     }
 
   };
 
   /*Compute the kinetic energy from the velocities*/
-  float computeKineticEnergyGPU(float3 *vel, uint N){
-    thrust::device_ptr<float3> d_vel3(vel);
-    float3 K;
-    thrust::plus<float3> binary_op;
+  real computeKineticEnergyGPU(real3 *vel, uint N){
+    thrust::device_ptr<real3> d_vel3(vel);
+    real3 K;
+    thrust::plus<real3> binary_op;
   
     K = thrust::transform_reduce(d_vel3, d_vel3 + N,
-				 dot_functor(), make_float3(0.0f), binary_op);
+				 dot_functor(), make_real3(0.0f), binary_op);
 
-    //float3 Ptot = thrust::reduce(d_vel3, d_vel3+N, make_float3(0.0f));
+    //real3 Ptot = thrust::reduce(d_vel3, d_vel3+N, make_real3(0.0f));
     
     //std::cout<<Ptot.x<< " "<<Ptot.y<<" "<<Ptot.z<<std::endl;
     
-    return 0.5f*(K.x+K.y+K.z)/(float)N;
+    return 0.5f*(K.x+K.y+K.z)/(real)N;
   }
   
 }

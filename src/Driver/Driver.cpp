@@ -25,12 +25,12 @@ void Driver::setParameters(){
   uint N = gcnf.N;
   if(pos.size() != N){
     pos = Vector4(N);
-    pos.fill_with(make_float4(0.0f));
+    pos.fill_with(make_real4(real(0.0)));
     pos.upload();
   }
   if(force.size()!=N){
     force = Vector4(N);
-    force.fill_with(make_float4(0.0f));
+    force.fill_with(make_real4(real(0.0)));
     force.upload();
   }
 
@@ -50,8 +50,7 @@ void Driver::run(uint nsteps, bool relax){
     integrator->update();
     if(!relax){
       if(i%gcnf.print_steps==0 && gcnf.print_steps >= 0 )
-	this->write(); //Writing is done in parallel, is practically free if the interval is big enough
-      
+	this->write(true); //Writing is done in parallel, is practically free if the interval is big enough
       
       if(i%gcnf.measure_steps==0 && gcnf.measure_steps>0)
 	for(auto m: measurables)
@@ -69,7 +68,7 @@ void Driver::write(bool block){
 //Read an initial configuration from fileName, TODO
 void Driver::read(const char *fileName){
   ifstream in(fileName);
-  float r,c,l;
+  real r,c,l;
   in>>l;
   fori(0,gcnf.N){
     in>>pos[i].x>>pos[i].y>>pos[i].z>>r>>c;

@@ -191,10 +191,10 @@ void BondedForces::sumForce(){
 				 bondStartFP, bondEndFP, bondListFP, N, nbondsFP);
 }
 
-float BondedForces::sumEnergy(){
+real BondedForces::sumEnergy(){
   return 0.0f;
 }
-float BondedForces::sumVirial(){
+real BondedForces::sumVirial(){
   return 0.0f;
 }
 
@@ -306,10 +306,10 @@ void ThreeBondedForces::sumForce(){
 }
 
 
-float ThreeBondedForces::sumEnergy(){
-  return 0.0f;
+real ThreeBondedForces::sumEnergy(){
+  return 0.0;
 }
 
-float ThreeBondedForces::sumVirial(){
-  return 0.0f;
+real ThreeBondedForces::sumVirial(){
+  return 0.0;
 }

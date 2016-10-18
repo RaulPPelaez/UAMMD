@@ -42,14 +42,14 @@ TODO:
 
 class BondedForces: public Interactor{
 public:
-  BondedForces(const std::vector<bonded_forces_ns::Bond> &bondList);
-  BondedForces(const char * readFile);
+  explicit BondedForces(const std::vector<bonded_forces_ns::Bond> &bondList) ;
+  explicit BondedForces(const char * readFile);
 
   ~BondedForces();
 
   void sumForce() override;
-  float sumEnergy() override;
-  float sumVirial() override;
+  real sumEnergy() override;
+  real sumVirial() override;
 private:
   void init();
   
@@ -67,14 +67,14 @@ private:
 
 class ThreeBondedForces: public Interactor{
 public:
-  ThreeBondedForces(const std::vector<bonded_forces_ns::ThreeBond> &bondList);
-  ThreeBondedForces(const char * readFile);
+  explicit  ThreeBondedForces(const std::vector<bonded_forces_ns::ThreeBond> &bondList);
+  explicit ThreeBondedForces(const char * readFile);
 
   ~ThreeBondedForces();
   
   void sumForce() override;
-  float sumEnergy() override;
-  float sumVirial() override;
+  real sumEnergy() override;
+  real sumVirial() override;
   
 private:
   

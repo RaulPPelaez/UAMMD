@@ -60,6 +60,12 @@ The simulation construction is performed in Driver/SimulationConfig.cpp. Where t
 	
 	1.Energy Measurable. Computes the total, potential and kinetic energy and the virial pressure of the system
 
+----------------------
+
+Now you can select between single and double precision in globals/defines.h. Single precision is used by default, you can change to double precision by commenting #define SINGLE_PRECISION and recompiling the entire code.
+
+
+
 ##USAGE
 
 -------------------

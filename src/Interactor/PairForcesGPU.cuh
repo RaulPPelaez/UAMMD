@@ -13,68 +13,69 @@ More info in the .cu
 
 #ifndef PAIRFORCESGPU_CUH
 #define PAIRFORCESGPU_CUH
-typedef unsigned long long int ullint;
+#include"globals/defines.h"
 
 namespace pair_forces_ns{
   
   //Stores some simulation parameters to upload as constant memory.
   struct Params{
-    float3 cellSize, invCellSize;
+    real3 cellSize, invCellSize;
     int ncells;
     int3 cellDim;
-    float rcut, invrc, invrc2;
-    float3 getCellFactor;
+    real rcut, invrc, invrc2;
     int3 gridPos2CellIndex;
     
     cudaTextureObject_t texForce, texEnergy;
     cudaTextureObject_t texSortPos, texPos;
     cudaTextureObject_t texCellStart, texCellEnd;
     uint N;
-    float3 L, invL;
+    real3 L, invL;
   };
   //Stores some simulation parameters to upload as constant memory, the rest are available in Params.
   struct ParamsDPD{
-    float gamma, noiseAmp, A;
+    real gamma, noiseAmp, A;
     cudaTextureObject_t texSortVel;
   };
 
   // void initGPU(Params &m_params,
   // 	       cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
   // 	       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
-  // 	       float4 *sortPos, float4 *pos, uint N);
+  // 	       real4 *sortPos, real4 *pos, uint N);
   void initGPU(Params &m_params, uint N);  
   void initDPDGPU(ParamsDPD &m_params);
 
 
   void updateParams(Params m_params);
 
-  void makeCellList(float4 *pos, float4 *sortPos,
+  void makeCellList(real4 *pos, real4 *sortPos,
 		    uint *&particleIndex, uint *&particleHash,
 		    uint *cellStart, uint *cellEnd,
 		    uint N, uint ncells);
   
-  void makeCellListDPD(float4 *pos, float3* vel,  float4 *sortPos, float4 *sortVel,
+  void makeCellListDPD(real4 *pos, real3* vel,  real4 *sortPos, real4 *sortVel,
 		       uint *&particleIndex, uint *&particleHash,
 		       uint *cellStart, uint *cellEnd,
 		       uint N, uint ncells);
 
 
-  void computePairForce(float4 *sortPos, float4 *force,
+  void computePairForce(real4 *sortPos, real4 *force,
 			uint *cellStart, uint *cellEnd,
 			uint *particleIndex, 
 			uint N);
 
-  void computePairForceDPD(float4 *force,
+  void computePairForceDPD(real4 *force,
 			   uint *particleIndex,
+			   uint *cellStart,
+			   uint *cellEnd,
 			   uint N, unsigned long long int seed);
 
 
 
-  float computePairEnergy(float4 *sortPos, float *energy,		  
+  real computePairEnergy(real4 *sortPos, real *energy,		  
 			  uint *cellStart, uint *cellEnd,
 			  uint *particleIndex, 
 			  uint N);
-  float computePairVirial(float4 *sortPos, float *virial,		  
+  real computePairVirial(real4 *sortPos, real *virial,		  
 			  uint *cellStart, uint *cellEnd,
 			  uint *particleIndex, 
 			  uint N);

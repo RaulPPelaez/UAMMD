@@ -5,18 +5,18 @@
 */
 #ifndef INTEGRATORBROWNIANEULERMARUYAMAGPU_CUH
 #define INTEGRATORBROWNIANEULERMARUYAMAGPU_CUH
-
+#include"globals/defines.h"
 
 namespace brownian_euler_maruyama_ns{
   struct Params{
-    float sqrtdt, dt;
-    float3 *B, *D, *K;
-    float3 L;
+    real sqrtdt, dt;
+    real3 *B, *D, *K;
+    real3 L;
     uint N;
   };
 
   void initGPU(Params m_params);
 
-  void integrateGPU(float4 *pos, float3 *noise, float4 *force, uint N);
+  void integrateGPU(real4 *pos, real3 *noise, real4 *force, uint N);
 }
 #endif

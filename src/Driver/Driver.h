@@ -26,7 +26,7 @@ TODO:
 #define DRIVER_H
 
 #include"globals/globals.h"
-
+#include"globals/defines.h"
 #include"Interactor/Interactor.h"
 #include"Interactor/PairForces.h"
 #include"Interactor/PairForcesDPD.h"

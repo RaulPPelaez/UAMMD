@@ -7,7 +7,7 @@ arbitrary calculation on the simulation variables. Although it is possible, meas
 not  directly change in any way any of the simulation variables, like the position or the force.
 
 A Measurable only has the method measure, which performs the computation and decides what to do with it.
-The idiea is for each measurable to print to measurables.dat each time measure is called.
+The idea is for each measurable to print to measurables.dat each time measure is called.
 Check EnergyMeasure for an example. 
 
 Each Measurable has an id that can be used to know the order of the calls.

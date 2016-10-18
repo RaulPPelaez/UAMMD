@@ -11,32 +11,71 @@ Matrixf eye(uint n){
   return A;
 }
 
-std::ostream& operator<<(std::ostream& out, const float3 &f){
+std::ostream& operator<<(std::ostream& out, const real3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
-std::ostream& operator<<(std::ostream& out, const float4 &f){
+std::ostream& operator<<(std::ostream& out, const real4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
 }
 
 //typedef enum {sc, bcc, fcc, dia, hcp, sq, tri} lattice;
 
-Vector4 cubicLattice(float3 L, uint N){
-  cerr<<"Starting in a cubic Lattice...";
-  Vector4 pos(N);
-  pos.fill_with(make_float4(0.0f));
+ Vector4 cubicLattice(real3 L, uint N){
+   cerr<<"Starting in a cubic Lattice...";
+   Vector<float4> pos(N);
+   pos.fill_with(make_float4(0.0f));
+   lattice lat = fcc;
+   if(L.z==real(0.0)) lat = sq;
 
-  Bravais((float *) pos.data,
-	  sc,/*Simple Cubic*/
-	  N,
-	  L.x, L.y, L.z,
+   Bravais((float *) pos.data,
+ 	  lat,/*Simple Cubic*/
+ 	  N,
+ 	  L.x, L.y, L.z,
 	  0.0f, /*Color*/
-	  NULL, NULL, /*Basis and vector files*/
-	  true); /*Keep aspect ratio*/
-  fori(0,N)
-    pos[i] += make_float4(0.5f, 0.5f, 0.5f, 0.0f);
-  
-  return pos;
-}
+ 	  NULL, NULL, /*Basis and vector files*/
+ 	  false); /*Keep aspect ratio*/
+   fori(0,N){
+     pos[i] += make_float4(0.56f, 0.56f, 0.56f, 0.0f);
+     if(L.z==real(0.0)) pos[i].z = 0.0f;
+   }
+
+   Vector4 pos_real(N);
+   fori(0,N)
+     pos_real[i] = make_real4(pos[i].x, pos[i].y, pos[i].z, real(0.0));
+   
+   return pos_real;
+ }
+
+ // Vector4 cubicLattice(real3 l, uint N){
+ //   real  L = l.x;
+ //   Vector4 pos(N);
+ //   real dx, dy, dz;
+ //   int nx, ny, nz, n;
+ //   int np = N;
+
+ //   nx = ny = nz = 1;
+ //   while((nx*ny*nz)<np){
+ //     if((nx*ny*nz)<np) nx++;
+ //     if((nx*ny*nz)<np) ny++;
+ //     if((nx*ny*nz)<np) nz++;
+ //   }
+ //   dx = L/real(nx);
+ //   dy = L/real(ny);
+ //   dz = L/real(nz);
+
+ //   n = 0;
+ //   for (int i=0;i<nz;i++)
+ //     for(int j=0;j<ny;j++)
+ //       for(int k=0;k<nx;k++)
+ //       if(n<np){
+ //         n = n + 1;
+ //         pos[(n-1)].x = (k + 0.5f) * dx - L/2.0f;
+ //         pos[(n-1)].y = (j + 0.5f) * dy - L/2.0f;
+ //         pos[(n-1)].z = (i + 0.5f) * dz - L/2.0f;
+ //       }
+ //   return pos;
+ // }                                      
+
 
 
 Vector4 readFile(const char * fileName){
@@ -46,7 +85,7 @@ Vector4 readFile(const char * fileName){
   in>>N;
   Vector4 p = Vector4(N);
   fori(0,N){
-    in>>p[i].x>>p[i].y>>p[i].z>>p[i].w;
+     in>>p[i].x>>p[i].y>>p[i].z>>p[i].w;
   }
   cerr<<"\tDONE!"<<endl;
   return p;
@@ -54,25 +93,25 @@ Vector4 readFile(const char * fileName){
 
 
 
-#define RANDESP (rand()/(float)RAND_MAX)
-#define RANDL2 (RANDESP-0.5f)
+#define RANDESP (rand()/(real)RAND_MAX)
+#define RANDL2 (RANDESP-0.5)
 
-bool randInitial(float4 *pos, float L, uint N){
+bool randInitial(real4 *pos, real L, uint N){
   srand(time(NULL));
-  pos[0] = make_float4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0f);
-  float4 tempos, rij;
+  pos[0] = make_real4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0);
+  real4 tempos, rij;
   bool accepted = true;
   uint trials = 0;
-  float r2;
+  real r2;
   cerr<<endl;
   fori(1,N){
     cerr<<"\rIntroducing "<<i<<"     ";
-    tempos = make_float4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0f);
+    tempos = make_real4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0);
     forj(0,i+1){
       rij = tempos-pos[j];
-      rij -= floorf(rij/L+0.5f)*L; 
+      rij -= floorf(rij/L+real(0.5))*L; 
       r2 = dot(rij, rij);
-      if(r2<1.0f){
+      if(r2<real(1.0)){
 	accepted = false;
 	break;
       }

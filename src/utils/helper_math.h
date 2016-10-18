@@ -18,13 +18,11 @@
  *
  *    Thanks to Linh Hah for additions and fixes.
  */
-/*Raul P. Pelaez 2016. Warning, I added some overloads to this file*/
 
 #ifndef HELPER_MATH_H
 #define HELPER_MATH_H
 
 #include "cuda_runtime.h"
-
 typedef unsigned int uint;
 typedef unsigned short ushort;
 
@@ -34,7 +32,6 @@ typedef unsigned short ushort;
 
 #ifndef __CUDACC__
 #include <math.h>
-
 ////////////////////////////////////////////////////////////////////////////////
 // host implementations of CUDA functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,6 +61,8 @@ inline float rsqrtf(float x)
     return 1.0f / sqrtf(x);
 }
 #endif
+
+#include "utils/vector_overloads.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // constructors
@@ -119,6 +118,9 @@ inline __host__ __device__ uint2 make_uint2(int2 a)
 inline __host__ __device__ float3 make_float3(float s)
 {
     return make_float3(s, s, s);
+}
+inline __host__ __device__ float3 make_float3(const float3 &s){
+  return s;
 }
 inline __host__ __device__ float3 make_float3(float2 a)
 {
@@ -207,6 +209,7 @@ inline __host__ __device__ float4 make_float4(uint4 a)
 {
     return make_float4(float(a.x), float(a.y), float(a.z), float(a.w));
 }
+
 
 inline __host__ __device__ int4 make_int4(int s)
 {
@@ -453,6 +456,8 @@ inline __host__ __device__ void operator+=(float4 &a, float b)
     a.w += b;
 }
 
+
+
 inline __host__ __device__ int4 operator+(int4 a, int4 b)
 {
     return make_int4(a.x + b.x, a.y + b.y, a.z + b.z,  a.w + b.w);
@@ -677,6 +682,11 @@ inline __host__ __device__ void operator-=(float4 &a, float b)
     a.z -= b;
     a.w -= b;
 }
+
+
+
+
+
 
 inline __host__ __device__ int4 operator-(int4 a, int4 b)
 {
@@ -907,6 +917,10 @@ inline __host__ __device__ void operator*=(float4 &a, float b)
     a.w *= b;
 }
 
+
+
+
+
 inline __host__ __device__ int4 operator*(int4 a, int4 b)
 {
     return make_int4(a.x * b.x, a.y * b.y, a.z * b.z,  a.w * b.w);
@@ -1039,6 +1053,9 @@ inline __host__ __device__ float4 operator/(float b, float4 a)
 {
     return make_float4(b / a.x, b / a.y, b / a.z, b / a.w);
 }
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // min
@@ -1300,7 +1317,6 @@ inline __host__ __device__ float length(float4 v)
 {
     return sqrtf(dot(v, v));
 }
-
 ////////////////////////////////////////////////////////////////////////////////
 // normalize
 ////////////////////////////////////////////////////////////////////////////////

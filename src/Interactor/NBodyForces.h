@@ -11,6 +11,7 @@ TODO:
 #ifndef NBODYFORCES_H
 #define NBODYFORCES_H
 
+#include"globals/defines.h"
 #include"utils/utils.h"
 #include"globals/globals.h"
 #include"Interactor.h"
@@ -29,8 +30,8 @@ public:
   ~NBodyForces();
 
   void sumForce() override;
-  float sumEnergy() override;
-  float sumVirial() override;
+  real sumEnergy() override;
+  real sumVirial() override;
 private:
   void init();
   

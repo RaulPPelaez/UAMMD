@@ -16,6 +16,7 @@ Each Measurable has an id that can be used to know the order of the calls.
 #ifndef MEASURABLE_H
 #define MEASURABLE_H
 #include "utils/utils.h"
+#include"globals/defines.h"
 #include"globals/globals.h"
 #include<fstream>
 using namespace std;
@@ -27,7 +28,7 @@ public:
   
 protected:
   uint N;
-  float3 L;
+  real3 L;
   int id;
   static ofstream out;
   static int total_measurables;

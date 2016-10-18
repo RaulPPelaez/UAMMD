@@ -12,10 +12,10 @@
 
 #ifndef EXTERNALFORCESGPU_CUH
 #define EXTERNALFORCESGPU_CUH
-
+#include"globals/defines.h"
 namespace external_forces_ns{
   struct Params{
-    float3 L, invL;
+    real3 L, invL;
   };
 
 
@@ -23,6 +23,6 @@ namespace external_forces_ns{
   void initGPU(Params m_params);
 
 
-  void computeExternalForce(float4* force, float4 *pos, uint N);
+  void computeExternalForce(real4* force, real4 *pos, uint N, real4 *poscpu);
 }
 #endif

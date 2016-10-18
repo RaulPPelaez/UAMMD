@@ -20,10 +20,15 @@ TODO:
 */
 #ifndef VERLETNVT_H
 #define VERLETNVT_H
+#include"globals/defines.h"
 #include "utils/utils.h"
 #include "Integrator.h"
 #include "VerletNVTGPU.cuh"
 #include<curand.h>
+
+#ifndef SINGLE_PRECISION
+#define curandGenerateNormal curandGenerateNormalDouble
+#endif
 
 class VerletNVT: public Integrator{
 public:
@@ -32,17 +37,17 @@ public:
 
   void update() override;
   //Returns the kinetic energy
-  float sumEnergy() override;
+  real sumEnergy() override;
 
-  void setTemp(float Tnew){
+  void setTemp(real Tnew){
     params.T = Tnew;
-    params.noiseAmp = sqrt(dt*0.5f)*sqrt(2.0f*gamma*Tnew);
+    params.noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*Tnew);
     verlet_nvt_ns::initGPU(params);
   }
 private:
-  Vector3 noise;
+  Vector3 noise; //Noise in single precision always
   
-  float gamma; //Gamma is not stored in gcnf
+  real gamma; //Gamma is not stored in gcnf
   
   verlet_nvt_ns::Params params;
   curandGenerator_t rng;

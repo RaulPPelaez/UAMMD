@@ -22,10 +22,11 @@ CUSTOM_OBJS=
 #These ones with $(NVCC)
 CUSTOM_CUOBJS=
 
+FORTRAN_OBJS =
 
 #############################################################################################################################
 
-#DEBUG
+#DEBUG= -g
 
 CFLAGS= -g -pthread -std=c++11 -O3  -I$(CUDA_INCLUDE) -march=native -pthread -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ $(DEBUG) -Wall
 
@@ -50,7 +51,7 @@ endif
 NVFLAGS= -g $(DEBUGGPU) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++ -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
 
 LDFLAGS= -L$(CUDA_LIBS)
-LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas
+LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran
 
 
 OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
@@ -77,6 +78,7 @@ CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/,
 THIRD_PARTY_OBJSS = $(addprefix third_party/, $(THIRD_PARTY_OBJS))
 
 
+
 ifdef EXPERIMENTAL
 OBJS += $(addprefix Interactor/Experimental/, $(OBJS_INTERACTOR_EXPERIMENTAL))
 CUOBJS += $(addprefix Interactor/Experimental/, $(CUOBJS_INTERACTOR_EXPERIMENTAL))
@@ -85,17 +87,23 @@ endif
 all: main
 
 $(THIRD_PARTY_OBJSS):
-	$(MAKE) -C third_party/
+	$(MAKE) -C third_party/		
 
-main:  $(OBJS) $(CUOBJS) $(THIRD_PARTY_OBJSS)
+
+main:  $(OBJS) $(CUOBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS)
+
+
 
 %.o:%.cu
 	$(NVCC) $(NVFLAGS) -c $< -o $@
 %.o:%.cpp 
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+%.o:%.f90
+	gfortran -O3 -c $< -o $@
+
 
 clean:
-	rm -f $(CUOBJS) $(OBJS) $(THIRD_PARTY_OBJSS) main
+	rm -f $(CUOBJS) $(OBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS) main
 
 cleanCPU:
 	rm -f $(OBJS) main	

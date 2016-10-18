@@ -18,10 +18,15 @@
 */
 #ifndef BROWNIANEULERMARUYAMAINTEGRATOR_H
 #define BROWNIANEULERMARUYAMAINTEGRATOR_H
+#include "globals/defines.h"
 #include "utils/utils.h"
 #include "Integrator.h"
 #include "BrownianEulerMaruyamaGPU.cuh"
 #include<curand.h>
+
+#ifndef SINGLE_PRECISION
+#define curandGenerateNormal curandGenerateNormalDouble
+#endif
 
 class BrownianEulerMaruyama: public Integrator{
 public:
@@ -30,7 +35,7 @@ public:
   ~BrownianEulerMaruyama();
 
   void update() override;
-  float sumEnergy() override;
+  real sumEnergy() override;
 private:
   Matrixf D, K, B;
   Vector3 noise;

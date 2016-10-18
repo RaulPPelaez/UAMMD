@@ -8,25 +8,28 @@
 #define INTEGRATORBROWNIANHYDRODYNAMICSEULERMARUYAMAGPU_CUH
 
 #include<thrust/device_vector.h>
+#include"globals/defines.h"
 namespace brownian_hy_euler_maruyama_ns{
   struct Params{
-    float sqrtdt;
-    float dt;
-    float sqrt2dt;
-    float4* K;
-    float D0, rh;
-    float3 L;
+    real sqrtdt;
+    real dt;
+    real sqrt2dt;
+    real D0, rh;
+    real3 L;
     uint N;
   };
 
 
-  void float4_to_float3GPU(float4 *force, float3* force3, uint N);
+  void real4_to_real3GPU(real4 *force, real3* force3, uint N);
 
-  void rodne_callGPU(float *d_D, float4 *d_R, cudaStream_t stream, uint N);
+  void rodne_callGPU(real *d_D, real4 *d_R, cudaStream_t stream, uint N);
 
 
   void initGPU(Params m_params);
 
-  void integrateGPU(float4 *pos, float3* DF, float3* BdW, float4 *K, uint N);
+  void integrateGPU(real4 *pos, real3* DF, real3* BdW, real3 *K, uint N);
+
+
+  void trmul(real *M, real *v, real *res, uint N);
 }
 #endif

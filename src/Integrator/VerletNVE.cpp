@@ -26,7 +26,7 @@ VerletNVE::VerletNVE():
 
   if(vel.size()!=N){
     /*Create the velocity if you need it*/
-    vel = Vector3(N);  vel.fill_with(make_float3(0.0f));  vel.upload();
+    vel = Vector3(N);  vel.fill_with(make_real3(0.0));  vel.upload();
   }
   cerr<<"\tSet E="<<E<<endl;
 
@@ -51,18 +51,18 @@ void VerletNVE::update(){
     /*In the first step, compute the force and energy in the system
       in order to adapt the initial kinetic energy to match the input total energy
       E = U+K */
-    float U = 0.0f;
+    real U = 0.0;
     for(auto forceComp: interactors) U += forceComp->sumEnergy();
     
-    float K = abs(E-U);
+    real K = abs(E-U);
     /*Distribute the velocities accordingly*/
-    float vamp = sqrt(2.0f*K);
+    real vamp = sqrt(2.0*K);
     /*Create velocities*/
-    vel.fill_with(make_float3(0.0f));
+    vel.fill_with(make_real3(real(0.0)));
     fori(0,N){
-      vel[i].x = vamp*(grng.uniform(-1.0f, 1.0f));
-      vel[i].y = vamp*(grng.uniform(-1.0f, 1.0f));
-      vel[i].z = vamp*(grng.uniform(-1.0f, 1.0f));
+      vel[i].x = vamp*(grng.uniform(-1.0, 1.0));
+      vel[i].y = vamp*(grng.uniform(-1.0, 1.0));
+      vel[i].z = vamp*(grng.uniform(-1.0, 1.0));
     }
     vel.upload();
   }
@@ -73,8 +73,7 @@ void VerletNVE::update(){
   integrateGPU(pos, vel, force, N, 1);
   /**Reset the force**/
   /*The integrator is in charge of resetting the force when it needs, an interactor always sums to the current force*/
-  cudaMemset(force.d_m, 0.0f, N*sizeof(float4));
-
+  cudaMemset(force.d_m, 0, N*sizeof(real4));
   /**Compute all the forces**/
   for(auto forceComp: interactors) forceComp->sumForce();
   /**Second integration step**/
@@ -82,7 +81,7 @@ void VerletNVE::update(){
 }
 
 
-float VerletNVE::sumEnergy(){
+real VerletNVE::sumEnergy(){
   /*The only apportation to the energy is kinetic*/
   return computeKineticEnergyGPU(vel, N);
 }
@@ -92,10 +91,10 @@ float VerletNVE::sumEnergy(){
 void VerletNVE::write(bool block){
   Integrator::write(block);
    // vel.download();
-   // float3 res = make_float3(0.0f);
+   // real3 res = make_real3(0.0f);
    // fori(0,N){
    //   res += vel[i];
    // }
 
-   // cout<<(res.x/(float)N)<<" "<<res.y/(float)N<<" "<<res.z/(float)N<<endl;
+   // cout<<(res.x/(real)N)<<" "<<res.y/(real)N<<" "<<res.z/(real)N<<endl;
 }

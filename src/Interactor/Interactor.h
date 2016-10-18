@@ -19,7 +19,7 @@ TODO:
 
 #ifndef INTERACTOR_H
 #define INTERACTOR_H
-
+#include"globals/defines.h"
 #include"utils/utils.h"
 #include"globals/globals.h"
 #include"misc/Potential.h"
@@ -32,14 +32,14 @@ public:
   virtual ~Interactor();
 
   virtual void sumForce() = 0;
-  virtual float sumEnergy() = 0;
-  virtual float sumVirial() = 0;
+  virtual real sumEnergy() = 0;
+  virtual real sumVirial() = 0;
 
   Vector4Ptr getForce(){return force;}
 
 protected:
   uint N;
-  float3 L;
+  real3 L;
   string name;
 };
 
