@@ -27,7 +27,6 @@ public:
   void update() override;
   //Returns the kinetic energy
   real sumEnergy() override;
-  void write(bool block) override;
 private:
   real E;
   verlet_nve_ns::Params params;

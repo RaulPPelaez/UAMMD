@@ -250,6 +250,7 @@ public:
     M = (T **)malloc(sizeof(T *)*nr);
     for(uint i=0; i<nr; i++) M[i] = this->data + i*nc;
   }
+  //TODO This one doesnt work
   /*Move constructor*/
   Matrix(Matrix<T>&& other) noexcept:
 			     Vector<T>(std::move(other)),

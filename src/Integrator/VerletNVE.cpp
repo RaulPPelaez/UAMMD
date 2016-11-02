@@ -56,7 +56,7 @@ void VerletNVE::update(){
     
     real K = abs(E-U);
     /*Distribute the velocities accordingly*/
-    real vamp = sqrt(2.0*K);
+    real vamp = sqrt(2.0*K*0.0);
     /*Create velocities*/
     vel.fill_with(make_real3(real(0.0)));
     fori(0,N){
@@ -84,17 +84,4 @@ void VerletNVE::update(){
 real VerletNVE::sumEnergy(){
   /*The only apportation to the energy is kinetic*/
   return computeKineticEnergyGPU(vel, N);
-}
-
-/*You can hijack the writing to disk process like this and perform a custom write,
-  maybe to add something or to completly change the process*/
-void VerletNVE::write(bool block){
-  Integrator::write(block);
-   // vel.download();
-   // real3 res = make_real3(0.0f);
-   // fori(0,N){
-   //   res += vel[i];
-   // }
-
-   // cout<<(res.x/(real)N)<<" "<<res.y/(real)N<<" "<<res.z/(real)N<<endl;
 }

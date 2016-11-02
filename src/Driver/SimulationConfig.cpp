@@ -1,3 +1,13 @@
+/* Raul P.Pelaez 2016- Simulation Config
+   
+   Implementation of the SimulationConfig class. 
+
+   The constructor of this class sets all the parameters, creates the initial configuration, constructs the simulation and runs it.
+
+
+
+ */
+
 #include "SimulationConfig.h"
 #include<random>
 #include<iomanip>
@@ -5,51 +15,53 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   
   Timer tim; tim.tic();
   /***********************Set all the parameters needed**********************/
+  /*See globals.h for a list of parameters*/
+  /*If you set a parameter that the modules you use do not need, It will just be ignored. i.e. Setting gcnf.E and using VerletNVT*/
   gcnf.E = 0.0;
   gcnf.T = 0.01;
   gcnf.gamma = 1.0;
 
   gcnf.N = pow(2,13);
-  gcnf.L = make_real3(18.3);
-  gcnf.dt = 0.001f;
+  gcnf.L = make_real3(32);
+  gcnf.dt = 0.01f;
 
   gcnf.rcut = 2.5;  //rcut = 2.5*sigma -> biggest sigma in the system 1.12246204830937f; //WCA
   
-  gcnf.nsteps1 = 100000000;
-  gcnf.nsteps2 = 50000;
-  gcnf.print_steps = -1;
-  gcnf.measure_steps = 100;
+  gcnf.nsteps1 = 10000;
+  gcnf.nsteps2 = 0;
+  gcnf.print_steps = 500;
+  gcnf.measure_steps = -1;
   
   gcnf.seed = 0xffaffbfDEADBULL;
 
-  
-  /********************************Set initial conditions*******************/
+  /********************************Set initial conditions*************************/
   /*Read a configuration from file*/
   // pos = readFile("helix.pos_fix");
   // gcnf.N = pos.size();
+  /*You can create or modify the initial configuration just by modifying the pos array*/
   // fori(0,gcnf.N){
   //   pos[i].z -= 40;
   // }
-  /*Start in a cubic lattice*/
-  pos = cubicLattice(gcnf.L, gcnf.N);
+  
+  /*Start in a lattice, see available lattices in utils.cpp*/
+  pos = initLattice(gcnf.L, gcnf.N, sc); //Start in a simple cubic lattice
 
   
-  
-  cerr<<"Box size: "<<gcnf.L<<endl;
-  cerr<<"Number of particles: "<<gcnf.N<<endl;
 
   /*Call this after all parameters are set.
     and do not change any parameter afterwards*/
   /*This function initializes pos if it is not initialized yet. You can set the initial positions
-    before or after calling this*/  
+    before or after calling this*/
+
   setParameters();
-  /*Dont forget to upload the positions to GPU!*/
+  /*Dont forget to upload the positions to GPU once you are done changing it!*/
+
   pos.upload();
 		 
-
   /*********************************Initialize the modules*****************************/
   /*See Driver.h for a list of all available modules!*/
   /*This is the simulation construction, where you choose integrator and force evaluators*/
+  /*Create an Interactor (AKA Force evaluator) like this, later you will have to add it to the other necessary modules*/
   auto interactor = make_shared<PairForces>();
 
   // Matrixf D(3,3), K(3,3);
@@ -59,23 +71,27 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   
   // K.fill_with(0.0f);                             
     
-  
+  /*Create an Integrator like this*/
   // integrator = make_shared<BrownianEulerMaruyama>(D,K);
-  integrator = make_shared<VerletNVE>();
+  integrator = make_shared<VerletNVT>();
+  /*And inform it of the Force evaluators like this*/
   /*You can add several interactors to an integrator as such*/
   integrator->addInteractor(interactor);
-  // integrator->addInteractor(interactor2);
-  
-   measurables.push_back(// /*You can measure energy coming from any source, in this case all the interactors in integrator*/
-			 make_shared<EnergyMeasure>(integrator->getInteractors(), integrator)
-			               );
+  //integrator->addInteractor(interactor2);
+
+  /*Create any desired measurable modules by adding them to the measurables vector like this*/
+  measurables.push_back(/*You can measure energy coming from any source, in this case all the interactors in integrator and the integrator itself*/
+			make_shared<EnergyMeasure>(integrator->getInteractors(), integrator)
+			);
+
   
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;
   
   tim.tic();  
   /***************************Start of the simulation***************************/
-  /**Run nsteps1 relaxation steps, no writing to disk, no measuring**/
-  run(gcnf.nsteps1); //Relaxation, without printing or measuring
+  /**Run nsteps1,
+     passing true to this function will be considered as a relaxation run, and wont write to disk nor measure anything**/
+  run(gcnf.nsteps1);
 
   // /*You can change the integrator at any time between calls to run*/
   // /*But remember to clear the measurables before,
@@ -100,5 +116,5 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   double total_time = tim.toc();
   
   cerr<<"\nMean step time: "<<setprecision(5)<<(double)gcnf.nsteps/total_time<<" FPS"<<endl;
-  cerr<<"\nTotal time: "<<setprecision(5)<<total_time<<"s"<<endl;  
+  cerr<<"\nSimulation time: "<<setprecision(5)<<total_time<<"s"<<endl;  
 }

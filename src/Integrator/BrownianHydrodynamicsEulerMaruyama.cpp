@@ -24,14 +24,16 @@ TODO:
 
 using namespace brownian_hy_euler_maruyama_ns;
 
-BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama(Matrixf D0, Matrixf K):
+BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama(Matrixf D0in, Matrixf Kin):
   Integrator(),
   force3(N),
   noise(N +((3*N)%2)), DF(N), BdW(3*N),
-  D(3*N, 3*N), K(K), D0(D0){
+  D(3*N, 3*N){
 
   cerr<<"Initializing Brownian Dynamics with Hydrodynamics (Euler Maruyama)..."<<endl;
 
+  this->K = Kin;
+  this->D0 = D0in;
   if(!D0.isSym()){
     cerr<<"D0 Matrix must be symmetric!!"<<endl;
     exit(1);

@@ -17,6 +17,7 @@ TODO:
 #include<functional>
 #include<cuda.h>
 #include"globals/defines.h"
+#include"globals/globals.h"
 #include"utils/utils.h"
 using std::vector;
 using std::ofstream;

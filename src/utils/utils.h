@@ -22,7 +22,7 @@
 #include<iostream>
 #include<sys/time.h>
 #include<memory>
-
+#include"third_party/bravais/bravais.h"
 using namespace std;
 
 #define fori(x,y) for(int i=x; i<int(y); i++)
@@ -101,7 +101,7 @@ public:
 
 
 //This function treats pos a s a float4 and puts the particles in a cubic lattice
-Vector4 cubicLattice(real3 L, uint N);
+Vector4 initLattice(real3 L, uint N, BRAVAISLAT lat = sc);
 
 //Vector4 cubicLattice2D(float L, uint N);
 

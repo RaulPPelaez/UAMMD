@@ -29,8 +29,7 @@ void ExternalForces::init(){
 }
 /*Perform an integration step*/
 void ExternalForces::sumForce(){
-  pos.download();
-  computeExternalForce(force, pos, N, pos.data);
+  computeExternalForce(force, pos, N);
 }
 
 real ExternalForces::sumEnergy(){

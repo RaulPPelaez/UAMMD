@@ -1,7 +1,11 @@
+#**Universaly Adaptable Multiscale Molecular Dynamics (UAMMD)**
+
 ##DESCRIPTION
 
 -----------------
+
 Raul P. Pelaez 2016
+
 
 A fast generic multiscale CUDA Molecular Dynamics code made into modules for expandability and generality.
 It is coded into separated modules, with a SimulationConfig driver in C++ that can hold many modules in order to construct a simulation. For example, the simulation could have a VerletNVT module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
@@ -34,7 +38,7 @@ These objects are abstract classes that can be derived to create all kinds of fu
 
 Finally there is a Driver that puts them all together and controls the flow of the simulation.
 
-The simulation construction is performed in Driver/SimulationConfig.cpp. Where the integrator, interactors and measurables are created and the initial conditions and parameters are set.
+**The simulation construction is performed in Driver/SimulationConfig.cpp. Where the integrator, interactors and measurables are created and the initial conditions and parameters are set. This is the "input" of UAMMD.**
 
 
 #Currently Implemented
@@ -42,7 +46,7 @@ The simulation construction is performed in Driver/SimulationConfig.cpp. Where t
 -----------------------
 **Interactors:**
 
-	1.Pair Forces: Implements hash (Morton hash) sort neighbour list construction algorithm to evaluate pair forces given some short range potential function, LJ i.e. Ultra fast
+	1.Pair Forces: Implements hash (Morton hash) sort neighbour cell list construction algorithm to evaluate pair forces given some short range potential function, LJ i.e. Ultra fast
 	2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
 	3.Three body angle bonded forces: Allows to join triples of particles via angle springs (Instructions in BondedForces.h)
     4.NBody forces: All particles interact with every other via some potential.
@@ -62,8 +66,7 @@ The simulation construction is performed in Driver/SimulationConfig.cpp. Where t
 
 ----------------------
 
-Now you can select between single and double precision in globals/defines.h. Single precision is used by default, you can change to double precision by commenting #define SINGLE_PRECISION and recompiling the entire code.
-
+Now you can select between single and double precision in globals/defines.h. Single precision is used by default, you can change to double precision by commenting "#define SINGLE_PRECISION" and recompiling the entire code. This last step is very important, as failing to do so will result in unexpected behavior.
 
 
 ##USAGE
@@ -73,10 +76,10 @@ If you dont have cub (thrust comes bundled with the CUDA installation) clone or 
 The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.
 The Makefile expects to find cub in /usr/local/cub, but you can change it. CUB doesnt need to be compiled.
 
-Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp, set number of particles, size of the box, dt and time of the simulation in main.cpp.
+Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp, set number of particles, size of the box, dt, etc, there.
 You can change the integrator at any time during the execution of the simulation, see Driver/SimulationConfig.cpp.
 
-Then compile with make and run
+Then compile with make and run. You can use the --device X flag to specify a certain GPU.
 
 You may need to adequate the Makefile to you particular system
 
@@ -99,7 +102,7 @@ This code makes use of the following CUDA packages:
 ##REQUERIMENTS
 
 --------------------
-Needs an NVIDIA GPU with compute capability sm_2.0+
+Needs an NVIDIA GPU with compute capability sm_3.5+
 Needs g++ with full C++11 support, 4.8+ recommended
 
 ##TESTED ON
@@ -107,6 +110,7 @@ Needs g++ with full C++11 support, 4.8+ recommended
 ------------
 	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5 and g++ 4.8
      - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5 and g++ 5.3.1
+     - GTX980 (sm_52) and GTX780 (sm_35)  on CentOS 6.5 with CUDA 7.5 and g++ 4.8
 
 ##BENCHMARK
 
@@ -153,7 +157,7 @@ Keep in mind that the compilation process is separated between CPU and GPU code,
 -------------------------------
 In globals/globals.h are the definitions of some variables that will be available throughout the entire CPU side of the project. These are mainly parameters. It also contains the position, force and an optional velocity arrays.
 
-In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from global when available. Things like the number of particles, the temperature or more importantly, the Vectors storing the positions, forces and velocities of each particle (again, when needed). These Vectors start with zero size.
+In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from global when available. Things like the number of particles, the temperature or more importantly, the Vectors storing the positions, forces and velocities of each particle (again, when needed). These Vectors start with zero size and are initialized in Driver.cpp. However, your code should check the size of the arrays at startup with Vector::size() and initialize them if the size doesnt match the number of particles (i.e is 0).
 
 Currently the code initializes pos and force Vectors in Driver.cpp, after the parameters are set. Vel should be initialized in the constructor of any module that needs it, see VerletNVT for an example.
 

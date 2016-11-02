@@ -28,10 +28,8 @@
 #include "globals/globals.h"
 
 #include "Interactor/Interactor.h"
-#include<thread>
 #include<memory>
 
-int write_concurrent(real4* posdata);
 class Integrator{
 public:
   //Constructor to be called in the initialization list of the derived class
@@ -43,7 +41,6 @@ public:
 
   //this function returns any contribution to the system energy the integrator provides, such as the kinecit energy in MD
   virtual real sumEnergy() = 0;
-  virtual void write(bool block = false);
   
   //The interactors can be called at any time from the integrator to compute the forces when needed.
   void addInteractor(shared_ptr<Interactor> an_interactor){
@@ -59,7 +56,6 @@ protected:
   uint N;
   real dt;
   real3 L;
-  std::thread writeThread;
   string name;
 };
 

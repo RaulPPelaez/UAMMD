@@ -43,12 +43,31 @@ TODO:
 #include"Measurable/EnergyMeasure.h"
 #include"utils/utils.h"
 #include<memory>
-
+#include<thread>
 #ifdef EXPERIMENTAL
 #include"Interactor/Experimental/PairForcesAlt.h"
 #endif
 
 
+
+//This class handles writing to disk
+class Writer{
+public:
+  Writer(){}
+  ~Writer();
+  //Write the current positions to disk, concurrently if block is false or not given
+  void write(bool block = false);
+
+
+  
+private:
+  void write_concurrent();
+  std::thread writeThread;
+
+
+};
+
+//This class controls the flow of the simulation
 class Driver{
 protected:
   //Interactors are added to an integrator
@@ -65,16 +84,15 @@ protected:
   void setParameters(); 
   
 public:
+  Writer writer;
   //The constructor configures and initializes the simulation
   Driver();
   ~Driver();
   //Move nsteps*dt forward in time
   void run(uint nsteps, bool relax = false);
-
-  //Write the current positions to disk, concurrently if block is false or not given
-  void write(bool block = false);
   //Read an initial configuration from fileName, TODO
   void read(const char *fileName);
 };
+
 
 #endif

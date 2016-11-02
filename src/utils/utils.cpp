@@ -1,7 +1,7 @@
 #include"utils.h"
 #include<stdlib.h>
 #include<fstream>
-#include"third_party/bravais/bravais.h"
+
 
 Matrixf eye(uint n){
   Matrixf A(n,n);
@@ -20,31 +20,60 @@ std::ostream& operator<<(std::ostream& out, const real4 &f){
 
 //typedef enum {sc, bcc, fcc, dia, hcp, sq, tri} lattice;
 
- Vector4 cubicLattice(real3 L, uint N){
-   cerr<<"Starting in a cubic Lattice...";
-   Vector<float4> pos(N);
-   pos.fill_with(make_float4(0.0f));
-   lattice lat = fcc;
-   if(L.z==real(0.0)) lat = sq;
+Vector4 initLattice(real3 L, uint N, BRAVAISLAT lat){
+  
+  cerr<<"Starting in a ";
 
-   Bravais((float *) pos.data,
- 	  lat,/*Simple Cubic*/
+
+  switch(lat){
+  case sc:
+    cerr<<"cubic";
+    break;
+  case fcc:
+    cerr<<"FCC";
+    break;
+  case bcc:
+    cerr<<"BCC";
+    break;
+  case hcp:
+    cerr<<"HCP";
+    break;
+  case tri:
+    cerr<<"triangular";
+    break;
+  case sq:
+    cerr<<"square";
+    break;
+  case dia:
+    cerr<<"zincblende";
+    break;
+
+  }
+  
+  cerr<<" Lattice...";
+  Vector<float4> pos(N);
+  pos.fill_with(make_float4(0.0f));
+  if(L.z==real(0.0)) lat = sq;
+
+  Bravais((float *) pos.data,
+	  lat,/*lattice type*/
  	  N,
  	  L.x, L.y, L.z,
 	  0.0f, /*Color*/
  	  NULL, NULL, /*Basis and vector files*/
  	  false); /*Keep aspect ratio*/
-   fori(0,N){
-     pos[i] += make_float4(0.56f, 0.56f, 0.56f, 0.0f);
-     if(L.z==real(0.0)) pos[i].z = 0.0f;
-   }
+  fori(0,N){
+    pos[i] += make_float4(0.56f, 0.56f, 0.56f, 0.0f);
+    if(L.z==real(0.0)) pos[i].z = 0.0f;
+  }
 
-   Vector4 pos_real(N);
-   fori(0,N)
-     pos_real[i] = make_real4(pos[i].x, pos[i].y, pos[i].z, real(0.0));
-   
-   return pos_real;
- }
+  Vector4 pos_real(N);
+  fori(0,N)
+    pos_real[i] = make_real4(pos[i].x, pos[i].y, pos[i].z, real(0.0));
+
+  cerr<<"\tDONE!"<<endl;
+  return pos_real;
+}
 
  // Vector4 cubicLattice(real3 l, uint N){
  //   real  L = l.x;
@@ -79,7 +108,7 @@ std::ostream& operator<<(std::ostream& out, const real4 &f){
 
 
 Vector4 readFile(const char * fileName){
-  cerr<<"Reading initial positions from file...";
+  cerr<<"Reading initial positions from "<<fileName<<" file...";
   uint N;
   ifstream in(fileName);
   in>>N;
@@ -97,6 +126,7 @@ Vector4 readFile(const char * fileName){
 #define RANDL2 (RANDESP-0.5)
 
 bool randInitial(real4 *pos, real L, uint N){
+  cerr<<"Starting in a random initial configuration..."<<endl;
   srand(time(NULL));
   pos[0] = make_real4(  RANDL2*L, RANDL2*L, RANDL2*L, 0.0);
   real4 tempos, rij;
@@ -132,6 +162,7 @@ bool randInitial(real4 *pos, real L, uint N){
   }
 
   cerr<<endl;
+  cerr<<"\tDONE!"<<endl;
   return true;
 }
 

@@ -16,6 +16,7 @@ TODO:
 struct GlobalConfig{
   /*Default parameters*/
   uint N = 0;
+  real sigma = 1.0;  //Biggest LJ diameter of the particles, wich defines length units
   real3 L = {0.0, 0.0, 0.0};
   real rcut = 2.5;
   real dt = 0.001;

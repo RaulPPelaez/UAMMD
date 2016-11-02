@@ -12,7 +12,6 @@ Interactor computes forces acting on each particle. For that it has default acce
 */
 
 #include "Driver.h"
-#define RANDESP (rand()/(float)RAND_MAX)
 
 //Constructor
 Driver::Driver(): step(0){
@@ -36,11 +35,23 @@ void Driver::setParameters(){
 
   grng = Xorshift128plus(gcnf.seed);
 
+  cerr<<endl;
+  cerr<<"Sigma: "<<gcnf.sigma<<endl;
+  cerr<<"Box size: "<<gcnf.L<<endl;
+  cerr<<"Number of particles: "<<gcnf.N<<endl;
+
+  cerr<<"Time step: "<<gcnf.dt<<endl;
+  if(gcnf.print_steps>0){
+    cerr<<"\tPrint every: "<<gcnf.print_steps<<endl;
+    cerr<<"\tTime between steps in file: "<<gcnf.dt*gcnf.print_steps<<endl;
+  }
+  cerr<<"Random seed: "<<std::hex<<"0x"<<gcnf.seed<<"ull"<<endl;
+  cerr<<std::dec<<endl;
 }
 
 //Perform the simulation steps
 void Driver::run(uint nsteps, bool relax){
-
+  if(relax)cerr<<"Running "<<nsteps<<" relaxation steps..."<<endl;
   Timer tim;
   tim.tic();
   /*Simulation*/
@@ -50,21 +61,17 @@ void Driver::run(uint nsteps, bool relax){
     integrator->update();
     if(!relax){
       if(i%gcnf.print_steps==0 && gcnf.print_steps >= 0 )
-	this->write(true); //Writing is done in parallel, is practically free if the interval is big enough
+	this->writer.write(); //Writing is done in parallel, is practically free if the interval is big enough
       
       if(i%gcnf.measure_steps==0 && gcnf.measure_steps>0)
 	for(auto m: measurables)
 	  m->measure();
     }
   }
-  cerr<<tim.toc()<<"s"<<endl;
+  cerr<<"Run time: "<<tim.toc()<<"s"<<endl;
   gcnf.nsteps += nsteps;
 }
 
-//Integrator handles the writing
-void Driver::write(bool block){
-  integrator->write(block);
-}
 //Read an initial configuration from fileName, TODO
 void Driver::read(const char *fileName){
   ifstream in(fileName);
@@ -87,4 +94,44 @@ Driver::~Driver(){
 }
 
 
+Writer::~Writer(){
+  if(writeThread.joinable())
+    writeThread.join();
+}
 
+
+//Write a step to disk using a separate thread
+void Writer::write(bool block){
+  /*Wait for the last write operation to finish*/
+
+  if(this->writeThread.joinable()){
+    this->writeThread.join();
+  }
+  /*Wait for any GPU work to be done*/
+  cudaDeviceSynchronize();
+  /*Bring pos from GPU*/
+  pos.download();
+  /*Wait for copy to finish*/
+  cudaDeviceSynchronize();
+  /*Query the write operation to another thread*/
+  this->writeThread =  std::thread(&Writer::write_concurrent, this);
+
+  /*Wait if needed*/
+  if(block && this->writeThread.joinable()){
+    this->writeThread.join();
+  }
+  
+}
+
+//TODO: generalize format somehow, and allow for any other global array to be written
+//This function writes a step to disk
+void Writer::write_concurrent(){
+  real3 L = gcnf.L;
+  uint N = gcnf.N;
+  real4 *posdata = pos.data;
+  cout<<"#Lx="<<L.x*0.5f<<";Ly="<<L.y*0.5f<<";Lz="<<L.z*0.5f<<";\n";
+  fori(0,N){
+    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" "<<gcnf.sigma*0.5f<<" "<<(int)(posdata[i].w+real(0.5))<<"\n";
+  }
+  //  cout<<make_real3(posdata[0])<<" "<<make_real3(posdata[1]);
+}

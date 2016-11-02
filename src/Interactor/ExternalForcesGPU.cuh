@@ -23,6 +23,6 @@ namespace external_forces_ns{
   void initGPU(Params m_params);
 
 
-  void computeExternalForce(real4* force, real4 *pos, uint N, real4 *poscpu);
+  void computeExternalForce(real4* force, real4 *pos, uint N);
 }
 #endif

@@ -27,10 +27,11 @@ Potential::Potential(std::function<real(real)> Ffoo,
 
   real dr2 = rc*rc/(real)N;
   real r2 = 0.5*dr2;
+  real sig2 = gcnf.sigma*gcnf.sigma;
   fori(1,N){
     r2 += dr2;
-    F[i] =(float) forceFun(r2);
-    E[i] =(float) energyFun(r2);
+    F[i] =(float) forceFun(r2/sig2);
+    E[i] =(float) energyFun(r2/sig2);
   }
   F[N-1] = 0.0;
   E[N-1] = 0.0;

@@ -607,7 +607,7 @@ namespace pair_forces_ns{
       real4 pos;
     };
 
-    energyTransverser(real *Energy, real4* sortPos):Energy(Energy),sortPos(sortPos){ };
+    energyTransverser(real *Energy):Energy(Energy){ };
     /*Returns the energy between two positions*/
     inline __device__ real compute(const ParticleInfo &R1,const ParticleInfo &R2){
       real3 r12 = make_real3(R2.pos-R1.pos);
@@ -638,20 +638,11 @@ namespace pair_forces_ns{
       return real(0.0);
     }
     inline __device__ ParticleInfo getInfo(uint index){
-#if defined SINGLE_PRECISION
       return {tex1Dfetch<real4>(params.texSortPos, index)};
-#else
-      double2 a = __ldg((double2*)sortPos+2*index);
-      double2 b = __ldg((double2*)sortPos+2*index+1);
-      return {a.x, a.y, b.x, b.y};
-#endif
-      //return {sortPos[index]};
-
     }
 
   private:
     real *Energy;
-    real4* sortPos;
   };
 
   
@@ -661,7 +652,7 @@ namespace pair_forces_ns{
 			 uint N){
 
     /*Analogous to computeForce, see for reference*/
-    energyTransverser et(energy, sortPos);
+    energyTransverser et(energy);
     transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(et,
 						   particleIndex, cellStart, cellEnd,
 						   N);
@@ -683,7 +674,7 @@ namespace pair_forces_ns{
       real4 pos;
     };
 
-    virialTransverser(real *virial, real4* sortPos):Virial(virial), sortPos(sortPos){ };
+    virialTransverser(real *virial):Virial(virial){ };
     inline __device__ real compute(const ParticleInfo &R1,const ParticleInfo &R2){
       real3 r12 = make_real3(R2.pos-R1.pos);
       apply_pbc(r12);
@@ -707,19 +698,11 @@ namespace pair_forces_ns{
     }
 
     inline __device__ ParticleInfo getInfo(uint index){
-#if defined SINGLE_PRECISION
       return {tex1Dfetch<real4>(params.texSortPos, index)};
-#else
-      double2 a = __ldg((double2*)sortPos+2*index);
-      double2 b = __ldg((double2*)sortPos+2*index+1);
-      return {a.x, a.y, b.x, b.y};
-#endif
-
     }
 
   private:
     real *Virial;
-    real4* sortPos;
   };
 
 
@@ -731,7 +714,7 @@ namespace pair_forces_ns{
 			  uint *particleIndex, 
 			  uint N){
 
-    virialTransverser ft(virial, sortPos);
+    virialTransverser ft(virial);
     transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft,
 						   particleIndex, cellStart, cellEnd,
 						   N);

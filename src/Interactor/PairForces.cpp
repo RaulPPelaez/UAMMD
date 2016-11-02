@@ -40,6 +40,8 @@ PairForces::PairForces(pairForceType fs,
   customForceFunction(cFFun), customEnergyFunction(cEFun),
   rcut(gcnf.rcut), forceSelector(fs)
 {
+
+
   pairForcesInstances++;
 
   cerr<<"Initializing Pair Forces..."<<endl;
@@ -47,8 +49,8 @@ PairForces::PairForces(pairForceType fs,
   if(pairForcesInstances>1){ cerr<<"ERROR: Only one PairForces instance is allowed!!!"<<endl; exit(1);}
   params.rcut = rcut;
 
-  int3 cellDim = make_int3(L/rcut);
 
+  int3 cellDim = make_int3(L/rcut);
   if(L.z==real(0.0)) cellDim.z = 1;
   
   params.L = L;
@@ -60,9 +62,16 @@ PairForces::PairForces(pairForceType fs,
 
 
   ncells = cellDim.x*cellDim.y*cellDim.z;
+
+  if(cellDim.x== 2 || cellDim.y == 2 || cellDim.z == 2)
+    cerr<<"WARNING: Only 2 cells in one direction can cause unexpected behavior, as a particle can interact with another both in the same box and in a periodic box at the same time.   # . | o # . -> .-o and  o-."<<endl;
+  if(ncells == 1)
+    cerr<<"WARNING: Using Pair forces with just one cell is equivalent to the Nbody Forces module, and performance will be much better with it"<<endl;
+  
   params.ncells = ncells;
   cerr<<"\tNumber of cells: "<<cellDim.x<<" "<<cellDim.y<<" "<<cellDim.z<<"; Total cells: "<<ncells<<endl;
 
+  cerr<<"\tCut-off distance: "<<params.rcut<<endl;
   init();
 
   cerr<<"Pair Forces\t\tDONE!!\n\n";
@@ -86,9 +95,11 @@ void PairForces::init(){
   /*Pre compute force and energy, using force  function*/
   switch(forceSelector){
   case LJ:
+    cerr<<"\tUsing LJ potential"<<endl;
     pot = Potential(forceLJ, energyLJ, 4096*params.rcut/real(2.5), params.rcut);
     break;
   case CUSTOM:
+    cerr<<"\tUsing custom potential"<<endl;
     pot = Potential(customForceFunction, customEnergyFunction, 4096*params.rcut/real(2.5), params.rcut);
     break;
   case NONE:
@@ -193,6 +204,7 @@ real PairForces::sumVirial(){
 
 //Force between two particles, depending on square distance between them
 // this function is only called on construction, so it doesnt need to be optimized at all
+//Distance is in units of sigma
 real forceLJ(real r2){
   real invr2 = 1.0/(r2);
   real invr = 1.0/sqrt(r2);

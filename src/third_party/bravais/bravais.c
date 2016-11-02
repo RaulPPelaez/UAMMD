@@ -14,13 +14,13 @@
 #include <math.h>
 
 /***** Pre-defined Bravais lattice types *****/
-typedef enum {sc, bcc, fcc, dia, hcp, sq, tri} lattice;
+typedef enum {sc, bcc, fcc, dia, hcp, sq, tri} BRAVAISLAT;
 typedef enum {false=0, true} bool;
 #define MAXBASIS 1000 /* Maximum number of user basis elements */
 
 /***** Create Bravais lattice *****/
 void Bravais(float * pos,  /* Pointer to positions array */
-             lattice type, /* Lattice (sc, bcc, fcc, dia, hcp, sq, tri) */
+             BRAVAISLAT type, /* Lattice (sc, bcc, fcc, dia, hcp, sq, tri) */
              int N,        /* Number of nodes ( = particles) */
              float Lx, float Ly, float Lz, /* Box dimensions */
              float colour, /* Colour */
