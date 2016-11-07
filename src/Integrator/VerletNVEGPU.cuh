@@ -15,7 +15,7 @@ namespace verlet_nve_ns{
   };
 
   void initGPU(Params params);
-  void integrateGPU(real4 *pos, real3 *vel, real4 *force, uint N, int step);
+  void integrateGPU(real4 *pos, real4 *pos1, real3 *vel, real4 *force, uint N, int step);
   
 
   real computeKineticEnergyGPU(real3 *vel, uint N);

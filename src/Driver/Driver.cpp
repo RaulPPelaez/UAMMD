@@ -131,7 +131,9 @@ void Writer::write_concurrent(){
   real4 *posdata = pos.data;
   cout<<"#Lx="<<L.x*0.5f<<";Ly="<<L.y*0.5f<<";Lz="<<L.z*0.5f<<";\n";
   fori(0,N){
-    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" "<<gcnf.sigma*0.5f<<" "<<(int)(posdata[i].w+real(0.5))<<"\n";
+
+    uint type = (uint)(posdata[i].w+0.5);
+    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" "<<(type==0?0.5f:1.0f)<<" "<<type<<"\n";
   }
   //  cout<<make_real3(posdata[0])<<" "<<make_real3(posdata[1]);
 }

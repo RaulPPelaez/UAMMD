@@ -17,8 +17,7 @@ namespace external_forces_ns{
   struct Params{
     real3 L, invL;
   };
-
-
+  
   //Stores some simulation parameters to upload as constant memory.
   void initGPU(Params m_params);
 

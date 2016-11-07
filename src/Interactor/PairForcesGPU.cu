@@ -356,12 +356,13 @@ namespace pair_forces_ns{
   //TODO The naming and explanation of this function
   /*Transverses all the neighbour particles of each particle using the cell list and computes a quantity as implemented by Transverser. Each thread goes through all the neighbours of a certain particle(s)(index), transversing its 27 neighbour cells*/
   /*Computes a quantity determined by Transverser, which is a class that must implement the following methods:
-    zero() -> returns the initial value of the quantity, in whatever type
-    compute(real4 r1, real4 r2) -> compute the quantity depending of the pair positions/types
-    set(uint index, TYPE quantity) -> sum the total quantity on particle index to global memory
+    T zero() -> returns the initial value of the quantity, in whatever type
+    T compute(ParticleInfo r1, ParticleInfo r2) -> compute the quantity depending of the pair positions/types
+    void set(uint index, T quantity) -> sum the total quantity on particle index to global memory
 
-    This quantity can be i.e a real4 and compute the force
-                         or a real and compute the energy...
+    This quantity "T" can be i.e a real4 and compute the force
+                         or a real and compute the energy or a general struct containing any info...
+    ParticleInfo can be a simple type like real4 containing the position or a general struct defined in the Transverser class containing anything (pos and vel i.e)
     */  
   template<class Transverser>
   __global__ void transverseListD(Transverser T, 
@@ -427,6 +428,7 @@ namespace pair_forces_ns{
   }
 
 
+  /*TODO: Same as above but implementing several threads per particle*/
     template<class Transverser>
   __global__ void transverseListTPPD(Transverser T, 
 				     const uint* __restrict__ particleIndex,
@@ -510,7 +512,6 @@ namespace pair_forces_ns{
     
 
 
-
   /***************************************FORCE*****************************/
   
   //tags: force compute force function forceij
@@ -544,7 +545,19 @@ namespace pair_forces_ns{
       //else if(r2c>=1.0f) return make_real4(0.0f);
       /*Get the force from the texture*/
       //real fmod = tex1D(texForce, r2c);
-      real fmod = (real) tex1D<float>(params.texForce, r2c);
+      real sigma2= real(1.0);
+      real epsilon = real(1.0); 
+      if(params.ntypes>1){
+	uint ti= (uint)(R1.pos.w+0.5);
+	uint tj= (uint)(R2.pos.w+0.5);
+	real2 pot_params = params.potParams[ti+tj*params.ntypes];
+	sigma2 = pot_params.x*pot_params.x;
+	epsilon = pot_params.y;
+
+	r2c /= sigma2;
+      }
+
+      real fmod = epsilon* (real) tex1D<float>(params.texForce, r2c);
       // real invr2 = 1.0f/r2;
       // real invr6 = invr2*invr2*invr2;
       // real invr8 = invr6*invr2;

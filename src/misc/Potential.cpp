@@ -16,11 +16,12 @@ TODO:
 
 Potential::Potential(std::function<real(real)> Ffoo,
 		     std::function<real(real)> Efoo,
-		     int N, real rc):
+		     int N, real rc, uint ntypes):
   N(N), F(N), E(N),
   FGPU(nullptr), EGPU(nullptr),
   texForce(0),texEnergy(0),
-  forceFun(Ffoo), energyFun(Efoo)
+  forceFun(Ffoo), energyFun(Efoo),
+  ntypes(ntypes), potParams(ntypes*ntypes)
 {
   F[0] = 0.0;
   E[0] = 0.0;
@@ -77,6 +78,8 @@ Potential::Potential(std::function<real(real)> Ffoo,
     cerr<<"Error in potential creation!!!"<<endl;
     exit(1);
   }
+
+  potParams.fill_with(make_real2(1));
   
 }
 
@@ -84,4 +87,17 @@ void Potential::print(){
   ofstream out("potential.dat");
   fori(0,N) out<<F[i]<<" "<<E[i]<<"\n";
   out.close();
+}
+
+void Potential::setPotParam(uint i, uint j, real2 params){
+
+  potParams[i+ntypes*j] = params;
+  potParams[j+ntypes*i] = params;
+  potParams.upload();
+}
+
+real2* Potential::getPotParams(){
+  potParams.upload();
+  return potParams.d_m;
+
 }

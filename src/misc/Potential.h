@@ -28,13 +28,15 @@ public:
   Potential(){};
   Potential(std::function<real(real)> Ffoo,
 	    std::function<real(real)> Efoo,
-	    int N, real rc);
+	    int N, real rc, uint ntypes=1);
   size_t getSize(){ return N;}
   float *getForceData(){ return F.data();}
   float *getEnergyData(){ return E.data();}
   cudaTextureObject_t getForceTexture(){ return this->texForce;}
   cudaTextureObject_t getEnergyTexture(){ return this->texEnergy;}
-  
+
+  void setPotParam(uint i, uint j, real2 params);
+  real2* getPotParams();
   void print();
 
   uint N;
@@ -47,6 +49,9 @@ public:
   
   std::function<real(real)> forceFun;
   std::function<real(real)> energyFun;
+
+  uint ntypes;
+  Vector<real2> potParams;
 };
 
 

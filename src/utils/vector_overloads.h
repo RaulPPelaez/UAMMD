@@ -71,6 +71,39 @@ inline __host__ __device__ real3 make_real3(uint3 a)
     return make_real3(real(a.x), real(a.y), real(a.z));
 }
 
+//////////////////REAL2///////////////////////////
+
+
+inline __host__ __device__ real2 make_real2(real x, real y)
+{
+ #ifdef SINGLE_PRECISION 
+  return make_float2(x,y);
+  #else
+  return make_double2(x,y);
+  #endif
+}
+
+inline __host__ __device__ real2 make_real2(real s)
+{
+    return make_real2(s, s);
+}
+inline __host__ __device__ real2 make_real2(real2 a)
+{
+  return make_real2(a.x, a.y);
+}
+inline __host__ __device__ real2 make_real2(real4 a)
+{
+  return make_real2(a.x, a.y);
+}
+inline __host__ __device__ real2 make_real2(int3 a)
+{
+    return make_real2(real(a.x), real(a.y));
+}
+inline __host__ __device__ real2 make_real2(uint3 a)
+{
+    return make_real2(real(a.x), real(a.y));
+}
+
 
 ////////////////DOUBLE PRECISION//////////////////////
 

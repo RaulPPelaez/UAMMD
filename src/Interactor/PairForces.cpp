@@ -28,6 +28,7 @@ TODO:
 #include<fstream>
 #include<functional>
 #include<iomanip>
+#include<set>
 using namespace std;
 using namespace pair_forces_ns;
 
@@ -91,19 +92,32 @@ PairForces::~PairForces(){
 }
 //Initialize variables and upload them to GPU, init CUDA
 void PairForces::init(){
-  
+
+  uint ntypes = 0;
+
+  vector<uint> types(N);
+  fori(0,N) types[i] = (uint)(pos[i].w+0.5);
+  /*Discard duplicates*/
+  set<uint> typeset(types.begin(), types.end());
+  ntypes = typeset.size();
+  cerr<<"\t"<<ntypes<<" Paticle types detected"<<endl;
+  if(ntypes>1 && gcnf.sigma != real(1.0)){
+
+    cerr<<"\tWARNING: gcnf.sigma should be 1.0 when using multiple types if you are setting different sigmas as potential parameters!"<<endl;
+
+  }
   /*Pre compute force and energy, using force  function*/
   switch(forceSelector){
   case LJ:
     cerr<<"\tUsing LJ potential"<<endl;
-    pot = Potential(forceLJ, energyLJ, 4096*params.rcut/real(2.5), params.rcut);
+    pot = Potential(forceLJ, energyLJ, 4096*params.rcut/real(2.5), params.rcut, ntypes);
     break;
   case CUSTOM:
     cerr<<"\tUsing custom potential"<<endl;
-    pot = Potential(customForceFunction, customEnergyFunction, 4096*params.rcut/real(2.5), params.rcut);
+    pot = Potential(customForceFunction, customEnergyFunction, 4096*params.rcut/real(2.5), params.rcut, ntypes);
     break;
   case NONE:
-    pot = Potential(nullForce, nullForce, 2, params.rcut);
+    pot = Potential(nullForce, nullForce, 2, params.rcut, ntypes);
     break;
   default:
     cerr<<"NON RECOGNIZED POTENTIAL SELECTED!!"<<endl;
@@ -132,12 +146,18 @@ void PairForces::init(){
   params.texCellStart = cellStart.getTexture();
   params.texCellEnd = cellEnd.getTexture();
 
+
+  params.ntypes = ntypes;
+  params.potParams = pot.getPotParams();
+  
   /*Upload parameters to GPU*/
   initGPU(params, N);
   
   cudaDeviceSynchronize();
 }
-
+void PairForces::setPotParam(uint i, uint j, real2 param){
+  pot.setPotParam(i,j,param);
+}
 /*** CONSTRUCT NEIGHBOUR LIST ***/
 void PairForces::makeNeighbourList(){
   makeCellList(pos, sortPos, particleIndex, particleHash, cellStart, cellEnd, N, ncells);

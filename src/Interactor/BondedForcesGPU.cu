@@ -54,7 +54,7 @@ namespace bonded_forces_ns{
 				      const uint* __restrict__ bondEnd,
 				      const uint* __restrict__ bondedParticleIndex,
 				      const Bond* __restrict__ bondList){
-    __shared__ real4 forceTotal[TPB]; /*Each thread
+    __shared__ real4 forceTotal[TPB]; /*Each thread*/
     /*A block per particle*/
     /*Instead of launching a thread per particle and discarding those without any bond,
       I store an additional array of size N_particles_with_bonds that contains the indices

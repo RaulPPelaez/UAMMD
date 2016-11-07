@@ -59,7 +59,8 @@ public:
   void sumForce() override;
   real sumEnergy() override;
   real sumVirial() override;
-  
+
+  void setPotParam(uint i, uint j, real2 param);
 protected:
   uint ncells;
   Vector4 sortPos;

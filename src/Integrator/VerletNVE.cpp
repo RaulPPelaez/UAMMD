@@ -28,6 +28,15 @@ VerletNVE::VerletNVE():
     /*Create the velocity if you need it*/
     vel = Vector3(N);  vel.fill_with(make_real3(0.0));  vel.upload();
   }
+    
+  if(pos1.size()!=N){
+    /*Create the velocity if you need it*/
+    pos1 = Vector4(N);  pos1.fill_with(make_real4(0.0));
+    fori(0,N)
+      pos1[i] = pos[i];
+    pos1.upload();
+  }
+
   cerr<<"\tSet E="<<E<<endl;
 
   /*All of this come from global config, and are defined as members in Integrator*/
@@ -70,14 +79,15 @@ void VerletNVE::update(){
   steps++;
   if(steps%1000==0) cerr<<"\rComputing step: "<<steps<<"   ";
   /**First integration step**/
-  integrateGPU(pos, vel, force, N, 1);
+  integrateGPU(pos, pos1, vel, force, N, 1);
   /**Reset the force**/
   /*The integrator is in charge of resetting the force when it needs, an interactor always sums to the current force*/
   cudaMemset(force.d_m, 0, N*sizeof(real4));
   /**Compute all the forces**/
   for(auto forceComp: interactors) forceComp->sumForce();
+  
   /**Second integration step**/
-  integrateGPU(pos, vel, force, N, 2);
+  integrateGPU(pos, pos1, vel, force, N, 2);
 }
 
 

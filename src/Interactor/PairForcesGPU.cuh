@@ -30,6 +30,9 @@ namespace pair_forces_ns{
     cudaTextureObject_t texCellStart, texCellEnd;
     uint N;
     real3 L, invL;
+
+    uint ntypes;
+    real2 *potParams;
   };
   //Stores some simulation parameters to upload as constant memory, the rest are available in Params.
   struct ParamsDPD{

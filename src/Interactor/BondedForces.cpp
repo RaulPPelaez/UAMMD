@@ -49,7 +49,7 @@ BondedForces::BondedForces(const char * readFile):
   if(nbonds>0){
     bondList = Vector<Bond>(nbonds*2);//Allocate 2*nbonds, see init for explication
     fori(0, nbonds){
-      in>>bondList[i].i>>bondList[i].j>>bondList[i].r0>>bondList[i].k;
+      in>>bondList[i].i>>bondList[i].j>>bondList[i].k>>bondList[i].r0;
     }
   }
   /*Fixed point bonds*/
@@ -59,11 +59,11 @@ BondedForces::BondedForces(const char * readFile):
     fori(0, nbondsFP){
       in>>bondListFP[i].i;
       in>>bondListFP[i].pos.x>>bondListFP[i].pos.y>>bondListFP[i].pos.z;
-      in>>bondListFP[i].r0>>bondListFP[i].k;
+      in>>bondListFP[i].k>>bondListFP[i].r0;
     }
   }
 
-  cerr<<"\tDetected: "<<nbonds<<" particle-particle bonds and "<<nbondsFP<<" Fixed Point bonds"<<endl;
+
   /*Upload and init GPU*/
   init();
   cerr<<"Bonded Forces\t\tDONE!!\n\n";
@@ -75,6 +75,7 @@ BondedForces::~BondedForces(){}
 //Criterion to sort bonds
 
 bool bondComp(const Bond &a, const Bond &b){ return a.i<b.i;}
+bool bondCompj(const Bond &a, const Bond &b){ return a.j<b.j;}
 bool bondCompFP(const BondFP &a, const BondFP &b){ return a.i<b.i;}
 
 //Initialize variables and upload them to GPU, init CUDA
@@ -92,12 +93,30 @@ void BondedForces::init(){
       bondList[i].k = bondList[i-nbonds].k;
       bondList[i].r0 = bondList[i-nbonds].r0;
     }
-    /*There are twice as bonds now*/
-    nbonds *= 2;
+    /*Sort in the i index to construct bondStart and bondEnd*/
+    std::sort(bondList.begin(), bondList.end(), bondComp);
+    
+    /*Check for duplicates i.e the file contains the ij and ji bonds already*/
+    // set<Bond,
+    // 	bool(*)(const Bond& lhs, const Bond& rhs)> defbondlist(
+    // 							       bondList.begin(), bondList.end(),
+    // vector<Bond> defbondlist;    
+    // fori(1,2*nbonds){
+    //   if(bondList[i].i==bondList[i-1].i && bondList[i].j==bondList[i-1].j){
+	
+    //   }
+    //   else{
+    // 	defbondlist.push_back(bondList[i-1]);
+    //   }
 
-    /*Now sort the bondList by the first particle, i*/
-    std::sort(bondList.data, bondList.data+nbonds, bondComp);
+    // }
+    // defbondlist.push_back(bondList[nbonds-1]);
+    // bondList.assign(defbondlist.begin(), defbondlist.end());
+    // /*Now sort the bondList by the first and second particle, i, j*/
+    // std::sort(bondList.begin(), bondList.end(), bondCompj);
+    // std::stable_sort(bondList.begin(), bondList.end(), bondComp);
 
+    nbonds = bondList.size();
     /*We have a list of bonds ordered by its first particle, so; All the particles
       bonded with particle i=0, all particles "" i=1...*/
 
@@ -133,7 +152,6 @@ void BondedForces::init(){
     }
 
     bondParticleIndex.assign(particlesWithBonds.begin(), particlesWithBonds.end());
-    cerr<<"\t"<<bondParticleIndex.size()<<" particles have at least one bond"<<endl;
 
     /*Upload all to GPU*/
     bondParticleIndex.upload();
@@ -174,7 +192,8 @@ void BondedForces::init(){
   /***********************************************************************************************/
   /*Init GPU side variables*/
   initGPU(params);
-
+  cerr<<"\tDetected: "<<bondList.size()/2<<" particle-particle bonds and "<<bondListFP.size()/2<<" Fixed Point bonds"<<endl;
+  cerr<<"\t"<<bondParticleIndex.size()<<" particles have at least one bond"<<endl;
 }
 /*Perform an integration step*/
 void BondedForces::sumForce(){
@@ -235,20 +254,20 @@ ThreeBondedForces::ThreeBondedForces(const char * readFile):
       isInBonds[i].push_back(b);
       isInBonds[j].push_back(b);
       isInBonds[k].push_back(b);
-
+      
       blst[b].i = i;
       blst[b].j = j;
       blst[b].k = k;
       in>>blst[b].kspring>>blst[b].r0>>blst[b].ang;
-
+      
       if(blst[b].r0>=0.5f*L.x || blst[b].r0>=0.5f*L.y || blst[b].r0>=0.5f*L.z){
 	cerr<<"The equilibrium distance of bond "<<b<<" is too large!!"<<endl;
 	cerr<<"\t This will cause unexpected behavior when computing distance using PBC!"<<endl;
       }
     }
   }
-
-
+  
+  
   bondList  = Vector<ThreeBond>(nbonds*3);//Allocate 3*nbonds
   bondStart = Vector<uint>(N); bondStart.fill_with(0xffFFffFF);
   bondEnd   = Vector<uint>(N); bondEnd.fill_with(0);

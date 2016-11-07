@@ -1,7 +1,7 @@
 #include<cuda_runtime.h>
 #include<stdint.h>
 
-#define UAMMD_VERSION "0.01(alpha)"
+#define UAMMD_VERSION "0.01.2(alpha)"
 #define SINGLE_PRECISION
 
 typedef uint32_t uint;
