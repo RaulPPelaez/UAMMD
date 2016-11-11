@@ -13,6 +13,7 @@ TODO:
 #include"Potential.h"
 #include<fstream>
 #include<cstring>
+#include<algorithm>
 
 Potential::Potential(std::function<real(real)> Ffoo,
 		     std::function<real(real)> Efoo,
@@ -38,7 +39,6 @@ Potential::Potential(std::function<real(real)> Ffoo,
   E[N-1] = 0.0;
 
 
-
   cudaChannelFormatDesc channelDesc;
   channelDesc = cudaCreateChannelDesc(32, 0,0,0, cudaChannelFormatKindFloat);
 
@@ -50,8 +50,8 @@ Potential::Potential(std::function<real(real)> Ffoo,
 			    &channelDesc,
 			    N,1));
   
-  gpuErrchk(cudaMemcpyToArray(FGPU, 0,0, F.data(), N*sizeof(float), cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToArray(EGPU, 0,0, E.data(), N*sizeof(float), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToArray(FGPU, 0,0, F.data, N*sizeof(float), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToArray(EGPU, 0,0, E.data, N*sizeof(float), cudaMemcpyHostToDevice));
 
 
 
@@ -69,18 +69,21 @@ Potential::Potential(std::function<real(real)> Ffoo,
   texDesc.normalizedCoords = 1;
 
   resDesc.res.array.array = FGPU;
-  gpuErrchk(cudaCreateTextureObject(&texForce, &resDesc, &texDesc, NULL));
+  cudaCreateTextureObject(&texForce, &resDesc, &texDesc, NULL);
   resDesc.res.array.array = EGPU;
-  gpuErrchk(cudaCreateTextureObject(&texEnergy, &resDesc, &texDesc, NULL));
-    
-  if(!texForce || !texEnergy ||
-     !FGPU || !EGPU){
-    cerr<<"Error in potential creation!!!"<<endl;
-    exit(1);
-  }
+  cudaCreateTextureObject(&texEnergy, &resDesc, &texDesc, NULL);
+
+
+  F.upload();
+  E.upload();
+  // if(!texForce || !texEnergy ||
+  //    !FGPU || !EGPU){
+  //   cerr<<"Error in potential creation!!!"<<endl;
+  //   exit(1);
+  // }
 
   potParams.fill_with(make_real2(1));
-  
+
 }
 
 void Potential::print(){
@@ -90,7 +93,10 @@ void Potential::print(){
 }
 
 void Potential::setPotParam(uint i, uint j, real2 params){
-
+  if(i>=ntypes || j>=ntypes){
+    cerr<<"WARNING: Cannot set particle type "<<i<<","<<j<<". Only "<<ntypes<<" particle types in the system"<<endl;
+    return;
+  }
   potParams[i+ntypes*j] = params;
   potParams[j+ntypes*i] = params;
   potParams.upload();

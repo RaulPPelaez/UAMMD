@@ -28,7 +28,6 @@ namespace verlet_nve_ns{
   /*Integrate the movement*/
   //All the parameters in Params struct are available here
   __global__ void integrateGPUD(real4 __restrict__  *pos,
-				real4 __restrict__  *pos1,
 				real3 __restrict__ *vel,
 				const real4 __restrict__  *force,
 				int step){
@@ -43,23 +42,14 @@ namespace verlet_nve_ns{
     /*In the first step, upload positions*/
     if(step==1)
       pos[i] += make_real4(vel[i])*params.dt;
-
-    /*Verlet*/
-     // if(step==2){       
-     //   real4 kk = pos[i];
-     //   pos[i] = 2*kk-pos1[i]+params.dt*params.dt*force[i];
-     //   vel[i] = make_real3(0.5*(pos[i]-pos1[i])/params.dt);
-     //   pos1[i] = kk;
-
-     // }
   }
 
   //Update the positions
-  void integrateGPU(real4 *pos, real4 *pos1, real3 *vel, real4 *force, uint N, int step){
+  void integrateGPU(real4 *pos, real3 *vel, real4 *force, uint N, int step){
     
     uint nthreads = TPB<N?TPB:N;
     uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0);
-    integrateGPUD<<<nblocks, nthreads>>>(pos, pos1,vel, force, step);
+    integrateGPUD<<<nblocks, nthreads>>>(pos,vel, force, step);
     //cudaCheckErrors("Integrate");  
   }
 

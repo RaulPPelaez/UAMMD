@@ -20,13 +20,12 @@ Each Measurable has an id that can be used to know the order of the calls.
 int Measurable::total_measurables = -1;
 ofstream Measurable::out;
 
-
 Measurable::Measurable(){
   total_measurables++;
   this->id = total_measurables;
   this-> N = gcnf.N;
   this-> L = gcnf.L;
   if(total_measurables==0){
-     out.open("measurable.dat");
+    out.open("measurable.dat");
   }
 }

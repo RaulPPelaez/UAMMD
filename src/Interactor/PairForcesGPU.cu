@@ -19,6 +19,10 @@
   http://docs.nvidia.com/cuda/samples/5_Simulations/particles/doc/particles.pdf
 
   TODO:
+100- Currently doesnt work for arch 20, 
+     SortPairs doesnt work if compiled with sm_20 after a certain number of particles for some reason.
+     Aparently is related to some obscure bug in CUDA that doesnt communicates correctly the PTX version to cub. So the block size, which depends on this, is incorect and nothing works.
+
   100- Implement many threads per particle in force compute
   100- Make number of blocks and threads to autotune
   100- Improve the transversing of the 27 neighbour cells
@@ -33,12 +37,12 @@
 #include"globals/defines.h"
 #include"utils/helper_math.h"
 #include"utils/helper_gpu.cuh"
-#include"utils/GPUutils.cuh"
 #include<thrust/device_ptr.h>
 #include<thrust/for_each.h>
 #include<thrust/iterator/zip_iterator.h>
 #include<thrust/sort.h>
 #include<iostream>
+#include"utils/GPUutils.cuh"
 
 
 #define BLOCKSIZE 128
@@ -51,12 +55,16 @@ namespace pair_forces_ns{
   __constant__ Params params; //Simulation parameters in constant memory, super fast access
   __constant__ ParamsDPD paramsDPD; //Simulation parameters in constant memory, super fast access
   __constant__ ullint seedGPU; //seed of the rng for DPD
+
+
+  texture<float,1, cudaReadModeElementType> texForce, texEnergy;
+  cudaArray *dF, *dE;
   
   uint GPU_Nblocks;
   uint GPU_Nthreads;
   
   //Initialize gpu variables 
-  void initGPU(Params &m_params, uint N){
+  void initGPU(Params &m_params, uint N, size_t potSize){
     /*Precompute some inverses to save time later*/
     m_params.invrc2 = 1.0/(m_params.rcut*m_params.rcut);
     m_params.invrc = 1.0/(m_params.rcut);
@@ -72,11 +80,43 @@ namespace pair_forces_ns{
       m_params.invCellSize.z = 0.0;
 
     }
-    if(!m_params.texPos || !m_params.texSortPos || !m_params.texCellStart ||
-       !m_params.texCellEnd || !m_params.texForce || !m_params.texEnergy){
-      cerr<<"Problem setting up textures!!"<<endl;
-      exit(1);
+    /*Only new architectures support texture objects*/
 
+     if(!m_params.texPos.d_ptr || !m_params.texSortPos.d_ptr || !m_params.texCellStart.d_ptr ||
+        !m_params.texCellEnd.d_ptr || !m_params.texForce.d_ptr || !m_params.texEnergy.d_ptr){
+       cerr<<"Problem setting up textures!!"<<endl;
+       exit(1);
+     }
+    /*In the old arch 20 the code uses textures only for force and energy*/
+
+     
+    if(!m_params.texForce.tex){
+      /*Create and bind force texture, this needs interpolation*/
+      cudaChannelFormatDesc channelDesc;
+      channelDesc = cudaCreateChannelDesc(32, 0,0,0, cudaChannelFormatKindFloat);
+
+      gpuErrchk(cudaMallocArray(&dF,
+				&channelDesc,
+				potSize/sizeof(float),1));
+      gpuErrchk(cudaMallocArray(&dE,
+				&channelDesc,
+				potSize/sizeof(float),1));
+
+      gpuErrchk(cudaMemcpyToArray(dF, 0,0,
+				  (float*)m_params.texForce.d_ptr, potSize, cudaMemcpyDeviceToDevice));
+      gpuErrchk(cudaMemcpyToArray(dE, 0,0,
+				  (float*)m_params.texEnergy.d_ptr, potSize, cudaMemcpyDeviceToDevice));
+
+      texForce.normalized = true; //The values are fetched between 0 and 1
+      texForce.addressMode[0] = cudaAddressModeClamp; //0 outside [0,1]
+      texForce.filterMode = cudaFilterModeLinear; //Linear filtering
+      texEnergy.normalized = true; //The values are fetched between 0 and 1
+      texEnergy.addressMode[0] = cudaAddressModeClamp; //0 outside [0,1]
+      texEnergy.filterMode = cudaFilterModeLinear; //Linear filtering
+
+      /*Texture binding*/
+      gpuErrchk(cudaBindTextureToArray(texForce, dF, channelDesc));
+      gpuErrchk(cudaBindTextureToArray(texEnergy, dE, channelDesc));
     }
     /*Upload parameters to constant memory*/
     gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
@@ -87,11 +127,9 @@ namespace pair_forces_ns{
   }
 
 
-  
   void initDPDGPU(ParamsDPD &m_params){
     gpuErrchk(cudaMemcpyToSymbol(paramsDPD, &m_params, sizeof(ParamsDPD)));
   }
-
   /****************************HELPER FUNCTIONS*****************************************/
   //MIC algorithm
   // template<typename vecType>
@@ -202,21 +240,23 @@ namespace pair_forces_ns{
     static size_t temp_storage_bytes = 0; //Additional storage needed by cub
     static uint *particleHash_alt = NULL, *particleIndex_alt = NULL; //Additional key/value pair
 
-    static cub::DoubleBuffer<uint> d_keys;
-    static cub::DoubleBuffer<uint> d_values;
+    // static cub::DoubleBuffer<uint> d_keys;
+    // static cub::DoubleBuffer<uint> d_values;
     /**Initialize CUB at first call**/
     if(!init){
       /*Allocate temporal value/key pair*/
-      gpuErrchk(cudaMalloc(&particleHash_alt, N*sizeof(uint)));
-      gpuErrchk(cudaMalloc(&particleIndex_alt, N*sizeof(uint)));
-    
+      gpuErrchk(cudaMalloc(&particleHash_alt,  N*sizeof(uint)));
+      gpuErrchk(cudaMalloc(&particleIndex_alt, N*sizeof(uint)));    
       /*Create this CUB like data structure*/
-      d_keys = cub::DoubleBuffer<uint>(particleHash, particleHash_alt);    
-      d_values = cub::DoubleBuffer<uint>(particleIndex, particleIndex_alt);
+      // d_keys = cub::DoubleBuffer<uint>(particleHash, particleHash_alt);    
+      // d_values = cub::DoubleBuffer<uint>(particleIndex, particleIndex_alt);
       /*On first call, this function only computes the size of the required temporal storage*/
       cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-     				      d_keys, 
-     				      d_values, N);
+				      particleHash, particleHash_alt,
+				      particleIndex, particleIndex_alt,
+				      N);
+     				      // d_keys, 
+     				      // d_values, N);
       /*Allocate temporary storage*/
       gpuErrchk(cudaMalloc(&d_temp_storage, temp_storage_bytes));
       init = true;
@@ -224,14 +264,17 @@ namespace pair_forces_ns{
 
     /**Perform the Radix sort on the index/cell pair**/
     cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-     				    d_keys, 
-     				    d_values, N); 
+				      particleHash, particleHash_alt,
+				      particleIndex, particleIndex_alt,
+				      N);
     /**Switch the references**/
-    particleHash     = d_keys.Current();
-    particleIndex = d_values.Current();
+    swap(particleHash, particleHash_alt);
+    swap(particleIndex, particleIndex_alt);
+    // particleHash     = d_keys.Current();
+    // particleIndex = d_values.Current();
 
-    particleHash_alt     = d_keys.Alternate();
-    particleIndex_alt = d_values.Alternate();
+    // particleHash_alt     = d_keys.Alternate();
+    // particleIndex_alt = d_values.Alternate();
 
     // thrust::stable_sort_by_key(device_ptr<uint>(particleHash),
     // 			device_ptr<uint>(particleHash+N),
@@ -240,20 +283,14 @@ namespace pair_forces_ns{
   }
 
   /*This kernel fills sortPos with the positions in pos, acording to the indices in particleIndex*/
-  __global__ void reorderPosD(real4 __restrict__ *sortPos, real4 __restrict__ *pos,
+  __global__ void reorderPosD(real4 __restrict__ *sortPos, const real4 __restrict__ *pos,
 			      const uint* __restrict__ particleIndex, uint N){
     uint i = blockIdx.x*blockDim.x + threadIdx.x;
     if(i>=N) return;
 
     uint sort_index = particleIndex[i]; //Coalesced
 
-#if defined SINGLE_PRECISION
     sortPos[i] = tex1Dfetch<real4>(params.texPos, sort_index);
-#else
-    double2 a= __ldg((double2*)pos+sort_index*2);
-    double2 b= __ldg((double2*)pos+sort_index*2+1);
-    sortPos[i] = make_double4(a.x, a.y, b.x, b.y);
-#endif
   }
   /*Same as above, but reordering vel aswell*/
   __global__ void reorderPosVelD(real4 *sortPos,
@@ -266,15 +303,9 @@ namespace pair_forces_ns{
 
     uint sort_index = particleIndex[i]; //Coalesced
 
-#if defined SINGLE_PRECISION
-    sortPos[i] = tex1Dfetch<real4>(params.texPos, sort_index);
-#else
-    double2 a= __ldg((double2*)pos+sort_index*2);
-    double2 b= __ldg((double2*)pos+sort_index*2+1);
-    sortPos[i] = make_double4(a.x, a.y, b.x, b.y);
-#endif
-    sortVel[i] = make_real4(vel[sort_index]);
 
+    sortPos[i] = tex1Dfetch<real4>(params.texPos, sort_index);
+    sortVel[i] = make_real4(vel[sort_index]);
   }
   
   /*Fill CellStart and CellEnd*/
@@ -306,9 +337,7 @@ namespace pair_forces_ns{
 	  cellEnd[icell2] = i;
       }
       //If I am the last particle my cell ends 
-      if(i == N-1) cellEnd[icell] = N;
-
-      
+      if(i == N-1) cellEnd[icell] = N;      
     }
 
   }
@@ -406,7 +435,7 @@ namespace pair_forces_ns{
 	    uint firstParticle = tex1Dfetch<uint>(params.texCellStart, icell);
 	    if(firstParticle ==0xffFFffFF) continue;
 	    /*Index of the last particle in the cell's list*/
-	    uint lastParticle = lastParticle= tex1Dfetch<uint>(params.texCellEnd, icell);
+	    uint lastParticle = tex1Dfetch<uint>(params.texCellEnd, icell);
 	    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
 	    /*If there are no particles in the cell, firstParticle=0xffffffff, the loop is not computed*/
 	    /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking firstParticle before fetching*/	    
@@ -421,7 +450,11 @@ namespace pair_forces_ns{
 	    
 	  }
       /*Write quantity with the original order to global memory*/
+#if __CUDA_ARCH__>=350
       uint pi = __ldg(particleIndex+index); //Coalesced
+#else
+      uint pi = particleIndex[index]; //Coalesced
+#endif
       T.set(pi, quantity);
     }
     
@@ -448,7 +481,7 @@ namespace pair_forces_ns{
       
       int3 celli = getCell(pinfoi.pos);
 
-      int x,y,z;
+      //int x,y,z;
       int3 cellj;
       //      real4 posj;
       /**Go through all neighbour cells**/
@@ -511,7 +544,6 @@ namespace pair_forces_ns{
     }
     
 
-
   /***************************************FORCE*****************************/
   
   //tags: force compute force function forceij
@@ -528,7 +560,7 @@ namespace pair_forces_ns{
       real4 pos;
     };
     /*I need the device pointer to force*/
-    forceTransverser(real4 *newForce, real4 *sortPos):newForce(newForce), sortPos(sortPos){
+    forceTransverser(real4 *newForce):newForce(newForce){
     };
     /*Compute the force between two positions*/
     inline __device__ real4 compute(const ParticleInfo &R1,const ParticleInfo &R2){
@@ -557,7 +589,11 @@ namespace pair_forces_ns{
 	r2c /= sigma2;
       }
 
-      real fmod = epsilon* (real) tex1D<float>(params.texForce, r2c);
+#if __CUDA_ARCH__>210
+      real fmod = epsilon* (real) tex1D<float>(params.texForce.tex, r2c);
+#else /*Use texture reference*/
+      real fmod = epsilon* (real) tex1D(texForce, r2c);
+#endif
       // real invr2 = 1.0f/r2;
       // real invr6 = invr2*invr2*invr2;
       // real invr8 = invr6*invr2;
@@ -577,20 +613,11 @@ namespace pair_forces_ns{
     }
 
     inline __device__ ParticleInfo getInfo(uint index){      
-#if defined SINGLE_PRECISION
       return {tex1Dfetch<real4>(params.texSortPos, index)};
-#else
-       double2 a = __ldg((double2*)sortPos+2*index);
-       double2 b = __ldg((double2*)sortPos+2*index+1);
-       return {a.x, a.y, b.x, b.y};
-#endif
-      //return {sortPos[index]};
-      
     }
  
   private:
     real4* newForce;
-    real4* sortPos;
   };
 
 
@@ -601,7 +628,7 @@ namespace pair_forces_ns{
 			uint *particleIndex, 
 			uint N){
     /*An instance of the class that holds the function that computes the force*/
-    forceTransverser ft(force, sortPos); //It needs the addres of the force in device memory
+    forceTransverser ft(force); //It needs the addres of the force in device memory
     /*Transverse the neighbour list for each particle, using ft to compute the force in each pair*/
     //transverseListTPPD<<<N/*GPU_Nblocks*/, TPP/*GPU_Nthreads*/>>>(ft,
     transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft,
@@ -630,6 +657,18 @@ namespace pair_forces_ns{
       real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
       float r2c = r2*params.invrc2;
+      real sigma2= real(1.0);
+      real epsilon = real(1.0); 
+      if(params.ntypes>1){
+	uint ti= (uint)(R1.pos.w+0.5);
+	uint tj= (uint)(R2.pos.w+0.5);
+	real2 pot_params = params.potParams[ti+tj*params.ntypes];
+	sigma2 = pot_params.x*pot_params.x;
+	epsilon = pot_params.y;
+
+	r2c /= sigma2;
+      }
+
       /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
       //if(r2c==0.0f) return 0.0f;  //Both cases handled in texForce
       /*Beyond rcut..*/
@@ -640,7 +679,11 @@ namespace pair_forces_ns{
       //real invr6 = invr2*invr2*invr2;
       //TODO take from a texture*/
       //real E =  2.0f*invr6*(invr6-1.0f);
-      float E = tex1D<float>(params.texEnergy, r2c);
+#if __CUDA_ARCH__>210      
+      float E = epsilon*tex1D<float>(params.texEnergy.tex, r2c);
+#else
+      float E = epsilon*tex1D(texEnergy, r2c);
+#endif
       
       return E;
     }
@@ -650,7 +693,7 @@ namespace pair_forces_ns{
     inline __device__ real zero(){
       return real(0.0);
     }
-    inline __device__ ParticleInfo getInfo(uint index){
+    inline __device__ ParticleInfo getInfo(uint index){      
       return {tex1Dfetch<real4>(params.texSortPos, index)};
     }
 
@@ -695,11 +738,24 @@ namespace pair_forces_ns{
       real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
       float r2c = r2*params.invrc2;
-      //if(r2c==0.0f) return 0.0f; //No need to check i==j, tex1D(texForce, 0.0) = 0.0
-      /*Beyond rcut..*/
-      //if(r2c>=1.0f) return 0.0f; //Also 0 in texForce
-      /*Get the force from the texture*/
-      float fmod = tex1D<float>(params.texForce, r2c);
+      real sigma2= real(1.0);
+      real epsilon = real(1.0); 
+      if(params.ntypes>1){
+	uint ti= (uint)(R1.pos.w+0.5);
+	uint tj= (uint)(R2.pos.w+0.5);
+	real2 pot_params = params.potParams[ti+tj*params.ntypes];
+	sigma2 = pot_params.x*pot_params.x;
+	epsilon = pot_params.y;
+
+	r2c /= sigma2;
+      }
+
+#if __CUDA_ARCH__>210
+      real fmod = epsilon* (real) tex1D<float>(params.texForce.tex, r2c);
+#else /*Use texture reference*/
+      real fmod = epsilon* (real) tex1D(texForce, r2c);
+#endif
+
       // P = rhoKT + (1/2dV)sum_ij( Fij·rij ) //Compute only the Fij·rij, the rest is done outside
       return dot(fmod*r12,r12);
     }
@@ -781,7 +837,20 @@ namespace pair_forces_ns{
       real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
       real r2c = r2*params.invrc2;
-    
+
+      real sigma2= real(1.0);
+      real epsilon = real(1.0); 
+      if(params.ntypes>1){
+	uint ti= (uint)(R1.pos.w+0.5);
+	uint tj= (uint)(R2.pos.w+0.5);
+	real2 pot_params = params.potParams[ti+tj*params.ntypes];
+	sigma2 = pot_params.x*pot_params.x;
+	epsilon = pot_params.y;
+
+	r2c /= sigma2;
+      }
+
+      
       real w = real(0.0); //The intensity of the DPD thermostat 
       real rinv = real(0.0);
       if(r2c<real(1.0)){
@@ -810,8 +879,12 @@ namespace pair_forces_ns{
       real randij = randGPU(i0+(ullint)params.N*j0 + seedGPU, &rng);
 
       //fmod = paramsDPD.A*w; //Soft force
-  
-      float fmod = -tex1D<float>(params.texForce, r2c); //Conservative force
+#if __CUDA_ARCH__>210
+      real fmod = -epsilon* (real) tex1D<float>(params.texForce.tex, r2c);
+#else /*Use texture reference*/
+      real fmod = -epsilon* (real) tex1D(texForce, r2c);
+#endif
+      
       fmod -= paramsDPD.gamma*w*w*dot(r12,v12); //Damping
       fmod += paramsDPD.noiseAmp*randij*w; //Random force
       return make_real4((real)fmod*r12);

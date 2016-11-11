@@ -12,6 +12,15 @@
 #include<cstring>
 typedef unsigned int uint;
 
+struct TexReference{
+  /*Raw pointer to device memory, 
+    in order to avoid templating this and mimic the typeless cudaTextureObject_t...*/
+  void *d_ptr;
+  /*Texture reference*/
+  cudaTextureObject_t tex;
+};
+
+
 template<typename T>
 class Texture{
 public:
@@ -47,7 +56,7 @@ public:
     memset(&texDesc, 0, sizeof(texDesc));				  
     texDesc.readMode = cudaReadModeElementType;			  
                                                                        
-    gpuErrchk(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
+    cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 
   }
   
@@ -92,7 +101,7 @@ inline void Texture<double4>::init(double4 *d_m, uint n){
     memset(&texDesc, 0, sizeof(texDesc));				  
     texDesc.readMode = cudaReadModeElementType;			  
                                                                        
-    gpuErrchk(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
+    cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL);
 }
 
 

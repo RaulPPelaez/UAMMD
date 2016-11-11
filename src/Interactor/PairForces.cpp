@@ -151,7 +151,7 @@ void PairForces::init(){
   params.potParams = pot.getPotParams();
   
   /*Upload parameters to GPU*/
-  initGPU(params, N);
+  initGPU(params, N, pot.getSize()*sizeof(float));
   
   cudaDeviceSynchronize();
 }

@@ -14,6 +14,7 @@ More info in the .cu
 #ifndef PAIRFORCESGPU_CUH
 #define PAIRFORCESGPU_CUH
 #include"globals/defines.h"
+#include"utils/Texture.h"
 
 namespace pair_forces_ns{
   
@@ -25,9 +26,9 @@ namespace pair_forces_ns{
     real rcut, invrc, invrc2;
     int3 gridPos2CellIndex;
     
-    cudaTextureObject_t texForce, texEnergy;
-    cudaTextureObject_t texSortPos, texPos;
-    cudaTextureObject_t texCellStart, texCellEnd;
+    TexReference texForce, texEnergy;
+    TexReference texSortPos, texPos;
+    TexReference texCellStart, texCellEnd;
     uint N;
     real3 L, invL;
 
@@ -37,14 +38,14 @@ namespace pair_forces_ns{
   //Stores some simulation parameters to upload as constant memory, the rest are available in Params.
   struct ParamsDPD{
     real gamma, noiseAmp, A;
-    cudaTextureObject_t texSortVel;
+    TexReference texSortVel;
   };
 
   // void initGPU(Params &m_params,
   // 	       cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
   // 	       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
   // 	       real4 *sortPos, real4 *pos, uint N);
-  void initGPU(Params &m_params, uint N);  
+  void initGPU(Params &m_params, uint N, size_t potSize);  
   void initDPDGPU(ParamsDPD &m_params);
 
 

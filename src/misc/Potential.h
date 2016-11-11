@@ -30,18 +30,18 @@ public:
 	    std::function<real(real)> Efoo,
 	    int N, real rc, uint ntypes=1);
   size_t getSize(){ return N;}
-  float *getForceData(){ return F.data();}
-  float *getEnergyData(){ return E.data();}
-  cudaTextureObject_t getForceTexture(){ return this->texForce;}
-  cudaTextureObject_t getEnergyTexture(){ return this->texEnergy;}
+  float *getForceData(){ return F.data;}
+  float *getEnergyData(){ return E.data;}
+  TexReference getForceTexture(){ return {(void*)F.d_m, this->texForce};}
+  TexReference getEnergyTexture(){ return {(void*)E.d_m, this->texEnergy};}
 
   void setPotParam(uint i, uint j, real2 params);
   real2* getPotParams();
   void print();
 
   uint N;
-  vector<float> F;
-  vector<float> E;
+  Vector<float> F;
+  Vector<float> E;
 
   cudaArray *FGPU, *EGPU;
 

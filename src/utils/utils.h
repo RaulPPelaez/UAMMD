@@ -97,6 +97,31 @@ public:
   double uniform(double min, double max){
     return min + (next()/((double) RANDOM_MAX))*(max - min);
   }
+
+  double gaussian(double mean, double std){
+
+    const double pi2 = 2.0*M_PI;
+
+    static double z0, z1;
+    static bool generate = false;
+    generate = !generate;
+
+    if (!generate)
+      return z1 * std + mean;
+
+    double u1, u2;
+    do{
+      u1 = uniform(0,1);
+      u2 = uniform(0,1);
+    }while ( u1 <= std::numeric_limits<double>::min() );
+
+    z0 = sqrt(-2.0 * log(u1)) * cos(pi2 * u2);
+    z1 = sqrt(-2.0 * log(u1)) * sin(pi2 * u2);
+    return z0 * std + mean;
+
+  }
+
+  
 };
 
 

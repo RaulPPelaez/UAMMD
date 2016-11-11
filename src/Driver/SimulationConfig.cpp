@@ -3,7 +3,6 @@
    Implementation of the SimulationConfig class. 
 
    The constructor of this class sets all the parameters, creates the initial configuration, constructs the simulation and runs it.
-
  */
 
 #include "SimulationConfig.h"
@@ -18,20 +17,20 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   /*See globals.h for a list of parameters*/
   /*If you set a parameter that the modules you use do not need, It will just be ignored. i.e. Setting gcnf.E and using VerletNVT*/
   gcnf.E = 0.0;
-  gcnf.T = 0.1;
+  gcnf.T = 0.01;
   gcnf.gamma = 1.0;
   
-  gcnf.N = pow(2,10);
-  gcnf.L = make_real3(32);
+  gcnf.N = pow(2,13);
+  gcnf.L = make_real3(18.3);
   gcnf.dt = 0.01f;
   /*Remember, rcut should be according to the longest range potential in pairforces!
     i.e the biggest sigma in LJ*/
-  gcnf.rcut = 2.5*2;  //rcut = 2.5*sigma -> biggest sigma in the system pow(2, 1/6.); //WCA
+  gcnf.rcut = 2.5;  //rcut = 2.5*sigma -> biggest sigma in the system; pow(2, 1/6.); //WCA
   
-  gcnf.nsteps1 = 40000;
+  gcnf.nsteps1 = 400000;
   gcnf.nsteps2 = 0;
-  gcnf.print_steps = 50;
-  gcnf.measure_steps = -1;
+  gcnf.print_steps = 500;
+  gcnf.measure_steps = 10;
   
   gcnf.seed = 0xffaffbfDEADBULL;
 
@@ -45,21 +44,21 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   // }
   
   /*Start in a lattice, see available lattices in utils.cpp*/
-  pos = initLattice(gcnf.L, gcnf.N, sc); //Start in a simple cubic lattice  
+  pos = initLattice(gcnf.L, gcnf.N, fcc); //Start in a simple cubic lattice  
   
   /*Call this after all parameters are set.
     and do not change any parameter afterwards*/
   /*This function initializes pos if it is not initialized yet. You can set the initial positions
     before or after calling this*/
-
-  setParameters();
-  /*Dont forget to upload the positions to GPU once you are done changing it!*/
-  /*Set random types, 0 or 1*/
-  fori(0,gcnf.N)
-    pos[i].w = grng.uniform(0,1)>0.15?0:1;
   
+  setParameters();
+  /*Set random types, 0 or 1*/
+  // fori(0,gcnf.N)
+  //   pos[i].w = grng.uniform(0,1)>0.15?0:1;
+  
+  /*Dont forget to upload the positions to GPU once you are done changing it!*/
   pos.upload();
-		 
+  
   /*********************************Initialize the modules*****************************/
   /*See Driver.h for a list of all available modules!*/
   /*This is the simulation construction, where you choose integrator and force evaluators*/
@@ -69,26 +68,26 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   /*Currently this feature only works for potentials with two parameters:
     the first one reescales the distance and the second is a factor to the force modulus*/
   /*For LJ this are sigma and epsilon, by default all the parameters are 1*/
-  interactor->setPotParam(0,0, make_real2(1, 1));
-  interactor->setPotParam(0,1, make_real2(1.5, 1));
-  interactor->setPotParam(1,1, make_real2(2, 1));
+  // interactor->setPotParam(0,0, make_real2(1, 1));
+  // interactor->setPotParam(0,1, make_real2(1.5, 1));
+  // interactor->setPotParam(1,1, make_real2(2, 1));
   // Matrixf D(3,3), K(3,3);
   // D.fill_with(0.0f);
   // fori(0,3) D[i][i] = gcnf.gamma*gcnf.T;  
   // K.fill_with(0.0f);                             
     
   /*Create an Integrator like this*/
-  // integrator = make_shared<BrownianEulerMaruyama>(D,K);
-  integrator = make_shared<VerletNVT>();
+  //integrator = make_shared<BrownianHydrodynamicsEulerMaruyama>(D,K);
+  integrator = make_shared<VerletNVE>();
   /*And inform it of the Force evaluators like this*/
   /*You can add several interactors to an integrator as such*/
   integrator->addInteractor(interactor);
   //integrator->addInteractor(interactor2);
-
+  
   /*Create any desired measurable modules by adding them to the measurables vector like this*/
-  // measurables.push_back(/*You can measure energy coming from any source, in this case all the interactors in integrator and the integrator itself*/
-  // 			make_shared<EnergyMeasure>(integrator->getInteractors(), integrator)
-  // 			);
+   measurables.push_back(/*You can measure energy coming from any source, in this case all the interactors in integrator and the integrator itself*/
+   			make_shared<EnergyMeasure>(integrator->getInteractors(), integrator)
+   			);
 
   
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;

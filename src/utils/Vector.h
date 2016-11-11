@@ -151,10 +151,10 @@ public:
 
   /*************************************************************/
 
-  cudaTextureObject_t getTexture(){
-    if(!initialized) return 0;
-    if(tex!=0) return tex;
-    if(n==0 || d_m == nullptr) return 0;
+  TexReference getTexture(){
+    if(!initialized) return {(void*)d_m, 0};
+    if(tex!=0) return {(void*) d_m,tex};
+    if(n==0 || d_m == nullptr) return {(void *)d_m, 0};
     tex.init(d_m, n);
     // cudaResourceDesc resDesc;
     // memset(&resDesc, 0, sizeof(resDesc));
@@ -169,7 +169,7 @@ public:
 
     // gpuErrchk(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
 
-    return tex;
+    return {(void*)d_m, tex};
   }
   
   iterator begin(){ return this->data;}
@@ -199,7 +199,7 @@ public:
       gpuErrchk(cudaMemcpy(data, d_m, n*sizeof(T), cudaMemcpyDeviceToHost));
   }
 
-  inline void GPUmemset(T x){
+  inline void GPUmemset(int x){
     uploaded= true;
     gpuErrchk(cudaMemset(d_m, x, n*sizeof(T)));
   }
@@ -211,6 +211,12 @@ public:
     }
     return false;
   }
+  inline bool GPUcopy_from(T* other_d_m){
+    this->uploaded = true;
+    gpuErrchk(cudaMemcpy(d_m, other_d_m, n*sizeof(T), cudaMemcpyDeviceToDevice));
+    return true;    
+  }
+
   void print(){
     download();
     for(int i=0; i<n; i++)
