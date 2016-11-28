@@ -42,37 +42,39 @@ Potential::Potential(std::function<real(real)> Ffoo,
   cudaChannelFormatDesc channelDesc;
   channelDesc = cudaCreateChannelDesc(32, 0,0,0, cudaChannelFormatKindFloat);
 
+  /*If the system doesnt support texture objects,
+    the textures will be initialized as references when needed*/
+  if(sysInfo.cuda_arch>210){
+    gpuErrchk(cudaMallocArray(&FGPU,
+			      &channelDesc,
+			      N,1));
+    gpuErrchk(cudaMallocArray(&EGPU,
+			      &channelDesc,
+			      N,1));
   
-  gpuErrchk(cudaMallocArray(&FGPU,
-			    &channelDesc,
-			    N,1));
-  gpuErrchk(cudaMallocArray(&EGPU,
-			    &channelDesc,
-			    N,1));
-  
-  gpuErrchk(cudaMemcpyToArray(FGPU, 0,0, F.data, N*sizeof(float), cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToArray(EGPU, 0,0, E.data, N*sizeof(float), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToArray(FGPU, 0,0, F.data, N*sizeof(float), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToArray(EGPU, 0,0, E.data, N*sizeof(float), cudaMemcpyHostToDevice));
 
 
 
-  cudaResourceDesc resDesc;
-  memset(&resDesc, 0, sizeof(resDesc));
-  resDesc.resType = cudaResourceTypeArray;
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
 
     
-  cudaTextureDesc texDesc;
-  memset(&texDesc, 0, sizeof(texDesc));
-  texDesc.readMode = cudaReadModeElementType;
-  texDesc.addressMode[0]   = cudaAddressModeClamp;
-  texDesc.addressMode[1]   = cudaAddressModeClamp;
-  texDesc.filterMode       = cudaFilterModeLinear;
-  texDesc.normalizedCoords = 1;
+    cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.readMode = cudaReadModeElementType;
+    texDesc.addressMode[0]   = cudaAddressModeClamp;
+    texDesc.addressMode[1]   = cudaAddressModeClamp;
+    texDesc.filterMode       = cudaFilterModeLinear;
+    texDesc.normalizedCoords = 1;
 
-  resDesc.res.array.array = FGPU;
-  cudaCreateTextureObject(&texForce, &resDesc, &texDesc, NULL);
-  resDesc.res.array.array = EGPU;
-  cudaCreateTextureObject(&texEnergy, &resDesc, &texDesc, NULL);
-
+    resDesc.res.array.array = FGPU;
+    gpuErrchk(cudaCreateTextureObject(&texForce, &resDesc, &texDesc, NULL));
+    resDesc.res.array.array = EGPU;
+    gpuErrchk(cudaCreateTextureObject(&texEnergy, &resDesc, &texDesc, NULL));
+  }
 
   F.upload();
   E.upload();

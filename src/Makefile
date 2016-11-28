@@ -1,15 +1,18 @@
+
+CUDA_VERSION=8.0
+
 CXX=g++
 CC=$(CXX)
-NVCC=nvcc
+NVCC=/usr/local/cuda-$(CUDA_VERSION)/bin/nvcc
 
 #EXPERIMENTAL=1  #Uncomment to compile with experimental modules
 
 ###############################Put here your system configuration:#####################################
 
 #the code will look here for the cuda and thrust sources
-CUDA_INCLUDE=/usr/local/cuda/include
+CUDA_INCLUDE=/usr/local/cuda-$(CUDA_VERSION)/include
 #The place where the cuda libs are, libcuda.so, libcudart, libcurand..
-CUDA_LIBS=/usr/local/cuda/lib64
+CUDA_LIBS=/usr/local/cuda-$(CUDA_VERSION)/lib64
 #The code will look for a folder named cub here, you can create a symlink if you have a folder i.e. cub-1.5.2
 CUB_INCLUDE=/usr/local/include
 
@@ -28,7 +31,7 @@ FORTRAN_OBJS =
 
 #DEBUG= -g
 
-CFLAGS= -g -pthread -O3  -I$(CUDA_INCLUDE) -march=native -pthread  -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ $(DEBUG) -Wall -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers -funroll-loops
+CFLAGS= -g -pthread -O3  -I$(CUDA_INCLUDE) -march=native -pthread  -I$(CUB_INCLUDE) -funroll-loops -m64 -I./ $(DEBUG) -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers
 
 ifdef EXPERIMENTAL
 CFLAGS += -DEXPERIMENTAL
@@ -48,10 +51,10 @@ $(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm
 ifdef DEBUG
 DEBUGGPU= -G
 endif
-NVFLAGS= -g  $(DEBUGGPU) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++   --compiler-options='$(CFLAGS)' -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
+NVFLAGS= $(DEBUGGPU) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=g++   --compiler-options='$(CFLAGS)' -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  -I./  -Xptxas -dlcm=ca
 
 LDFLAGS= -L$(CUDA_LIBS) -flto
-LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -flto
+LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -flto -lgomp
 
 
 OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
@@ -71,7 +74,7 @@ CUOBJS_INTEGRATOR= VerletNVEGPU.o VerletNVTGPU.o BrownianEulerMaruyamaGPU.o Brow
 
 OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))
 OBJS += $(addprefix Measurable/, $(OBJS_MEASURABLE))
-OBJS += utils/utils.o misc/Potential.o Driver/Driver.o  Driver/SimulationConfig.o $(CUSTOM_OBJS)
+OBJS += utils/utils.o misc/Potential.o  misc/Diagonalize.o Driver/Driver.o  Driver/SimulationConfig.o $(CUSTOM_OBJS)
 
 CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS)
 

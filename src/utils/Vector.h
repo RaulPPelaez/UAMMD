@@ -60,7 +60,7 @@ public:
   /*Default constructor*/
   Vector():n(0), pinned(false),
 	   initialized(false),uploaded(false),
-	   data(nullptr), d_m(nullptr), tex(0){}
+	   data(nullptr), d_m(nullptr), tex(){}
   /*Destructor*/
   ~Vector() noexcept{
     /*Using the destructor messes real bad with the CUDA enviroment when using global variables, so you have to call freeMem manually for any global Vector before main exits...*/
@@ -70,7 +70,7 @@ public:
   Vector(uint n, bool pinned = false):
     n(n), pinned(pinned),
     initialized(false), uploaded(false),
-    data(nullptr), d_m(nullptr), tex(0)
+    data(nullptr), d_m(nullptr), tex()
   {
     if(n>0){
       this->initialized = true;
@@ -190,13 +190,16 @@ public:
   
   void fill_with(T x){std::fill(data, data+n, (T)x);}
   //Upload/Download from the GPU, ultra fast if is pinned memory
-  inline void upload(){
+  inline void upload(int N = 0){
+    if(N==0) N = n;
     uploaded= true;
-    gpuErrchk(cudaMemcpy(d_m, data, n*sizeof(T), cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(d_m, data, N*sizeof(T), cudaMemcpyHostToDevice));
   }
-  inline void download(){
-    if(!pinned)
-      gpuErrchk(cudaMemcpy(data, d_m, n*sizeof(T), cudaMemcpyDeviceToHost));
+  inline void download(int N = 0){
+    if(!pinned){
+      if(N==0) N = n;
+      gpuErrchk(cudaMemcpy(data, d_m, N*sizeof(T), cudaMemcpyDeviceToHost));
+    }
   }
 
   inline void GPUmemset(int x){
@@ -217,9 +220,8 @@ public:
     return true;    
   }
 
-  void print(){
-    download();
-    for(int i=0; i<n; i++)
+  void print(){    
+    for(uint i=0; i<n; i++)
       cout<<data[i]<<" ";
     cout<<endl;
     
@@ -244,7 +246,7 @@ public:
   Matrix(): Vector<T>(0),
     nr(0), nc(0),
     M(nullptr){}
-  Matrix(uint nc, uint nr): Vector<T>(nr*nc),
+  Matrix(uint nr, uint nc): Vector<T>(nr*nc),
     nr(nr),nc(nc),
     M(nullptr){
     M = (T **)malloc(sizeof(T *)*nr);
@@ -307,8 +309,8 @@ public:
     return true;
   }
   void print(){
-    fori(0,nr){
-      forj(0, nc) cout<<M[i][j]<<"\t";
+    fori(0,(int)nr){
+      forj(0, (int)nc) cout<<M[i][j]<<"\t";
       cout<<endl;
     }
   }

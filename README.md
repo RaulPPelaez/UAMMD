@@ -1,4 +1,4 @@
-#**Universaly Adaptable Multiscale Molecular Dynamics (UAMMD)**
+#**Universally Adaptable Multiscale Molecular Dynamics (UAMMD)**
 
 ##DESCRIPTION
 
@@ -58,7 +58,7 @@ Finally there is a Driver that puts them all together and controls the flow of t
 	1.Two step velocity verlet NVE
 	2.Two step velocity verlet NVT with BBK thermostat
 	3.Euler Maruyama Brownian dynamics
-	4.Euler Maruyama Brownian dynamics with hydrodynamic interactions via Rotne Prager
+	4.Euler Maruyama Brownian dynamics with hydrodynamic interactions via Rotne Prager Yamakawa (obtaining the brownian noise via several choices. Cholesky or Lanczos)
 
 **Measurables**
 	
@@ -164,6 +164,8 @@ Currently the code initializes pos and force Vectors in Driver.cpp, after the pa
 **Guidelines**
 
 Each module should have its own namespace, or adhere to an existing one, in order to avoid naming conflicts. This allows to name the functions and parameters in a more human readable way.
+
+If you want to make small changes to an existing module, without changing it. Then you should create a new module that inherits it, and overload the necesary functions.
 
 ------------------------------------------
 

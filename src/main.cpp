@@ -43,21 +43,21 @@ TODO:
 #include<chrono>
 #include<ctime>
 #include"Driver/SimulationConfig.h"
-
+#include<cuda.h>
 
 /*Declaration of extern variables in globals.h*/
 GlobalConfig gcnf;
+SystemInfo sysInfo;
 Vector4 pos, force;
 Vector3 vel;
 Xorshift128plus grng;
 
 
-
-
-int main(int argc, char *argv[]){  
+int main(int argc, char *argv[]){
+  int dev = 0;
   fori(1,argc)
     if(strcmp("--device", argv[i])==0)
-      cudaSetDevice(atoi(argv[i+1]));
+      dev = atoi(argv[i+1]);
   {
     fori(0,60) cerr<<"━";
     cerr<<"┓"<<endl;
@@ -70,6 +70,23 @@ int main(int argc, char *argv[]){
   
     std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     cerr<<"Computation started at "<<std::ctime(&time)<<endl;
+  }
+  /*Get device information*/
+  cudaSetDevice(dev);
+  cudaDeviceProp deviceProp;
+  cudaGetDeviceProperties(&deviceProp, dev);
+
+  cerr<<"Using device: "<<deviceProp.name<<endl;
+
+  sysInfo.dev = dev;
+  sysInfo.cuda_arch = 100*deviceProp.major + 10*deviceProp.minor;
+  cerr<<"Compute capability of the device: "<<deviceProp.major<<"."<<deviceProp.minor<<endl;
+  cerr<<"  ";
+  fori(0,29) cerr<<"━ ";
+  cerr<<endl;
+  if(sysInfo.cuda_arch<200){
+    cerr<<"\tERROR: Unsupported configuration, the GPU must have at least compute capability 2.0"<<endl;
+    exit(1);
   }
   /*To increase the size of the printf buffer inside kernels, default is 4096 lines I think*/
   // size_t size;
@@ -86,7 +103,6 @@ int main(int argc, char *argv[]){
     cerr<<"Computation finished at "<<std::ctime(&time)<<endl;
     fori(0,60) cerr<<"━";
     cerr<<"┛"<<endl;
-
   }
   return 0;
 }

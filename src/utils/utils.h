@@ -25,9 +25,6 @@
 #include"third_party/bravais/bravais.h"
 using namespace std;
 
-#define fori(x,y) for(int i=x; i<int(y); i++)
-#define forj(x,y) for(int j=x; j<int(y); j++)
-
 std::ostream& operator<<(std::ostream& out, const real3 &f);
 std::ostream& operator<<(std::ostream& out, const real4 &f);
 

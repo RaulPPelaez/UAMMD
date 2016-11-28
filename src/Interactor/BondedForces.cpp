@@ -45,6 +45,7 @@ BondedForces::BondedForces(const char * readFile):
   /*If some bond type number is zero, the loop will simply not be entered, and no storage will be used*/
   /*Read the bond list from the file*/
   ifstream in(readFile);
+  if(!in.good()){cerr<<"\tERROR: Bond file not found!!"<<endl; exit(1);}
   in>>nbonds;
   if(nbonds>0){
     bondList = Vector<Bond>(nbonds*2);//Allocate 2*nbonds, see init for explication
@@ -192,8 +193,8 @@ void BondedForces::init(){
   /***********************************************************************************************/
   /*Init GPU side variables*/
   initGPU(params);
-  cerr<<"\tDetected: "<<bondList.size()/2<<" particle-particle bonds and "<<bondListFP.size()/2<<" Fixed Point bonds"<<endl;
-  cerr<<"\t"<<bondParticleIndex.size()<<" particles have at least one bond"<<endl;
+  cerr<<"\tDetected: "<<bondList.size()/2<<" particle-particle bonds and "<<bondListFP.size()<<" Fixed Point bonds"<<endl;
+  cerr<<"\t"<<max(bondParticleIndex.size(), bondListFP.size())<<" particles have at least one bond"<<endl;
 }
 /*Perform an integration step*/
 void BondedForces::sumForce(){

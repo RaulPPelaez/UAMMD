@@ -6,7 +6,7 @@
   2-Sort particleIndex based on particleHash (sort by key). This way the particles in a same cell are one after the other in particleIndex. The Morton hash also improves the memory acces patter in the GPU.
   3-Fill cellStart and cellEnd with the indices of particleIndex in which a cell starts and ends. This allows to identify where all the [indices of] particles in a cell are in particleIndex, again, one after the other.
   
-  The transversal of this cell list is done by transversing, for each particle, the 27 neighbour cells of that particle's cell.
+  The transversal of this cell list is done by transversing, for each particle, the 27 neighbour cells of that particle's cell. You can make use of this by creating a transversable, see forceTransversable
   
 
   Force is evaluated using table lookups (with texture memory)
@@ -19,10 +19,6 @@
   http://docs.nvidia.com/cuda/samples/5_Simulations/particles/doc/particles.pdf
 
   TODO:
-100- Currently doesnt work for arch 20, 
-     SortPairs doesnt work if compiled with sm_20 after a certain number of particles for some reason.
-     Aparently is related to some obscure bug in CUDA that doesnt communicates correctly the PTX version to cub. So the block size, which depends on this, is incorect and nothing works.
-
   100- Implement many threads per particle in force compute
   100- Make number of blocks and threads to autotune
   100- Improve the transversing of the 27 neighbour cells
@@ -44,6 +40,7 @@
 #include<iostream>
 #include"utils/GPUutils.cuh"
 
+extern SystemInfo sysInfo;
 
 #define BLOCKSIZE 128
 
@@ -81,16 +78,14 @@ namespace pair_forces_ns{
 
     }
     /*Only new architectures support texture objects*/
-
-     if(!m_params.texPos.d_ptr || !m_params.texSortPos.d_ptr || !m_params.texCellStart.d_ptr ||
-        !m_params.texCellEnd.d_ptr || !m_params.texForce.d_ptr || !m_params.texEnergy.d_ptr){
-       cerr<<"Problem setting up textures!!"<<endl;
-       exit(1);
-     }
-    /*In the old arch 20 the code uses textures only for force and energy*/
-
-     
-    if(!m_params.texForce.tex){
+    if(sysInfo.cuda_arch>210){
+      if(!m_params.texPos.tex || !m_params.texSortPos.tex || !m_params.texCellStart.tex ||
+	 !m_params.texCellEnd.tex || !m_params.texForce.tex || !m_params.texEnergy.tex){
+	cerr<<"Problem setting up textures!!"<<endl;
+	exit(1);
+      }
+    }
+    else{ /*In the old arch 20 the code uses textures only for force and energy*/     
       /*Create and bind force texture, this needs interpolation*/
       cudaChannelFormatDesc channelDesc;
       channelDesc = cudaCreateChannelDesc(32, 0,0,0, cudaChannelFormatKindFloat);
@@ -159,10 +154,11 @@ namespace pair_forces_ns{
     int3 cell = make_int3((r+real(0.5)*params.L)*params.invCellSize);
     //Anti-Traquinazo guard, you need to explicitly handle the case where a particle
     // is exactly at the box limit, AKA -L/2. This is due to the precision loss when
-    // casting int from reals, which gives non-correct results very near the cell borders.
+    // casting int from floats, which gives non-correct results very near the cell borders.
     // This is completly neglegible in all cases, except with the cell 0, that goes to the cell
-    // cellDim, wich is catastrophic.
-    //Doing the previous operation in double precision (by changing 0.5f to 0.5) also works, but it is a bit of a hack and the performance appears to be the same.
+    // cellDim, which is catastrophic.
+    //Doing the previous operation in double precision (by changing 0.5f to 0.5) also works, but it is a bit of a hack and the performance appears to be the same as this.
+    //TODO: Maybe this can be skipped if the code is in double precision mode
     if(cell.x==params.cellDim.x) cell.x = 0;
     if(cell.y==params.cellDim.y) cell.y = 0;
     if(cell.z==params.cellDim.z) cell.z = 0;
@@ -189,9 +185,7 @@ namespace pair_forces_ns{
 
   /*Interleave a 10 bit number in 32 bits, fill one bit and leave the other 2 as zeros.*/
   inline __device__ uint encodeMorton(uint i){
-  
     uint x = i;
-  
     x &= 0x3ff;
     x = (x | x << 16) & 0x30000ff;
     x = (x | x << 8) & 0x300f00f;
@@ -201,7 +195,6 @@ namespace pair_forces_ns{
   }
   /*Fuse three 10 bit numbers in 32 bits, producing a Z order Morton hash*/
   inline __device__ uint mortonHash(const int3 &cell){
-
     return encodeMorton(cell.x) | (encodeMorton(cell.y) << 1) | (encodeMorton(cell.z) << 2);
   }
   
@@ -230,51 +223,39 @@ namespace pair_forces_ns{
 
   /*Sort the particleIndex list by hash*/
   // this allows to access the neighbour list of each particle in a more coalesced manner
-  //Each time this is called, the pointers particleHash and particleIndex are swapped
+  //Each time this is called, the pointers particleHash and particleIndex are swapped with local ones
   void sortCellHash(uint *&particleHash, uint *&particleIndex, uint N){
     //This uses the CUB API to perform a radix sort
     //CUB orders by key an array pair and copies them onto another pair
-    //This function stores an internal key/value pair and switches the arrays each time
+    //This function stores an internal key/value pair and switches the arrays each time its called
     static bool init = false;
     static void *d_temp_storage = NULL;
     static size_t temp_storage_bytes = 0; //Additional storage needed by cub
     static uint *particleHash_alt = NULL, *particleIndex_alt = NULL; //Additional key/value pair
 
-    // static cub::DoubleBuffer<uint> d_keys;
-    // static cub::DoubleBuffer<uint> d_values;
     /**Initialize CUB at first call**/
     if(!init){
       /*Allocate temporal value/key pair*/
       gpuErrchk(cudaMalloc(&particleHash_alt,  N*sizeof(uint)));
       gpuErrchk(cudaMalloc(&particleIndex_alt, N*sizeof(uint)));    
-      /*Create this CUB like data structure*/
-      // d_keys = cub::DoubleBuffer<uint>(particleHash, particleHash_alt);    
-      // d_values = cub::DoubleBuffer<uint>(particleIndex, particleIndex_alt);
       /*On first call, this function only computes the size of the required temporal storage*/
       cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
 				      particleHash, particleHash_alt,
 				      particleIndex, particleIndex_alt,
 				      N);
-     				      // d_keys, 
-     				      // d_values, N);
       /*Allocate temporary storage*/
       gpuErrchk(cudaMalloc(&d_temp_storage, temp_storage_bytes));
       init = true;
     }
 
-    /**Perform the Radix sort on the index/cell pair**/
+    /**Perform the Radix sort on the index/hash pair**/
     cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
 				      particleHash, particleHash_alt,
 				      particleIndex, particleIndex_alt,
 				      N);
-    /**Switch the references**/
+    /**Swap the references**/
     swap(particleHash, particleHash_alt);
     swap(particleIndex, particleIndex_alt);
-    // particleHash     = d_keys.Current();
-    // particleIndex = d_values.Current();
-
-    // particleHash_alt     = d_keys.Alternate();
-    // particleIndex_alt = d_values.Alternate();
 
     // thrust::stable_sort_by_key(device_ptr<uint>(particleHash),
     // 			device_ptr<uint>(particleHash+N),
@@ -305,6 +286,7 @@ namespace pair_forces_ns{
 
 
     sortPos[i] = tex1Dfetch<real4>(params.texPos, sort_index);
+    /*TODO: Texture this aswell*/
     sortVel[i] = make_real4(vel[sort_index]);
   }
   
@@ -386,11 +368,11 @@ namespace pair_forces_ns{
   /*Transverses all the neighbour particles of each particle using the cell list and computes a quantity as implemented by Transverser. Each thread goes through all the neighbours of a certain particle(s)(index), transversing its 27 neighbour cells*/
   /*Computes a quantity determined by Transverser, which is a class that must implement the following methods:
     T zero() -> returns the initial value of the quantity, in whatever type
-    T compute(ParticleInfo r1, ParticleInfo r2) -> compute the quantity depending of the pair positions/types
+    T compute(ParticleInfo r1, ParticleInfo r2) -> compute the quantity depending of the pair positions/types/etc
     void set(uint index, T quantity) -> sum the total quantity on particle index to global memory
 
-    This quantity "T" can be i.e a real4 and compute the force
-                         or a real and compute the energy or a general struct containing any info...
+    This quantity "T" can be anything that can be sum. i.e a real4 and compute the force
+                       or a real and compute the energy or a general struct containing any info (which must have an operator += overloaded)...
     ParticleInfo can be a simple type like real4 containing the position or a general struct defined in the Transverser class containing anything (pos and vel i.e)
     */  
   template<class Transverser>
@@ -404,18 +386,17 @@ namespace pair_forces_ns{
     //Grid-stride loop
     for(int index = ii; index<N; index += blockDim.x * gridDim.x){
       /*Compute force acting on particle particleIndex[index], index in the new order*/
-      //real4 pos = tex1Dfetch<real4>(texSortPos, index);
+      /*Get my particle's data*/
+      auto pinfoi = T.getInfo(index);
 
-      auto pinfoi = T.getInfo(index);//tex1Dfetch<real4>(texSortPos, index);
-
-      /*Initial value of the quantity*/
+      /*Initial value of the quantity,
+	mostly just a hack so the compiler can guess the type of the quantity*/
       auto quantity = T.zero();
       
       int3 celli = getCell(pinfoi.pos);
 
       int x,y,z;
       int3 cellj;
-      //      real4 posj;
       /**Go through all neighbour cells**/
       //For some reason unroll doesnt help here
       int zi = -1; //For the 2D case
@@ -431,20 +412,16 @@ namespace pair_forces_ns{
 
 	    uint icell  = getCellIndex(cellj);
 	    /*Index of the first particle in the cell's list*/
-	    //Nor global fetch nor __ldg cellStart[icell];//
 	    uint firstParticle = tex1Dfetch<uint>(params.texCellStart, icell);
-	    if(firstParticle ==0xffFFffFF) continue;
+	    if(firstParticle ==0xffFFffFF) continue; /*Continue only if there are particles in this cell*/
 	    /*Index of the last particle in the cell's list*/
 	    uint lastParticle = tex1Dfetch<uint>(params.texCellEnd, icell);
 	    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
-	    /*If there are no particles in the cell, firstParticle=0xffffffff, the loop is not computed*/
-	    /*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking firstParticle before fetching*/	    
 	    for(uint j=firstParticle; j<lastParticle; j++){
 	      /*Retrieve j info*/
 	      auto pinfoj = T.getInfo(j);
 	      /*Add quantity*/
-	      quantity += T.compute(pinfoi, pinfoj);
-	      
+	      quantity += T.compute(pinfoi, pinfoj);	      
 
 	    }
 	    
@@ -669,16 +646,6 @@ namespace pair_forces_ns{
 	r2c /= sigma2;
       }
 
-      /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
-      //if(r2c==0.0f) return 0.0f;  //Both cases handled in texForce
-      /*Beyond rcut..*/
-      //else if(r2c>=1.0f) return 0.0f;
-      /*Get the force from the texture*/
-      //real fmod = tex1D(texForce, r2c);
-      //real invr2 = 1.0f/r2;
-      //real invr6 = invr2*invr2*invr2;
-      //TODO take from a texture*/
-      //real E =  2.0f*invr6*(invr6-1.0f);
 #if __CUDA_ARCH__>210      
       float E = epsilon*tex1D<float>(params.texEnergy.tex, r2c);
 #else
@@ -901,11 +868,6 @@ namespace pair_forces_ns{
     }
 
     inline __device__ ParticleInfo getInfo(uint index){
-      // ParticleInfo kk;
-      // kk.pos = tex1Dfetch<real4>(params.texSortPos, index);
-      // kk.vel = tex1Dfetch<real4>(paramsDPD.texSortVel, index);
-      // kk.pi = index;
-      
       return {tex1Dfetch<real4>(params.texSortPos, index),
 	      index};
     }

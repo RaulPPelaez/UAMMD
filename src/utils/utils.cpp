@@ -26,28 +26,13 @@ Vector4 initLattice(real3 L, uint N, BRAVAISLAT lat){
 
 
   switch(lat){
-  case sc:
-    cerr<<"cubic";
-    break;
-  case fcc:
-    cerr<<"FCC";
-    break;
-  case bcc:
-    cerr<<"BCC";
-    break;
-  case hcp:
-    cerr<<"HCP";
-    break;
-  case tri:
-    cerr<<"triangular";
-    break;
-  case sq:
-    cerr<<"square";
-    break;
-  case dia:
-    cerr<<"zincblende";
-    break;
-
+  case sc:   cerr<<"cubic";     break;
+  case fcc:  cerr<<"FCC";       break;
+  case bcc:  cerr<<"BCC";       break;
+  case hcp:  cerr<<"HCP";       break;
+  case tri:  cerr<<"triangular";break;
+  case sq:   cerr<<"square";    break;
+  case dia:  cerr<<"zincblende";break;
   }
   
   cerr<<" Lattice...";
@@ -111,6 +96,7 @@ Vector4 readFile(const char * fileName){
   cerr<<"Reading initial positions from "<<fileName<<" file...";
   uint N;
   ifstream in(fileName);
+  if(!in.good()){ cerr<<"\tERROR: File not found!!"<<endl; exit(1);}
   in>>N;
   Vector4 p = Vector4(N);
   fori(0,N){

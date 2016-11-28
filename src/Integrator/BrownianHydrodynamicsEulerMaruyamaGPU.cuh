@@ -14,22 +14,28 @@ namespace brownian_hy_euler_maruyama_ns{
     real sqrtdt;
     real dt;
     real sqrt2dt;
-    real D0, rh;
     real3 L;
     uint N;
   };
+  /*Rodne-Prager-Yamakawa parameters*/
+  struct RPYParams{
+    real D0, rh;
+    real inv32rhtimes3;
+    real rhrh2div3;
 
+  };
 
   void real4_to_real3GPU(real4 *force, real3* force3, uint N);
 
-  void rodne_callGPU(real *d_D, real4 *d_R, cudaStream_t stream, uint N);
+  void computeDiffusionRPYGPU(real *d_D, real4 *d_R, cudaStream_t stream, uint N);
 
+  void diffusionDotGPU(real4 *pos, real3 *v, real3 *Dv, uint N);
 
   void initGPU(Params m_params);
 
+  void initRPYGPU(RPYParams m_params);
+  
   void integrateGPU(real4 *pos, real3* DF, real3* BdW, real3 *K, uint N);
 
-
-  void trmul(real *M, real *v, real *res, uint N);
 }
 #endif

@@ -45,3 +45,7 @@ headaches when trying to round them to integers in some extreme cases.
 
 
 Uninitialized constant memory data defaults to zero!
+
+---------------------------------------------------------------
+
+cusolver returns error code 7 (CUSOLVER_INTERNAL_ERROR in cusolver_common.h) if some pointer passed to it is null, including d_info.
