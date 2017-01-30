@@ -14,6 +14,7 @@
 #define UTILS_H
 #include"globals/defines.h"
 #include<stdio.h>
+#include<string.h>
 #include<stdlib.h>
 #include<algorithm>
 #include<cuda_runtime.h>
@@ -23,10 +24,30 @@
 #include<sys/time.h>
 #include<memory>
 #include"third_party/bravais/bravais.h"
-using namespace std;
+#include<iomanip>
+
+using std::shared_ptr;
+using std::string;
+using std::cerr;
+using std::endl;
+using std::cout;
+using std::make_shared;
+using std::vector;
+using std::ifstream;
+using std::ofstream;
+using std::flush;
+using std::setprecision;
 
 std::ostream& operator<<(std::ostream& out, const real3 &f);
 std::ostream& operator<<(std::ostream& out, const real4 &f);
+
+
+
+/*Returns the input argument number of a flag, -1 if it doesnt exist*/
+int checkFlag(int argc, char *argv[], const char *flag);
+
+std::vector<std::string> stringSplit(string s);
+
 
 #include "Texture.h"
 #include "Vector.h"
@@ -94,7 +115,10 @@ public:
   double uniform(double min, double max){
     return min + (next()/((double) RANDOM_MAX))*(max - min);
   }
-
+  double3 uniform3(double min, double max){
+    return {uniform(min, max), uniform(min, max), uniform(min, max)};
+  }
+  
   double gaussian(double mean, double std){
 
     const double pi2 = 2.0*M_PI;

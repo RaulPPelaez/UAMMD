@@ -61,10 +61,13 @@ namespace pair_forces_ns{
   uint GPU_Nthreads;
   
   //Initialize gpu variables 
-  void initGPU(Params &m_params, uint N, size_t potSize){
+  void initGPU(Params &m_params, Params *&d_params, uint N, size_t potSize){
     /*Precompute some inverses to save time later*/
-    m_params.invrc2 = 1.0/(m_params.rcut*m_params.rcut);
-    m_params.invrc = 1.0/(m_params.rcut);
+    m_params.invrc2_pot = 1.0/(m_params.rcut_pot*m_params.rcut_pot);
+    m_params.invrc_pot = 1.0/(m_params.rcut_pot);
+   
+
+    
     m_params.invL = 1.0/m_params.L;
     m_params.invCellSize = 1.0/m_params.cellSize;
     m_params.gridPos2CellIndex = make_int3( 1,
@@ -113,6 +116,12 @@ namespace pair_forces_ns{
       gpuErrchk(cudaBindTextureToArray(texForce, dF, channelDesc));
       gpuErrchk(cudaBindTextureToArray(texEnergy, dE, channelDesc));
     }
+
+
+    /*Upload params to global memory*/
+    gpuErrchk(cudaMalloc(&d_params, sizeof(Params)));
+    gpuErrchk(cudaMemcpy(d_params, &m_params, sizeof(Params), cudaMemcpyHostToDevice));
+    
     /*Upload parameters to constant memory*/
     gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
 
@@ -125,6 +134,18 @@ namespace pair_forces_ns{
   void initDPDGPU(ParamsDPD &m_params){
     gpuErrchk(cudaMemcpyToSymbol(paramsDPD, &m_params, sizeof(ParamsDPD)));
   }
+
+  /*TODO you have to update textures too in arch<350*/
+  /*Reupload the parameters to constant memory from CPU*/
+  void updateParams(Params m_params){
+    gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
+  }
+  /*Reupload the parameters to constant memory from GPU*/
+  void updateParamsFromGPU(Params *d_params){
+    gpuErrchk(cudaMemcpyToSymbol(params, d_params, sizeof(Params), 0, cudaMemcpyDeviceToDevice));
+  }
+
+  
   /****************************HELPER FUNCTIONS*****************************************/
   //MIC algorithm
   // template<typename vecType>
@@ -324,21 +345,16 @@ namespace pair_forces_ns{
 
   }
 
-  /*Reupload the parameters to constant memory*/
-  void updateParams(Params m_params){
-    gpuErrchk(cudaMemcpyToSymbol(params, &m_params, sizeof(Params)));
-  }
-
   /*Create the Cell List from scratch in the GPU*/
-  void makeCellList(real4 *pos, real4 *sortPos,
+  void makeCellList(real4 *pos, real4 *sortPos, //real4 *oldPos,
 		    uint *&particleIndex, uint *&particleHash,
 		    uint *cellStart, uint *cellEnd,
 		    uint N, uint ncells){
-    
     cudaMemset(cellStart, 0xffffffff, ncells*sizeof(uint));
 
-    calcHashD<<<GPU_Nblocks, GPU_Nthreads>>>(particleHash, particleIndex, pos, N);
+    //cudaMemcpy(oldPos, pos, N*sizeof(real4), cudaMemcpyDeviceToDevice);
     
+    calcHashD<<<GPU_Nblocks, GPU_Nthreads>>>(particleHash, particleIndex, pos, N);    
     sortCellHash(particleHash, particleIndex, N);
     
     reorderPosD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, pos, particleIndex, N);
@@ -416,10 +432,11 @@ namespace pair_forces_ns{
 	    if(firstParticle ==0xffFFffFF) continue; /*Continue only if there are particles in this cell*/
 	    /*Index of the last particle in the cell's list*/
 	    uint lastParticle = tex1Dfetch<uint>(params.texCellEnd, icell);
+	    uint nincell = lastParticle-firstParticle;
 	    /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
-	    for(uint j=firstParticle; j<lastParticle; j++){
+	    for(uint j=0; j<nincell; j++){
 	      /*Retrieve j info*/
-	      auto pinfoj = T.getInfo(j);
+	      auto pinfoj = T.getInfo(j+firstParticle);
 	      /*Add quantity*/
 	      quantity += T.compute(pinfoi, pinfoj);	      
 
@@ -428,99 +445,100 @@ namespace pair_forces_ns{
 	  }
       /*Write quantity with the original order to global memory*/
 #if __CUDA_ARCH__>=350
-      uint pi = __ldg(particleIndex+index); //Coalesced
+      uint pi = __ldg(particleIndex+index);
 #else
-      uint pi = particleIndex[index]; //Coalesced
+      uint pi = particleIndex[index]; 
 #endif
       T.set(pi, quantity);
     }
     
   }
 
-
-  /*TODO: Same as above but implementing several threads per particle*/
-    template<class Transverser>
-  __global__ void transverseListTPPD(Transverser T, 
+  //NO FUNCIONA, CUB DOES SOMETHING ODD
+#define tpp 1
+  template<class Transverser>
+  __global__ void transverseListDtpp(Transverser T, 
 				     const uint* __restrict__ particleIndex,
 				     const uint* __restrict__ cellStart,
 				     const uint* __restrict__ cellEnd,
 				     uint N){
-    uint index =  blockIdx.x;
-    //__shared__ real4 store[32];
+    uint index =  blockIdx.x*(blockDim.x/tpp) + threadIdx.x/tpp;
+    bool active = true;
+
+    if(index>=N) active = false;
+
+    auto quantity = T.zero();
+
+    typedef cub::WarpReduce<decltype(quantity), tpp> WarpReduce;
+    constexpr int particles_per_block = BLOCKSIZE/tpp;
+    __shared__ typename WarpReduce::TempStorage temp_storage[particles_per_block];
+
     
-    //Grid-stride loop
-      /*Compute force acting on particle particleIndex[index], index in the new order*/
-
-      auto pinfoi = T.getInfo(index);//tex1Dfetch<real4>(texSortPos, index);
-
-      /*Initial value of the quantity*/
-      auto quantity = T.zero();
-      
+    if(active){
+      auto pinfoi = T.getInfo(index);
       int3 celli = getCell(pinfoi.pos);
-
-      //int x,y,z;
+   
+      int x,y,z;
       int3 cellj;
-      //      real4 posj;
       /**Go through all neighbour cells**/
       //For some reason unroll doesnt help here
-
-      // for(z=-1; z<=1; z++)
-      // 	for(y=-1; y<=1; y++)
-      // 	  for(x=-1; x<=1; x++){
-
-      int3 cell_stride;
-
-      uint tid = threadIdx.x;
-      cell_stride.x = tid%3-1;
-      cell_stride.y = (tid%9)/3-1;
-      cell_stride.z = (tid%27)/9-1;
-            
-      cellj = celli + cell_stride;// + make_int3(x,y,z);
-      pbc_cell(cellj);
-
-      uint icell  = getCellIndex(cellj);
-      /*Index of the first particle in the cell's list*/
-      //Nor global fetch nor __ldg cellStart[icell];//
-      uint firstParticle = tex1Dfetch<uint>(params.texCellStart, icell);
-      if(firstParticle != 0xffFFffFF){
-	/*Index of the last particle in the cell's list*/
-	uint lastParticle = lastParticle= tex1Dfetch<uint>(params.texCellEnd, icell);
-        #define TPP 64
-	uint cid = (cell_stride.x+1)+3*(cell_stride.y+1) +9*(cell_stride.z+1);
-      
-	uint ts_in_my_cell = (blockDim.x/27) + (cid<blockDim.x%27)?1:0;
-
-	/*Because the list is ordered, all the particle indices in the cell are coalescent!*/
-	/*If there are no particles in the cell, firstParticle=0xffffffff, the loop is not computed*/
-	/*The fetch of lastParticle eitherway reduces branch divergency and is actually faster than checking firstParticle before fetching*/	    
-	for(uint j=firstParticle+(tid/27); j<lastParticle; j+=ts_in_my_cell){
-	  /*Retrieve j pos*/
-	  //posj = tex1Dfetch<real4>(texSortPos, j);
-	  auto pinfoj = T.getInfo(j);
-	  /*Add force, i==j is handled in forceij */
-	  //quantity += T.compute(pos, posj);
-	  quantity += T.compute(pinfoi, pinfoj);
-	
-	}
+      int zi = -1; //For the 2D case
+      int zf = 1;
+      if(params.L.z == real(0.0)){
+	zi = zf = 0;
       }
-      //	  }
-      //store[threadIdx.x] = quantity;
-      __syncthreads();
-      auto sum = cub::BlockReduce<real4, TPP>().Sum(quantity);
-      if(threadIdx.x==0){
-	/*Write quantity with the original order*/
-	uint pi = __ldg(particleIndex+index); //Coalesced
-	//typedef cub::BlockReduce<real4, 32> BlockReduce;
-	//real4 sum = make_real4(0.0f);
-	// for(int i=0; i<32; i++){
-	//   sum += store[i];
-	// }
-	
-	T.set(pi, sum);
-      }
+      for(z=zi; z<=zf; z++)
+	for(y=-1; y<=1; y++)
+	  for(x=-1; x<=1; x++){
+	    cellj = celli + make_int3(x,y,z);
+	    pbc_cell(cellj);
+
+	    uint icell  = getCellIndex(cellj);
+	    /*Index of the first particle in the cell's list*/
+	    uint firstParticle = tex1Dfetch<uint>(params.texCellStart, icell);
+	    if(firstParticle != 0xffFFffFF) continue; /*Continue only if there are particles in this cell*/
+	      /*Index of the last particle in the cell's list*/
+	      uint lastParticle = tex1Dfetch<uint>(params.texCellEnd, icell);
+	      uint nincell = lastParticle-firstParticle;
+	      /*Because the list is ordered, all the particle indices in the cell are coalescent!*/
+	      for(uint j=threadIdx.x%tpp; j<nincell+tpp-nincell%tpp; j+=tpp){
+		if(j<nincell){
+		  /*Retrieve j info*/
+		  auto pinfoj = T.getInfo(j+firstParticle);
+		  /*Add quantity*/
+		  quantity += T.compute(pinfoi, pinfoj);
+		}
+	      }
+	    }
+    }
+
+    int warp_id = threadIdx.x/particles_per_block;
+    auto total_quantity = WarpReduce(temp_storage[warp_id]).Sum(quantity);
+    
+    if(active && threadIdx.x%tpp==0){
+      /*Write quantity with the original order to global memory*/
+#if __CUDA_ARCH__>=350
+      uint pi = __ldg(particleIndex+index);
+#else
+      uint pi = particleIndex[index]; 
+#endif
+      T.set(pi, total_quantity);
     }
     
+  }
+  
+  /*****************************CUSTOM TRANSVERSER***********************************/
 
+ template<class Transverser>
+  void computeWithListGPU(Transverser t,
+			  uint *cellStart, uint *cellEnd,
+			  uint *particleIndex, 
+			  uint N){
+    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(
+    //transverseListDtpp<<<GPU_Nblocks*tpp, GPU_Nthreads>>>(
+							  t, particleIndex, cellStart,cellEnd, N);
+  }
+  
   /***************************************FORCE*****************************/
   
   //tags: force compute force function forceij
@@ -546,7 +564,7 @@ namespace pair_forces_ns{
       /*Squared distance*/
       real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
-      float r2c = r2*params.invrc2;
+      float r2c = r2*params.invrc2_pot;
       /*Both cases handled in texForce*/
       /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
       //if(r2c==0.0f) return make_real4(0.0f);  
@@ -607,10 +625,13 @@ namespace pair_forces_ns{
     /*An instance of the class that holds the function that computes the force*/
     forceTransverser ft(force); //It needs the addres of the force in device memory
     /*Transverse the neighbour list for each particle, using ft to compute the force in each pair*/
-    //transverseListTPPD<<<N/*GPU_Nblocks*/, TPP/*GPU_Nthreads*/>>>(ft,
-    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(ft,
+
+    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(
+    //transverseListDtpp<<<GPU_Nblocks*tpp, GPU_Nthreads>>>(
+						   ft,
 						   particleIndex, cellStart, cellEnd,
 						   N);
+    
     //cudaCheckErrors("computeForce");
   }
 
@@ -633,7 +654,7 @@ namespace pair_forces_ns{
 
       real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
-      float r2c = r2*params.invrc2;
+      float r2c = r2*params.invrc2_pot;
       real sigma2= real(1.0);
       real epsilon = real(1.0); 
       if(params.ntypes>1){
@@ -704,7 +725,7 @@ namespace pair_forces_ns{
 
       real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
-      float r2c = r2*params.invrc2;
+      float r2c = r2*params.invrc2_pot;
       real sigma2= real(1.0);
       real epsilon = real(1.0); 
       if(params.ntypes>1){
@@ -803,7 +824,7 @@ namespace pair_forces_ns{
 
       real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
-      real r2c = r2*params.invrc2;
+      real r2c = r2*params.invrc2_pot;
 
       real sigma2= real(1.0);
       real epsilon = real(1.0); 
@@ -824,7 +845,7 @@ namespace pair_forces_ns{
 	if(r2c==real(0.0)) return make_real4(real(0.0));
 	//w = r-rc -> linear
 	rinv = rsqrt(r2);
-	w = rinv-params.invrc;
+	w = rinv-params.invrc_pot;
       }
       else return make_real4(real(0.0));
       
@@ -892,5 +913,35 @@ namespace pair_forces_ns{
     //cudaCheckErrors("computeForce");
   }
 
+
+  
+
+  __global__ void needsUpdateGPUD(real4 *pos, real4 *old_pos, real threshold, int *flagGPU, uint N){
+    int id = blockIdx.x*blockDim.x + threadIdx.x;
+    if(id>=N) return;
+    real3 rij = make_real3(pos[id])-make_real3(old_pos[id]);
+    if(dot(rij, rij) > threshold*threshold)
+      atomicMax(flagGPU, id); 
+  }  
+
+
+  bool needsUpdateGPU(real4 *pos, real4 *old_pos, real threshold, uint N){
+    static int *flagGPU = NULL;
+    if(!flagGPU) cudaMalloc(&flagGPU, sizeof(int));
+
+    cudaMemset(flagGPU, 0xffffffff, sizeof(int));
+    needsUpdateGPUD<<<GPU_Nblocks, GPU_Nthreads>>>(pos, old_pos, threshold, flagGPU, N);
+  
+    int flag;
+    cudaMemcpy(&flag, flagGPU, sizeof(int), cudaMemcpyDeviceToHost);   
+    return flag!=0xffffffff;
+
+  }
+
+  void reorderPosGPU( real4 *sortPos, real4 *pos, uint *particleIndex, uint N){
+    reorderPosD<<<GPU_Nblocks, GPU_Nthreads>>>(sortPos, pos, particleIndex, N);
+  }
+
+  
 }
   

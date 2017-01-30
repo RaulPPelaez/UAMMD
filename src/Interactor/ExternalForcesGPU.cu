@@ -8,8 +8,19 @@ namespace external_forces_ns{
 
   /*This function takes the position of a particle and returns the force on it*/
   inline __device__ real4 ForceFunction(real4 pos, uint i){
+    real4 f = make_real4(0);
+    real *F = &(f.x);
+    real *r = &(pos.x);
+    real L = 7.2f;
+    real K = 100.0f;
+    for(int i=0; i<3; i++){
+      if(r[i]> L*0.5f)
+	F[i] -= K*(r[i]-L*0.5f);
+      else if(r[i]<-L*0.5f)
+	F[i] -= K*(r[i]+L*0.5f);
+    }
     
-    return make_real4(0);
+    return f;
 
   }
   
@@ -27,15 +38,12 @@ namespace external_forces_ns{
     uint i = blockIdx.x*blockDim.x+threadIdx.x;
 
     if(i>=N) return;
-
-    
-    force[i] = ForceFunction(pos[i], i);
-   
+    force[i] += ForceFunction(pos[i], i);   
   }
 
   
-  void computeExternalForce(real4 *force, real4 *pos, uint N){
-
+  
+  void computeExternalForce(real4 *force, real4 *pos, uint N){    
     uint nthreads = 128<N?128:N;
     uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0); 
 

@@ -1,7 +1,7 @@
 #include "cuda_runtime.h"
 #include "globals/defines.h"
 #include <math.h>
-/*Raul P. Pelaez 2016. vector overloads*/
+/*Raul P. Pelaez 2016. vector overloads not defined in helper_math.h*/
 
 
 /////////////////REAL4////////////////////////////////
@@ -26,6 +26,11 @@ inline __host__ __device__ real4 make_real4(real3 a, real w)
 {
     return make_real4(a.x, a.y, a.z, w);
 }
+inline __host__ __device__ real4 make_real4(double3 a, real w)
+{
+    return make_real4(a.x, a.y, a.z, w);
+}
+
 inline __host__ __device__ real4 make_real4(int4 a)
 {
     return make_real4(real(a.x), real(a.y), real(a.z), real(a.w));
@@ -54,10 +59,20 @@ inline __host__ __device__ real3 make_real3(real3 a)
 {
   return make_real3(a.x, a.y, a.z);
 }
+inline __host__ __device__ real3 make_real3(double3 a)
+{
+  return make_real3(a.x, a.y, a.z);
+}
+
 inline __host__ __device__ real3 make_real3(real4 a)
 {
   return make_real3(a.x, a.y, a.z);
 }
+inline __host__ __device__ real3 make_real3(double4 a)
+{
+  return make_real3(a.x, a.y, a.z);
+}
+
 inline __host__ __device__ real3 make_real3(real2 a, real z)
 {
     return make_real3(a.x, a.y, z);

@@ -1,4 +1,4 @@
-/*
+/* Raul P. Pelaez 2016. cudaTextureObject_t wrapper
 
   See GPUUtils.h for texture fetch overloads
 
@@ -10,8 +10,6 @@
 #include<cuda_runtime.h>
 #include"utils/helper_gpu.cuh"
 #include<cstring>
-typedef unsigned int uint;
-
 
 struct TexReference{
   /*Raw pointer to device memory, 

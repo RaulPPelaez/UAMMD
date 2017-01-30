@@ -23,7 +23,8 @@ namespace pair_forces_ns{
     real3 cellSize, invCellSize;
     int ncells;
     int3 cellDim;
-    real rcut, invrc, invrc2;
+    real rcut_pot, invrc_pot, invrc2_pot;
+    real rcut;
     int3 gridPos2CellIndex;
     
     TexReference texForce, texEnergy;
@@ -45,16 +46,18 @@ namespace pair_forces_ns{
   // 	       cudaTextureObject_t texForce, cudaTextureObject_t texEnergy,
   // 	       uint *cellStart, uint *cellEnd, uint* particleIndex, uint ncells,
   // 	       real4 *sortPos, real4 *pos, uint N);
-  void initGPU(Params &m_params, uint N, size_t potSize);  
+  void initGPU(Params &m_params, Params *&d_params, uint N, size_t potSize);  
   void initDPDGPU(ParamsDPD &m_params);
 
 
   void updateParams(Params m_params);
+  void updateParamsFromGPU(Params *d_params);
 
-  void makeCellList(real4 *pos, real4 *sortPos,
+  void makeCellList(real4 *pos, real4 *sortPos,// real4 *old_pos,
 		    uint *&particleIndex, uint *&particleHash,
 		    uint *cellStart, uint *cellEnd,
 		    uint N, uint ncells);
+  bool needsUpdateGPU(real4 *pos, real4 *old_pos, real threshold, uint N);
   
   void makeCellListDPD(real4 *pos, real3* vel,  real4 *sortPos, real4 *sortVel,
 		       uint *&particleIndex, uint *&particleHash,
@@ -62,6 +65,13 @@ namespace pair_forces_ns{
 		       uint N, uint ncells);
 
 
+  template<class Transverser>
+  void computeWithListGPU(Transverser t,
+			  uint *cellStart, uint *cellEnd,
+			  uint *particleIndex, 
+			  uint N);
+
+  
   void computePairForce(real4 *sortPos, real4 *force,
 			uint *cellStart, uint *cellEnd,
 			uint *particleIndex, 
@@ -83,6 +93,8 @@ namespace pair_forces_ns{
 			  uint *cellStart, uint *cellEnd,
 			  uint *particleIndex, 
 			  uint N);
+
+  void reorderPosGPU( real4 *sortPos, real4 *pos, uint *particleIndex, uint N);
 
 }
 #endif

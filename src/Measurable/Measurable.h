@@ -19,7 +19,7 @@ Each Measurable has an id that can be used to know the order of the calls.
 #include"globals/defines.h"
 #include"globals/globals.h"
 #include<fstream>
-using namespace std;
+
 class Measurable{
 public:
   Measurable();
@@ -30,9 +30,9 @@ protected:
   uint N;
   real3 L;
   int id;
-  static ofstream out;
+  static std::ofstream out;
   static int total_measurables;
 };
-typedef vector<shared_ptr<Measurable>> MeasurableArray;
+typedef std::vector<shared_ptr<Measurable>> MeasurableArray;
 
 #endif

@@ -14,7 +14,6 @@
 TODO:
 100- Finish the vector input of the bonds
 100- Write sumEnergy
-100- Implement Three body springs
 */
 
 #include"BondedForces.h"

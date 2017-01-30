@@ -9,13 +9,13 @@
  
   
   Solves the following differential equation:
-      X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
+      X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2·T·dt)·dW·B
    Being:
      X - Positions
-     D - Diffusion matrix
+     M - Mobility matrix
      K - Shear matrix
      dW- Noise vector
-     B - sqrt(D)
+     B - chol(M)
 */
 #include "BrownianEulerMaruyama.h"
 
@@ -69,7 +69,7 @@ BrownianEulerMaruyama::BrownianEulerMaruyama(Matrixf Din,
 
   /*Set GPU parameters*/
   
-  params.sqrtdt = sqrt(dt)*sqrt(2.0);
+  params.sqrt2Tdt = sqrt(dt)*sqrt(2.0*gcnf.T);
   params.dt = dt;
   params.L = L;
   params.N = N;

@@ -9,7 +9,7 @@
 
 namespace brownian_euler_maruyama_ns{
   struct Params{
-    real sqrtdt, dt;
+    real sqrt2Tdt, dt;
     real3 *B, *D, *K;
     real3 L;
     uint N;

@@ -17,16 +17,31 @@ TODO:
 
 #define TPB 128
 namespace nbody_ns{
-  inline __device__ real4 forceij(const real4 &posi, const real4 &posj){
+  inline __device__ real3 forceij(const real4 &posi, const real4 &posj){
     real3 r12 = make_real3(posj)-make_real3(posi);
-    real r2 = dot(r12, r12)+real(0.01);
-    real r6 = r2*r2*r2;
-#ifdef SINGLE_PRECISION
-    real invr3 = rsqrtf(r6);
-#else
-    real invr3 = rsqrt(r6);
-#endif
-    return make_real4(invr3*r12, real(0.0));
+    real r2 = dot(r12, r12);
+    if(r2==real(0.0))
+      return make_real3(0.0);
+    real invr = rsqrtf(r2);
+    if(r2>real(1.0)){
+      r2 *= real(4.0);
+      return make_real3(real(0.75)*real(2.0)*(r2-real(2.0))/(r2*r2)*r12*invr);
+    }
+    else{
+      //return make_real3(0.0);
+      return make_real3(real(0.09375)*real(2.0)*r12*invr);
+    }
+
+ //    real3 r12 = make_real3(posj)-make_real3(posi);
+ //    real r2 = dot(r12, r12)+real(0.01);
+ //     real r6 = r2*r2*r2;
+ // #ifdef SINGLE_PRECISION
+ //     real invr3 = rsqrtf(r6);
+ // #else
+ //     real invr3 = rsqrt(r6);
+ // #endif
+ //     return make_real4(invr3*r12, real(0.0));
+    
   }
 
 
@@ -44,8 +59,8 @@ namespace nbody_ns{
     /*Storing blockDim.x positions in shared memory and processing all of them in parallel*/
     extern __shared__ real4 shPos[];
     
-    real4 pi = pos[id]; /*My position*/
-    real4 f = make_real4(real(0.0)); /*The three elements of the result D·v I compute*/
+    const real4 pi = pos[id]; /*My position*/
+    real3 f = make_real3(real(0.0)); /*The three elements of the result D·v I compute*/
 
     /*Distribute the N particles in numTiles tiles.
       Storing in each tile blockDim.x positions and elements of v in shared memory*/
@@ -55,16 +70,16 @@ namespace nbody_ns{
       shPos[threadIdx.x] = pos[tile*blockDim.x+threadIdx.x];
       __syncthreads();
       /*Go through all the particles in the current tile*/
-      //#pragma unroll 4
+      #pragma unroll 8
       for(uint counter = 0; counter<blockDim.x; counter++){
-	f += forceij(pi,shPos[counter]);
-	
+	if(id != tile*blockDim.x+counter)
+	  f += forceij(pi,shPos[counter]);	
       }/*End of particles in tile loop*/
-      __syncthreads();    
+      __syncthreads();
 
     }/*End of tile loop*/
     /*Write the result to global memory*/
-    force[id] = f;
+    force[id] += make_real4(f,0);
   }
 
   void computeNBodyForce(real4 *force, real4 *pos, uint N){

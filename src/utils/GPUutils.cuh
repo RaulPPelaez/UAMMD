@@ -1,3 +1,4 @@
+/*Raul P. Pelaez 2016. Custom texture fetches for double and TexReference*/
 #ifndef GPUUTILS_H
 #define GPUUTILS_H
 

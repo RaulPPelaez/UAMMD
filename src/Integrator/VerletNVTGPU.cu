@@ -37,11 +37,11 @@ namespace verlet_nvt_ns{
 
 
   /*Integrate the movement*/
+  template<int step>
   __global__ void integrateGPUD(real4 __restrict__  *pos,
 				real3 __restrict__ *vel,
 				const real4 __restrict__  *force,
-				const real3 __restrict__ *noise,
-				int step){
+				const real3 __restrict__ *noise){
     uint i = blockIdx.x*blockDim.x+threadIdx.x;
     if(i>=params.N) return;
     /*Half step velocity*/
@@ -57,8 +57,15 @@ namespace verlet_nvt_ns{
   void integrateGPU(real4 *pos, real3 *vel, real4 *force, real3* noise, uint N,
 		    int step){
     uint nthreads = TPB<N?TPB:N;
-    uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0); 
-    integrateGPUD<<<nblocks, nthreads>>>(pos, vel, force, noise, step);
+    uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0);
+    switch(step){
+    case 1:
+      integrateGPUD<1><<<nblocks, nthreads>>>(pos, vel, force, noise);
+      break;
+    case 2:
+      integrateGPUD<2><<<nblocks, nthreads>>>(pos, vel, force, noise);
+      break;      
+    }
   }
 
   /*Returns the squared of each element in a real3*/

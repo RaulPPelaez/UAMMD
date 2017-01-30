@@ -1,4 +1,4 @@
-
+/*Raul P. Pelaez 2016. Precision agnostic cublas/cusolver function defines*/
 #include"globals/defines.h"
 #include<cublas_v2.h>
 #include<cusolverDn.h>

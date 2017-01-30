@@ -13,7 +13,6 @@ TODO:
 #include<memory.h>
 #include<algorithm>
 /*Pinned memory is a little broken, it doesnt really help to make writes to disk faster, apparently pinned memory makes a CPU array accesible from the GPU, so it is not needed to download. The problem is taht writing to disk in parallel is incompatible with this, so it is better to just keep a separate CPU and GPU copies and download manually when needed*/
-typedef unsigned int uint;
 
 template<class T>
 class Vector{
@@ -190,16 +189,25 @@ public:
   
   void fill_with(T x){std::fill(data, data+n, (T)x);}
   //Upload/Download from the GPU, ultra fast if is pinned memory
-  inline void upload(int N = 0){
-    if(N==0) N = n;
+  inline void upload(int start, int end){
     uploaded= true;
-    gpuErrchk(cudaMemcpy(d_m, data, N*sizeof(T), cudaMemcpyHostToDevice));
+    int N = end-start;
+    gpuErrchk(cudaMemcpy(d_m+start, data+start, N*sizeof(T), cudaMemcpyHostToDevice));
   }
-  inline void download(int N = 0){
+  inline void upload(int N=0){
+    if(N==0) N=n;
+    this->upload(0,N);
+  }
+  
+  inline void download(int start, int end){
     if(!pinned){
-      if(N==0) N = n;
-      gpuErrchk(cudaMemcpy(data, d_m, N*sizeof(T), cudaMemcpyDeviceToHost));
+      int N = end-start;
+      gpuErrchk(cudaMemcpy(data+start, d_m+start, N*sizeof(T), cudaMemcpyDeviceToHost));
     }
+  }
+  inline void download(int N=0){
+    if(N==0) N=n;
+    this->download(0,N);
   }
 
   inline void GPUmemset(int x){
@@ -235,7 +243,7 @@ public:
   operator T *&() {return d_m;}
   operator T *() const{return d_m;}
   operator shared_ptr<Vector<T>>() {return make_shared<Vector<T>>(*this);}
-  operator cudaTextureObject_t(){ return this->getTexture(); }
+  operator cudaTextureObject_t(){ return this->getTexture().tex; }
 };
 
 template<class T>

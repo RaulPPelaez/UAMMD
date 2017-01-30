@@ -8,13 +8,13 @@
  
   
   Solves the following differential equation:
-      X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
+      X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*Tdt)·dW·B
    Being:
      X - Positions
-     D - Diffusion matrix
+     M - Diffusion matrix
      K - Shear matrix
      dW- Noise vector
-     B - sqrt(D)
+     B - chol(M)
 */
 #ifndef BROWNIANEULERMARUYAMAINTEGRATOR_H
 #define BROWNIANEULERMARUYAMAINTEGRATOR_H
@@ -39,13 +39,9 @@ public:
 private:
   Matrixf D, K, B;
   Vector3 noise;
-
-  
   
   curandGenerator_t rng;
   brownian_euler_maruyama_ns::Params params;
-  
-
 
 };
 

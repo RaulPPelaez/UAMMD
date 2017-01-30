@@ -1,10 +1,13 @@
+/*Raul P. Pelaez 2016. Global defines, the whole proyect is aware of this, both GPU and CPU code*/
 #include<cuda_runtime.h>
 #include<stdint.h>
 
-#define UAMMD_VERSION "0.01.4(alpha)"
+#define UAMMD_VERSION "0.01.6(alpha)"
+
+/*Comment to compile for double precision*/
 #define SINGLE_PRECISION
 
-typedef uint32_t uint;
+typedef unsigned int uint;
 typedef unsigned long long int ullint;
 
 
@@ -25,6 +28,7 @@ typedef double4 real4;
 #endif
 
 
+/*Some minimal information about the current system*/
 #ifndef SYSTEMINFO_H
 #define SYSTEMINFO_H
 struct SystemInfo{

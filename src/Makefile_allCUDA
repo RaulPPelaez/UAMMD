@@ -5,7 +5,7 @@ CXX=g++
 CC=$(CXX)
 NVCC=/usr/local/cuda-$(CUDA_VERSION)/bin/nvcc
 
-#EXPERIMENTAL=1  #Uncomment to compile with experimental modules
+EXPERIMENTAL=1  #Uncomment to compile with experimental modules
 
 ###############################Put here your system configuration:#####################################
 
@@ -60,8 +60,8 @@ DEBUGGPU= -G
 endif
 NVFLAGS= $(DEBUGGPU) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=$(CXX)   --compiler-options='$(CFLAGS)' -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  $(INCLUDEFLAGS) # -Xptxas -dlcm=ca
 
-LDFLAGS= -L$(CUDA_LIBS) -flto
-LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -flto -lgomp
+LDFLAGS= -L$(CUDA_LIBS) 
+LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -lgomp
 
 
 OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
@@ -104,11 +104,11 @@ $(THIRD_PARTY_OBJSS):
 
 
 main:  $(OBJS) $(CUOBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS)
-
+	$(NVCC) $(LDFLAGS) $(LDLIBS) $^
 %.o:%.cu
 	$(NVCC) $(NVFLAGS) -c $< -o $@
 %.o:%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(NVCC) -x cu -rdc=true $(NVFLAGS) -c $< -o $@
 %.o:%.f90
 	gfortran -O3 -c $< -o $@
 

@@ -43,6 +43,7 @@ TODO:
 #include<chrono>
 #include<ctime>
 #include"Driver/SimulationConfig.h"
+#include"Driver/SimulationScript.h"
 #include<cuda.h>
 
 /*Declaration of extern variables in globals.h*/
@@ -54,10 +55,12 @@ Xorshift128plus grng;
 
 
 int main(int argc, char *argv[]){
-  int dev = 0;
-  fori(1,argc)
-    if(strcmp("--device", argv[i])==0)
-      dev = atoi(argv[i+1]);
+  int dev = -1;
+  {
+    int arg_dev = checkFlag(argc, argv, "--device");
+    if(arg_dev!=-1)
+      dev = atoi(argv[arg_dev+1]);
+  }
   {
     fori(0,60) cerr<<"━";
     cerr<<"┓"<<endl;
@@ -67,12 +70,15 @@ int main(int argc, char *argv[]){
     cerr<<line1<<endl;
     cerr<<line2<<" Version: "<<UAMMD_VERSION<<endl;
     cerr<<line3<<endl;
-  
+    cerr<<"Compiled at: "<<__DATE__<<" "<<__TIME__<<endl;
     std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     cerr<<"Computation started at "<<std::ctime(&time)<<endl;
   }
   /*Get device information*/
-  cudaSetDevice(dev);
+  if(dev<0)
+    cudaGetDevice(&dev);
+  else
+    cudaSetDevice(dev);
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
 
@@ -93,9 +99,18 @@ int main(int argc, char *argv[]){
   // cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
   // cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*1000);
 
+  /*Check for a simulation script*/
+  int arg_script = checkFlag(argc, argv, "--script");
+  
   /*The simulation handler*/
-  SimulationConfig psystem(argc, argv);
   /*The constructor does all the work*/
+
+  if(arg_script!=-1)   /*Simulation is script driven*/
+    SimulationScript psystem(argc, argv, argv[arg_script+1]);
+  else /*Simulation is hardcoded in SimulationConfig.cpp*/
+    SimulationConfig psystem(argc, argv);
+
+  
   /*Wait for any unfinished GPU job and get out*/
   cudaDeviceSynchronize();
   {

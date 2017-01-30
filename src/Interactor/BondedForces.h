@@ -23,7 +23,6 @@
 
 TODO:
 100- Allow for fluam like input (AKA check for repeated springs) ignore and print a message.
-100- Implement Three body springs
 */
 
 #ifndef BONDEDFORCES_H

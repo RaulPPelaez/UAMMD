@@ -1,4 +1,4 @@
-#**Universally Adaptable Multiscale Molecular Dynamics (UAMMD)**
+#**Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.01.6(alpha)**
 
 ##DESCRIPTION
 
@@ -31,7 +31,7 @@ In order to do so it can hold any number of Interactors and use them to compute 
 A Measurable is any computation that has to be performed between steps of the simulation, it can be any magnitude that is calculated from the simulation state (positions, forces..).
 A measurable can compute the energy, the radial function distribution or any arbitrary computation that does not change the simulation state.
 
-----------------
+----------------------
 
 These objects are abstract classes that can be derived to create all kinds of functionality and add new physics. Just create a new class that inherits Interactor, Integrator or Measurable and override the virtual methods with the new functionality.
 
@@ -102,7 +102,7 @@ This code makes use of the following CUDA packages:
 ##REQUERIMENTS
 
 --------------------
-Needs an NVIDIA GPU with compute capability sm_3.5+
+Needs an NVIDIA GPU with compute capability sm_2.0+
 Needs g++ with full C++11 support, 4.8+ recommended
 
 ##TESTED ON
@@ -110,7 +110,8 @@ Needs g++ with full C++11 support, 4.8+ recommended
 ------------
 	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5 and g++ 4.8
      - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5 and g++ 5.3.1
-     - GTX980 (sm_52) and GTX780 (sm_35)  on CentOS 6.5 with CUDA 7.5 and g++ 4.8
+     - GTX980 (sm_52), GTX780 (sm_35), GTX480(sm_20) and GTX580(sm_20) on CentOS 6.5 with CUDA 7.5 and g++ 4.8
+	 - GTX1080 (sm_61), Tesla P1000 (sm_60) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
 
 ##BENCHMARK
 

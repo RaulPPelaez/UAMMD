@@ -1,7 +1,22 @@
 #include"utils.h"
 #include<stdlib.h>
 #include<fstream>
+#include<sstream>
+#include<vector>
+#include <iterator>
+int checkFlag(int argc, char *argv[], const char *flag){
+  fori(1, argc){
+    if(strcmp(flag, argv[i])==0) return i;
+  }
+  return -1;
+}
 
+vector<string> stringSplit(string s){
+  std::stringstream ss(s);
+  std::istream_iterator<std::string> begin(ss);
+  std::istream_iterator<std::string> end;
+  return std::vector<std::string>(begin, end);
+}
 
 Matrixf eye(uint n){
   Matrixf A(n,n);

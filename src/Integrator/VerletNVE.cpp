@@ -60,18 +60,11 @@ void VerletNVE::update(){
     real vamp = sqrt(2.0*K/3.0);
     /*Create velocities*/
     vel.fill_with(make_real3(real(0.0)));
-    real3 sumvel = make_real3(0);
     fori(0,N){
       vel[i].x = vamp*grng.gaussian(0.0, 1.0);
       vel[i].y = vamp*grng.gaussian(0.0, 1.0);
       vel[i].z = vamp*grng.gaussian(0.0, 1.0);
-      sumvel += vel[i];
     }
-
-    fori(0,N)
-      vel[i] -= sumvel/(real)N;
-    cerr<<sumvel<<endl;
-    
     vel.upload();
     cudaMemset(force.d_m, 0, N*sizeof(real4));
   }

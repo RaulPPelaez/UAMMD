@@ -57,13 +57,15 @@ public:
   ~PairForces();
 
   void sumForce() override;
+  template<class Transversable>
+  void sumCustom(Transversable t);
   real sumEnergy() override;
   real sumVirial() override;
 
   void setPotParam(uint i, uint j, real2 param);
 protected:
   uint ncells;
-  Vector4 sortPos;
+  Vector4 sortPos;//, oldPos;
   
   void init();
   void makeNeighbourList();
@@ -73,7 +75,8 @@ protected:
  
   Vector<real> energyArray, virialArray;
   
-  pair_forces_ns::Params params;
+  pair_forces_ns::Params params; //CPU version of parameters
+  pair_forces_ns::Params *paramsGPU; //GPU global memory version of parameters
   
   //These handle the selected force functions
   
@@ -86,5 +89,8 @@ protected:
   pairForceType forceSelector;
   
   static uint pairForcesInstances;
+  static uint pairForcesConstantMemoryOwner;
+  uint my_instance;
 };
+
 #endif

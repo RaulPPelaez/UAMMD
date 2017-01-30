@@ -23,7 +23,7 @@
 #define HELPER_MATH_H
 
 #include "cuda_runtime.h"
-typedef unsigned int uint;
+#include "globals/defines.h"
 typedef unsigned short ushort;
 
 #ifndef EXIT_WAIVED

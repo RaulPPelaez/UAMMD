@@ -4,13 +4,13 @@
   takes a thrust::Tuple containing positions, velocities and forces on each particle. 
 
   Solves the following differential equation:
-  X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
+  X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2·T·dt)·dW·B
   Being:
   X - Positions
-  D - Diffusion matrix
+  M - Mobility matrix
   K - Shear matrix
   dW- Noise vector
-  B - sqrt(D)
+  B - chol(D)
 
 
   TODO:
@@ -22,7 +22,6 @@
 #include<thrust/device_ptr.h>
 #include<thrust/for_each.h>
 #include<thrust/iterator/zip_iterator.h>
-
 
 
 using namespace thrust;
@@ -51,15 +50,18 @@ namespace brownian_euler_maruyama_ns{
     real3 *B = params.B;
     real3 *D = params.D;
     real3 *K = params.K;
-    real sqrtdt = params.sqrtdt;
+    real sqrt2Tdt = params.sqrt2Tdt;
     real dt = params.dt; 
     real3 p = make_real3(pos[i]);
     real3 f = make_real3(force[i]);
+
+    real3 KR = make_real3(dot(K[0],p), dot(K[1],p), dot(K[2],p));
+    
     // X[t+dt] = dt(K·X[t]+D·F[t]) + sqrt(dt)·dW·B
-    p.x =  dt*( dot(K[0],p) +  dot(D[0],f)) + sqrtdt*dot(dW[i],B[0]);
-    p.y =  dt*( dot(K[1],p) +  dot(D[1],f)) + sqrtdt*dot(dW[i],B[1]);
+    p.x =  dt*(  KR.x +  dot(D[0],f)) + sqrt2Tdt*dot(dW[i],B[0]);
+    p.y =  dt*(  KR.y +  dot(D[1],f)) + sqrt2Tdt*dot(dW[i],B[1]);
     if(params.L.z!=real(0.0))//If 3D
-      p.z =  dt*( dot(K[2],p) +  dot(D[2],f)) + sqrtdt*dot(dW[i],B[2]);
+      p.z =  dt*( KR.z +  dot(D[2],f)) + sqrt2Tdt*dot(dW[i],B[2]);
 
     pos[i] += make_real4(p);
   }

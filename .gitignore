@@ -1,5 +1,9 @@
+src/Interactor/Experimental
 *.o
 *~
 *.particles
 *.pbc
+*.gdr
+*.bak
+gdrDATA
 bin/*
