@@ -1,6 +1,6 @@
-#**Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.01.6(alpha)**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.02.01(alpha)**
 
-##DESCRIPTION
+## DESCRIPTION
 
 -----------------
 
@@ -41,7 +41,7 @@ Finally there is a Driver that puts them all together and controls the flow of t
 **The simulation construction is performed in Driver/SimulationConfig.cpp. Where the integrator, interactors and measurables are created and the initial conditions and parameters are set. This is the "input" of UAMMD.**
 
 
-#Currently Implemented
+# Currently Implemented
 
 -----------------------
 **Interactors:**
@@ -73,7 +73,7 @@ Finally there is a Driver that puts them all together and controls the flow of t
 You can select between single and double precision in globals/defines.h. Single precision is used by default, you can change to double precision by commenting "#define SINGLE_PRECISION" and recompiling the entire code. This last step is very important, as failing to do so will result in unexpected behavior.
 
 
-##USAGE
+## USAGE
 
 -------------------
 If you dont have cub (thrust comes bundled with the CUDA installation) clone or download the v1.5.2 (see dependencies).
@@ -87,7 +87,7 @@ Then compile with make and run. You can use the --device X flag to specify a cer
 
 You may need to adequate the Makefile to you particular system
 
-##DEPENDENCIES
+## DEPENDENCIES
 
 ---------------------
 Depends on:
@@ -103,13 +103,13 @@ This code makes use of the following CUDA packages:
 	3. cuSolver
 	
 
-##REQUERIMENTS
+## REQUERIMENTS
 
 --------------------
 Needs an NVIDIA GPU with compute capability sm_3.5+
 Needs g++ with full C++11 support, 4.8+ recommended
 
-##TESTED ON
+## TESTED ON
 
 ------------
 	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5 and g++ 4.8
@@ -117,7 +117,7 @@ Needs g++ with full C++11 support, 4.8+ recommended
      - GTX980 (sm_52), GTX780 (sm_35), GTX480(sm_20) and GTX580(sm_20) on CentOS 6.5 with CUDA 7.5 and g++ 4.8
 	 - GTX1080 (sm_61), Tesla P1000 (sm_60) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
 
-##BENCHMARK
+## BENCHMARK
 
 ------------
 
@@ -133,7 +133,7 @@ Current benchmark:
 	Starting in a cubicLattice
 
 
-####------HIGHSCORE---------
+#### ------HIGHSCORE---------
 
 	Number of cells: 51 51 51; Total cells: 132651
 	Initializing...
@@ -147,7 +147,7 @@ Current benchmark:
 	sys  0m25.212s
 
 
-##NOTES FOR DEVELOPERS
+## NOTES FOR DEVELOPERS
 
 The procedure to implement a new module is the following:
 
@@ -173,6 +173,6 @@ If you want to make small changes to an existing module, without changing it. Th
 
 ------------------------------------------
 
-##ACKNOWLEDGMENTS
+## ACKNOWLEDGMENTS
 
 UAMMD was developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.
