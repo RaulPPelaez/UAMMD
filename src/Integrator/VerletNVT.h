@@ -40,19 +40,17 @@ public:
   real sumEnergy() override;
 
   void setTemp(real Tnew){
-    params.T = Tnew;
+    gcnf.T = Tnew;
     params.noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*Tnew);
     verlet_nvt_ns::initGPU(params);
   }
 private:
-  Vector3 noise; //Noise in single precision always
-  
+  Vector3 noise; //Noise in single precision always  
   real gamma; //Gamma is not stored in gcnf
   
   verlet_nvt_ns::Params params;
   curandGenerator_t rng;
 };
-
 
 
 #endif

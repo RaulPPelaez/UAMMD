@@ -10,12 +10,8 @@
 namespace verlet_nvt_ns{
 
   struct Params{
-    real dt;
     real gamma;
-    real T;
     real noiseAmp;
-    real3 L;
-    uint N;
   };
 
   void initGPU(Params m_params);

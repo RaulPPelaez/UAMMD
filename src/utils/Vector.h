@@ -13,35 +13,29 @@ TODO:
 #include<memory.h>
 #include<algorithm>
 /*Pinned memory is a little broken, it doesnt really help to make writes to disk faster, apparently pinned memory makes a CPU array accesible from the GPU, so it is not needed to download. The problem is taht writing to disk in parallel is incompatible with this, so it is better to just keep a separate CPU and GPU copies and download manually when needed*/
-
 template<class T>
 class Vector{
   typedef T* iterator;
 public:
   uint n; //size of the matrix
-  bool pinned; //Flag to use pinned memory
   bool initialized;
   bool uploaded;
   T *data; //The data itself, stored aligned in memory
   T *d_m; //device pointer
 
-  //  cudaTextureObject_t tex;
-  Texture<T> tex;
+  cudaTextureObject_t tex;
+  //Texture<T> tex;
   //Free the CPU version of the Vector
   void freeCPU(){
     if(!initialized) return;
-    if(pinned){
-      cudaFreeHost(data);
-      d_m = nullptr;
-    }
-    else free(data);
+    free(data);
     data = nullptr;
   }
   //Free the device memory
   void freeGPU(){
     if(this->initialized){
-      if(!pinned && d_m){gpuErrchk(cudaFree(d_m)); d_m = nullptr;}
-      if(tex!=0)tex.destroy();
+      if(d_m){gpuErrchk(cudaFree(d_m)); d_m = nullptr;}
+      if(tex!=0) Texture::destroy(tex);
     }
 
   }
@@ -50,43 +44,32 @@ public:
     freeGPU();
     n = 0;
     initialized = false;
-    pinned = false;
     uploaded = false;
   }
 
   /********RULE OF FIVE******************/
   
   /*Default constructor*/
-  Vector():n(0), pinned(false),
+  Vector():n(0),
 	   initialized(false),uploaded(false),
-	   data(nullptr), d_m(nullptr), tex(){}
+	   data(nullptr), d_m(nullptr), tex(0){}
   /*Destructor*/
   ~Vector() noexcept{
     /*Using the destructor messes real bad with the CUDA enviroment when using global variables, so you have to call freeMem manually for any global Vector before main exits...*/
     freeMem();
   }
   /*Initializer Constructor*/
-  Vector(uint n, bool pinned = false):
-    n(n), pinned(pinned),
+  Vector(uint n):
+    n(n),
     initialized(false), uploaded(false),
-    data(nullptr), d_m(nullptr), tex()
+    data(nullptr), d_m(nullptr), tex(0)
   {
     if(n>0){
-      this->initialized = true;
-      //Pined memory is allocated by cuda
-      if(pinned){
-	/* cudaHostAlloc allows the array to be accesed from the CPU without copy needed, it is always updated, and there is no need for allocation on device side, the GPU address is obtained with cudaHostGetDevicePointer(&d_m, data, 0)
-	 */
-	gpuErrchk(cudaHostAlloc(&data, sizeof(T)*n, 0));
-	gpuErrchk(cudaHostGetDevicePointer(&d_m, data, 0));
+      this->initialized = true;     
+      data = (T *)malloc(sizeof(T)*n); //C style memory management
+      //Allocate device memory
+      gpuErrchk(cudaMalloc(&d_m, n*sizeof(T)));
       
-	uploaded = true;
-      }
-      else{
-	data = (T *)malloc(sizeof(T)*n); //C style memory management
-	//Allocate device memory
-	gpuErrchk(cudaMalloc(&d_m, n*sizeof(T)));
-      }
       if(!data || !d_m){
 	cerr<<"Could not allocate data for Vector!!"<<endl;
 	exit(1);
@@ -96,7 +79,7 @@ public:
   
   /*Copy constructor*/
   Vector(const Vector<T>& other):
-    Vector(other.size(), other.pinned){
+    Vector(other.size()){
     if(other.initialized){
       std::copy(other.data, other.data+n, data);
       if(other.uploaded){
@@ -107,17 +90,16 @@ public:
   }
   /*Move constructor*/
   Vector(Vector<T>&& other) noexcept:
-			     n(other.n), pinned(other.pinned),
+			     n(other.n),
 			     initialized(other.initialized),
 			     uploaded(other.uploaded),
-			     data(other.data), d_m(other.d_m)
+			     data(other.data), d_m(other.d_m), tex(other.tex)
   {
-    other.pinned = false;
     other.initialized = false;
     other.n = 0;
     other.data = nullptr;
     other.d_m = nullptr;
-    other.tex.destroy();
+    other.tex = 0;
   }
 
   /*Copy assignement operator*/
@@ -135,16 +117,14 @@ public:
     this->data = other.data;
     this->d_m = other.d_m;
     this->initialized = other.initialized;
-    this->pinned = other.pinned;
     this->uploaded = other.uploaded;
-    this->tex.destroy();
+    this->tex = other.tex;
     other.n = 0;
     other.data = nullptr;
     other.d_m = nullptr;
     other.initialized = false;
     other.uploaded = false;
-    other.pinned = false;
-    other.tex.destroy();
+    other.tex = 0;
     return *this;
   }
 
@@ -154,20 +134,7 @@ public:
     if(!initialized) return {(void*)d_m, 0};
     if(tex!=0) return {(void*) d_m,tex};
     if(n==0 || d_m == nullptr) return {(void *)d_m, 0};
-    tex.init(d_m, n);
-    // cudaResourceDesc resDesc;
-    // memset(&resDesc, 0, sizeof(resDesc));
-    // resDesc.resType = cudaResourceTypeLinear;
-    // resDesc.res.linear.devPtr = d_m;
-    // resDesc.res.linear.desc = cudaCreateChannelDesc<T>();
-    // resDesc.res.linear.sizeInBytes = n*sizeof(T);
-
-    // cudaTextureDesc texDesc;
-    // memset(&texDesc, 0, sizeof(texDesc));
-    // texDesc.readMode = cudaReadModeElementType;
-
-    // gpuErrchk(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
-
+    Texture::init<T>(d_m, tex, n);
     return {(void*)d_m, tex};
   }
   
@@ -200,20 +167,24 @@ public:
   }
   
   inline void download(int start, int end){
-    if(!pinned){
-      int N = end-start;
-      gpuErrchk(cudaMemcpy(data+start, d_m+start, N*sizeof(T), cudaMemcpyDeviceToHost));
-    }
+    int N = end-start;
+    gpuErrchk(cudaMemcpy(data+start, d_m+start, N*sizeof(T), cudaMemcpyDeviceToHost));
   }
   inline void download(int N=0){
     if(N==0) N=n;
     this->download(0,N);
   }
 
-  inline void GPUmemset(int x){
+  inline void GPUmemset(uint x){
     uploaded= true;
     gpuErrchk(cudaMemset(d_m, x, n*sizeof(T)));
   }
+  inline void memset(uint x){
+    uploaded= true;
+    std::memset(data, x, n*sizeof(T));
+    gpuErrchk(cudaMemset(d_m, x, n*sizeof(T)));
+  }
+
   inline bool GPUcopy_from(const Vector<T> &other){
     if(other.uploaded && this->n == other.n){
       this->uploaded = true;
@@ -245,6 +216,171 @@ public:
   operator shared_ptr<Vector<T>>() {return make_shared<Vector<T>>(*this);}
   operator cudaTextureObject_t(){ return this->getTexture().tex; }
 };
+
+template<class T>
+__global__ void GPUfill_with(T* d_m, T x, int n){
+  int i = blockIdx.x*blockDim.x+threadIdx.x;
+  if(i>=n) return;
+  d_m[i] = x;
+}
+
+template<class T>
+class GPUVector{
+  typedef T* iterator;
+public:
+  uint n; //size of the matrix
+  bool initialized;
+  T *d_m; //device pointer
+  //Texture<T> tex;
+  cudaTextureObject_t tex;
+  //Free the device memory
+  void freeMem(){
+    if(this->initialized){
+      if(d_m){gpuErrchk(cudaFree(d_m)); d_m = nullptr;}
+      if(tex!=0)Texture::destroy(tex);
+      initialized = false;
+      n = 0;
+    }
+
+  }
+
+  /********RULE OF FIVE******************/
+  
+  /*Default constructor*/
+  GPUVector():n(0),
+	      initialized(false),
+	      d_m(nullptr), tex(0){}
+  /*Destructor*/
+  ~GPUVector() noexcept{
+    /*Using the destructor messes real bad with the CUDA enviroment when using global variables, so you have to call freeMem manually for any global Vector before main exits...*/
+    freeMem();
+  }
+  /*Initializer Constructor*/
+  GPUVector(uint n):
+    n(n),
+    initialized(false),
+    d_m(nullptr), tex(0)
+  {
+    if(n>0){
+      this->initialized = true;
+      //Allocate device memory
+      gpuErrchk(cudaMalloc(&d_m, n*sizeof(T)));
+      if(!d_m){
+	cerr<<"Could not allocate data for GPUVector!!"<<endl;
+	exit(1);
+      }
+    }
+  }
+  
+  /*Copy constructor*/
+  GPUVector(const GPUVector<T>& other):
+    GPUVector(other.size()){
+    if(other.initialized)
+      gpuErrchk(cudaMemcpy(d_m, other.d_m, n*sizeof(T), cudaMemcpyDeviceToDevice));
+  }
+  /*Move constructor*/
+  GPUVector(GPUVector<T>&& other) noexcept:
+				   n(other.n),
+				   initialized(other.initialized),
+				   d_m(other.d_m), tex(other.tex)
+  {
+    other.initialized = false;
+    other.d_m = nullptr;
+    other.tex = 0;
+  }
+  
+  /*Copy assignement operator*/
+  GPUVector<T>& operator=(const GPUVector<T>& other){
+    GPUVector<T> tmp(other);
+    *this = std::move(tmp);
+    return *this;
+  }
+  /*Move assignement operator*/
+  GPUVector<T>& operator= (GPUVector<T>&& other) noexcept{
+    if(initialized){
+      this->freeMem();
+    }
+    this->n = other.size();
+    this->d_m = other.d_m;
+    this->initialized = other.initialized;
+    this->tex = other.tex;
+    other.n = 0;
+    other.d_m = nullptr;
+    other.initialized = false;
+    other.tex = 0;
+    return *this;
+  }
+
+  /*************************************************************/
+
+  TexReference getTexture(){
+    if(!initialized) return {(void*)d_m, 0};
+    if(tex!=0) return {(void*) d_m,tex};
+    if(n==0 || d_m == nullptr) return {(void *)d_m, 0};
+    Texture::init<T>(d_m, tex, n);
+    return {(void*)d_m, tex};
+  }
+  
+  iterator begin(){ return this->d_m;}
+  iterator end(){ return this->d_m+n;}
+  
+  //Upload/Download from the GPU, ultra fast if is pinned memory
+  inline void upload(T* data, int start, int end){
+    int N = end-start;
+    gpuErrchk(cudaMemcpy(d_m+start, data+start, N*sizeof(T), cudaMemcpyHostToDevice));
+  }
+  inline void upload(T* data, int N=0){
+    if(N==0) N=n;
+    this->upload(data, 0,N);
+  }
+  
+  inline void download(T* data, int start, int end){
+    int N = end-start;
+    gpuErrchk(cudaMemcpy(data+start, d_m+start, N*sizeof(T), cudaMemcpyDeviceToHost));
+  }
+  inline void download(T* data, int N=0){
+    if(N==0) N=n;
+    this->download(data, 0,N);
+  }
+
+  inline void memset(int x, cudaStream_t st = 0){
+    if(st != 0){
+      gpuErrchk(cudaMemsetAsync(d_m, x, n*sizeof(T), st));
+    }
+    else{
+      gpuErrchk(cudaMemset(d_m, x, n*sizeof(T)));
+    }
+  }
+  inline bool copy_fromGPU(T* other_d_m){
+    this->uploaded = true;
+    gpuErrchk(cudaMemcpy(d_m, other_d_m, n*sizeof(T), cudaMemcpyDeviceToDevice));
+    return true;    
+  }
+  inline void fill_with(T x){
+    int BLOCKSIZE = 1024;
+    int nthreads = BLOCKSIZE<n?BLOCKSIZE:n;
+    int nblocks  =  n/nthreads +  ((n%nthreads!=0)?1:0); 
+    GPUfill_with<T><<<nblocks, nthreads>>>(d_m, x, n);    
+  }
+  uint size() const{return this->n;}
+  //void operator =(const Vector<T> &a){fori(0,n) data[i] = a[i]; }
+  //Access data with bracket operator
+  inline __device__ T& operator [](const int &i){return d_m[i];}
+  //Cast to float* returns the device pointer!
+  operator T *&() {return d_m;}
+  operator T *() const{return d_m;}
+  operator shared_ptr<GPUVector<T>>() {return make_shared<GPUVector<T>>(*this);}
+  operator cudaTextureObject_t(){ return this->getTexture().tex; }
+};
+
+
+
+
+
+
+
+
+
 
 template<class T>
 class Matrix: public Vector<T>{

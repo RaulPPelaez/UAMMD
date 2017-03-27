@@ -31,61 +31,42 @@ REFERENCES:
 #ifndef INTEGRATORBROWNIANHYDRODYNAMICSEULERMARUYAMA_H
 #define INTEGRATORBROWNIANHYDRODYNAMICSEULERMARUYAMA_H
 #include"globals/defines.h"
-#include "utils/utils.h"
-#include "Integrator.h"
-#include "BrownianHydrodynamicsEulerMaruyamaGPU.cuh"
-#include<curand.h>
-#include<cublas_v2.h>
-#include<cusolverDn.h>
-#include<cuda_runtime.h>
-#include"utils/cuda_lib_defines.h"
+#include"globals/globals.h"
+#include"utils/utils.h"
+#include"Integrator.h"
+#include"BDHI.cuh"
+#include"BDHI_Cholesky.cuh"
+#include"BDHI_Lanczos.cuh"
+#include"BDHI_PSE.cuh"
 
-/*How the diffusion matrix will be handled,
-  -MATRIXFULL stores a 3Nx3N matrix, computes it once and performs a matrix vector multiplication when needed
-  -MATRIXFREE doesnt store a D matrix, and recomputes it on the fly when asked to multiply it by a vector
-  -DEFAULT is FULL
+enum BDHIMethod {CHOLESKY, LANCZOS, PSE, DEFAULT};
 
-*/
-enum DiffusionMatrixMode{DEFAULT,MATRIXFULL, MATRIXFREE};
-/*Method of obtaining the Brownian noise vector y = sqrt(D)·z
- -Cholesky Performs a Choesky decomposition on D and explicitly multiplies it by z, needs FULL matrix mode.
- -LANCZOS Performs a Krylov subspace reduction on D, and computes y in a much smaller subspace.
- */
-enum StochasticNoiseMethod{CHOLESKY, LANCZOS};
-
-#include "DiffusionBDHI.h"
-#include "BrownianNoiseBDHI.h"
 /*-----------------------------INTEGRATOR CLASS----------------------------------*/
 class BrownianHydrodynamicsEulerMaruyama: public Integrator{
 public:
-  BrownianHydrodynamicsEulerMaruyama(Matrixf D0, Matrixf K,
-				     StochasticNoiseMethod stochMethod = CHOLESKY,
-				     DiffusionMatrixMode mode=DEFAULT, int max_iter = 0);
+  
+  BrownianHydrodynamicsEulerMaruyama(Matrixf K, real vis, real rh,
+				     BDHIMethod BDHIMethod = DEFAULT,
+				     int max_iter = 0);
 				     
   ~BrownianHydrodynamicsEulerMaruyama();
 
   void update() override;
   real sumEnergy() override;
   
-private:
-
-  Vector3 force3; /*Cublas needs a real3 array instead of real4 to multiply matrices*/
+private:  
   
-  Vector3 DF;  /*Result of D·F*/
-  Vector3 divM;/*Divergence of the mobility Matrix, only in 2D*/
-  Matrixf K, D0; /*Shear and self mobility 3x3 matrices*/
+  Vector3 MF;  /*Result of M·F*/
+  GPUVector3 BdW;  /*Result of B·dW*/
+  GPUVector3 divM;/*Divergence of the mobility Matrix, only in 2D*/
+  Matrixf K; /*Shear 3x3 matrices*/
 
-  brownian_hy_euler_maruyama_ns::Params params; /*GPU parameters (CPU version)*/
-  
   cudaStream_t stream, stream2;
+  /*The method for computing the hydrodynamic interactions.
+    Mainly in charge of computing MF, BdW and divM*/
+  shared_ptr<BDHI::BDHI_Method> bdhi;
 
-  /*Mobility handler*/
-  shared_ptr<brownian_hy_euler_maruyama_ns::Diffusion> D; 
-  /*Brownian noise computer, a shared pointer to the virtual base class*/
-  shared_ptr<brownian_hy_euler_maruyama_ns::BrownianNoiseComputer> cuBNoise;
-  
-  cublasStatus_t status;
-  cublasHandle_t handle;
+  int nblocks, nthreads;
 };
 
 

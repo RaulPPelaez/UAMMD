@@ -72,7 +72,8 @@ namespace nbody_ns{
       /*Go through all the particles in the current tile*/
       #pragma unroll 8
       for(uint counter = 0; counter<blockDim.x; counter++){
-	if(id != tile*blockDim.x+counter)
+	int cur_j = tile*blockDim.x+counter;
+	if(id != cur_j && cur_j<N)
 	  f += forceij(pi,shPos[counter]);	
       }/*End of particles in tile loop*/
       __syncthreads();
@@ -89,9 +90,5 @@ namespace nbody_ns{
 
     computeForceGPUD<<<Nblocks, TPB, TPB*sizeof(real4)>>>(pos, force, numtiles, N);
   }
-
-
-
-  
 
 }

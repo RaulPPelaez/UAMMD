@@ -36,11 +36,7 @@ VerletNVT::VerletNVT():
 
   /*Set params and init GPU parameters*/
   params.gamma = gamma;
-  params.dt = dt;
-  params.T = gcnf.T;
-  params.noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*params.T);
-  params.N = N;
-  params.L = L;
+  params.noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*gcnf.T);
   
   /*Init rng*/
   curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
@@ -51,11 +47,12 @@ VerletNVT::VerletNVT():
     vel = Vector3(N);
     noise.download();
     /*Distribute the velocities according to the temperature*/
-    double vamp = sqrt(3.0*params.T);
+    double vamp = sqrt(3.0*gcnf.T);
     /*Create velocities*/
     vel.fill_with(make_real3(0.0));
     fori(0,N){
       vel[i] = vamp*noise[i];
+      if(gcnf.D2) vel[i].z = 0;
     }
     vel.upload();
     curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), 0.0, 1.0);
@@ -70,31 +67,26 @@ VerletNVT::~VerletNVT(){
 
 //The integration process can have two steps
 void VerletNVT::update(){
-  cudaDeviceSynchronize();
   if(steps==0)
     for(auto forceComp: interactors) forceComp->sumForce();
   
   steps++;
   if(steps%1000==0) cerr<<"\rComputing step: "<<steps<<"   ";
 
-  cudaDeviceSynchronize();
   /**First integration step**/
   /*Gen noise*/
   curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), real(1.0));
   integrateGPU(pos, vel, force, noise, N, 1);
   /**Compute all the forces**/
-  cudaDeviceSynchronize();
   /*Reset forces*/
   cudaMemset((void *)force.d_m, 0, N*sizeof(real4));
   for(auto forceComp: interactors) forceComp->sumForce();
-  cudaDeviceSynchronize();
+
   /**Second integration step**/
   /*Gen noise*/
   curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), real(1.0));
   integrateGPU(pos, vel, force, noise, N, 2);
-    cudaDeviceSynchronize();
-  
- }
+}
 
 
 real VerletNVT::sumEnergy(){

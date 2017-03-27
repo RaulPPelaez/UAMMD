@@ -10,6 +10,7 @@ Driver::Driver(): step(0){
 
 void Driver::setParameters(){
   /*Initialize pos and force if needed*/
+  if(pos.size() != gcnf.N && pos.size() > 0) gcnf.N = pos.size();
   uint N = gcnf.N;
   if(pos.size() != N){
     pos = Vector4(N);
@@ -36,6 +37,21 @@ void Driver::setParameters(){
   }
   cerr<<"Random seed: "<<std::hex<<"0x"<<gcnf.seed<<"ull"<<endl;
   cerr<<std::dec<<endl;
+
+  if(gcnf.L.z==real(0.0)) gcnf.D2 = true;
+  
+  GlobalConfigGPU gcnfGPU_m;
+  gcnfGPU_m.L = gcnf.L;
+  gcnfGPU_m.invL = 1.0/gcnf.L;
+  gcnfGPU_m.N = gcnf.N;
+  gcnfGPU_m.dt = gcnf.dt;
+  gcnfGPU_m.T = gcnf.T;
+  gcnfGPU_m.D2 = gcnf.D2;
+  
+  gpuErrchk(cudaMemcpyToSymbol(gcnfGPU, &gcnfGPU_m, sizeof(GlobalConfigGPU)));
+
+
+  
 }
 
 /*Forward the simulation state nsteps·dt in time*/
@@ -47,6 +63,7 @@ void Driver::run(uint nsteps, bool relax){
   uint fps_steps = 0;
   /*Simulation*/
   fori(0,nsteps){
+    current_step = i;
     step++;
     fps_steps++;
     /**********FPS computation is done each second******/
@@ -86,6 +103,7 @@ void Driver::run(uint nsteps, bool relax){
     }
   }
   cerr<<"     Run time: "<<tim.toc()<<"s                                           "<<endl;
+  gcnf.nsteps += nsteps;
 }
 
 Driver::~Driver(){
@@ -133,15 +151,15 @@ void Writer::write(bool block){
 }
 
 //TODO: generalize format somehow, and allow for any other global array to be written
-//This function writes a step to disk
-void Writer::write_concurrent(){
-  real3 L = gcnf.L;
-  uint N = gcnf.N;
-  real4 *posdata = pos.data;
-  cout<<"#Lx="<<L.x*0.5f<<";Ly="<<L.y*0.5f<<";Lz="<<L.z*0.5f<<";\n";
-  fori(0,N){    
-    uint type = (uint)(posdata[i].w+0.5);
-    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" "<<0.5f*gcnf.sigma<<" "<<type<<"\n";
-  }
-  cout<<flush;
-}
+// //This function writes a step to disk
+// void Writer::write_concurrent(){
+//   real3 L = gcnf.L;
+//   uint N = gcnf.N;
+//   real4 *posdata = pos.data;
+//   cout<<"#Lx="<<L.x*0.5f<<";Ly="<<L.y*0.5f<<";Lz="<<L.z*0.5f<<";\n";
+//   fori(0,N){    
+//     uint type = (uint)(posdata[i].w+0.5);
+//     cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" "<<0.5f*gcnf.sigma<<" "<<type<<"\n";
+//   }
+//   cout<<flush;
+// }

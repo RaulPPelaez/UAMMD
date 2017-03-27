@@ -20,25 +20,35 @@ ARCH ?= 52 #35
 
 #You can place your custom files either here or below in the diferent OBJS_*/CUOBJS_* variables. Dont forget the folders if you put it here!
 #These will be compiled with $(CXX)
-CUSTOM_OBJS=
+CUSTOM_OBJS= 
 
 #These ones with $(NVCC)
-CUSTOM_CUOBJS=
+CUSTOM_CUOBJS= Interactor/NeighbourList/Sorter.o Interactor/NeighbourList/CellList.o Interactor/NeighbourList/NeighbourList.o
 
 FORTRAN_OBJS =
 
+
+INPUT_FILE= Driver/SimulationConfig.cpp
+
+INPUT_FILE_OBJ= $(patsubst %.cpp,%.o,$(patsubst %.cu,%.o,$(INPUT_FILE)))
+
 #############################################################################################################################
 
-#DEBUG= -g
+#DEBUG
+OPTIMCPU=-O3 -funroll-loops -m64 -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers -march=native -fPIC
+
+ifdef DEBUG
+OPTIMCPU= -g -O0 -fPIC
+endif
 
 
-INCLUDEDIRS= . Integrator Interactor Driver utils globals Measurable third_party misc $(CUDA_INCLUDE) $(CUDA_INCLUDE) $(CUB_INCLUDE)
+INCLUDEDIRS= . Integrator Interactor Interactor/NeighbourList Driver utils globals Measurable third_party misc $(CUDA_INCLUDE) $(CUDA_INCLUDE) $(CUB_INCLUDE)
 
 INCLUDEFLAGS= $(addprefix -I, $(INCLUDEDIRS))
 
 
 
-CFLAGS= -g -pthread -O3  -march=native -pthread   -funroll-loops -m64 -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers $(INCLUDEFLAGS)
+CFLAGS= -pthread $(OPTIMCPU)   $(INCLUDEFLAGS)
 
 ifdef EXPERIMENTAL
 CFLAGS += -DEXPERIMENTAL
@@ -50,18 +60,20 @@ CFLAGS += -DEXPERIMENTAL
 endif
 
 
-CXXFLAGS=$(CFLAGS) -std=c++11 -flto
+CXXFLAGS=$(CFLAGS) -std=c++11 #-flto 
 
 
 $(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 
 ifdef DEBUG
-DEBUGGPU= -G
+OPTIMGPU= -G -O0 -g
+else
+OPTIMGPU= -O3
 endif
-NVFLAGS= $(DEBUGGPU) -std=c++11 -D_FORCE_INLINES -O3 -ccbin=$(CXX)   --compiler-options='$(CFLAGS)' -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  $(INCLUDEFLAGS) # -Xptxas -dlcm=ca
+NVFLAGS= $(OPTIMGPU) -std=c++11  -ccbin=$(CXX)   --compiler-options='$(CFLAGS)' -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  $(INCLUDEFLAGS) -Xptxas -dlcm=cg #-Xptxas -warn-spills
 
-LDFLAGS= -L$(CUDA_LIBS) -flto
-LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -flto -lgomp
+LDFLAGS= -L$(CUDA_LIBS)
+LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -lgomp -lnvToolsExt -lcufft -llapacke
 
 
 OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
@@ -70,23 +82,23 @@ CUOBJS_INTERACTOR_EXPERIMENTAL= PairForcesAltGPU.o
 
 THIRD_PARTY_OBJS= bravais.o
 
-OBJS_INTERACTOR= Interactor.o PairForcesDPD.o BondedForces.o NBodyForces.o ExternalForces.o
+OBJS_INTERACTOR= BondedForces.o
 
-OBJS_BDHI= BrownianHydrodynamicsEulerMaruyama.o DiffusionBDHI.o BrownianNoiseBDHI.o
-CUOBJS_BDHI= BrownianHydrodynamicsEulerMaruyamaGPU.o DiffusionBDHIGPU.o
+OBJS_BDHI=    #BrownianHydrodynamicsEulerMaruyama.o DiffusionBDHI.o BrownianNoiseBDHI.o
+CUOBJS_BDHI= BrownianHydrodynamicsEulerMaruyama.o   BDHI_Cholesky.o BDHI_Lanczos.o BDHI_PSE.o
 
-OBJS_INTEGRATOR= Integrator.o VerletNVE.o VerletNVT.o BrownianEulerMaruyama.o  $(addprefix BDHI/, $(OBJS_BDHI))
+OBJS_INTEGRATOR= VerletNVT.o VerletNVE.o BrownianEulerMaruyama.o  $(addprefix BDHI/, $(OBJS_BDHI))
 OBJS_MEASURABLE= Measurable.o EnergyMeasure.o
 
 
-CUOBJS_INTERACTOR= PairForcesGPU.o PairForces.o BondedForcesGPU.o NBodyForcesGPU.o ExternalForcesGPU.o
-CUOBJS_INTEGRATOR= VerletNVEGPU.o VerletNVTGPU.o BrownianEulerMaruyamaGPU.o $(addprefix BDHI/, $(CUOBJS_BDHI))
+CUOBJS_INTERACTOR= PairForces.o PairForcesDPD.o BondedForcesGPU.o #NBodyForcesGPU.o
+CUOBJS_INTEGRATOR= VerletNVTGPU.o VerletNVEGPU.o BrownianEulerMaruyamaGPU.o $(addprefix BDHI/, $(CUOBJS_BDHI))
 
 OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))
 OBJS += $(addprefix Measurable/, $(OBJS_MEASURABLE))
-OBJS += utils/utils.o misc/Potential.o  misc/Diagonalize.o Driver/Driver.o  Driver/SimulationConfig.o Driver/SimulationScript.o $(CUSTOM_OBJS)
+OBJS +=  main.o utils/utils.o misc/Potential.o  Driver/Driver.o  Driver/SimulationScript.o $(CUSTOM_OBJS)  misc/Diagonalize.o $(INPUT_FILE_OBJ) 
 
-CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS)
+CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS) misc/LanczosAlgorithm.o
 
 THIRD_PARTY_OBJSS = $(addprefix third_party/, $(THIRD_PARTY_OBJS))
 
@@ -103,18 +115,22 @@ $(THIRD_PARTY_OBJSS):
 	$(MAKE) -C third_party/
 
 
-main:  $(OBJS) $(CUOBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS)
+main:  $(OBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS)  $(CUOBJS)
+	$(NVCC) $(NVFLAGS) $(LDFLAGS) $(GENCODE_FLAGS) $(INCLUDEFLAGS) -dlink $^  $(LDLIBS) -o gpu.o
+	$(CXX) $(CXXFLAGS)  gpu.o $^  $(LDFLAGS) $(LDLIBS) -o uammd
+
+
 
 %.o:%.cu
-	$(NVCC) $(NVFLAGS) -c $< -o $@
+	$(NVCC) $(NVFLAGS) -dc $< -o $@
 %.o:%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(NVCC) $(NVFLAGS) -x cu -dc $< -o $@
 %.o:%.f90
 	gfortran -O3 -c $< -o $@
 
 
 clean:
-	rm -f $(CUOBJS) $(OBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS) main
+	rm -f $(CUOBJS) $(OBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS) uammd
 
 cleanCPU:
 	rm -f $(OBJS) main

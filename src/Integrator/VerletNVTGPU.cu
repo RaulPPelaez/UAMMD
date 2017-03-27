@@ -20,7 +20,8 @@ TODO:
 #include<thrust/device_ptr.h>
 //#include<thrust/reduce.h>
 #include<thrust/transform_reduce.h>
-
+#include"utils/GPUutils.cuh"
+#include"globals/globals.h"
 //Threads per block
 #define TPB 128
 
@@ -28,7 +29,7 @@ TODO:
 namespace verlet_nvt_ns{
   /*Parameters in constant memory*/
   __constant__ Params params;
-
+  
   /*Initialize all necesary things on GPU*/
   void initGPU(Params m_params){
     /*Upload params to constant memory*/
@@ -41,16 +42,18 @@ namespace verlet_nvt_ns{
   __global__ void integrateGPUD(real4 __restrict__  *pos,
 				real3 __restrict__ *vel,
 				const real4 __restrict__  *force,
-				const real3 __restrict__ *noise){
-    uint i = blockIdx.x*blockDim.x+threadIdx.x;
-    if(i>=params.N) return;
+				const real3 __restrict__ *noise, int N){
+    int i = blockIdx.x*blockDim.x+threadIdx.x;
+    if(i>=N) return;
     /*Half step velocity*/
-    vel[i] += (make_real3(force[i])-params.gamma*vel[i])*params.dt*real(0.5) + params.noiseAmp*noise[i];
-    if(params.L.z==real(0.0)) vel[i].z = real(0.0);
+    real3 dw = noise[i];
+    vel[i] += (make_real3(force[i])-params.gamma*vel[i])*gcnfGPU.dt*real(0.5) + params.noiseAmp*dw;
+
+    if(gcnfGPU.D2) vel[i].z = real(0.0);
     /*In the first step, upload positions*/
     if(step==1)
-      pos[i] += make_real4(vel[i])*params.dt;    
-    
+      pos[i] += make_real4(vel[i],0)*gcnfGPU.dt;
+        
   }
 
   /*CPU kernel caller*/
@@ -60,10 +63,10 @@ namespace verlet_nvt_ns{
     uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0);
     switch(step){
     case 1:
-      integrateGPUD<1><<<nblocks, nthreads>>>(pos, vel, force, noise);
+      integrateGPUD<1><<<nblocks, nthreads>>>(pos, vel, force, noise, N);
       break;
     case 2:
-      integrateGPUD<2><<<nblocks, nthreads>>>(pos, vel, force, noise);
+      integrateGPUD<2><<<nblocks, nthreads>>>(pos, vel, force, noise, N);
       break;      
     }
   }

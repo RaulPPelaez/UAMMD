@@ -22,6 +22,7 @@ TODO:
 #include<thrust/reduce.h>
 #include<thrust/for_each.h>
 #include<thrust/iterator/zip_iterator.h>
+#include"utils/GPUutils.cuh"
 
 using namespace thrust;
 namespace bonded_forces_ns{
@@ -36,14 +37,14 @@ namespace bonded_forces_ns{
 
 
   //MIC algorithm
-  template<typename vecType>
-  inline __device__ void apply_pbc(vecType &r){
-    real3 r3 = make_real3(r.x, r.y, r.z);
-    real3 shift = (floorf(r3*params.invL+real(0.5))*params.L); //MIC Algorithm
-    r.x -= shift.x;
-    r.y -= shift.y;
-    r.z -= shift.z;
-  }
+  // template<typename vecType>
+  // inline __device__ void apply_pbc(vecType &r){
+  //   real3 r3 = make_real3(r.x, r.y, r.z);
+  //   real3 shift = (floorf(r3*params.invL+real(0.5))*params.L); //MIC Algorithm
+  //   r.x -= shift.x;
+  //   r.y -= shift.y;
+  //   r.z -= shift.z;
+  // }
 
 
 #define TPB 64
@@ -131,7 +132,7 @@ namespace bonded_forces_ns{
     //The operation is performed on creation
     template <typename Tuple>
     __device__  void operator()(Tuple t){
-      /*Retrive the data*/
+      /*Retrive the.data*/
       real4 pos = get<0>(t);
       real4 force = get<1>(t);
       uint first = get<2>(t); //bondStart

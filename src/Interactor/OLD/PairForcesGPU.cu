@@ -31,14 +31,14 @@
 #include<curand_kernel.h>
 #include"PairForcesGPU.cuh"
 #include"globals/defines.h"
-#include"utils/helper_math.h"
-#include"utils/helper_gpu.cuh"
+#include"globals/globals.h"
 #include<thrust/device_ptr.h>
 #include<thrust/for_each.h>
 #include<thrust/iterator/zip_iterator.h>
 #include<thrust/sort.h>
 #include<iostream>
 #include"utils/GPUutils.cuh"
+
 
 extern SystemInfo sysInfo;
 
@@ -60,25 +60,20 @@ namespace pair_forces_ns{
   uint GPU_Nblocks;
   uint GPU_Nthreads;
   
+  
   //Initialize gpu variables 
   void initGPU(Params &m_params, Params *&d_params, uint N, size_t potSize){
     /*Precompute some inverses to save time later*/
     m_params.invrc2_pot = 1.0/(m_params.rcut_pot*m_params.rcut_pot);
-    m_params.invrc_pot = 1.0/(m_params.rcut_pot);
-   
+    m_params.invrc_pot = 1.0/(m_params.rcut_pot); 
 
-    
-    m_params.invL = 1.0/m_params.L;
     m_params.invCellSize = 1.0/m_params.cellSize;
     m_params.gridPos2CellIndex = make_int3( 1,
 					    m_params.cellDim.x,
-					    m_params.cellDim.x*m_params.cellDim.y);
+					    m_params.cellDim.x*m_params.cellDim.y);    
 
-
-    if(m_params.L.z == real(0.0)){
-      m_params.invL.z = 0.0;
+    if(gcnf.D2){
       m_params.invCellSize.z = 0.0;
-
     }
     /*Only new architectures support texture objects*/
     if(sysInfo.cuda_arch>210){
@@ -146,33 +141,13 @@ namespace pair_forces_ns{
   }
 
   
-  /****************************HELPER FUNCTIONS*****************************************/
-  //MIC algorithm
-  // template<typename vecType>
-  // inline __device__ void apply_pbc(vecType &r){
-  //   real3 r3 = make_real3(r.x, r.y, r.z);
-  //   real3 shift = (floorf(r3*params.invL+0.5f)*params.L); //MIC Algorithm
-  //   r.x -= shift.x;
-  //   r.y -= shift.y;
-  //   r.z -= shift.z;    
-  // }
-
-  inline __device__ void apply_pbc(real4 &r){    
-    r -= make_real4(floorf(make_real3(r)*params.invL+real(0.5))*params.L); //MIC Algorithm
-  }
-  inline __device__ void apply_pbc(real3 &r){
-    
-    r -= floorf(r*params.invL+real(0.5))*params.L; //MIC Algorithm
-  }
-  
-  
+  /****************************HELPER FUNCTIONS*****************************************/  
   //Get the 3D cell p is in, just pos in [0,L] divided by ncells(vector) .INT DANGER.
-  template<typename vecType>
-  inline __device__ int3 getCell(vecType p){
-    real3 r = make_real3(p);
+
+  inline __device__ int3 getCell(real3 r){    
     apply_pbc(r); //Reduce to MIC
     // return  int( (p+0.5L)/cellSize )
-    int3 cell = make_int3((r+real(0.5)*params.L)*params.invCellSize);
+    int3 cell = make_int3((r+real(0.5)*gcnfGPU.L)*params.invCellSize);
     //Anti-Traquinazo guard, you need to explicitly handle the case where a particle
     // is exactly at the box limit, AKA -L/2. This is due to the precision loss when
     // casting int from floats, which gives non-correct results very near the cell borders.
@@ -227,7 +202,7 @@ namespace pair_forces_ns{
 			    const real4 __restrict__ *pos, uint N){
     uint index = blockIdx.x*blockDim.x + threadIdx.x;  
     if(index>=N) return;
-    real4 p = pos[index];
+    real3 p = make_real3(pos[index]);
 
     int3 cell = getCell(p);
     /*The particleIndex array will be sorted by the hashes, any order will work*/
@@ -321,11 +296,11 @@ namespace pair_forces_ns{
     if(i<N){//If my particle is in range
       uint icell, icell2;
       /*Get my icell*/
-      icell = getCellIndex(getCell(sortPos[i]));
+      icell = getCellIndex(getCell(make_real3(sortPos[i])));
       
       /*Get the previous part.'s icell*/
       if(i>0){ /*Shared memory target VVV*/
-	icell2 = getCellIndex(getCell(sortPos[i-1]));
+	icell2 = getCellIndex(getCell(make_real3(sortPos[i-1])));
       }
       else
 	icell2 = 0;
@@ -402,14 +377,14 @@ namespace pair_forces_ns{
     //Grid-stride loop
     for(int index = ii; index<N; index += blockDim.x * gridDim.x){
       /*Compute force acting on particle particleIndex[index], index in the new order*/
-      /*Get my particle's data*/
+      /*Get my particle's.data*/
       auto pinfoi = T.getInfo(index);
 
       /*Initial value of the quantity,
 	mostly just a hack so the compiler can guess the type of the quantity*/
       auto quantity = T.zero();
       
-      int3 celli = getCell(pinfoi.pos);
+      int3 celli = getCell(make_real3(pinfoi.pos));
 
       int x,y,z;
       int3 cellj;
@@ -417,7 +392,7 @@ namespace pair_forces_ns{
       //For some reason unroll doesnt help here
       int zi = -1; //For the 2D case
       int zf = 1;
-      if(params.L.z == real(0.0)){
+      if(gcnfGPU.D2){
 	zi = zf = 0;
       }
       for(z=zi; z<=zf; z++)
@@ -476,7 +451,7 @@ namespace pair_forces_ns{
     
     if(active){
       auto pinfoi = T.getInfo(index);
-      int3 celli = getCell(pinfoi.pos);
+      int3 celli = getCell(make_real3(pinfoi.pos));
    
       int x,y,z;
       int3 cellj;
@@ -484,7 +459,7 @@ namespace pair_forces_ns{
       //For some reason unroll doesnt help here
       int zi = -1; //For the 2D case
       int zf = 1;
-      if(params.L.z == real(0.0)){
+      if(gcnfGPU.D2){
 	zi = zf = 0;
       }
       for(z=zi; z<=zf; z++)
@@ -527,17 +502,6 @@ namespace pair_forces_ns{
     
   }
   
-  /*****************************CUSTOM TRANSVERSER***********************************/
-
- template<class Transverser>
-  void computeWithListGPU(Transverser t,
-			  uint *cellStart, uint *cellEnd,
-			  uint *particleIndex, 
-			  uint N){
-    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(
-    //transverseListDtpp<<<GPU_Nblocks*tpp, GPU_Nthreads>>>(
-							  t, particleIndex, cellStart,cellEnd, N);
-  }
   
   /***************************************FORCE*****************************/
   
@@ -549,52 +513,56 @@ namespace pair_forces_ns{
     function to every neighbouring particle pair in the system*/
   /*In order to compute any other quantity create a class like this, implementing the same functions
     but with any desired type, instead of real4 as in this case*/
+  template<bool many_types>
   class forceTransverser{
   public:
     struct ParticleInfo{
       real4 pos;
     };
     /*I need the device pointer to force*/
-    forceTransverser(real4 *newForce):newForce(newForce){
-    };
+    forceTransverser(real4 *newForce):newForce(newForce){};
     /*Compute the force between two positions*/
     inline __device__ real4 compute(const ParticleInfo &R1,const ParticleInfo &R2){
-      real3 r12 = make_real3(R2.pos-R1.pos);
+      real3 r12 = make_real3(R2.pos)-make_real3(R1.pos);
       apply_pbc(r12);
       /*Squared distance*/
-      real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
-      float r2c = r2*params.invrc2_pot;
-      /*Both cases handled in texForce*/
-      /*Check if i==j. This way reduces warp divergence and its faster than checking i==j outside*/
-      //if(r2c==0.0f) return make_real4(0.0f);  
-      /*Beyond rcut..*/
-      //else if(r2c>=1.0f) return make_real4(0.0f);
-      /*Get the force from the texture*/
-      //real fmod = tex1D(texForce, r2c);
-      real sigma2= real(1.0);
+      const real r2 = dot(r12,r12);
+      real r2c = r2*(float)params.invrc2_pot;
+
+      /*Reescale for current type pair*/
       real epsilon = real(1.0); 
-      if(params.ntypes>1){
-	uint ti= (uint)(R1.pos.w+0.5);
-	uint tj= (uint)(R2.pos.w+0.5);
-	real2 pot_params = params.potParams[ti+tj*params.ntypes];
-	sigma2 = pot_params.x*pot_params.x;
-	epsilon = pot_params.y;
-
-	r2c /= sigma2;
-      }
-
+      if(many_types){
+       	const int ti= (int)(R1.pos.w+0.5f);
+       	const int tj= (int)(R2.pos.w+0.5f);
+       	const real2 pot_params = params.potParams[ti+tj*params.ntypes];
+       	const real sigma2 = pot_params.x*pot_params.x;
+       	epsilon = pot_params.y;
+	/*STORE invsig2 instead, and directly rescale r2c, this really slows down rt*/
+       	r2c /= sigma2;
+       }
+      /*Get the force from the texture*/
 #if __CUDA_ARCH__>210
-      real fmod = epsilon* (real) tex1D<float>(params.texForce.tex, r2c);
+       const real3 f = (epsilon*(real) tex1D<float>(params.texForce.tex, r2c))*r12;
 #else /*Use texture reference*/
-      real fmod = epsilon* (real) tex1D(texForce, r2c);
+       const real3 f = (epsilon*(real) tex1D(texForce, r2c))*r12;
 #endif
-      // real invr2 = 1.0f/r2;
-      // real invr6 = invr2*invr2*invr2;
-      // real invr8 = invr6*invr2;
-      // //real E =  2.0f*invr6*(invr6-1.0f);
-      // real fmod = -48.0f*invr8*invr6+24.0f*invr8;
-      return  make_real4(fmod*r12.x, fmod*r12.y, fmod*r12.z, real(0.0));
+      
+      // /*Both cases handled in texForce*/
+      // /*Check if ai==j. This way reduces warp divergence and its faster than checking i==j outside*/
+      // if(r2c==real(0.0)) return make_real4(real(0.0));  
+      // /*Beyond rcut..*/
+      // else if(r2c>=real(1.0)) return make_real4(real(0.0));
+
+      // real3 f;
+      // if(r2<params.rcut_pot*params.rcut_pot){
+      // 	real invr2 = real(1.0)/r2;
+      // 	real invr6 = invr2*invr2*invr2;
+      // 	f = -epsilon*real(24.0)*invr2*invr6*(real(2.0)*invr6-real(1.0))*r12;       
+      // }
+      // else f=make_real3(real(0.0));
+      
+      return  make_real4(f, real(0.0));
     }
     /*Update the force acting on particle pi, pi is in the normal order*/
     inline __device__ void set(uint pi, const real4 &totalForce){
@@ -619,19 +587,30 @@ namespace pair_forces_ns{
   
   //CPU kernel caller
   void computePairForce(real4 *sortPos, real4 *force,
-			uint *cellStart, uint *cellEnd,
-			uint *particleIndex, 
-			uint N){
+   			uint *cellStart, uint *cellEnd,
+   			uint *particleIndex, 
+   			uint N, uint ntypes){
     /*An instance of the class that holds the function that computes the force*/
-    forceTransverser ft(force); //It needs the addres of the force in device memory
-    /*Transverse the neighbour list for each particle, using ft to compute the force in each pair*/
+    if(ntypes>1){ /*ntypes is templated, really makes a difference*/
+      forceTransverser<true> ft(force); //It needs the addres of the force in device memory
+      /*Transverse the neighbour list for each particle, using ft to compute the force in each pair*/
+      transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(
+     //transverseListDtpp<<<GPU_Nblocks*tpp, GPU_Nthreads>>>(
+						     ft,
+						     particleIndex, cellStart, cellEnd,
+						     N);
 
-    transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(
-    //transverseListDtpp<<<GPU_Nblocks*tpp, GPU_Nthreads>>>(
-						   ft,
-						   particleIndex, cellStart, cellEnd,
-						   N);
-    
+    }
+    else{
+      forceTransverser<false> ft(force); //It needs the addres of the force in device memory
+      /*Transverse the neighbour list for each particle, using ft to compute the force in each pair*/
+      transverseListD<<<GPU_Nblocks, GPU_Nthreads>>>(
+     //transverseListDtpp<<<GPU_Nblocks*tpp, GPU_Nthreads>>>(
+						     ft,
+						     particleIndex, cellStart, cellEnd,
+						     N);
+    }
+
     //cudaCheckErrors("computeForce");
   }
 
@@ -864,7 +843,7 @@ namespace pair_forces_ns{
 	swap(i0,j0);
       
       curandState rng;
-      real randij = randGPU(i0+(ullint)params.N*j0 + seedGPU, &rng);
+      real randij = randGPU(i0+(ullint)gcnfGPU.N*j0 + seedGPU, &rng);
 
       //fmod = paramsDPD.A*w; //Soft force
 #if __CUDA_ARCH__>210

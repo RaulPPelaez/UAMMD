@@ -12,22 +12,25 @@ TODO:
  */
 #ifndef POTENTIAL_H
 #define POTENTIAL_H
-#include<vector>
-#include<fstream>
 #include<functional>
 #include<cuda.h>
 #include"globals/defines.h"
 #include"globals/globals.h"
 #include"utils/utils.h"
-using std::vector;
-using std::ofstream;
 
 
 class Potential{
 public:
+  /*Defined force functions*/
+  static real forceLJ(real r2, real rcut);
+  static real energyLJ(real r2, real rcut);
+  static real nullForce(real r2, real rcut){ return 0;}
+
+
+  
   Potential(){};
-  Potential(std::function<real(real)> Ffoo,
-	    std::function<real(real)> Efoo,
+  Potential(std::function<real(real,real)> Ffoo,
+	    std::function<real(real,real)> Efoo,
 	    int N, real rc, uint ntypes=1);
   size_t getSize(){ return N;}
   float *getForceData(){ return F.data;}
@@ -39,6 +42,7 @@ public:
   real2* getPotParams();
   void print();
 
+private:
   uint N;
   Vector<float> F;
   Vector<float> E;
@@ -47,11 +51,12 @@ public:
 
   cudaTextureObject_t texForce, texEnergy;
   
-  std::function<real(real)> forceFun;
-  std::function<real(real)> energyFun;
+  std::function<real(real, real)> forceFun;
+  std::function<real(real, real)> energyFun;
 
   uint ntypes;
   Vector<real2> potParams;
+  real rc;
 };
 
 

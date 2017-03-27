@@ -28,8 +28,9 @@ TODO:
 
 class Interactor{
 public:
-  Interactor();
-  virtual ~Interactor();
+  Interactor():
+    N(gcnf.N),L(gcnf.L), name(""), BLOCKSIZE(128){}
+  virtual ~Interactor(){}
 
   virtual void sumForce() = 0;
   virtual real sumEnergy() = 0;
@@ -37,10 +38,17 @@ public:
 
   Vector4Ptr getForce(){return force;}
 
+  virtual void print_info(){};
+  void print(){
+    std::cerr<<"Using "<<name<<" module."<<std::endl;
+    print_info();
+  }
+
 protected:
   uint N;
   real3 L;
   string name;
+  int BLOCKSIZE;
 };
 
 typedef vector<shared_ptr<Interactor>> InteractorArray;

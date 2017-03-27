@@ -54,7 +54,9 @@ std::vector<std::string> stringSplit(string s);
 
 
 typedef Vector<real4> Vector4;
+typedef GPUVector<real4> GPUVector4;
 typedef Vector<real3> Vector3;
+typedef GPUVector<real3> GPUVector3;
 #define Vector4Ptr shared_ptr<Vector4> 
 #define Vector3Ptr shared_ptr<Vector3> 
 typedef Matrix<real> Matrixf;
@@ -154,5 +156,12 @@ Vector4 initLattice(real3 L, uint N, BRAVAISLAT lat = sc);
 Vector4 readFile(const char * fileName);
 
 bool randInitial(real4 *pos, real L, uint N);
+
+
+
+namespace printUtils{
+  /*Get a pretty output of a size in bytes*/
+  std::string prettySize(size_t size);
+}
 
 #endif

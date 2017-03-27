@@ -2,11 +2,11 @@
 #define MODULES_H
 
 
-#include"Interactor/PairForces.h"
-#include"Interactor/PairForcesDPD.h"
+#include"Interactor/PairForces.cuh"
+#include"Interactor/PairForcesDPD.cuh"
 #include"Interactor/BondedForces.h"
-#include"Interactor/NBodyForces.h"
-#include"Interactor/ExternalForces.h"
+#include"Interactor/NBodyForces.cuh"
+#include"Interactor/ExternalForces.cuh"
 
 #include"Integrator/VerletNVE.h"
 #include"Integrator/VerletNVT.h"
@@ -20,6 +20,9 @@
 #include"Interactor/Experimental/PairForcesAlt.h"
 #endif
 
+
+#include"Interactor/NeighbourList/NeighbourList.cuh"
+#include"Interactor/NeighbourList/CellList.cuh"
 
 
 

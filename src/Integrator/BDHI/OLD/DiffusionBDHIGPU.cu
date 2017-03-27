@@ -35,7 +35,7 @@ namespace brownian_hy_euler_maruyama_ns{
     const real rh = RPYparams.rh;
     /*c12.y = c2 -> c2*invr2*/
     if(r >= real(2.0)*rh){
-      const real A = real(0.75)*RPYparams.rh*invr;
+      const real A = real(0.75)*rh*invr;
       const real invr2 = invr*invr;
 
       // c12.x = real(0.75)*(invr+(2.0f/3.0f)*rh*rh*invr2*invr)*rh;

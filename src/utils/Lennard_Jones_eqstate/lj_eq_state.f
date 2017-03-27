@@ -3,7 +3,7 @@
       include 'param_lj.inc'
       double precision dens,temp,u,p,cv
       double precision coef_adia,cs,eta,thc,bulkv,sa
-      logical lrc !long range corrections
+      logical lrc               !long range corrections
 
       lrc=.false.
 
@@ -163,7 +163,7 @@ c   calculate  internal energy=u, pressure = p
       u=u-ulrc
       p=p-plrc
       end if
-      u = u+1.5*t
+      u = u
 
 
       return

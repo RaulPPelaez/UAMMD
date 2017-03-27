@@ -169,4 +169,20 @@ bool randInitial(real4 *pos, real L, uint N){
 
 
 
+namespace printUtils{
+  std::string prettySize(size_t size) {
+    static const char *SIZES[] = { "B", "KB", "MB", "GB" };
+    int div = 0;
+    size_t rem = 0;
 
+    while (size >= 1024 && div < (sizeof(SIZES)/ sizeof (*SIZES))) {
+      rem = (size % 1024);
+      div++;
+      size /= 1024;
+    }
+
+    double size_d = (float)size + (float)rem / 1024.0;
+    std::string result = std::to_string(size_d) + " " + std::string(SIZES[div]);
+    return result;
+  }
+}

@@ -57,8 +57,12 @@ Finally there is a Driver that puts them all together and controls the flow of t
 
 	1.Two step velocity verlet NVE
 	2.Two step velocity verlet NVT with BBK thermostat
-	3.Euler Maruyama Brownian dynamics
-	4.Euler Maruyama Brownian dynamics with hydrodynamic interactions via Rotne Prager Yamakawa (obtaining the brownian noise via several choices. Cholesky or Lanczos)
+	3.Euler Maruyama Brownian dynamics (BD)
+	4. Brownian Dynamics with Hydrodynamic interactions (BDHI)
+	4.1 Euler Maruyama w/HI via RPY tensor 
+	4.1.1 Using the Cholesky decomposition on the full Mobility matrix to compute the stochastic term. Open Boundaries.
+	4.1.2 Using the Lanczos algorithm and a matrix free method to compute the stochastic term. Open Boundaries.
+	4.1.3 Using the Positively Split Ewald method with rapid stochastic sampling. Periodic Boundary Conditions
 
 **Measurables**
 	
@@ -66,7 +70,7 @@ Finally there is a Driver that puts them all together and controls the flow of t
 
 ----------------------
 
-Now you can select between single and double precision in globals/defines.h. Single precision is used by default, you can change to double precision by commenting "#define SINGLE_PRECISION" and recompiling the entire code. This last step is very important, as failing to do so will result in unexpected behavior.
+You can select between single and double precision in globals/defines.h. Single precision is used by default, you can change to double precision by commenting "#define SINGLE_PRECISION" and recompiling the entire code. This last step is very important, as failing to do so will result in unexpected behavior.
 
 
 ##USAGE
@@ -102,7 +106,7 @@ This code makes use of the following CUDA packages:
 ##REQUERIMENTS
 
 --------------------
-Needs an NVIDIA GPU with compute capability sm_2.0+
+Needs an NVIDIA GPU with compute capability sm_3.5+
 Needs g++ with full C++11 support, 4.8+ recommended
 
 ##TESTED ON
@@ -147,16 +151,15 @@ Current benchmark:
 
 The procedure to implement a new module is the following:
 
-	1. Create a new class that inherits from one of the parents (Interactor, Integrator, Measurable...) and overload the virtual methods. It is advised to create 4 files, Header and declarations for the CPU side, and header and declarations for the GPU callers and kernels. But you can code it and compile it anyway you want as long as the virtual methods are overloaded.
-	2. Include the new CPU header in Driver/Driver.h
+	1. Create a new class that inherits from one of the parents (Interactor, Integrator, Measurable...) and overload the virtual methods. You want as long as the virtual methods are overloaded.
+	2. Include the new CPU header in global/Modules.h
 	3. Add the new sources in the Makefile.
-	4. Initialize them as needed in driver/SimulationConfig.cpp as in the examples.
+	4. Initialize them as needed in Driver/SimulationConfig.cpp as in the examples.
 	
-	
-Keep in mind that the compilation process is separated between CPU and GPU code, so any GPU code in a .cpp file will cause a compilation error. See any of the available modules for a guideline.
+All the project is compiled with nvcc and relocatable device code, so you can put GPU code anywhere. Although it is advised to keep "__device__" functions as inline and always in the same compilation unit as the kernel that uses them.
 
 -------------------------------
-In globals/globals.h are the definitions of some variables that will be available throughout the entire CPU side of the project. These are mainly parameters. It also contains the position, force and an optional velocity arrays.
+In globals/globals.h are the definitions of some variables that will be available throughout the entire project. These are mainly parameters. It also contains the position, force and an optional velocity arrays.
 
 In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from global when available. Things like the number of particles, the temperature or more importantly, the Vectors storing the positions, forces and velocities of each particle (again, when needed). These Vectors start with zero size and are initialized in Driver.cpp. However, your code should check the size of the arrays at startup with Vector::size() and initialize them if the size doesnt match the number of particles (i.e is 0).
 

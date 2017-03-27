@@ -48,7 +48,7 @@ bool BrownianNoiseCholesky::init(Diffusion &D, uint N){
   /*Initialize cusolver*/
 
   cusolverDnpotrf_bufferSize(solver_handle, 
-			     CUBLAS_FILL_MODE_UPPER, 3*N, D.getMatrix()->d_m, 3*N, &h_work_size);
+			     CUBLAS_FILL_MODE_UPPER, 3*N, D.getMatrix()-.d_m, 3*N, &h_work_size);
   gpuErrchk(cudaMalloc(&d_work, h_work_size*sizeof(real)));
   gpuErrchk(cudaMalloc(&d_info, sizeof(int)));
   cerr<<"DONE!!"<<endl;
@@ -60,7 +60,7 @@ real* BrownianNoiseCholesky::compute(cublasHandle_t handle, Diffusion &D, uint N
   cusolverDnSetStream(solver_handle, stream);
   /*Perform cholesky factorization, store B on LOWER part of D matrix*/
   cusolverDnpotrf(solver_handle, CUBLAS_FILL_MODE_UPPER,
-		  3*N, D.getMatrix()->d_m, 3*N, d_work, h_work_size, d_info);
+		  3*N, D.getMatrix()-.d_m, 3*N, d_work, h_work_size, d_info);
   /*Gen new noise*/
   curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), real(1.0));
   /*Print dw*/
@@ -74,7 +74,7 @@ real* BrownianNoiseCholesky::compute(cublasHandle_t handle, Diffusion &D, uint N
   cublastrmv(handle,
 	     CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_T, CUBLAS_DIAG_NON_UNIT,
 	     3*N,
-	     D.getMatrix()->d_m, 3*N,
+	     D.getMatrix()-.d_m, 3*N,
 	     (real*)noise.d_m, 1);
 
   /*Print B*/

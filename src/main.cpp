@@ -48,11 +48,12 @@ TODO:
 
 /*Declaration of extern variables in globals.h*/
 GlobalConfig gcnf;
+uint current_step = 0;
 SystemInfo sysInfo;
 Vector4 pos, force;
 Vector3 vel;
 Xorshift128plus grng;
-
+__constant__ GlobalConfigGPU gcnfGPU;
 
 int main(int argc, char *argv[]){
   int dev = -1;
@@ -75,14 +76,16 @@ int main(int argc, char *argv[]){
     cerr<<"Computation started at "<<std::ctime(&time)<<endl;
   }
   /*Get device information*/
+  
+  cudaFree(0);/*This forces CUDAs lazy initialization to create a context, so a GPU is available to cudaGetDevice*/
   if(dev<0)
-    cudaGetDevice(&dev);
-  else
-    cudaSetDevice(dev);
+    cudaGetDevice(&dev);  
+  cudaFree(0);
+  cudaSetDevice(dev);
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, dev);
 
-  cerr<<"Using device: "<<deviceProp.name<<endl;
+  cerr<<"Using device: "<<deviceProp.name<<" with id: "<<dev<<endl;
 
   sysInfo.dev = dev;
   sysInfo.cuda_arch = 100*deviceProp.major + 10*deviceProp.minor;
@@ -95,9 +98,9 @@ int main(int argc, char *argv[]){
     exit(1);
   }
   /*To increase the size of the printf buffer inside kernels, default is 4096 lines I think*/
-  // size_t size;
-  // cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
-  // cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*1000);
+   size_t size;
+  cudaDeviceGetLimit(&size,cudaLimitPrintfFifoSize);
+  cudaDeviceSetLimit(cudaLimitPrintfFifoSize, size*10);
 
   /*Check for a simulation script*/
   int arg_script = checkFlag(argc, argv, "--script");

@@ -21,10 +21,8 @@ Raul P. Pelaez 2016. Short range pair forces Interactor implementation.
   Force is evaluated using table lookups (with texture memory)
   
 TODO:
-100- Colors, this almost done, color can simply be encoded in pos.w, and additional parameters are needed in force fucntions/textures
-90- Non cubic boxes, almost done, just be carefull in the constructor and use vector types.
-100- PairForces should be a singleton or multiple PairForces should be possible somehow
-80- Change the handling of the potential to better allow inheritance, see DPD
+100- Fix particle types, differentiate between color and tag/type.
+100- Make a better potential generalization.
  */
 
 #ifndef PAIRFORCES_H
@@ -33,9 +31,8 @@ TODO:
 #include"utils/utils.h"
 #include"globals/globals.h"
 #include"Interactor.h"
-#include"PairForcesGPU.cuh"
 #include"misc/Potential.h"
-
+#include"PairForcesGPU.cuh"
 #include<cstdint>
 #include<memory>
 #include<functional>
@@ -43,22 +40,16 @@ TODO:
 //The currently implemented forces, custom allows for an arbitrary function tu be used as force function
 enum pairForceType{LJ,NONE,CUSTOM};
 
-real forceLJ(real r2);
-real energyLJ(real r2);
-real nullForce(real r2);
-
 
 class PairForces: public Interactor{
 public:
   //PairForces(pairForceType fs = LJ);
   PairForces(pairForceType fs = LJ,
-	     std::function<real(real)> customForceFunction = nullForce,
-  	     std::function<real(real)> customEnergyFunction = nullForce);
+	     std::function<real(real)> customForceFunction = Potential::nullForce,
+  	     std::function<real(real)> customEnergyFunction = Potential::nullForce);
   ~PairForces();
 
   void sumForce() override;
-  template<class Transversable>
-  void sumCustom(Transversable t);
   real sumEnergy() override;
   real sumVirial() override;
 

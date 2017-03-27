@@ -3,7 +3,6 @@
 #include <math.h>
 /*Raul P. Pelaez 2016. vector overloads not defined in helper_math.h*/
 
-
 /////////////////REAL4////////////////////////////////
 inline __host__ __device__ real4 make_real4(real x, real y, real z, real w)
 {
@@ -322,7 +321,16 @@ inline __host__ __device__ double4 floorf(double4 v)
 inline __host__ __device__ int3 make_int3(double3 a){
   return make_int3((int)a.x, (int)a.y, (int)a.z);
 }
+inline __host__ __device__ double3 make_double3(double a){
+  return make_double3(a, a, a);
+}
 
+inline __host__ __device__ double3 make_double3(int3 a){
+  return make_double3(a.x, a.y, a.z);
+}
+inline __host__ __device__ double3 make_double3(float3 a){
+  return make_double3(a.x, a.y, a.z);
+}
 
 inline __host__ __device__  double3 operator +(const double3 &a, const double3 &b){
   return make_double3(
@@ -477,3 +485,9 @@ inline __host__ __device__ double3 cross(double3 a, double3 b)
 
 //////////////////////////////////////////////////////////
 /****************************************************************************************/
+
+
+///////////INT3/////////////////
+inline __host__ __device__ int3 operator /(int3 a, int3 b){
+  return make_int3( a.x/b.x, a.y/b.y, a.z/b.z);
+}

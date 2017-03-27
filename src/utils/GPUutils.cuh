@@ -1,55 +1,36 @@
-/*Raul P. Pelaez 2016. Custom texture fetches for double and TexReference*/
-#ifndef GPUUTILS_H
-#define GPUUTILS_H
+/*Raul P. Pelaez 2017*/
+/*WARNING!!! THIS FILE CAN CONTAIN ONLY HEADERS, EXTERNS AND INLINES,
+  Any definition of a function outside this terms will result in 'Multiple definitions' erros.*/
+/*Any declaration of an extern item will be placed in main.cpp, initialization will take place after Driver::setParameters is called, in globals/initGPU.cu::initGPU*/
+/*This file is a trick so the compiler inlines device functions across compilation units*/
+/*This file can only be included once per C.U., so if a file includes a file that includes this, you dont have, and cant include it.*/
 
-#include"Texture.h"
+#include"utils/helper_math.h"
+#include"utils/helper_gpu.cuh"
+#include"globals/globals.h"
 
-template<>
-inline __device__ double tex1Dfetch<double>(cudaTextureObject_t t, int i){
+//MIC algorithm
+// template<typename vecType>
+// inline __device__ void apply_pbc(vecType &r){
+//   real3 r3 = make_real3(r.x, r.y, r.z);
+//   real3 shift = (floorf(r3*params.invL+0.5f)*params.L); //MIC Algorithm
+//   r.x -= shift.x;
+//   r.y -= shift.y;
+//   r.z -= shift.z;    
+// }
+#ifndef GPUUTILS_CUH
+#define GPUUTILS_CUH
 
-  int2 v = tex1Dfetch<int2>(t, i);
-
-  return __hiloint2double(v.y, v.x);
+inline __device__ void apply_pbc(real3 &r){    
+  r -= floorf(r*gcnfGPU.invL+real(0.5))*gcnfGPU.L; //MIC Algorithm
 }
 
-
-template<>
-inline __device__ double4 tex1Dfetch<double4>(cudaTextureObject_t t, int i){
-  
- int4 v1 = tex1Dfetch<int4>(t,2*i);
- int4 v2 = tex1Dfetch<int4>(t,2*i+1);
-
- return make_double4(
- 		      __hiloint2double(v1.y, v1.x),
- 		      __hiloint2double(v1.w, v1.z),
- 		      __hiloint2double(v2.y, v2.x),
- 		      __hiloint2double(v2.w, v2.z));		      
-}
-
-
-template<class T>
-inline __device__ T tex1Dfetch(TexReference t, int i){
-#if __CUDA_ARCH__>210
-  return tex1Dfetch<T>(t.tex, i);
-#else
-  return ((T*)t.d_ptr)[i];
-#endif
-}
-
-template<>
-inline __device__ double4 tex1Dfetch<double4>(TexReference t, int i){
-
-#if __CUDA_ARCH__>=350
-  double2 a= __ldg((double2*)t.d_ptr+i*2);
-  double2 b= __ldg((double2*)t.d_ptr+i*2+1);
-  return make_double4(a.x, a.y, b.x, b.y);
-#else
-  return *((double4*)t.d_ptr+i);
-#endif    
-}
-
+struct BoxUtils{
+  real3 L, invL;
+  BoxUtils(real3 L): L(L), invL(1.0/L){}
+  inline __device__ void apply_pbc(real3 &r){    
+    r -= floorf(r*invL+real(0.5))*L; //MIC Algorithm
+  }
+};
 
 #endif
-
-
-

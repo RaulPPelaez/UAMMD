@@ -33,8 +33,11 @@
 class Integrator{
 public:
   //Constructor to be called in the initialization list of the derived class
-  Integrator();
-  ~Integrator();
+  Integrator():
+    N(gcnf.N), dt(gcnf.dt), L(gcnf.L), BLOCKSIZE(128){
+    steps = 0;
+  }
+  ~Integrator(){}
   
   //This function forwards the simulation one dt in time, must be overrided in each new implementation!
   virtual void update() = 0;
@@ -44,7 +47,11 @@ public:
   
   //The interactors can be called at any time from the integrator to compute the forces when needed.
   void addInteractor(shared_ptr<Interactor> an_interactor){
+    std::cerr<<"Adding Interactor..."<<std::endl;
     interactors.push_back(an_interactor);
+    std::cerr<<"\t";
+    an_interactor->print();
+    std::cerr<<std::endl;
   }
   vector<shared_ptr<Interactor>> getInteractors(){
     return interactors;
@@ -57,6 +64,7 @@ protected:
   real dt;
   real3 L;
   string name;
+  int BLOCKSIZE;
 };
 
 

@@ -7,3 +7,6 @@ src/Interactor/Experimental
 *.bak
 gdrDATA
 bin/*
+kk*
+src/uammd
+src/aradillo.inipos
