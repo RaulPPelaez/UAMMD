@@ -257,7 +257,7 @@ PSE::PSE(real m0, /*1/(6pi·vis)*/
     int fnsize = mesh.ncells;
     fnsize += fnsize%2;
     farNoise = GPUVector<curandState>(fnsize);
-    PSE_ns::initCurand<<<fnsize/128+1, 128,0, stream>>>(farNoise, gcnf.seed, fnsize);
+    PSE_ns::initCurand<<<fnsize/32+1, 32,0, stream>>>(farNoise, gcnf.seed, fnsize);
   }
   /*Grid spreading/interpolation parameters*/
   /*Gaussian spreading/interpolation kernel support points neighbour distance
@@ -405,7 +405,9 @@ namespace PSE_ns{
 		       real rcut,/*cutoff distance*/
 		       BoxUtils box/*Contains information and methods about the box, like apply_pbc*/
 		       ):
-      v(v), Mv(Mv), texF(texF), texG(texG), M0(M0), rcut(rcut), box(box){}
+      v(v), Mv(Mv), texF(texF), texG(texG), M0(M0), rcut(rcut), box(box){
+      invrcut2 = 1/(rcut*rcut);
+    }
     
     /*Start with Mv[i] = 0*/
     inline __device__ computeType zero(){ return make_real3(0);}
@@ -422,7 +424,7 @@ namespace PSE_ns{
       box.apply_pbc(rij);
       
       const real r2 = dot(rij, rij);
-      const float r2c = r2/(rcut*rcut);
+      const float r2c = r2*invrcut2;
       
       /*M0 := Mii := RPY_near(0) is multiplied once at the end*/
       /*Fetch RPY coefficients, see RPYPSE_nearTextures*/
@@ -431,11 +433,14 @@ namespace PSE_ns{
       const real g = (real)tex1D<float>(texG, r2c);
       
       const real gmf = g-f;
+
+      real invr2;
       /*Delay the conditional as much as possible to avoid divergence*/
       /*If i==j */
       if(r2==real(0.0)){
-	/* M_ii·vi = M0*I·vi */
-	return vj;
+	invr2 = real(0.0);
+	/*M_ii·vi = M0*I·vi */
+	//return vj;
       }
       /*No need to check this, as f,g(r>rcut) = 0, doing it this way reduces thread divergence*/
       //if(r2c>=1.0f) return make_real3(0);
@@ -446,7 +451,7 @@ namespace PSE_ns{
 	Mr = f(r)*I+(g(r)-f(r))*r(diadic)r - > (M·v)_ß = f(r)·v_ß + (g(r)-f(r))·v·(r(diadic)r)
 	Where f and g are the RPY coefficients
       */
-      const real gmfv = gmf*dot(rij, vj)/r2;
+      const real gmfv = gmf*dot(rij, vj)*invr2;
       /*gmfv = (g(r)-f(r))·( vx·rx + vy·ry + vz·rz )*/
       /*((g(r)-f(r))·v·(r(diadic)r) )_ß = gmfv·r_ß*/
       return (f*vj + gmfv*rij);
@@ -462,7 +467,7 @@ namespace PSE_ns{
     real3* Mv;    
     real M0;
     cudaTextureObject_t texF, texG;
-    real rcut;
+    real rcut, invrcut2;
     BoxUtils box;
   };
 }

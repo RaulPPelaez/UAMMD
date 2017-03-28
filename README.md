@@ -40,6 +40,11 @@ Finally there is a Driver that puts them all together and controls the flow of t
 
 **The simulation construction is performed in Driver/SimulationConfig.cpp. Where the integrator, interactors and measurables are created and the initial conditions and parameters are set. This is the "input" of UAMMD.**
 
+You can specify a different input file implementing the simulation configuration when compiling by:
+
+``` $make INPUT_FILE=my_input.cpp ```
+
+INPUT_FILE will be Driver/SimulationConfig.cpp by default.
 
 # Currently Implemented
 

@@ -27,7 +27,10 @@ inline __device__ void apply_pbc(real3 &r){
 
 struct BoxUtils{
   real3 L, invL;
-  BoxUtils(real3 L): L(L), invL(1.0/L){}
+  BoxUtils(real3 L): L(L), invL(1.0/L){
+    if(L.z==real(0.0))
+      invL.z = real(0.0);
+  }
   inline __device__ void apply_pbc(real3 &r){    
     r -= floorf(r*invL+real(0.5))*L; //MIC Algorithm
   }

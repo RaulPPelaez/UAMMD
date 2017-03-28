@@ -43,6 +43,7 @@ void Driver::setParameters(){
   GlobalConfigGPU gcnfGPU_m;
   gcnfGPU_m.L = gcnf.L;
   gcnfGPU_m.invL = 1.0/gcnf.L;
+  if(gcnf.D2) gcnfGPU_m.invL.z = real(0.0);
   gcnfGPU_m.N = gcnf.N;
   gcnfGPU_m.dt = gcnf.dt;
   gcnfGPU_m.T = gcnf.T;
@@ -104,6 +105,7 @@ void Driver::run(uint nsteps, bool relax){
   }
   cerr<<"     Run time: "<<tim.toc()<<"s                                           "<<endl;
   gcnf.nsteps += nsteps;
+  cudaDeviceSynchronize();
 }
 
 Driver::~Driver(){

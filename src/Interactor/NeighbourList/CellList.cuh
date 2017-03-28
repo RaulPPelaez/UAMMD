@@ -176,13 +176,13 @@ namespace NeighbourList{
       int zf = 1;
       if(gcnfGPU.D2){
 	zi = zf = 0;
-      }
+      }      
       for(x=-1; x<=1; x++)
 	for(z=zi; z<=zf; z++)
 	  for(y=-1; y<=1; y++){
 	    cellj = celli + make_int3(x,y,z);
 	    nl.utils.pbc_cell(cellj);
-
+	      
 	    uint icell  = nl.utils.getCellIndex(cellj);
 	    /*Index of the first particle in the cell's list*/
 	    uint firstParticle = tex1Dfetch<uint>(nl.texCellStart, icell);

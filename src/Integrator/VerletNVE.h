@@ -29,7 +29,6 @@ public:
   real sumEnergy() override;
 private:
   real E;
-  Vector4 pos1;
   verlet_nve_ns::Params params;
 };
 

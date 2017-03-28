@@ -47,16 +47,16 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   /*See globals.h for a list of parameters*/
   /*If you set a parameter that the modules you use do not need, It will just be ignored. i.e. Setting gcnf.E and using VerletNVT*/
 
-  gcnf.T = 0.5;
+  gcnf.T = 1.0;
   
-  gcnf.L = make_real3(32, 32, 0);
+  gcnf.L = make_real3(32);
 
   
-  gcnf.N = pow(2,10);
+  gcnf.N = pow(2,12);
   gcnf.dt = 0.05;
   
     
-  gcnf.nsteps1 = 74000;
+  gcnf.nsteps1 = 174000;
   gcnf.print_steps = 200;
   gcnf.measure_steps = -1;
 
@@ -73,7 +73,6 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   /*A random initial configuration*/
   fori(0,gcnf.N){
     pos[i] = make_real4(grng.uniform3(-gcnf.L.x/2.0, gcnf.L.x/2.0), 0);
-    pos[i].z = 0;
   }
 
   /*Upload positions to GPU once the initial conditions are set*/
@@ -85,17 +84,17 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   Matrixf K(3,3);
   K.fill_with(0);
   //int niter = 4; //Number of Lanczos iterations
-  integrator = make_shared<BrownianHydrodynamicsEulerMaruyama>(K, vis, rh, CHOLESKY);//PSE); //LANCZOS, niter);
+  integrator = make_shared<BrownianHydrodynamicsEulerMaruyama>(K, vis, rh, PSE); //LANCZOS, niter);
 
   /*Short range forces, with LJ potential if other is not provided*/
   // auto interactor = make_shared<PairForces<CellList>>();
 
   /*ExternalForces module specialized for the ExternalTor above*/
-  Externaltor tr(gcnf.L, 50.0f);
-  auto interactor = make_shared<ExternalForces<Externaltor>>(tr);
+  // Externaltor tr(gcnf.L, 50.0f);
+  // auto interactor = make_shared<ExternalForces<Externaltor>>(tr);
 
-  /*Add it to the integrator*/
-  integrator->addInteractor(interactor);
+  // /*Add it to the integrator*/
+  // integrator->addInteractor(interactor);
   
   //integrator->addInteractor(interactor2);
   //integrator->addInteractor(interactor3);
