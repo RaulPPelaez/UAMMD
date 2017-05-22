@@ -55,6 +55,7 @@ Vector3 vel;
 Xorshift128plus grng;
 __constant__ GlobalConfigGPU gcnfGPU;
 
+
 int main(int argc, char *argv[]){
   int dev = -1;
   {

@@ -19,7 +19,7 @@ See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces-DPD   for more info.
 #include"Interactor.h"
 #include"globals/defines.h"
 #include"globals/globals.h"
-#include"misc/Potential.h"
+#include"misc/Potential.cuh"
 #include<functional>
 #include"third_party/type_names.h"
 
@@ -28,11 +28,11 @@ class PairForcesDPD: public Interactor{
 
 public:
   /*Default is parameters for gcnf (all system), and LJ potential*/
-  PairForcesDPD(std::function<real(real,real)> Ffoo = Potential::forceLJ,
-		std::function<real(real,real)> Efoo = Potential::energyLJ);
+  PairForcesDPD(std::function<real(real,real)> Ffoo = forceLJ,
+		std::function<real(real,real)> Efoo = energyLJ);
   PairForcesDPD(real rcut, real3 L, int N,
-		std::function<real(real,real)> Ffoo = Potential::forceLJ,
-		std::function<real(real,real)> Efoo = Potential::energyLJ);
+		std::function<real(real,real)> Ffoo = forceLJ,
+		std::function<real(real,real)> Efoo = energyLJ);
   ~PairForcesDPD(){}
   void sumForce() override;
   real sumEnergy() override{return 0;}
@@ -44,7 +44,7 @@ public:
 
 private:
   NeighbourList nl;
-  Potential pot;
+  TablePotential pot;
   GPUVector4 sortVel;
   ullint seed;
   real gamma;

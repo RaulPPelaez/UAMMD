@@ -20,12 +20,11 @@ This base class allows to code different BDHI methods just by providing function
 namespace BDHI{
   class BDHI_Method{
   public:
-    BDHI_Method(){}
+    BDHI_Method(): M0(0), rh(0), N(0){}
     void init(real M0, real rh, int N){
       this->M0 = M0;
       this->rh = rh;
       this->N = N;
-      BLOCKSIZE = 128;
       this->init();
     }
     void init(){
@@ -40,7 +39,7 @@ namespace BDHI{
     }
     
     BDHI_Method(real M0, real rh, int N):
-      M0(M0), rh(rh), BLOCKSIZE(128), N(N){
+      M0(M0), rh(rh), N(N){
       this->init();
     }
     ~BDHI_Method(){
@@ -51,13 +50,13 @@ namespace BDHI{
     virtual void computeMF(real3* MF,     cudaStream_t st = 0) = 0;
     virtual void computeBdW(real3* BdW,   cudaStream_t st = 0) = 0;
     virtual void computeDivM(real3* divM, cudaStream_t st = 0) = 0;
-
+    virtual void finish_step(              cudaStream_t st = 0){}
     curandGenerator_t getRNG(){return curng;}
   protected:
     curandGenerator_t curng;
     real M0;
     real rh;
-    uint BLOCKSIZE; /*CUDA kernel block size, threads per block*/    
+    uint BLOCKSIZE = 128; /*CUDA kernel block size, threads per block*/    
     int N;
   };
   

@@ -3,6 +3,10 @@
    Implementation of the SimulationConfig class. 
 
    The constructor of this class sets all the parameters, creates the initial configuration and constructs the simulation.
+
+
+   This is a simulation of a LJ liquid using a neighbour list and a verlet NVT integrator.
+
  */
 
 #include "SimulationConfig.h"
@@ -13,58 +17,36 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
     
   Timer tim; tim.tic();
   
-  gcnf.E = 0.0;
-  gcnf.T = 0.3;
+  gcnf.T = 1.0;
   gcnf.gamma = 1.0;
   
-  gcnf.L = make_real3(32);
+  gcnf.L = make_real3(128);
 
-  gcnf.N = pow(2,14);
+  gcnf.N = pow(2,20);
   gcnf.dt = 0.01;
   
 
-  gcnf.rcut = 2.5;//pow(2, 1/6.)*gcnf.sigma;//2.5*gcnf.sigma;//  //rcut = 2.5*sigma -> biggest sigma in the system;
+  gcnf.rcut = 2.5;
   
   gcnf.nsteps1 = 100000;
   gcnf.nsteps2 = 0;
-  gcnf.print_steps = 500;
+  gcnf.print_steps = -1;
   gcnf.measure_steps = -1;
 
 
-  gcnf.seed = 0xffaffbfDEADBULL;//^time(NULL);
-  pos = initLattice(gcnf.L, gcnf.N, fcc); //Start in a simple cubic lattice
-
-  int N = gcnf.N;
+  gcnf.seed = 0xffaffbfDEADBULL^time(NULL);
+  pos = initLattice(gcnf.L, gcnf.N, fcc); //Start in a fcc lattice
 
   setParameters();
 
-
-  // pos.fill_with(make_real4(1));
-  // pos.upload();
-  // Vector<int> tmp(N);
-  // NBody_ns::SimpleCountingTransverser tr(tmp.d_m); 
-
-  // auto nbody = make_shared<NBodyForces<NBody_ns::SimpleCountingTransverser>>(tr);
-  // tim.tic();
-  // int counter = 0;
-  // while(tim.toc()<1){
-  //   nbody->sumForce();
-  //   cudaDeviceSynchronize();
-  //   counter++;
-  // }
-  // cerr<<counter<<endl;
-  // cerr<<(counter/tim.toc())<<endl<<endl;
-  // tmp.download(10);
-  // fori(0,10) cerr<<tmp[i]<<endl;  
-  // exit(1);
-
-  
   pos.upload();
   
   integrator = make_shared<VerletNVT>();
 
-  auto interactor = make_shared<PairForces<CellList>>();  
-  integrator->addInteractor(interactor);
+  auto lj = make_shared<PairForces<CellList, Potential::LJ>>();
+  lj->setPotParams(0,0,
+		   {1.0f /*epsilon*/, 1.0f /*sigma*/, 2.5f /*rcut*/, true/*shift?*/});
+  integrator->addInteractor(lj);
 
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;
   

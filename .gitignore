@@ -9,4 +9,6 @@ gdrDATA
 bin/*
 kk*
 src/uammd
-src/aradillo.inipos
+src/aradillo.*
+star*
+armadillo*

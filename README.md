@@ -8,7 +8,20 @@ Raul P. Pelaez 2016
 
 
 A fast generic multiscale CUDA Molecular Dynamics code made into modules for expandability and generality.
-It is coded into separated modules, with a SimulationConfig driver in C++ that can hold many modules in order to construct a simulation. For example, the simulation could have a VerletNVT module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
+
+UAMMD can perform several types of simulations, to this moment multiple integrators are implemented allowing it to perform:
+
+	-Molecular dynamics
+	-Brownian Dynamics
+	-Brownian Hydrodynamics
+	-Dissipative Particle Dynamics
+
+Multiple building blocks are provided in order for the user to construct a certain simulation, 
+highly templated so the user can easily add in the input the specific interactions when they are not implemented by default. 
+
+For example, there is not a harmonic trap module, but you can write a simple functor in the input file (directly in device code!) telling that each particle should experiment a force when it is trying to leave the box and you are set!. You can do the same with a bonded force, an interaction that needs to transverse a neighbour list, an nbody interaction... See the examples folder and the wiki for more info!
+
+UAMMD is coded into separated modules, with a SimulationConfig driver in C++ that can hold many modules in order to construct a simulation. For example, the simulation could have a VerletNVT module and and PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc.
 
 There are three types of modules:
 
@@ -38,23 +51,26 @@ These objects are abstract classes that can be derived to create all kinds of fu
 
 Finally there is a Driver that puts them all together and controls the flow of the simulation.
 
-**The simulation construction is performed in Driver/SimulationConfig.cpp. Where the integrator, interactors and measurables are created and the initial conditions and parameters are set. This is the "input" of UAMMD.**
+**The UAMMD input is set when compiling using: make INPUT_FILE=myinput.cpp**
+
+The default input is Driver/SimulationConfig.cpp. Any file containing at least the definition of the constructor of the class "SimulationConfig" is considered an input file. See the wiki/Input-File for more info!
 
 You can specify a different input file implementing the simulation configuration when compiling by:
 
 ``` $make INPUT_FILE=my_input.cpp ```
 
-INPUT_FILE will be Driver/SimulationConfig.cpp by default.
 
 # Currently Implemented
+
+See the wiki page for each interactor for more info and instructions!
 
 -----------------------
 **Interactors:**
 
 	1.Pair Forces: Implements hash (Morton hash) sort neighbour cell list construction algorithm to evaluate pair forces given some short range potential function, LJ i.e. Ultra fast
-	2.Bonded forces: Allows to join pairs of particles via springs (Instructions in BondedForces.h)
+	2.Bonded forces: Allows to join pairs of particles via bonds (i.e a harmonic spring) (Instructions in BondedForces.h)
 	3.Three body angle bonded forces: Allows to join triples of particles via angle springs (Instructions in BondedForces.h)
-    4.NBody forces: All particles interact with every other via some potential.
+    4.NBody forces: All particles interact with every other via some force.
 	5.External forces: A custom force function that will be applied to each particle individually.
 	6.Pair Forces DPD: A thermostat that uses the Pair Forces module to compute the interactions between particles as given by dissipative particle dynamics.
 	
@@ -75,7 +91,7 @@ INPUT_FILE will be Driver/SimulationConfig.cpp by default.
 
 ----------------------
 
-You can select between single and double precision in globals/defines.h. Single precision is used by default, you can change to double precision by commenting "#define SINGLE_PRECISION" and recompiling the entire code. This last step is very important, as failing to do so will result in unexpected behavior.
+You can select between single and double precision via Makefile, changing the OPTIONS variable. Single precision is used by default, remember to recompile the entire code when changing the precision. This last step is very important, as failing to do so will result in unexpected behavior.
 
 
 ## USAGE
@@ -121,6 +137,7 @@ Needs g++ with full C++11 support, 4.8+ recommended
      - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5 and g++ 5.3.1
      - GTX980 (sm_52), GTX780 (sm_35), GTX480(sm_20) and GTX580(sm_20) on CentOS 6.5 with CUDA 7.5 and g++ 4.8
 	 - GTX1080 (sm_61), Tesla P1000 (sm_60) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
+     - K40 (sm_35), GTX780(sm_35) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
 
 ## BENCHMARK
 
@@ -157,7 +174,7 @@ Current benchmark:
 The procedure to implement a new module is the following:
 
 	1. Create a new class that inherits from one of the parents (Interactor, Integrator, Measurable...) and overload the virtual methods. You want as long as the virtual methods are overloaded.
-	2. Include the new CPU header in global/Modules.h
+	2. Include the new header in global/Modules.h
 	3. Add the new sources in the Makefile.
 	4. Initialize them as needed in Driver/SimulationConfig.cpp as in the examples.
 	
@@ -166,7 +183,7 @@ All the project is compiled with nvcc and relocatable device code, so you can pu
 -------------------------------
 In globals/globals.h are the definitions of some variables that will be available throughout the entire project. These are mainly parameters. It also contains the position, force and an optional velocity arrays.
 
-In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from global when available. Things like the number of particles, the temperature or more importantly, the Vectors storing the positions, forces and velocities of each particle (again, when needed). These Vectors start with zero size and are initialized in Driver.cpp. However, your code should check the size of the arrays at startup with Vector::size() and initialize them if the size doesnt match the number of particles (i.e is 0).
+In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from global, the Vectors storing the positions, forces and velocities of each particle (when needed). These Vectors start with zero size and are initialized in Driver.cpp. However, your code should check the size of the arrays at startup with Vector::size() and initialize them if the size doesnt match the number of particles (i.e is 0).
 
 Currently the code initializes pos and force Vectors in Driver.cpp, after the parameters are set. Vel should be initialized in the constructor of any module that needs it, see VerletNVT for an example.
 
@@ -181,3 +198,5 @@ If you want to make small changes to an existing module, without changing it. Th
 ## ACKNOWLEDGMENTS
 
 UAMMD was developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.
+
+Acknowledgment is made to NVIDIA Corporation.

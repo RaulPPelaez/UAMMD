@@ -18,7 +18,7 @@ References:
 namespace BDHI{
   class Lanczos: public BDHI_Method{
   public:
-    Lanczos(real M0, real rh, int N, int max_iter = 100);
+    Lanczos(real M0, real rh, int N, real tolerance = 1e-3);
     ~Lanczos();
     void setup_step(              cudaStream_t st = 0) override{};
     void computeMF(real3* MF,     cudaStream_t st = 0) override;    

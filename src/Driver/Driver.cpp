@@ -7,7 +7,29 @@ Raul P. Pelaez 2016. Driver implementation. Controls the flow of the simulation.
 //Constructor does nothing
 Driver::Driver(): step(0){
 }
-
+#include<set>
+#include<map>
+void Driver::identifyColors(){
+  int N = pos.size();
+  /*Identify particle types*/
+  int type0 = pos[0].w;
+  std::set<uint> color2name;
+  color2name.insert(type0);
+  fori(0,N){
+    if(pos[i].w != type0){      
+      type0 = pos[i].w;
+      color2name.insert(type0);
+    }
+  }
+  gcnf.color2name.assign(color2name.begin(), color2name.end());
+  std::map<uint, uint> name2color;
+  fori(0, gcnf.color2name.size()){
+    name2color[gcnf.color2name[i]] = i;
+  }
+  fori(0,N)
+    pos[i].w = name2color[pos[i].w];
+  
+}
 void Driver::setParameters(){
   /*Initialize pos and force if needed*/
   if(pos.size() != gcnf.N && pos.size() > 0) gcnf.N = pos.size();
@@ -22,10 +44,14 @@ void Driver::setParameters(){
     force.fill_with(make_real4(real(0.0)));
     force.upload();
   }
+  /*Change names to colors in positions and save a map between both*/
+  this->identifyColors();
+  
   /*Initialize RNG*/
   grng = Xorshift128plus(gcnf.seed);
 
   cerr<<endl;
+  cerr<<"Setting the following parameters: "<<endl;
   cerr<<"Sigma: "<<gcnf.sigma<<endl;
   cerr<<"Box size: "<<gcnf.L<<endl;
   cerr<<"Number of particles: "<<gcnf.N<<endl;
@@ -58,7 +84,7 @@ void Driver::setParameters(){
 /*Forward the simulation state nsteps·dt in time*/
 void Driver::run(uint nsteps, bool relax){
   if(relax)cerr<<"Running "<<nsteps<<" relaxation steps..."<<endl;
-  
+  else     cerr<<"Running "<<nsteps<<" steps..."<<endl;
   Timer tim, timfps; /*Counter of total time and FPS helper timer*/
   tim.tic(); timfps.tic();
   uint fps_steps = 0;

@@ -38,11 +38,11 @@ NeighbourList_Base::NeighbourList_Base(real rcut, real3 L, int N, bool reorder):
   utils.cellSize = cellSize;
 }
 
-void NeighbourList_Base::reorderParticles(){
+void NeighbourList_Base::reorderParticles(cudaStream_t st){
   int nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
   int nblocks  =  N/nthreads +  ((N%nthreads!=0)?1:0); 
 
-  NeighbourList::computeHash<NeighbourList::MortonHash><<<nblocks, nthreads>>>(pos.d_m, particleIndex.d_m, particleHash.d_m, N, utils);
-  Sorter::sortByKey(particleIndex.d_m, particleIndex_alt.d_m, particleHash, particleHash_alt.d_m, N);
-  this->reorderProperty(pos.getTexture(), sortPos.d_m, N);
+  NeighbourList::computeHash<NeighbourList::MortonHash><<<nblocks, nthreads, 0, st>>>(pos.d_m, particleIndex.d_m, particleHash.d_m, N, utils);
+  Sorter::sortByKey(particleIndex.d_m, particleIndex_alt.d_m, particleHash, particleHash_alt.d_m, N, st);
+  this->reorderProperty(pos.getTexture(), sortPos.d_m, N, st);
 }

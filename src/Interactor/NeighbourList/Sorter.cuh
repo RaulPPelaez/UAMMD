@@ -7,7 +7,7 @@
 namespace Sorter{
 
   /*Radix sort by key using cub, puts sorted versions of inde,hash in index_alt, hash_alt*/
-  void sortByKey(uint *&index, uint *&index_alt, uint *&hash, uint *&hash_alt, int N);
+  void sortByKey(uint *&index, uint *&index_alt, uint *&hash, uint *&hash_alt, int N, cudaStream_t st);
     /*Reorder arrays with the new order, and transform if needed*/
   template<class T>
   __global__ void reorderProperty(T* __restrict__ old,

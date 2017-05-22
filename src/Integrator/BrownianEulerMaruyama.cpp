@@ -99,7 +99,6 @@ BrownianEulerMaruyama::~BrownianEulerMaruyama(){}
 
 void BrownianEulerMaruyama::update(){
   steps++;
-  if(steps%500==0) cerr<<"\rComputing step: "<<steps<<"   ";
   /*Generate noise*/
   curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), real(1.0));
   /*Reset force*/

@@ -1,16 +1,8 @@
 /*
-Raul P. Pelaez 2016.
-Force evaluator handler.
-Takes a function to compute the force, a number of sampling points and a
- cutoff distance. Evaluates the force and saves it to upload as a texture 
- with interpolation.
-
-TODO:
-100- Use texture objects instead of creating and binding the texture in 
-     initGPU.
+Raul P. Pelaez 2016.Potentials 
 
  */
-#include"Potential.h"
+#include"Potential.cuh"
 #include<fstream>
 #include<cstring>
 #include<algorithm>
@@ -18,14 +10,14 @@ TODO:
 
 
 
-Potential::Potential(std::function<real(real, real)> Ffoo,
-		     std::function<real(real, real)> Efoo,
-		     int N, real rc, uint ntypes):
+TablePotential::TablePotential(std::function<real(real, real)> Ffoo,
+			       std::function<real(real, real)> Efoo,
+			       int N, real rc):
   N(N), F(N), E(N),
   FGPU(nullptr), EGPU(nullptr),
   texForce(0),texEnergy(0),
   forceFun(Ffoo), energyFun(Efoo),
-  ntypes(ntypes), potParams(ntypes*ntypes), rc(rc)
+  rc(rc)
 {
   F[0] = 0.0f;
   E[0] = 0.0f;
@@ -86,61 +78,54 @@ Potential::Potential(std::function<real(real, real)> Ffoo,
   //   cerr<<"Error in potential creation!!!"<<endl;
   //   exit(1);
   // }
-
-  potParams.fill_with(make_real2(1));
+  
 
 }
 
-void Potential::print(){
+TablePotential::~TablePotential(){
+
+   cudaFreeArray(FGPU);  
+   cudaFreeArray(EGPU);
+  
+   cudaDestroyTextureObject(texForce);
+   cudaDestroyTextureObject(texEnergy);
+}
+void TablePotential::print(){
   ofstream out("potential.dat");
   fori(0,N) out<<F[i]<<" "<<E[i]<<"\n";
   out.close();
-}
-
-void Potential::setPotParam(uint i, uint j, real2 params){
-  if(i>=ntypes || j>=ntypes){
-    cerr<<"WARNING: Cannot set particle type "<<i<<","<<j<<". Only "<<ntypes<<" particle types in the system"<<endl;
-    return;
-  }
-  potParams[i+ntypes*j] = params;
-  potParams[j+ntypes*i] = params;
-  potParams.upload();
-}
-
-real2* Potential::getPotParams(){
-  potParams.upload();
-  return potParams.d_m;
-
 }
 
 //Force between two particles, depending on square distance between them
 // this function is only called on construction, so it doesnt need to be optimized at all
 //Distance is in units of sigma
 
-real Potential::forceLJ(real r2, real rcut){
-  real invr2 = 1.0/(r2);
-  real invr = 1.0/sqrt(r2);
+real forceLJ(real r2, real rcut){
+  real invr2 = 1/(r2);
+
   real invr6 = invr2*invr2*invr2;
   real invr8 = invr6*invr2;
 
-  real invrc13 = pow(1.0/rcut, 13);
-  real invrc7 = pow(1.0/rcut, 7);
+  real invrc13 = pow(1/rcut, 13);
+  real invrc7 = pow(1/rcut, 7);
   
-  real fmod = -48.0*invr8*invr6 + 24.0*invr8;  
-  real fmodcorr = 48.0*invr*invrc13 - 24.0*invr*invrc7;
+  real fmod = -48.0*invr8*invr6 + 24.0*invr8;
 
-  if(rcut>2.0)
+  if(rcut>2.0){
+    real invr = sqrt(invr2);
+    real fmodcorr = 48.0*invr*invrc13 - 24.0*invr*invrc7;
   //(f(r)-f(rcut))/r
     return fmod+fmodcorr;
+  }
   else
     return fmod;
 }
-real Potential::energyLJ(real r2, real rcut){
+real energyLJ(real r2, real rcut){
   real r = sqrt(r2);
   real invr2 = 1.0/r2;
   real invr6 = invr2*invr2*invr2;
   //real E =  2.0f*invr6*(invr6-1.0f);
-  //potential as u(r)-(r-rcut)*f(rcut)-r(rcut) 
+  //potential as u(r)-(r-rcut)*f(rcut)-u(rcut) 
   real E = 2.0*(invr6*(invr6-1.0));
   real Ecorr = 2.0*(
 		      -(r-rcut)*(-24.0*pow(1.0/rcut, 13)+12.0*pow(1.0/rcut, 7))

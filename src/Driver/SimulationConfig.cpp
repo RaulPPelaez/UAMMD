@@ -5,126 +5,169 @@
    The constructor of this class sets all the parameters, creates the initial configuration, constructs and runs the simulation.   
 
 
-   Currently configured to create a Brownian Dynamics with hydrodynamic interactions using the Cholesky decomposition. With ideal particles trapped in a harmonic box.
+   Currently configured to create a Brownian Dynamics with hydrodynamic interactions using the Positively Split Edwald method.
+
+
+   This input file implements a bond type called ChemicalBond and makes a BondedForces interactor out of it. 
+   It also implements an ExternalForces functor that puts all particles in an harmonic trap according to their z position.
+
+   Although this functionality is not commented out and a simulation with ideal particles is created.
+
+   For a simpler input file example see WCA.cpp.
 
 References:
-[1] https://github.com/RaulPPelaez/UAMMD/wiki
-[2] https://github.com/RaulPPelaez/UAMMD/wiki/External-Forces 
- */
+   [1] https://github.com/RaulPPelaez/UAMMD/wiki
+
+*/
+
+
+
+
+
 
 #include "SimulationConfig.h"
 
-/*This is a functor to be used with the ExternalForces module. See [1]
-  The operator (pos, i) will be called for each particle, and will have available
-  any private member.
-  The result will be added to the global force array: force[i] = tr(pos, i);
-  It is intended for computing a quantity for each particle that depends only on information about that particle.
- */
-struct Externaltor{
-  Externaltor(real3 L, real k): L(L), k(k){}
-  inline __device__ real4 operator()(const real4 &pos, int i){
-    real4 f = make_real4(0);
 
-    /*A simple harmonic wall*/
-    real *F = &(f.x);
-    const real *r = &(pos.x);
-    for(int i=0; i<3; i++){
-      if(r[i]> L.x*0.5f)
-     	F[i] -= k*(r[i]-L.x*0.5f);
-      else if(r[i]<-L.x*0.5f)
-     	F[i] -= k*(r[i]+L.x*0.5f);
-    }                                 
+/*Random generators for the Chemical Bonds*/
+curandState_t *rngst_tmp = nullptr, *curngst_cpu = nullptr;
+__global__ void initcurng(curandState_t *cust, ullint seed, int N){
+  int id = blockIdx.x*blockDim.x+threadIdx.x;
+  if(id>N) return;
+  curand_init(seed, id, 0, &cust[id]);
 
-    return f;
+}
+
+/*A bond that can activate or deactivate according to a random number*/
+struct ChemicalBond{
+  struct BondInfo{
+    real r0, k, range;
+    bool active;
+    curandState_t curng;
+  };
+  ChemicalBond(int nbonds):nbonds(nbonds){
+    cudaMalloc(&rngst_tmp, nbonds*sizeof(curandState_t));
+    curngst_cpu = new curandState_t[nbonds];
+    initcurng<<<nbonds/128+1,128>>>(rngst_tmp, gcnf.seed, nbonds);
+
+    cudaMemcpy(curngst_cpu, rngst_tmp, nbonds*sizeof(curandState_t), cudaMemcpyDeviceToHost);
+    cudaFree(rngst_tmp);
+      
   }
-  real k;
-  real3 L;
+  inline __device__ real force(int i, int j, const real3 &r12, BondInfo &bi){
+    real r2 = dot(r12, r12);
+    float Z = curand_uniform(&bi.curng);
+          
+    if(bi.active){
+      if(Z>0.999f) bi.active = false;
+      //if(r2>bi.range*bi.range){return 0;}	
+      real invr = rsqrtf(r2);
+      real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
+      return f;
+      
+    }
+    else{
+      if(Z>0.999f) bi.active = true;
+      return 0;
+    }
+
+  }
+        
+  static __host__ BondInfo readBond(std::istream &in){
+    static int ibond =0;
+    BondInfo bi;
+    in>>bi.k>>bi.r0;
+    bi.range = 2.0;
+    bi.active = true;
+
+    bi.curng = curngst_cpu[ibond];
+      
+    ibond++;
+    return bi;
+  }
+  int nbonds;
 };
-  
+
+
+
+/*This struct is passed to ExternalForces and its () operator is called for every particle*/
+struct ExtTor{
+  inline  __device__ real4 operator()(const real4 &pos, int i){
+    return make_real4(0,0,-10.0f*(pos.z-20.0f),0);
+  }
+
+};
+
 SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){    
   Timer tim; tim.tic();
-  /***********************Set all the parameters needed**********************/
-  /*See globals.h for a list of parameters*/
-  /*If you set a parameter that the modules you use do not need, It will just be ignored. i.e. Setting gcnf.E and using VerletNVT*/
 
   gcnf.T = 1.0;
   
-  gcnf.L = make_real3(32);
+  gcnf.L = make_real3(64);
+  
+  gcnf.N = pow(2, 14);
+  gcnf.dt = 0.01;
 
-  
-  gcnf.N = pow(2,12);
-  gcnf.dt = 0.05;
-  
-    
-  gcnf.nsteps1 = 174000;
-  gcnf.print_steps = 200;
+  gcnf.rcut = 2.5;
+   
+  gcnf.nsteps1 = 1000000;
+  gcnf.print_steps = 500;
   gcnf.measure_steps = -1;
 
+  
+  gcnf.seed = 0xffaffbfDEADBULL^time(NULL);  
+  
+  //pos = initLattice(gcnf.L, gcnf.N, sc);
 
-  gcnf.seed = 0xffaffbfDEADBULL^time(NULL);
-  //pos = initLattice(gcnf.L, gcnf.N, sc); //Start in a simple cubic lattice
-  //pos = readFile("armadillo.inipos");
-  
-  
-  setParameters();
-  
-  //fori(0,gcnf.N) pos[i] = make_real4(make_real3(pos[i])+10, 0);
-  
-  /*A random initial configuration*/
+  pos = Vector4(gcnf.N);
   fori(0,gcnf.N){
-    pos[i] = make_real4(grng.uniform3(-gcnf.L.x/2.0, gcnf.L.x/2.0), 0);
-  }
+    pos[i] = make_real4( grng.uniform3(-gcnf.L.x*0.5, gcnf.L.x*0.5), 1);
 
+  }
+  
+    
+  setParameters();
   /*Upload positions to GPU once the initial conditions are set*/
   pos.upload();
   
+
+  Matrixf K(3,3); //Shear matrix
+  K.fill_with(0.0);
+  
+  real vis = 1.0;//Viscosity
+  real rh = 1.0; //Hydrodynamic radius
+  
+  integrator = make_shared<BrownianHydrodynamicsEulerMaruyama>(K, vis, rh, PSE);
   //integrator = make_shared<VerletNVT>();
-  real vis = 1;
-  real rh = 1.0;
-  Matrixf K(3,3);
-  K.fill_with(0);
-  //int niter = 4; //Number of Lanczos iterations
-  integrator = make_shared<BrownianHydrodynamicsEulerMaruyama>(K, vis, rh, PSE); //LANCZOS, niter);
-
-  /*Short range forces, with LJ potential if other is not provided*/
-  // auto interactor = make_shared<PairForces<CellList>>();
-
-  /*ExternalForces module specialized for the ExternalTor above*/
-  // Externaltor tr(gcnf.L, 50.0f);
-  // auto interactor = make_shared<ExternalForces<Externaltor>>(tr);
-
-  // /*Add it to the integrator*/
-  // integrator->addInteractor(interactor);
   
+   // ifstream in("kk.2bonds");
+   // int nbonds;
+   // in>>nbonds;
+   // in.close();
+   // ChemicalBond cb(nbonds);
+   // /*Short range forces, using LJ potential*/
+   //auto interactor = make_shared<PairForces<CellList, Potential::LJ>>();
+   // interactor->setPotParams(0, 0,
+   // 			   {1/*epsilon*/, 1/*sigma*/, 2.5f/*rcut*/, 0/*shift?*/});
+
+  //auto interactor = make_shared<BondedForces<ChemicalBond>>("kk.2bonds");
+   
+  //auto interactor2 = make_shared<ExternalForces<ExtTor>>(ExtTor());
+
+  
+  //integrator->addInteractor(interactor);
   //integrator->addInteractor(interactor2);
-  //integrator->addInteractor(interactor3);
-  
+
+
+  //measurables.push_back(make_shared<EnergyMeasure>(integrator->getInteractors(), integrator)); 
+
   
   cerr<<"Initialization time: "<<setprecision(5)<<tim.toc()<<"s"<<endl;
   
   tim.tic();
-  /***************************Start of the simulation***************************/
-  /**Run nsteps1,
-     passing true to this function will be considered as a relaxation run, and wont write to disk nor measure anything**/
-  //  run(1000, true);  
+
+  run(5000, true);  
   run(gcnf.nsteps1);  
 
-  // /*You can change the integrator at any time between calls to run*/
-  // /*But remember to clear the measurables before,
-  //   so you are not measuring the energy from an incorrect place!*/
-  // cerr<<"\n\nChanging Integrator...\n\n"<<endl;
-  // measurables.clear();  
-  // /*Set a new Integrator like before*/
-  // integrator = make_shared<VerletNVT>();
-  // integrator->addInteractor(interactor);
-  // integrator->addInteractor(interactor2);
-  
-  // /*Add it to the measrables vector, which is now empty!*/
-  // measurables.push_back(make_shared<EnergyMeasure>(integrator->getInteractors(), integrator));
-  
-  // /**Run nsteps2 with the second integrator, no relaxation**/
-  // run(gcnf.nsteps2);
-  
   
   /*********************************End of simulation*****************************/
   double total_time = tim.toc();
@@ -142,8 +185,8 @@ void Writer::write_concurrent(){
   real4 *posdata = pos.data;
   cout<<"#Lx="<<L.x*0.5f<<";Ly="<<L.y*0.5f<<";Lz="<<L.z*0.5f<<";\n";
   fori(0,N){    
-    uint type = (uint)(posdata[i].w+0.5);
-    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" "<<1.0f<<" "<<type<<"\n";
+    uint type = gcnf.color2name[posdata[i].w];
+    cout<<posdata[i].x<<" "<<posdata[i].y<<" "<<posdata[i].z<<" "<<0.5<<" "<<type<<"\n";
   }
   cout<<flush;
 }

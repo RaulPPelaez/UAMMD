@@ -65,7 +65,7 @@ protected:
   //Any change of parameters after a call to this function will produce
   //undefined behavior.
   void setParameters(); 
-  
+  void identifyColors();
 public:
   Writer writer;
   Driver();

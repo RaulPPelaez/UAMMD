@@ -15,34 +15,50 @@ See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces   for more info.
 #include"Interactor.h"
 #include"globals/defines.h"
 #include"globals/globals.h"
-#include"misc/Potential.h"
+#include"misc/Potential.cuh"
 #include<functional>
 #include<memory>
 #include"third_party/type_names.h"
 
 /*This makes the class valid for any NeighbourList*/
-template<class NeighbourList>
+template<class NeighbourList, class Potential>
 class PairForces: public Interactor{
-
 public:
   /*Default is parameters for gcnf (all system), and LJ potential*/
-  PairForces(std::function<real(real,real)> Ffoo = Potential::forceLJ,
-	     std::function<real(real,real)> Efoo = Potential::energyLJ);
-  PairForces(real rcut, real3 L, int N,
-	     std::function<real(real,real)> Ffoo = Potential::forceLJ,
-	     std::function<real(real,real)> Efoo = Potential::energyLJ);
+  PairForces();
+  PairForces(real rcut);
+  PairForces(real rcut, real3 L, int N);
   ~PairForces(){}
   void sumForce() override;
-  real sumEnergy() override{return 0;}
+  real sumEnergy() override;
   real sumVirial() override{return 0;}
   void print_info(){
     std::cerr<<"\t Using: "<<type_name<NeighbourList>()<<" Neighbour List."<<std::endl;
     nl.print();
+    std::cerr<<"\t Using: "<<type_name<Potential>()<<" potential."<<std::endl;
+	
+  }
+
+  template<typename TypeParams = typename Potential::TypeParams>
+  void setPotParams(int namei, int namej, TypeParams params){
+    pot.setPotParams(namei, namej, params);
   }
 
 private:
   NeighbourList nl;
   Potential pot;
+  Vector3 potParams;
+
+  void *cubTempStorage;
+  size_t cubTempStorageBytes;
+  GPUVector<real> energy;
+  
 };
 
+
+
+
+#include<PairForces.cu>
+  
 #endif
+

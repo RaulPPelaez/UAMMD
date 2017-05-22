@@ -48,32 +48,9 @@ namespace CellList_ns{
   
 }
 
-/*Construct the neighbour list*/
-void CellList::makeNeighbourList(){
-  /*The list only has to be recomputed one time per step*/
-  if(last_step_updated == current_step) return;
-  
-  last_step_updated = current_step;
-  /*Clear the cellStart array, if cellStart[icell] = 0xffFFffFFff, no particle is in that cell*/
-  uint ncells = utils.cellDim.x*utils.cellDim.y*utils.cellDim.z;
-  cudaMemset(cellStart.d_m, 0xffffffff, ncells*sizeof(uint));
-  /*Order positions, grouping them by cell index*/
-  this->reorderParticles();
-  /*I need the conversion between old and new order,
-    the reference to it changes each iteration due to the sorting process*/
-  nl.particleIndex = particleIndex.d_m;
-
-  /*Configure and launch the kernel to find cellStart and cellEnd*/
-  int nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
-  int nblocks  =  N/nthreads +  ((N%nthreads!=0)?1:0);     
-  CellList_ns::fillCellListD<<<nblocks, nthreads>>>(sortPos,
-						    cellStart, cellEnd,
-						    N, utils);
-}
-
 
 /*Initialize a CellList instance*/
-CellList::CellList(real rcut, real3 L, int N): NeighbourList_Base(rcut, L, N,true){
+CellList::CellList(real rcut, real3 L, int N): NeighbourList_Base(rcut, L, N, true){
   /*Base initialization created some variables*/
   uint ncells = utils.cellDim.x*utils.cellDim.y*utils.cellDim.z;
   /*Initialize arrays*/
@@ -88,4 +65,29 @@ CellList::CellList(real rcut, real3 L, int N): NeighbourList_Base(rcut, L, N,tru
   nl.particleIndex = particleIndex.d_m;
   nl.N = N;
 }
+
+
+/*Construct the neighbour list*/
+void CellList::makeNeighbourList(cudaStream_t st){
+  /*The list only has to be recomputed one time per step*/
+  if(last_step_updated == current_step) return;
+  
+  last_step_updated = current_step;
+  /*Clear the cellStart array, if cellStart[icell] = 0xffFFffFFff, no particle is in that cell*/
+  uint ncells = utils.cellDim.x*utils.cellDim.y*utils.cellDim.z;
+  cudaMemsetAsync(cellStart.d_m, 0xffffffff, ncells*sizeof(uint), st);
+  /*Order positions, grouping them by cell index*/
+  this->reorderParticles(st);
+  /*I need the conversion between old and new order,
+    the reference to it changes each iteration due to the sorting process*/
+  nl.particleIndex = particleIndex.d_m;
+
+  /*Configure and launch the kernel to find cellStart and cellEnd*/
+  int nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
+  int nblocks  =  N/nthreads +  ((N%nthreads!=0)?1:0);     
+  CellList_ns::fillCellListD<<<nblocks, nthreads, 0, st>>>(sortPos,
+							   cellStart, cellEnd,
+							   N, utils);
+}
+
 

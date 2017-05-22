@@ -21,11 +21,11 @@
 using namespace std;
 using namespace BDHI;
 
-Lanczos::Lanczos(real M0, real rh, int N, int max_iter):
+Lanczos::Lanczos(real M0, real rh, int N, real tolerance):
   BDHI_Method(M0, rh, N),
-  utilsRPY(rh), lanczosAlgorithm(N, max_iter){
+  utilsRPY(rh), lanczosAlgorithm(N, tolerance){
   cerr<<"\tInitializing Lanczos subsystem...";  
-
+ 
   lanczosAlgorithm.init();
 
   BLOCKSIZE = 1024;
@@ -91,7 +91,7 @@ namespace Lanczos_ns{
       const real gv = g*dot(rij, vj);
       /*gv = g(r)·( vx·rx + vy·ry + vz·rz )*/
       /*(g(r)·v·(r(diadic)r) )_ß = gv·r_ß*/
-      Mv_t = f*vj + gv*rij;
+      Mv_t = f*vj + gv*rij/(r*r);
       return Mv_t;
     }
     /*Sum the result of each interaction*/
@@ -156,11 +156,48 @@ void Lanczos::computeBdW(real3 *BdW, cudaStream_t st){
   lanczosAlgorithm.solveNoise(Mdot, (real*) BdW, st);
 }
 
+namespace Lanczos_ns{
+  /*This Nbody Transverser computes the analytic divergence of the RPY tensor*/
+  struct divMTransverser{
+    divMTransverser(real3* divM, real M0, real rh): divM(divM), M0(M0), rh(rh){
+      this->invrh = 1.0/rh;
+    }
+    
+    inline __device__ real3 zero(){ return make_real3(real(0.0));}
+    inline __device__ real3 compute(const real4 &pi, const real4 &pj){
+      /*Work in units of rh*/
+      const real3 r12 = (make_real3(pi)-make_real3(pj))*invrh;
+      const real r2 = dot(r12, r12);
+      if(r2==real(0.0))
+	return make_real3(real(0.0));
+      real invr = rsqrtf(r2);
+      /*Just the divergence of the RPY tensor in 2D, taken from A. Donev's notes*/
+      /*The 1/6pia is in M0, the factor kT is in the integrator, and the factor 1/a is in set*/
+      if(r2>real(4.0)){
+	real invr2 = invr*invr;
+	return real(0.75)*(r2-real(2.0))*invr2*invr2*r12*invr;
+      }
+      else{
+	return real(0.09375)*r12*invr;
+      }
+    }
+    inline __device__ void accumulate(real3 &total, const real3 &cur){total += cur;}
+    
+    inline __device__ void set(int id, const real3 &total){
+      divM[id] = M0*total*invrh;
+    }
+  private:
+    real3* divM;
+    real M0;
+    real rh, invrh;
+  };
+
+}
 
 void Lanczos::computeDivM(real3* divM, cudaStream_t st){
-   BDHI::divMTransverser divMtr(divM, M0, utilsRPY.rh);
+  Lanczos_ns::divMTransverser divMtr(divM, M0, utilsRPY.rh);
   
-   NBodyForces<BDHI::divMTransverser> nbody_divM(divMtr,st);
+   NBodyForces<Lanczos_ns::divMTransverser> nbody_divM(divMtr,st);
   
    nbody_divM.sumForce();
 }

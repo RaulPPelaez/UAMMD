@@ -16,6 +16,13 @@ CUDA_LIBS=/usr/local/cuda-$(CUDA_VERSION)/lib64
 #The code will look for a folder named cub here, you can create a symlink if you have a folder i.e. cub-1.5.2
 CUB_INCLUDE=/usr/local/include
 
+#Recompile entire project if you change options
+OPTIONS = SINGLE_PRECISION USE_CPU_LAPACK_AND_BLAS
+
+ifdef $(MKLROOT)
+	OPTIONS += USE_MKL
+endif
+
 ARCH ?= 52 #35
 
 #You can place your custom files either here or below in the diferent OBJS_*/CUOBJS_* variables. Dont forget the folders if you put it here!
@@ -23,7 +30,7 @@ ARCH ?= 52 #35
 CUSTOM_OBJS= 
 
 #These ones with $(NVCC)
-CUSTOM_CUOBJS= Interactor/NeighbourList/Sorter.o Interactor/NeighbourList/CellList.o Interactor/NeighbourList/NeighbourList.o
+CUSTOM_CUOBJS= 
 
 FORTRAN_OBJS =
 
@@ -48,21 +55,6 @@ INCLUDEFLAGS= $(addprefix -I, $(INCLUDEDIRS))
 
 
 
-CFLAGS= -pthread $(OPTIMCPU)   $(INCLUDEFLAGS)
-
-ifdef EXPERIMENTAL
-CFLAGS += -DEXPERIMENTAL
-endif
-
-
-ifdef EXPERIMENTAL
-CFLAGS += -DEXPERIMENTAL
-endif
-
-
-CXXFLAGS=$(CFLAGS) -std=c++11 #-flto 
-
-
 $(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 
 ifdef DEBUG
@@ -70,10 +62,37 @@ OPTIMGPU= -G -O0 -g
 else
 OPTIMGPU= -O3
 endif
-NVFLAGS= $(OPTIMGPU) -std=c++11  -ccbin=$(CXX)   --compiler-options='$(CFLAGS)' -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  $(INCLUDEFLAGS) -Xptxas -dlcm=cg #-Xptxas -warn-spills
 
 LDFLAGS= -L$(CUDA_LIBS)
-LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -lgomp -lnvToolsExt -lcufft -llapacke
+LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -lgomp -lnvToolsExt -lcufft
+
+ifneq (,$(findstring USE_MKL,$(OPTIONS)))
+	LDLIBS +=  -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
+	INCLUDEFLAGS += -DMKL_ILP64 -m64 -I${MKLROOT}/include
+	OPTIONS += USE_CPU_LAPACK_AND_BLAS
+endif
+
+OPTIONS := $(sort $(OPTIONS))
+
+ifneq (,$(findstring USE_CPU_LAPACK_AND_BLAS,$(OPTIONS)))
+ifeq (,$(findstring USE_MKL,$(OPTIONS)))	
+	LDLIBS := $(LDLIBS) -llapacke  -lcblas
+endif
+endif
+
+
+
+
+CFLAGS= -pthread $(OPTIMCPU)   $(INCLUDEFLAGS)  $(addprefix -D, $(OPTIONS))
+
+ifdef EXPERIMENTAL
+CFLAGS += -DEXPERIMENTAL
+endif
+
+CXXFLAGS=$(CFLAGS) -std=c++11 #-flto 
+
+
+NVFLAGS= $(OPTIMGPU) -std=c++11  -ccbin=$(CXX)   --compiler-options='$(CFLAGS)' -lineinfo -m64 $(GENCODE_FLAGS) -src-in-ptx  $(INCLUDEFLAGS) -Xptxas -dlcm=cg -Xptxas -warn-spills
 
 
 OBJS_INTERACTOR_EXPERIMENTAL= PairForcesAlt.o
@@ -82,23 +101,22 @@ CUOBJS_INTERACTOR_EXPERIMENTAL= PairForcesAltGPU.o
 
 THIRD_PARTY_OBJS= bravais.o
 
-OBJS_INTERACTOR= BondedForces.o
+OBJS_INTERACTOR= 
 
-OBJS_BDHI=    #BrownianHydrodynamicsEulerMaruyama.o DiffusionBDHI.o BrownianNoiseBDHI.o
 CUOBJS_BDHI= BrownianHydrodynamicsEulerMaruyama.o   BDHI_Cholesky.o BDHI_Lanczos.o BDHI_PSE.o
 
-OBJS_INTEGRATOR= VerletNVT.o VerletNVE.o BrownianEulerMaruyama.o  $(addprefix BDHI/, $(OBJS_BDHI))
-OBJS_MEASURABLE= Measurable.o EnergyMeasure.o
+OBJS_INTEGRATOR=  $(addprefix BDHI/, $(OBJS_BDHI)) VerletNVT.o VerletNVE.o BrownianEulerMaruyama.o 
+OBJS_MEASURABLE=  Measurable.o EnergyMeasure.o
 
 
-CUOBJS_INTERACTOR= PairForces.o PairForcesDPD.o BondedForcesGPU.o #NBodyForcesGPU.o
-CUOBJS_INTEGRATOR= VerletNVTGPU.o VerletNVEGPU.o BrownianEulerMaruyamaGPU.o $(addprefix BDHI/, $(CUOBJS_BDHI))
+CUOBJS_INTERACTOR= PairForcesDPD.o ThreeBondedForces.o NeighbourList/Sorter.o NeighbourList/CellList.o NeighbourList/NeighbourList.o
+CUOBJS_INTEGRATOR= $(addprefix BDHI/, $(CUOBJS_BDHI)) VerletNVTGPU.o VerletNVEGPU.o BrownianEulerMaruyamaGPU.o 
 
 OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))
 OBJS += $(addprefix Measurable/, $(OBJS_MEASURABLE))
-OBJS +=  main.o utils/utils.o misc/Potential.o  Driver/Driver.o  Driver/SimulationScript.o $(CUSTOM_OBJS)  misc/Diagonalize.o $(INPUT_FILE_OBJ) 
+OBJS += $(INPUT_FILE_OBJ) main.o  utils/utils.o  Driver/Driver.o  Driver/SimulationScript.o $(CUSTOM_OBJS)  #misc/Diagonalize.o 
 
-CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS) misc/LanczosAlgorithm.o
+CUOBJS = $(addprefix Interactor/, $(CUOBJS_INTERACTOR)) $(addprefix Integrator/, $(CUOBJS_INTEGRATOR)) $(CUSTOM_CUOBJS) misc/LanczosAlgorithm.o misc/Potential.o
 
 THIRD_PARTY_OBJSS = $(addprefix third_party/, $(THIRD_PARTY_OBJS))
 

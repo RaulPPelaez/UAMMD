@@ -9,22 +9,25 @@
      dW- Brownian noise vector
      B - B*B^T = M -> i.e Cholesky decomposition B=chol(M) or Square root B=sqrt(M)
 
-  The Diffusion matrix is computed via the Rotne Prager Yamakawa tensor
+  The Mobility matrix is computed via the Rotne Prager Yamakawa tensor.
 
-  The module offers several ways to compute and sovle the different terms.
+  The module offers several ways to compute and solve the different terms.
+  
+     BDHI::Cholesky:
+     -Computing M·F and B·dW  explicitly storing M and performing a Cholesky decomposition on M.
 
-  The brownian Noise can be computed by:
-     -Computing B·dW explicitly performing a Cholesky decomposition on M.
-     -Through a Lanczos iterative method to reduce M to a smaller Krylov subspace and performing the operation there.
+     BDHI::Lanczos:
+     -A Lanczos iterative method to reduce M to a smaller Krylov subspace and performing the operation B·dW there, the product M·F is performed in a matrix-free way, recomputing M every time M·v is needed.
 
-  On the other hand the mobility(diffusion) matrix can be handled in several ways:
-     -Storing and computing it explicitly as a 3Nx3N matrix.
-     -Not storing it and recomputing it when a product M·v is needed.
+     BDHI::PSE:
+     -The Positively Split Edwald Method, which takes the computation to fourier space.
 
 REFERENCES:
 
 1- Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations
         J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
+2- Rapid sampling of stochastic displacements in Brownian dynamics simulations 
+        The Journal of Chemical Physics 146, 124116 (2017); doi: http://dx.doi.org/10.1063/1.4978242
 
 TODO:
 100- Optimize streams
@@ -38,7 +41,7 @@ using namespace std;
 
 BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama(Matrixf Kin, real vis, real rh,
 								       BDHIMethod bdhiMethod,
-								       int max_iter):
+								       real tolerance):
   Integrator(),
   MF(N), BdW(N+1)
 {  
@@ -67,23 +70,22 @@ BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama(Matrixf K
   cudaStreamCreate(&stream);
   cudaStreamCreate(&stream2);
 
-  rh = 1.0;
+
 
   
-  real psi = 0.9;
+  real psi = 1.2;
   switch(bdhiMethod){
   case CHOLESKY:
-    M0 = 1/(6*M_PI*vis*rh);
+    M0 = 1/(6*M_PI*vis*rh);    
     bdhi = make_shared<BDHI::Cholesky>(M0, rh, N);
     break;
   case DEFAULT:
   case PSE:
-    M0=1;    
-    bdhi = make_shared<BDHI::PSE>(M0, gcnf.T, rh, psi, N);
+    bdhi = make_shared<BDHI::PSE>(vis, gcnf.T, rh, psi, N);
     break;
   case LANCZOS:
     M0 = 1/(6*M_PI*vis*rh);
-    bdhi = make_shared<BDHI::Lanczos>(M0, rh, N, max_iter);
+    bdhi = make_shared<BDHI::Lanczos>(M0, rh, N, tolerance);
     break;   
   }
   
@@ -96,10 +98,7 @@ BrownianHydrodynamicsEulerMaruyama::BrownianHydrodynamicsEulerMaruyama(Matrixf K
 }
 BrownianHydrodynamicsEulerMaruyama::~BrownianHydrodynamicsEulerMaruyama(){
   cerr<<"Destroying BrownianHydrodynamicsEulerMarujama...";
-  // gpuErrchk(cudaStreamDestroy(stream));
-  // gpuErrchk(cudaStreamDestroy(stream2));
   cerr<<"DONE!!"<<endl;
-  //cusolverSpDestroy(solver_handle);
 }
 
 
@@ -117,7 +116,7 @@ namespace BDHI_EulerMaruyama_ns{
 				const real3* __restrict__ BdW,
 				const real3* __restrict__ K,
 				const real3* __restrict__ divM, int N,
-				real sqrt2Tdt){
+				real sqrt2Tdt, real T, real dt, bool D2){
     uint i = blockIdx.x*blockDim.x+threadIdx.x;    
     if(i>=N) return;
     /*Position and color*/
@@ -126,28 +125,28 @@ namespace BDHI_EulerMaruyama_ns{
     real c = pc.w;
 
     /*Shear stress*/
-    real3 KR = make_real3(0);
+   real3 KR = make_real3(0);
     KR.x = dot(K[0], p);
     KR.y = dot(K[1], p);
     /*2D clause. Although K[2] should be 0 in 2D anyway...*/
-    if(!gcnfGPU.D2)
+    if(!D2)
       KR.z = dot(K[2], p);
     
     /*Update the position*/
-    p += (KR + MF[i])*gcnfGPU.dt;
+    p += (KR + MF[i])*dt;
     /*T=0 is treated specially, there is no need to produce noise*/
     if(noise){
       real3 bdw  = BdW[i];
-      if(gcnfGPU.D2)
+      if(D2)
 	bdw.z = 0;
       p += sqrt2Tdt*bdw;
     }
     /*If we are in 2D and the divergence term exists*/
-    if(gcnfGPU.D2 && divM){
+    if(divM){
       real3 divm = divM[i];
       //divm.z = real(0.0);
       //p += params.T*divm*params.invDelta*params.invDelta*params.dt; //For RFD
-      p += gcnfGPU.T*gcnfGPU.dt*divm;
+      p += T*dt*divm;
     }           
     /*Write to global memory*/
     pos[i] = make_real4(p,c);
@@ -170,41 +169,28 @@ void BrownianHydrodynamicsEulerMaruyama::update(){
 
   bdhi->setup_step();
 
-  
-  //force.fill_with(make_real4(0.0f,0,0,0));
-
-  // if(steps==1){
-  //  fori(0, N/2) force[i] = make_real4(1,0,0,0);
-  //  fori(N/2, N) force[i] = make_real4(-1,0,0,0);
-  // }
-  //  force.upload();
   bdhi->computeMF(MF.d_m, stream);
-  // MF.download();
-  // ofstream out("MF.dat");
-  // fori(0,N){
-  //   out<<MF[i]<<endl;
-  // }
-  // exit(1);
   
   bdhi->computeBdW(BdW, stream);
   /* divM =  (M(q+dw)-M(q))·dw/d^2*/
   if(gcnf.D2){
-    bdhi->computeDivM(divM, stream2);
+    bdhi->computeDivM(divM.d_m, stream2);
   }
 
   real sqrt2Tdt = sqrt(2*dt*gcnf.T);
-  
+
+  bdhi->finish_step(stream);
   /*Update the positions*/
   /* R += KR + MF + sqrt(2dtT)BdW + kTdivM*/
   cudaDeviceSynchronize();
   if(gcnf.T > 0)
     BDHI_EulerMaruyama_ns::integrateGPUD<true><<<nblocks, nthreads>>>(pos,
-					      MF, (real3*)(BdW), (real3 *)K.d_m, divM,
-					      N, sqrt2Tdt);  
+					      MF, (real3*)(BdW), (real3 *)K.d_m, divM.d_m,
+					      N, sqrt2Tdt, gcnf.T, dt, gcnf.D2);  
   else
     BDHI_EulerMaruyama_ns::integrateGPUD<false><<<nblocks, nthreads>>>(pos,
-					       MF, (real3*)(BdW), (real3 *)K.d_m, divM,
-					       N, sqrt2Tdt);
+					       MF, (real3*)(BdW), (real3 *)K.d_m, divM.d_m,
+					       N, sqrt2Tdt, gcnf.T, dt, gcnf.D2);
   
 }
 

@@ -213,7 +213,6 @@ public:
   //Cast to float* returns the device pointer!
   operator T *&() {return d_m;}
   operator T *() const{return d_m;}
-  operator shared_ptr<Vector<T>>() {return make_shared<Vector<T>>(*this);}
   operator cudaTextureObject_t(){ return this->getTexture().tex; }
 };
 

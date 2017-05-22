@@ -11,6 +11,9 @@
 #include"globals/defines.h"
 #include "Driver.h"
 
+#include<stdlib.h>
+#include<string.h>
+
 class SimulationConfig: public Driver{
 public:
   SimulationConfig(int argc, char* argv[]);

@@ -4,7 +4,8 @@
 
 #include"Interactor/PairForces.cuh"
 #include"Interactor/PairForcesDPD.cuh"
-#include"Interactor/BondedForces.h"
+#include"Interactor/BondedForces.cuh"
+#include"Interactor/ThreeBondedForces.cuh"
 #include"Interactor/NBodyForces.cuh"
 #include"Interactor/ExternalForces.cuh"
 

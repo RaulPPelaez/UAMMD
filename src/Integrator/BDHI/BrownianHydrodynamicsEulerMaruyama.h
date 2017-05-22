@@ -47,7 +47,7 @@ public:
   
   BrownianHydrodynamicsEulerMaruyama(Matrixf K, real vis, real rh,
 				     BDHIMethod BDHIMethod = DEFAULT,
-				     int max_iter = 0);
+				     real tolerance = 1e-3);
 				     
   ~BrownianHydrodynamicsEulerMaruyama();
 

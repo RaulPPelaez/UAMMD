@@ -54,7 +54,6 @@ void VerletNVE::update(){
       E = U+K */
     real U = 0.0;
     for(auto forceComp: interactors) U += forceComp->sumEnergy();
-    
     real K = abs(E-U);
     /*Distribute the velocities accordingly*/
     real vamp = sqrt(2.0*K/3.0);
@@ -70,7 +69,6 @@ void VerletNVE::update(){
   }
   
   steps++;
-  if(steps%1000==0) cerr<<"\rComputing step: "<<steps<<"   ";
   /**First integration step**/
   integrateGPU(pos, vel, force, N, 1);
   /**Reset the force**/

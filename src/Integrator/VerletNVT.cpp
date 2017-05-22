@@ -71,7 +71,6 @@ void VerletNVT::update(){
     for(auto forceComp: interactors) forceComp->sumForce();
   
   steps++;
-  if(steps%1000==0) cerr<<"\rComputing step: "<<steps<<"   ";
 
   /**First integration step**/
   /*Gen noise*/

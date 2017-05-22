@@ -16,28 +16,33 @@ TODO:
 
 struct GlobalConfig{
   /*Default parameters*/
-  uint N = 0;
+  uint N = 0;         //Number of particles
   real sigma = 1.0;  //Biggest LJ diameter of the particles, wich defines length units
-  real3 L = {0.0, 0.0, 0.0};
-  bool D2 = false; /*Two dimensions*/
-  real rcut = 2.5;
-  real dt = 0.001;
-  real T = 0.0;
+  real3 L = {0.0, 0.0, 0.0};  //Size of the simulation box
+  bool D2 = false; /*Two dimensions*/ //Do not manually set this flag.
+  real rcut = 2.5;  //A cut-off radius (for PairForces i.e)
+  real dt = 0.001;  //Time step size
+  real T = 0.0;     //Target Temperature for a constant T ensemble
   real gamma = 1.0; //General damping factor for a thermostat
-  real E = 0.0;
+  real E = 0.0;     //Target energy for a constant E ensemble
 
-  uint nsteps = 0; /*Total steps performed*/
-  uint nsteps1 = 0;
+  uint nsteps = 0; /*Total steps performed, do not manually change this variable*/
+  uint nsteps1 = 0; //Two number of steps, you can use these if you want to run()
   uint nsteps2 = 0;
-  int print_steps=-1;
-  int measure_steps = -1;
-  /*Anytime seed is used, it should be replaced with a new random number*/
-  ullint seed = 0xf31337Bada55D00dULL;  
+  int print_steps=-1;     //Print every X steps
+  int measure_steps = -1; //Measure every X steps
+  /*Anytime seed is used, it should be replaced with a new random number, i.e grng.next()*/
+  ullint seed = 0xf31337Bada55D00dULL;
+
+  //names do not have to be adjacent (there can be two colors in the system, 0 and 112 e.g). But color must be adjacent, if there are two types their colors are 0 and 1. This transform between both
+  vector<uint> color2name;
+  
+  
 };
 
 /*Usual parameters to use on GPU side, max 64kb(constant memory)*/
 struct GlobalConfigGPU{
-  bool D2; /*Two dimensions flag*/
+  bool D2; /*Two dimensions flag*/ //Do not manually set this flag. 
   real3 L;
   real3 invL;
   int N;
@@ -55,6 +60,7 @@ extern uint current_step;
 extern Vector4 pos, force;
 extern Vector3 vel;
 extern Xorshift128plus grng;
+
 
 /**************GPU SIDE****************/
 extern __constant__ GlobalConfigGPU gcnfGPU;

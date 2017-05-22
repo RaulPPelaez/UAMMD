@@ -5,7 +5,7 @@
 #define UAMMD_VERSION "0.02.01(alpha)"
 
 /*Comment to compile for double precision*/
-#define SINGLE_PRECISION
+//#define SINGLE_PRECISION //Defined in Makefile
 
 typedef unsigned int uint;
 typedef unsigned long long int ullint;

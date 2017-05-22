@@ -18,7 +18,7 @@ template<class NL>
 PairForcesDPD<NL>::PairForcesDPD(real rcut, real3 L, int N,
 				 std::function<real(real,real)> Ffoo,
 				 std::function<real(real,real)> Efoo):
-  Interactor(), nl(rcut,L, N), sortVel(N){
+  Interactor(128, L, N), nl(rcut), sortVel(N){
   if(vel.size()!=gcnf.N){
     vel = Vector3(N);
   }
@@ -29,7 +29,7 @@ PairForcesDPD<NL>::PairForcesDPD(real rcut, real3 L, int N,
   fori(0, 1000) seed = grng.next();
 
   
-  pot = Potential(Ffoo, Efoo, 4096*rcut/real(2.5)+1, rcut, 1);
+  pot = TablePotential(Ffoo, Efoo, 4096*rcut/real(2.5)+1, rcut);
 }
 
 

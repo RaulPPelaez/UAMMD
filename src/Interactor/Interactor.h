@@ -22,21 +22,20 @@ TODO:
 #include"globals/defines.h"
 #include"utils/utils.h"
 #include"globals/globals.h"
-#include"misc/Potential.h"
 #include<cstdint>
 #include<memory>
 
 class Interactor{
 public:
   Interactor():
-    N(gcnf.N),L(gcnf.L), name(""), BLOCKSIZE(128){}
+    Interactor(128, gcnf.L, gcnf.N){}
+  Interactor(int blocksize, real3 L, int N, int Nstart = 0):name("UnnamedInteractor"),BLOCKSIZE(blocksize), L(L), N(N),Nstart(Nstart) {}
   virtual ~Interactor(){}
 
   virtual void sumForce() = 0;
   virtual real sumEnergy() = 0;
   virtual real sumVirial() = 0;
 
-  Vector4Ptr getForce(){return force;}
 
   virtual void print_info(){};
   void print(){
@@ -46,9 +45,11 @@ public:
 
 protected:
   uint N;
+  int Nstart;
   real3 L;
   string name;
   int BLOCKSIZE;
+  
 };
 
 typedef vector<shared_ptr<Interactor>> InteractorArray;

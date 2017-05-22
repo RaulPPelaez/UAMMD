@@ -71,6 +71,7 @@ using namespace BDHI;
 using namespace std;
 
 
+
 namespace PSE_ns{
   /* Initialize the cuRand states for later use in PSE_ns::fourierBrownianNoise */
   __global__ void initCurand(curandState *states, ullint seed, int size){
@@ -78,8 +79,9 @@ namespace PSE_ns{
     if(id>= size) return;
     /*Each state has the same seed and a different sequence, this makes 
       initialization really slow, but ensures good random number properties*/
-    curand_init(seed, id, 0, &states[id]);
-    //curand_init((seed<<20)+id, 0, 0, &states[id]);   
+    //curand_init(seed, id, 0, &states[id]);
+    /*Faster but bad random number properties*/
+    curand_init((seed<<20)+id, 0, 0, &states[id]);   
   }
 
   /* Precomputes the fourier scaling factor B (see eq. 9 and 20.5 in [1]),
@@ -88,6 +90,7 @@ namespace PSE_ns{
   __global__ void fillFourierScalingFactor(real3 * __restrict__ Bfactor, /*Global memory results*/
 					   NeighbourList::Utils utils,  /*Grid information*/
 					   double rh, /*Hydrodynamic radius*/
+					   double vis, /*Viscosity*/
 					   double psi, /*RPY splitting parameter*/
 					   real3 eta /*Gaussian kernel splitting parameter*/
 					   ){
@@ -136,7 +139,7 @@ namespace PSE_ns{
     double3 hashimoto = (1.0 + k2_invpsi2_4)*make_double3(expf(tau.x), expf(tau.y), expf(tau.z))/k2;
 
     /*eq. 20.5 in [1]*/    
-    double3 B = sink*sink*invk2*hashimoto;
+    double3 B = sink*sink*invk2*hashimoto/(vis*rh*rh);
     B /= double(utils.cellDim.x*utils.cellDim.y*utils.cellDim.z);
     /*Store theresult in global memory*/
     Bfactor[icell] = make_real3(B);    
@@ -145,16 +148,16 @@ namespace PSE_ns{
 
 }
 /*Constructor*/
-PSE::PSE(real m0, /*1/(6pi·vis)*/
+PSE::PSE(real vis, /*viscosity*/
 	 real T, /*Temperature*/
 	 real rh,/*Hydrodynamic radius*/
 	 real psi,/*RPY splitting parameter*/
 	 int N, /*Number of particles*/
 	 int max_iter /*Maximum number of Lanczos iterations for the near part*/
 	 ):
-  BDHI_Method(m0, rh, N), T(T),
+  BDHI_Method(1/(6*M_PI*rh*vis), rh, N), T(T),
   psi(psi),
-  lanczos(N, 5){
+  lanczos(N, 0.05){
   cerr<<"\tInitializing PSE subsystem..."<<endl;
   /*Get the box size*/
   real3 L = gcnf.L;
@@ -163,34 +166,33 @@ PSE::PSE(real m0, /*1/(6pi·vis)*/
   BLOCKSIZE = 128;
   Nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
   Nblocks  =  N/Nthreads +  ((N%Nthreads!=0)?1:0); 
-
-
+  
   /* M = Mr + Mw */
 
   /*Compute M0*/
   double pi = M_PI;
   double a = rh;
-  double prefac = (1.0/(24*sqrt(pi*pi*pi)*psi*a*a));
+  double prefac = (1.0/(24*sqrt(pi*pi*pi)*psi*a*a*vis));
   /*M0 = Mr(0) = F(0)(I-r^r) + G(0)(r^r) = F(0) = Mii_r . 
     See eq. 14 in [1] and RPYPSE_nearTextures*/
-  this->M0 = m0*prefac*(1-exp(-4*a*a*psi*psi)+4*sqrt(pi)*a*psi*std::erfc(2*a*psi));  
+  this->M0 = prefac*(1-exp(-4*a*a*psi*psi)+4*sqrt(pi)*a*psi*std::erfc(2*a*psi));  
 
   /****Initialize near space part: Mr *******/
-  real er = 1e-5; /*Short range error tolerance*/
+  real er = 1e-3; /*Short range error tolerance*/
   /*Near neighbour list cutoff distance, see sec II:C in [1]*/
-  rcut = sqrt(-log(er))/psi;
+  rcut = a*sqrt(-log(er))/psi;
 
   /*Initialize the neighbour list */
-  this->cl = CellList(rcut, L, N);
+  this->cl = CellList(rcut);
   /*Initialize the near RPY textures*/
-  nearTexs = RPYPSE_nearTextures(rh, psi, M0, rcut, 2*4096);
+  nearTexs = RPYPSE_nearTextures(vis, rh, psi, M0, rcut, 4096);
   /*Initialize the Lanczos algorithm*/
   lanczos.init();
 
   /****Initialize wave space part: Mw ******/
-  real ew = 1e-5; /*Long range error tolerance*/
+  real ew = 1e-3; /*Long range error tolerance*/
   /*Maximum wave number for the far calculation*/
-  kcut = 2*psi*sqrt(-log(ew));
+  kcut = 2*psi*sqrt(-log(ew))/a;
   /*Corresponding real space grid size*/
   double hgrid = 2*pi/kcut;
 
@@ -224,7 +226,6 @@ PSE::PSE(real m0, /*1/(6pi·vis)*/
       cdim[j] = tmp[i];
     }
   }
-
 
   /*Store grid parameters in a Mesh object*/
   mesh = Mesh(cellDim, L, L.x/double(cellDim.x));
@@ -284,8 +285,7 @@ PSE::PSE(real m0, /*1/(6pi·vis)*/
 
   PSE_ns::fillFourierScalingFactor<<<NblocksCells, NthreadsCells, 0, stream2>>>
     (fourierFactor.d_m, mesh.utils,
-     rh, psi, eta);
-
+     rh,vis, psi, eta);
   
     
   /*Be sure everything starts at zero*/
@@ -297,28 +297,29 @@ PSE::PSE(real m0, /*1/(6pi·vis)*/
   /*I will be handling workspace memory*/
   cufftSetAutoAllocation(cufft_plan_forward, 0);
   cufftSetAutoAllocation(cufft_plan_inverse, 0);
-  
+
+  int3 cdtmp = {mesh.cellDim.z, mesh.cellDim.y, mesh.cellDim.x};
   /*I want to make three 3D FFTs, each one using one of the three interleaved coordinates*/
   auto cufftStatus = cufftPlanMany(&cufft_plan_forward,
-				   3, &mesh.cellDim.x, /*Three dimensional FFT*/
-				   &mesh.cellDim.x,
+				   3, &cdtmp.x, /*Three dimensional FFT*/
+				   &cdtmp.x,
 				   /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
 				   3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
 				   /*Same format in the output*/
-				   &mesh.cellDim.x,
+				   &cdtmp.x,
 				   3, 1,
 				   /*Perform 3 Batched FFTs*/
 				   CUFFT_R2C, 3);
 
   if(cufftStatus != CUFFT_SUCCESS){
-    cerr<<"ERROR!: Setting up cuFFT Forward in BDHI_PSE!"<<endl; exit(1);}
+    cerr<<"ERROR!: Setting up cuFFT Forward in BDHI_PSE!"<<endl; exit(1);}  
   /*Same as above, but with C2R for inverse FFT*/
   cufftStatus = cufftPlanMany(&cufft_plan_inverse,
-				   3, &mesh.cellDim.x, /*Three dimensional FFT*/
-				   &mesh.cellDim.x,
+				   3, &cdtmp.x, /*Three dimensional FFT*/
+				   &cdtmp.x,
 				   /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
 				   3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
-				   &mesh.cellDim.x,
+				   &cdtmp.x,
 				   3, 1,
 				   /*Perform 3 FFTs*/
 			           CUFFT_C2R, 3);
@@ -369,10 +370,16 @@ void PSE::setup_step(cudaStream_t st){}
 /*Compute M·v = Mr·v + Mw·v*/
 template<typename vtype>
 void PSE::Mdot(real3 *Mv, vtype *v, cudaStream_t st){
+
   /*Ensure the result array is set to zero*/
   cudaMemset((real*)Mv, 0, N*sizeof(real3));
+
+  // Mdot_nearThread = std::thread(&PSE::Mdot_near<vtype>, this, Mv, v, st);
+  // Mdot_nearThread.join();  
+  
   Mdot_near<vtype>(Mv, v, st);
-  Mdot_far<vtype>(Mv, v, st);
+  Mdot_farThread = std::thread(&PSE::Mdot_far<vtype>, this, Mv, v, stream2);
+  //Mdot_far<vtype>(Mv, v, st);
 }
 
 
@@ -423,35 +430,32 @@ namespace PSE_ns{
       real3 rij = make_real3(pj)-make_real3(pi);
       box.apply_pbc(rij);
       
-      const real r2 = dot(rij, rij);
-      const float r2c = r2*invrcut2;
+      const real r2 = dot(rij, rij);      
+      const float r2c = r2*invrcut2;      
+      /*Predication seems to work geat here, so the checkings are done as soon as possible*/
+      /*If i==j */
+      if(r2==real(0.0)){
+	/*M_ii·vi = M0*I·vi */
+	return vj;
+      }
+      /*Many particles fall outside rcut, so checking here improves eficiency*/
+      if(r2c>=1.0f) return make_real3(0);
+
+
       
       /*M0 := Mii := RPY_near(0) is multiplied once at the end*/
       /*Fetch RPY coefficients, see RPYPSE_nearTextures*/
       /* Mreal(r) = M0*(F(r)·I + (G(r)-F(r))·rr) */
       const real f = (real)tex1D<float>(texF, r2c);
       const real g = (real)tex1D<float>(texG, r2c);
-      
-      const real gmf = g-f;
 
-      real invr2;
-      /*Delay the conditional as much as possible to avoid divergence*/
-      /*If i==j */
-      if(r2==real(0.0)){
-	invr2 = real(0.0);
-	/*M_ii·vi = M0*I·vi */
-	//return vj;
-      }
-      /*No need to check this, as f,g(r>rcut) = 0, doing it this way reduces thread divergence*/
-      //if(r2c>=1.0f) return make_real3(0);
-      
       /*Update the result with Mr_ij·vj, the current box dot the current three elements of v*/
       /*This expression is a little obfuscated, Mr_ij·vj*/
       /*
 	Mr = f(r)*I+(g(r)-f(r))*r(diadic)r - > (M·v)_ß = f(r)·v_ß + (g(r)-f(r))·v·(r(diadic)r)
 	Where f and g are the RPY coefficients
       */
-      const real gmfv = gmf*dot(rij, vj)*invr2;
+      const real gmfv = (g-f)*dot(rij, vj)/r2;
       /*gmfv = (g(r)-f(r))·( vx·rx + vy·ry + vz·rz )*/
       /*((g(r)-f(r))·v·(r(diadic)r) )_ß = gmfv·r_ß*/
       return (f*vj + gmfv*rij);
@@ -488,10 +492,10 @@ void PSE::Mdot_near(real3 *Mv, vtype *v, cudaStream_t st){
 				       M0, rcut, box);
 
   /*Update the list if needed*/
-  cl.makeNeighbourList();
+  cl.makeNeighbourList(st);
   /*Reorder the input vector if needed*/
-  cl.reorderProperty(v, sortV.d_m, N);
-  cl.transverse(tr);
+  cl.reorderProperty(v, sortV.d_m, N, st);
+  cl.transverse(tr, st);
 
 }
 
@@ -528,7 +532,7 @@ namespace PSE_ns{
     int3 cellj;    
     int x,y,z;
     /*Conversion between cell number and cell center position*/
-    real3 cellPosOffset = -utils.Lhalf+real(0.5)*utils.cellSize;
+    real3 cellPosOffset = real(0.5)*utils.cellSize-utils.Lhalf;
 
     /*Transverse the Pth neighbour cells*/
     for(x=-P.x+offset; x<=P.x; x+=TPP) 
@@ -644,7 +648,7 @@ namespace PSE_ns{
     
     int x,y,z;
     /*Transform cell number to cell center position*/
-    real3 cellPosOffset = -utils.Lhalf+real(0.5)*utils.cellSize;
+    real3 cellPosOffset = real(0.5)*utils.cellSize-utils.Lhalf;
     /*Transvers the Pth neighbour cells*/
     for(z=-P.z; z<=P.z; z++)
       for(y=-P.y; y<=P.y; y++)
@@ -674,7 +678,7 @@ namespace PSE_ns{
     Launch a thread per cell grid/fourier node
    */
   __global__ void fourierBrownianNoise(
-	  curandState * __restrict__ farNoise, /*cuRand generators*/
+	  curandState_t * __restrict__ farNoise, /*cuRand generators*/
 	  cufftComplex3 *__restrict__ gridVelsFourier, /*Values of vels on each cell*/
 	  real3* __restrict__ Bfactor,/*Fourier scaling factors, see PSE_ns::fillFourierScalingFactor*/ 
 	  NeighbourList::Utils utils, /*Grid parameters. Size of a cell, number of cells...*/
@@ -687,14 +691,8 @@ namespace PSE_ns{
     cell.y= blockIdx.y*blockDim.y + threadIdx.y;
     cell.z= blockIdx.z*blockDim.z + threadIdx.z;
 
-    /*Fix prefactor*/
-    prefactor /= sqrtf(utils.cellSize.x*utils.cellSize.y*utils.cellSize.z);
-
     /*Get my cell index*/
-    int icell = utils.getCellIndex(cell);
-
-    /*Fetch my rng*/
-    curandState rng = farNoise[icell];
+    const int icell = utils.getCellIndex(cell);
 
     /*cuFFT R2C and C2R only store half of the innermost dimension, the one that varies the fastest
       
@@ -710,19 +708,25 @@ namespace PSE_ns{
     
     /*K=0 is not added, no stochastic motion is added to the center of mass*/
     if(icell == 0){ return;}
+    /*Fetch my rng*/
+    curandState_t *rng = &farNoise[icell];
 
     /*Corresponding conjugate wave number,
       as the innermost dimension conjugates are redundant, computing the conjugate is needed
       only when cell.x == 0
+      
+     Note that this line works even on nyquist points
      */
-    int3 cell_conj = {(cell.x?(utils.cellDim.x-cell.x):cell.x),
-		      (cell.y?(utils.cellDim.y-cell.y):cell.y),
-		      (cell.z?(utils.cellDim.z-cell.z):cell.z)};
+    const int3 cell_conj = {(cell.x?(utils.cellDim.x-cell.x):cell.x),
+			    (cell.y?(utils.cellDim.y-cell.y):cell.y),
+			    (cell.z?(utils.cellDim.z-cell.z):cell.z)};    
+
     
-    int icell_conj = utils.getCellIndex(cell_conj);
+    const int icell_conj = utils.getCellIndex(cell_conj);
     
     /*Compute the wave number of my cell and its conjugate*/
-    real3 pi2invL = real(M_PI)/utils.Lhalf;
+    const real3 pi2invL = real(M_PI)/utils.Lhalf;
+    
     real3 k = make_real3(cell)*pi2invL;
     real3 kc = make_real3(cell_conj)*pi2invL;
     
@@ -738,8 +742,6 @@ namespace PSE_ns{
 
     /*  Z = sqrt(B)· dW \propto (I-k^k)·dW */
     real k2 = dot(k,k);
-    real k2c = dot(kc,kc);
-    
     real invk2 = real(1.0)/k2;
 
     real3 Bsq_t = Bfactor[icell];
@@ -749,26 +751,57 @@ namespace PSE_ns{
       std = prefactor -> ||z||^2 = <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
     /*A complex random number for each direction*/
     cufftComplex3 vel;
-    real complex_gaussian_sc = real(1.0)/sqrtf(2.0f);
-    real2 tmp = curand_normal2(&rng)*complex_gaussian_sc;
+    real complex_gaussian_sc = real(0.707106781186547)*prefactor; //1/sqrt(2)
+    real2 tmp = curand_normal2(rng)*complex_gaussian_sc;
     vel.x.x = tmp.x;
     vel.x.y = tmp.y;
-    tmp = curand_normal2(&rng)*complex_gaussian_sc;
+    tmp = curand_normal2(rng)*complex_gaussian_sc;
     vel.y.x = tmp.x;
     vel.y.y = tmp.y;
-    tmp = curand_normal2(&rng)*complex_gaussian_sc;
+    tmp = curand_normal2(rng)*complex_gaussian_sc;
     vel.z.x = tmp.x;
     vel.z.y = tmp.y;
     
     bool nyquist = false;
     /*Beware of nyquist points!*/
-    if(utils.cellDim.x/2 == (utils.cellDim.x+1)/2)
-    if((k.x == 0 && k.z == 0 && k.y == (utils.cellDim.y)/2*pi2invL.y) ||
-       (k.x == 0 && k.y == 0 && k.z == (utils.cellDim.z)/2*pi2invL.z) ){
+    bool isXnyquist = (cell.x == utils.cellDim.x/2) && (utils.cellDim.x/2 == (utils.cellDim.x+1)/2);
+    bool isYnyquist = (cell.y == utils.cellDim.y/2) && (utils.cellDim.y/2 == (utils.cellDim.y+1)/2);
+    bool isZnyquist = (cell.z == utils.cellDim.z/2) && (utils.cellDim.z/2 == (utils.cellDim.z+1)/2);
+
+    /*There are 8 nyquist points at most (cell=0,0,0 is excluded at the beggining)
+      These are the 8 vertex of the inferior left cuadrant. The O points:
+               +--------+--------+
+              /|       /|       /|
+             / |      / |      / | 
+            +--------+--------+  |
+           /|  |    /|  |    /|  |
+          / |  +---/-|--+---/-|--+
+         +--------+--------+  |	/|
+         |  |/ |  |  |/    |  |/ |
+         |  O-----|--O-----|--+	 |
+         | /|6 |  | /|7    | /|	 |
+         |/ |  +--|/-|--+--|/-|--+
+         O--------O--------+  |	/ 
+         |5 |/    |4 |/    |  |/       
+         |  O-----|--O-----|--+	 
+     ^   | / 3    | / 2    | /  ^     
+     |   |/       |/       |/  /     
+     kz  O--------O--------+  ky
+         kx ->     1
+    */
+    if( (isXnyquist && cell.y==0   && cell.z==0)  || //1
+	(isXnyquist && isYnyquist  && cell.z==0)  || //2
+	(cell.x==0  && isYnyquist  && cell.z==0)  || //3
+	(isXnyquist && cell.y==0   && isZnyquist) || //4
+	(cell.x==0  && cell.y==0   && isZnyquist) || //5
+	(cell.x==0  && isYnyquist  && isZnyquist) || //6
+	(isYnyquist  && isYnyquist  && isZnyquist)   //7	       
+	){
       nyquist = true;
+
       /*The random numbers are real in the nyquist points, 
 	||r||^2 = <x^2> = ||Real{z}||^2 = <Real{z}^2>·sqrt(2) =  prefactor*/
-      real nqsc = sqrtf(2.0f);
+      real nqsc = real(1.41421356237310); //sqrt(2)
       vel.x.x *= nqsc;
       vel.x.y = 0;
       vel.y.x *= nqsc;
@@ -776,17 +809,15 @@ namespace PSE_ns{
       vel.z.x *= nqsc;
       vel.z.y = 0;            
     }
-
-    /*Compute the dyadic product, both real and imaginary parts*/
-    real3 fr = make_real3(vel.x.x, vel.y.x, vel.z.x)*prefactor;
-    real kfr = dot(k,fr)*invk2;
-    
-    real3 fi = make_real3(vel.x.y, vel.y.y, vel.z.y)*prefactor;    
-    real kfi = dot(k,fi)*invk2;
-
     /*Z = bsq·(I-k^k)·vel*/
-    real3 vr = (fr-k*kfr)*Bsq;
-    real3 vi = (fi-k*kfi)*Bsq;
+    /*Compute the dyadic product, both real and imaginary parts*/
+    real3 f = make_real3(vel.x.x, vel.y.x, vel.z.x);
+    real kf = dot(k,f)*invk2;
+    real3 vr = (f-k*kf)*Bsq;
+    
+    f = make_real3(vel.x.y, vel.y.y, vel.z.y);    
+    kf = dot(k,f)*invk2;
+    real3 vi = (f-k*kf)*Bsq;
 
     /*Add the random velocities to global memory*/
     /*Velocities are stored as a complex number in each dimension, 
@@ -796,23 +827,19 @@ namespace PSE_ns{
     gridVelsFourier[icell] = {kk.x.x+vr.x, kk.x.y+vi.x,
 			      kk.y.x+vr.y, kk.y.y+vi.y,
 			      kk.z.x+vr.z, kk.z.y+vi.z};
-
-
-    if(nyquist /*|| cell.x != 0*/) return;
-    real invk2c = 1.0f/k2c;
-    /*Compute the dyadic product, both real and imaginary parts*/
-    fr = make_real3(vel.x.x, vel.y.x, vel.z.x)*prefactor;
-    kfr = dot(kc,fr)*invk2c;
     
-    fi = make_real3(vel.x.y, vel.y.y, vel.z.y)*prefactor;    
-    kfi = dot(kc,fi)*invk2c;
-
-    real3 Bsqc_t = Bfactor[icell_conj];
-    real3 Bsqc = {sqrtf(Bsqc_t.x), sqrtf(Bsqc_t.y), sqrtf(Bsqc_t.z)};
-
+    if(nyquist) return;
+    /*Only if there is a conjugate point*/
+    
     /*Z = bsq·(I-k^k)·vel*/
-    vr = (fr-kc*kfr)*Bsqc;
-    vi = (fi-kc*kfi)*Bsqc;
+    /*Compute the dyadic product, both real and imaginary parts*/
+    f = make_real3(vel.x.x, vel.y.x, vel.z.x);
+    kf = dot(kc,f)*invk2;
+    vr = (f-kc*kf)*Bsq;
+    
+    f = make_real3(vel.x.y, vel.y.y, vel.z.y);    
+    kf = dot(kc,f)*invk2;
+    vi = (f-kc*kf)*Bsq;
 
     /*Add the random velocities to global memory*/
     /*Velocities are stored as a complex number in each dimension, 
@@ -822,8 +849,6 @@ namespace PSE_ns{
     gridVelsFourier[icell_conj] = {kk.x.x+vr.x, kk.x.y+vi.x,
 				   kk.y.x+vr.y, kk.y.y+vi.y,
 				   kk.z.x+vr.z, kk.z.y+vi.z};        
-    /*Store the new rng state*/
-    farNoise[icell] = rng;
     
   }
   
@@ -835,14 +860,13 @@ Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw 
 */
 template<typename vtype>
 void PSE::Mdot_far(real3 *Mv, vtype *v, cudaStream_t st){
-  st = 0;
 
   cufftSetStream(cufft_plan_forward, st);
   cufftSetStream(cufft_plan_inverse, st);
 
   /*Clean gridVels*/
-  cudaMemset(gridVels.d_m, 0, mesh.ncells*sizeof(real3));
-  cudaMemset(gridVelsFourier.d_m, 0, 3*mesh.ncells*sizeof(cufftComplex));
+  cudaMemsetAsync(gridVels.d_m, 0, mesh.ncells*sizeof(real3), st);
+  cudaMemsetAsync(gridVelsFourier.d_m, 0, 3*mesh.ncells*sizeof(cufftComplex), st);
 
 
   /*Gaussian spreading/interpolation kernel parameters, s(r) = prefactor*exp(-tau*r2)
@@ -855,7 +879,7 @@ void PSE::Mdot_far(real3 *Mv, vtype *v, cudaStream_t st){
   BoxUtils box(gcnf.L);
   PSE_ns::particles2GridD<<<Nblocks*TPP, Nthreads,0, st>>>
     (pos, v, gridVels.d_m, N, P, mesh.utils, box, prefactor, tau);
-  cudaDeviceSynchronize();
+
 
 
   /*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
@@ -880,14 +904,16 @@ void PSE::Mdot_far(real3 *Mv, vtype *v, cudaStream_t st){
 	    mesh.utils);
 
   /*The stochastic part only needs to be computed with T>0*/
-  if(T > real(0.0)){      
-
+  if(T > real(0.0)){
+    NblocksCells.x = NblocksCells.x/2+1;
+    
+    real prefactor = sqrt(2*T/gcnf.dt/(mesh.utils.cellSize.x*mesh.utils.cellSize.y*mesh.utils.cellSize.z));
     /*Add the stochastic noise to the fourier velocities -> B·FFT·S·F + 1/√σ·√B·dWw*/
     PSE_ns::fourierBrownianNoise<<<NblocksCells, NthreadsCells, 0, st>>>(
 				       farNoise.d_m,
 				       (PSE_ns::cufftComplex3*)gridVelsFourier.d_m,
 				       fourierFactor.d_m,
-				       mesh.utils, sqrt(2*T/gcnf.dt));
+				       mesh.utils, prefactor);
   }
 
   /*Take the fourier velocities back to real space ->  FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
@@ -901,9 +927,7 @@ void PSE::Mdot_far(real3 *Mv, vtype *v, cudaStream_t st){
     σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
   PSE_ns::grid2ParticlesD<<<Nblocks, Nthreads, 0, st>>>
     (pos.d_m, Mv, gridVels.d_m,
-     N, P, mesh.utils, box, prefactor, tau);
-  
-  cudaStreamSynchronize(st);
+     N, P, mesh.utils, box, prefactor, tau);  
 }
 
 
@@ -923,8 +947,8 @@ namespace PSE_ns{
     typedef typename PSE_ns::RPYNearTransverser<real3> myTransverser;
     myTransverser Mv_tr;
     CellList *cl;
-
-    Dotctor(myTransverser Mv_tr, CellList *cl): Mv_tr(Mv_tr), cl(cl){ }
+    cudaStream_t st;
+    Dotctor(myTransverser Mv_tr, CellList *cl, cudaStream_t st): Mv_tr(Mv_tr), cl(cl), st(st){ }
 
     inline void operator()(real3* Mv, real3 *v){
       /*Static storage for reordering the input vector*/
@@ -932,28 +956,28 @@ namespace PSE_ns{
       if(cl->needsReorder())
 	if(sortV.size() != gcnf.N) sortV = GPUVector3(gcnf.N);
       /*Clean the result array just in case*/
-      cudaMemset(Mv, 0, gcnf.N*sizeof(real3));
+      cudaMemsetAsync(Mv, 0, gcnf.N*sizeof(real3), st);
 
       /*No need to remake the list each time, makeNeighbourList takes care of that*/
-      cl->makeNeighbourList();
+      //cl->makeNeighbourList(st);
       /*Reorder the input array if needed by the list*/
-      cl->reorderProperty(v, sortV.d_m, sortV.size());      
+      cl->reorderProperty(v, sortV.d_m, sortV.size(), st);      
 
       /*Update the transverser input and output arrays*/
       Mv_tr.v = sortV.d_m;      
       Mv_tr.Mv = Mv;
 
       /*Perform the dot product*/
-      cl->transverse(Mv_tr);
+      cl->transverse(Mv_tr, st);
     
     }
   };
 }
 
-void PSE::computeBdW(real3* BdW,   cudaStream_t st){
+void PSE::computeBdW(real3* BdW, cudaStream_t st){
+  /*Far contribution is in Mdot_far*/
   /*Compute stochastic term only if T>0 */
   if(T == real(0.0)) return;
-  st = 0;
   /****Near part*****/
   BoxUtils box(gcnf.L);
   /*List transverser for near dot product*/
@@ -961,17 +985,26 @@ void PSE::computeBdW(real3* BdW,   cudaStream_t st){
     nearTexs.getFtex(), nearTexs.getGtex(),
     M0, rcut, box);
   /*Functor for dot product*/
-  PSE_ns::Dotctor Mvdot_near(tr, &cl);
+  PSE_ns::Dotctor Mvdot_near(tr, &cl, st);
   /*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/
-  lanczos.solveNoise(Mvdot_near, (real *)BdW, st);	  	  
+
+  lanczos.solveNoise(Mvdot_near, (real *)BdW, st);
+
+  
 }
 
 void PSE::computeDivM(real3* divM, cudaStream_t st){}
 
 
+void PSE::finish_step(cudaStream_t st){
+  Mdot_farThread.join();
+  cudaDeviceSynchronize();
 
-RPYPSE_nearTextures::RPYPSE_nearTextures(real rh, real psi, real m0, real rcut, int ntab):
-  rh(rh), psi(psi), FGPU(nullptr), GGPU(nullptr){
+
+}
+
+RPYPSE_nearTextures::RPYPSE_nearTextures(real vis, real rh, real psi, real m0, real rcut, int ntab):
+  vis(vis), rh(rh), psi(psi), FGPU(nullptr), GGPU(nullptr){
 	  
   this->M0 = 6*M_PI*m0;
   float Fcpu[ntab], Gcpu[ntab];
@@ -993,7 +1026,7 @@ RPYPSE_nearTextures::RPYPSE_nearTextures(real rh, real psi, real m0, real rcut, 
     //out<<sqrt(r2-0.5*dr2)<<" "<<Fcpu[i]+(Gcpu[i]-Fcpu[i])<<endl;
 
   }
-
+  
   Fcpu[ntab-1] = 0.0f;
   Gcpu[ntab-1] = 0.0f;
   //out<<sqrt(r2+dr2-0.5*dr2)<<" "<<Fcpu[ntab-1]+(Gcpu[ntab-1]-Fcpu[ntab-1])<<endl;
@@ -1117,8 +1150,8 @@ double2 RPYPSE_nearTextures::FandG(double r){
       
   g7 = -3.0*(4.0*r4*psi4+1.0)/(64.0*rh*r3*psi4);
         
-  return {params2FG(r, f0, f1, f2, f3, f4, f5, f6, f7)/(rh*M0),
-      params2FG(r, g0, g1, g2, g3, g4, g5, g6, g7)/(rh*M0)};
+  return {params2FG(r, f0, f1, f2, f3, f4, f5, f6, f7)/(vis*rh*M0),
+      params2FG(r, g0, g1, g2, g3, g4, g5, g6, g7)/(vis*rh*M0)};
 }
 
 

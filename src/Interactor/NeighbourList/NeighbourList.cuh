@@ -16,23 +16,23 @@
 #include"NeighbourList_common.cuh"
 class NeighbourList_Base{
 public:
-  NeighbourList_Base(){}
+  NeighbourList_Base():NeighbourList_Base(gcnf.rcut, gcnf.L, gcnf.N, true){}
   NeighbourList_Base(real rcut, real3 L, int N, bool reorder = true);
   virtual ~NeighbourList_Base(){ }
-  void reorderParticles();
+  void reorderParticles(cudaStream_t st = 0);
   
   /*Reorder some array to the new order, perfom some transformation if needed*/
   template<class Told, class T, class TransformFunction>
-  void reorderTransformProperty(Told* old, T* sorted, TransformFunction ft, int N);
+  void reorderTransformProperty(Told* old, T* sorted, TransformFunction ft, int N, cudaStream_t st=0);
   template<class Told, class T, class TransformFunction>
-  void reorderTransformProperty(TexReference old, T* sorted, TransformFunction ft, int N);
+  void reorderTransformProperty(TexReference old, T* sorted, TransformFunction ft, int N, cudaStream_t st=0);
   
   template<class T>
-  void reorderProperty(T* old, T* sorted, int N);
+  void reorderProperty(T* old, T* sorted, int N, cudaStream_t st=0);
   template<class T>
-  void reorderProperty(TexReference old, T* sorted, int N);
+  void reorderProperty(TexReference old, T* sorted, int N, cudaStream_t st=0);
 
-  virtual void makeNeighbourList() = 0;  
+  virtual void makeNeighbourList(cudaStream_t st = 0) = 0;  
 
   virtual bool needsReorder() = 0;
   /*TransverseList is needed in each implementations .cuh
@@ -48,7 +48,7 @@ protected:
   real3 L;
 
   uint last_step_updated; //Last step in which the list was updated
-  
+
   GPUVector<real4> sortPos;
   GPUVector<uint> particleHash, particleIndex;
   GPUVector<uint> particleHash_alt, particleIndex_alt;
@@ -70,35 +70,35 @@ namespace NeighbourList{
 
 /*Specializations of reorderProperty and reorderTransformPorperty*/
 template<class Told, class T, class TransformFunction>
-void NeighbourList_Base::reorderTransformProperty(Told* old, T* sorted, TransformFunction ft, int N){
+void NeighbourList_Base::reorderTransformProperty(Told* old, T* sorted, TransformFunction ft, int N, cudaStream_t st){
   if(!this->needsReorder()) return;
   int nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
   int nblocks  =  N/nthreads +  ((N%nthreads!=0)?1:0);     
-  Sorter::reorderTransformProperty<Told,T, TransformFunction><<<nblocks, nthreads>>>(old, sorted, particleIndex.d_m, ft, N);
+  Sorter::reorderTransformProperty<Told,T, TransformFunction><<<nblocks, nthreads,0,st>>>(old, sorted, particleIndex.d_m, ft, N);
 }
 template<class Told, class T, class TransformFunction>
-void NeighbourList_Base::reorderTransformProperty(TexReference old, T* sorted, TransformFunction ft, int N){
+void NeighbourList_Base::reorderTransformProperty(TexReference old, T* sorted, TransformFunction ft, int N, cudaStream_t st){
   if(!this->needsReorder()) return;
   int nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
   int nblocks  =  N/nthreads +  ((N%nthreads!=0)?1:0);     
-  Sorter::reorderTransformProperty<Told,T, TransformFunction><<<nblocks, nthreads>>>(old, sorted, particleIndex.d_m, ft, N);
+  Sorter::reorderTransformProperty<Told,T, TransformFunction><<<nblocks, nthreads, 0, st>>>(old, sorted, particleIndex.d_m, ft, N);
 }
 
 template<class T>
-void NeighbourList_Base::reorderProperty(T* old, T* sorted, int N){
+void NeighbourList_Base::reorderProperty(T* old, T* sorted, int N, cudaStream_t st){
   if(!this->needsReorder()) return;
   int nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
   int nblocks  =  N/nthreads +  ((N%nthreads!=0)?1:0);     
-  Sorter::reorderProperty<T><<<nblocks, nthreads>>>(old, sorted, particleIndex.d_m, N);
+  Sorter::reorderProperty<T><<<nblocks, nthreads, 0, st>>>(old, sorted, particleIndex.d_m, N);
 }
     
 /*Told can be accesed as a device pointer of type T or a TexReference*/
 template<class T>
-void NeighbourList_Base::reorderProperty(TexReference old, T* sorted, int N){
+void NeighbourList_Base::reorderProperty(TexReference old, T* sorted, int N, cudaStream_t st){
   if(!this->needsReorder()) return;
   int nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
   int nblocks  =  N/nthreads +  ((N%nthreads!=0)?1:0); 
-  Sorter::reorderProperty<T><<<nblocks, nthreads>>>(old, sorted, particleIndex.d_m, N);
+  Sorter::reorderProperty<T><<<nblocks, nthreads, 0, st>>>(old, sorted, particleIndex.d_m, N);
 }
 
 
