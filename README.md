@@ -11,10 +11,10 @@ A fast generic multiscale CUDA Molecular Dynamics code made into modules for exp
 
 UAMMD can perform several types of simulations, to this moment multiple integrators are implemented allowing it to perform:
 
-	-Molecular dynamics
-	-Brownian Dynamics
-	-Brownian Hydrodynamics
-	-Dissipative Particle Dynamics
+	-Molecular dynamics (MD)
+	-Brownian Dynamics  (BD)
+	-Brownian Hydrodynamics (BDHI)
+	-Dissipative Particle Dynamics (DPD)
 
 Multiple building blocks are provided in order for the user to construct a certain simulation, 
 highly templated so the user can easily add in the input the specific interactions when they are not implemented by default. 
