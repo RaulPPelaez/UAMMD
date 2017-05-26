@@ -8,13 +8,14 @@ CXXFLAGS=$(CFLAGS)
 LDLIBS= -lgomp -lpthread -pthread
 
 OBJS= pbc.o msd.o gdr.o 
-EXE=pbc msd gdr 
+EXE=pbc msd gdr Elastic_Network_Model
 
 all:$(EXE)
 
 msd:Timer.o
 
 coherent_intermediate_scfnc: math_helper.o Timer.o
+
 
 clean:
 	rm -f $(OBJS) $(EXE) *.o

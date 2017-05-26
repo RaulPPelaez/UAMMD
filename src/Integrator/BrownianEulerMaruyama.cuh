@@ -16,12 +16,11 @@
      dW- Noise vector
      B - chol(M)
 */
-#ifndef BROWNIANEULERMARUYAMAINTEGRATOR_H
-#define BROWNIANEULERMARUYAMAINTEGRATOR_H
+#ifndef BROWNIANEULERMARUYAMAINTEGRATOR_CUH
+#define BROWNIANEULERMARUYAMAINTEGRATOR_CUH
 #include "globals/defines.h"
 #include "utils/utils.h"
 #include "Integrator.h"
-#include "BrownianEulerMaruyamaGPU.cuh"
 #include<curand.h>
 
 #ifndef SINGLE_PRECISION
@@ -31,18 +30,18 @@
 class BrownianEulerMaruyama: public Integrator{
 public:
   //Constructor, you have to provide D and K.
-  BrownianEulerMaruyama(Matrixf D, Matrixf K);
+  BrownianEulerMaruyama(Matrixf M, Matrixf K);
+  BrownianEulerMaruyama(Matrixf M, Matrixf K, int N, real3 L, real dt);
   ~BrownianEulerMaruyama();
 
   void update() override;
   real sumEnergy() override;
 private:
-  Matrixf D, K, B;
+  Matrixf M, K, B;
   Vector3 noise;
-  
+  real sqrt2Tdt;
   curandGenerator_t rng;
-  brownian_euler_maruyama_ns::Params params;
-
+  real T;
 };
 
 

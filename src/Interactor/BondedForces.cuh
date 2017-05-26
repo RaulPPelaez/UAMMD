@@ -63,6 +63,43 @@ namespace BondedType{
       Note that this function will be called for ij and ji*/
     /*In the case of a Fixed Point bond, j will be 0*/
     inline __device__ real force(int i, int j, const real3 &r12, const BondInfo &bi){
+      real r2 = dot(r12, r12);
+      if(r2==real(0.0)) return real(0.0);
+      
+#ifdef SINGLE_PRECISION
+      real invr = rsqrtf(r2);
+#else
+      real invr = rsqrt(r2);
+#endif
+      real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
+      return f;
+    }
+    /*A function called readbond that reads a bond from in (the bond file).
+      This function will be called for every line in the file except for the first*/
+    static __host__ BondInfo readBond(std::istream &in){
+      /*BondedForces will read i j, readBond has to read the rest of the line*/
+      BondInfo bi;
+      in>>bi.k>>bi.r0;
+      return bi;
+    }
+    
+  };
+  struct HarmonicPBC{
+      BoxUtils box;
+      HarmonicPBC(): box(gcnf.L){}
+      HarmonicPBC(BoxUtils box): box(box){}
+    /*Needs a struct called BondInfo with 
+      the parameters that characterize a bond*/
+    struct BondInfo{
+      real r0, k;
+    };
+    /*A device function called force with these arguments that returns f/r for a given bond.
+      Note that this function will be called for ij and ji*/
+    /*In the case of a Fixed Point bond, j will be 0*/
+    inline __device__ real force(int i, int j, real3 &r12, const BondInfo &bi){
+      box.apply_pbc(r12);
+      real r2 = dot(r12, r12);
+      if(r2==real(0.0)) return real(0.0);
 #ifdef SINGLE_PRECISION
       real invr = rsqrtf(dot(r12, r12));
 #else

@@ -2,7 +2,7 @@
 #include<cuda_runtime.h>
 #include<stdint.h>
 
-#define UAMMD_VERSION "0.1"
+#define UAMMD_VERSION "0.2"
 
 /*Comment to compile for double precision*/
 //#define SINGLE_PRECISION //Defined in Makefile

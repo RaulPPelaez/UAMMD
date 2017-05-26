@@ -40,16 +40,6 @@ struct GlobalConfig{
   
 };
 
-/*Usual parameters to use on GPU side, max 64kb(constant memory)*/
-struct GlobalConfigGPU{
-  bool D2; /*Two dimensions flag*/ //Do not manually set this flag. 
-  real3 L;
-  real3 invL;
-  int N;
-  real dt;
-  real T;
-};
-
 #endif
 /********************CPU SIDE************/
 //Everyone can access to gcnf, its initialized in main, before entering main().
@@ -60,8 +50,4 @@ extern uint current_step;
 extern Vector4 pos, force;
 extern Vector3 vel;
 extern Xorshift128plus grng;
-
-
-/**************GPU SIDE****************/
-extern __constant__ GlobalConfigGPU gcnfGPU;
 

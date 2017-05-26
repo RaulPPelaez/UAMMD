@@ -19,7 +19,7 @@
 #include<algorithm>
 #include<cuda_runtime.h>
 #include"helper_gpu.cuh"
-#include"helper_math.h"
+#include"vector_overloads.h"
 #include<iostream>
 #include<sys/time.h>
 #include<memory>

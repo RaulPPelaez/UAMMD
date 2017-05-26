@@ -66,19 +66,6 @@ void Driver::setParameters(){
 
   if(gcnf.L.z==real(0.0)) gcnf.D2 = true;
   
-  GlobalConfigGPU gcnfGPU_m;
-  gcnfGPU_m.L = gcnf.L;
-  gcnfGPU_m.invL = 1.0/gcnf.L;
-  if(gcnf.D2) gcnfGPU_m.invL.z = real(0.0);
-  gcnfGPU_m.N = gcnf.N;
-  gcnfGPU_m.dt = gcnf.dt;
-  gcnfGPU_m.T = gcnf.T;
-  gcnfGPU_m.D2 = gcnf.D2;
-  
-  gpuErrchk(cudaMemcpyToSymbol(gcnfGPU, &gcnfGPU_m, sizeof(GlobalConfigGPU)));
-
-
-  
 }
 
 /*Forward the simulation state nsteps·dt in time*/
@@ -158,19 +145,22 @@ void Writer::synchronize(){
 //Write a step to disk using a separate thread
 void Writer::write(bool block){
   /*Wait for the last write operation to finish*/
-
   if(this->writeThread.joinable()){
     this->writeThread.join();
   }
+  
   /*Wait for any GPU work to be done*/
   cudaDeviceSynchronize();
+  
   /*Bring pos from GPU*/
   pos.download();
+  
   /*Wait for copy to finish*/
   cudaDeviceSynchronize();
+  
   /*Query the write operation to another thread*/
   this->writeThread =  std::thread(&Writer::write_concurrent, this);
-
+  
   /*Wait if needed*/
   if(block && this->writeThread.joinable()){
     this->writeThread.join();

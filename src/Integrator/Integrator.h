@@ -34,9 +34,12 @@ class Integrator{
 public:
   //Constructor to be called in the initialization list of the derived class
   Integrator():
-    N(gcnf.N), dt(gcnf.dt), L(gcnf.L), BLOCKSIZE(128){
+    Integrator(gcnf.N, gcnf.L, gcnf.dt){}
+  Integrator(int N, real3 L, real dt, int BLOCKSIZE = 128):
+    N(N), dt(dt), L(L), BLOCKSIZE(BLOCKSIZE){
     steps = 0;
   }
+
   ~Integrator(){}
   
   //This function forwards the simulation one dt in time, must be overrided in each new implementation!

@@ -18,21 +18,17 @@ TODO:
 100- Implement more thermostats, allow for selection of a thermostat on creation
 
 */
-#ifndef VERLETNVT_H
-#define VERLETNVT_H
+#ifndef VERLETNVT_CUH
+#define VERLETNVT_CUH
 #include"globals/defines.h"
 #include "utils/utils.h"
 #include "Integrator.h"
-#include "VerletNVTGPU.cuh"
 #include<curand.h>
-
-#ifndef SINGLE_PRECISION
-#define curandGenerateNormal curandGenerateNormalDouble
-#endif
 
 class VerletNVT: public Integrator{
 public:
   VerletNVT();
+  VerletNVT(int N, real3 L, real dt, real gamma);
   ~VerletNVT();
 
   void update() override;
@@ -40,17 +36,22 @@ public:
   real sumEnergy() override;
 
   void setTemp(real Tnew){
-    gcnf.T = Tnew;
-    params.noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*Tnew);
-    verlet_nvt_ns::initGPU(params);
+    this->T = Tnew;
+    this->noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*Tnew);
   }
 private:
   Vector3 noise; //Noise in single precision always  
   real gamma; //Gamma is not stored in gcnf
-  
-  verlet_nvt_ns::Params params;
+  real noiseAmp;
+  real T;
   curandGenerator_t rng;
-};
 
+
+  /*For energy*/
+  void *d_temp_storage;
+  size_t temp_storage_bytes;
+  real3 *d_K;
+  
+};
 
 #endif

@@ -53,7 +53,6 @@ SystemInfo sysInfo;
 Vector4 pos, force;
 Vector3 vel;
 Xorshift128plus grng;
-__constant__ GlobalConfigGPU gcnfGPU;
 
 
 int main(int argc, char *argv[]){

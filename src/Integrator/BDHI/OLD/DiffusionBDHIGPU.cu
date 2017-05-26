@@ -2,7 +2,7 @@
   Using the Rodne-Prager-Yamakawa tensor.
 */ 
 #include "globals/defines.h"
-#include"utils/helper_math.h"
+#include"utils/vector_overloads.h"
 #include"utils/helper_gpu.cuh"
 #include"DiffusionBDHIGPU.cuh"
 

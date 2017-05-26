@@ -1,4 +1,5 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.1**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.2**
+
 
 ## DESCRIPTION
 
