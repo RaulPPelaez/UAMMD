@@ -66,13 +66,14 @@ namespace PairForcesDPD_ns{
 			real gamma, real noiseAmp, 
 			cudaTextureObject_t texForce,/*Texture holding the short-range force*/
 			TexReference texSortVel,/*Ordered particle velocities*/
-			ullint seed, ullint N): /*A random seed and the number of particles*/
+			ullint seed, ullint N, /*A random seed and the number of particles*/
+			BoxUtils box): /*The box information, apply_pbc*/
       newForce(newForce),
       invrc(invrc), invrc2(invrc2),
       gamma(gamma), noiseAmp(noiseAmp),
       texForce(texForce),
       texSortVel(texSortVel),
-      seed(seed), N(N){};
+      seed(seed), N(N), box(box){};
 
     /*Get the information of particle index, in sorted order!*/
     inline __device__ ParticleInfo getInfo(uint index){
@@ -83,7 +84,7 @@ namespace PairForcesDPD_ns{
     inline __device__ real4 compute(const real4 &R1, const real4 &R2,
 				    const ParticleInfo &P1,const ParticleInfo &P2){
       real3 r12 = make_real3(R1)-make_real3(R2);  
-      apply_pbc(r12);
+      box.apply_pbc(r12);
 
       const real r2 = dot(r12,r12);
       /*Squared distance between 0 and 1*/
@@ -139,6 +140,7 @@ namespace PairForcesDPD_ns{
     float invrc,invrc2;    /*Precompute this expensive number*/
     ullint seed, N;
     real gamma, noiseAmp;
+    BoxUtils box;
   };
   
   /*Transform a real3 into a real4, which is better for memory fetches!*/
@@ -161,7 +163,7 @@ void PairForcesDPD<NL>::sumForce(){
 				gamma, noiseAmp,
 				pot.getForceTexture().tex,
 				sortVel.getTexture(),
-				seed, N);
+						  seed, N, BoxUtils(L));
   nl.transverse(ft);
 }
 

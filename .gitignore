@@ -1,3 +1,13 @@
+
+# Ignore all
+*
+
+# Unignore all with extensions
+!*.*
+
+# Unignore all dirs
+!*/
+
 src/Interactor/Experimental
 *.o
 *~
@@ -12,3 +22,6 @@ src/uammd
 src/aradillo.*
 star*
 armadillo*
+\#*
+
+

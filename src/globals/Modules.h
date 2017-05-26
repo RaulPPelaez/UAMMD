@@ -9,9 +9,9 @@
 #include"Interactor/NBodyForces.cuh"
 #include"Interactor/ExternalForces.cuh"
 
-#include"Integrator/VerletNVE.h"
-#include"Integrator/VerletNVT.h"
-#include"Integrator/BrownianEulerMaruyama.h"
+#include"Integrator/VerletNVE.cuh"
+#include"Integrator/VerletNVT.cuh"
+#include"Integrator/BrownianEulerMaruyama.cuh"
 #include"Integrator/BDHI/BrownianHydrodynamicsEulerMaruyama.h"
 
 #include"Measurable/Measurable.h"

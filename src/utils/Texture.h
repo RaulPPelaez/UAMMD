@@ -95,21 +95,21 @@ inline void Texture::init<double>(double *d_m, cudaTextureObject_t &tex, uint n)
 template<>
 inline void Texture::init<double4>(double4 *d_m,cudaTextureObject_t &tex, uint n){
     // this->d_m = d_m;
-    // this->n = 2*n;
+  //this->n = 2*n;
     
-    if(sysInfo.cuda_arch<=210) return;
-    cudaResourceDesc resDesc;					  
-    memset(&resDesc, 0, sizeof(resDesc));				  
-    resDesc.resType = cudaResourceTypeLinear;			  
-    resDesc.res.linear.devPtr = (int4 *)d_m;					  
-    resDesc.res.linear.desc = cudaCreateChannelDesc<int4>();		  
-    resDesc.res.linear.sizeInBytes = n*sizeof(int4);  
+  if(sysInfo.cuda_arch<=210) return;
+  cudaResourceDesc resDesc;					  
+  memset(&resDesc, 0, sizeof(resDesc));				  
+  resDesc.resType = cudaResourceTypeLinear;			  
+  resDesc.res.linear.devPtr = (uint4 *)d_m;					  
+  resDesc.res.linear.desc = cudaCreateChannelDesc<uint4>();		  
+  resDesc.res.linear.sizeInBytes = 2*n*sizeof(uint4);  
                                                                        
-    cudaTextureDesc texDesc;						  
-    memset(&texDesc, 0, sizeof(texDesc));				  
-    texDesc.readMode = cudaReadModeElementType;			  
+  cudaTextureDesc texDesc;						  
+  memset(&texDesc, 0, sizeof(texDesc));				  
+  texDesc.readMode = cudaReadModeElementType;			  
                                                                        
-    gpuErrchk(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
+  gpuErrchk(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
 }
 
 
@@ -118,7 +118,7 @@ inline void Texture::init<double4>(double4 *d_m,cudaTextureObject_t &tex, uint n
 template<>
 inline __device__ double tex1Dfetch<double>(cudaTextureObject_t t, int i){
 
-  int2 v = tex1Dfetch<int2>(t, i);
+  uint2 v = tex1Dfetch<uint2>(t, i);
 
   return __hiloint2double(v.y, v.x);
 }
@@ -127,8 +127,8 @@ inline __device__ double tex1Dfetch<double>(cudaTextureObject_t t, int i){
 template<>
 inline __device__ double4 tex1Dfetch<double4>(cudaTextureObject_t t, int i){
   
- int4 v1 = tex1Dfetch<int4>(t,2*i);
- int4 v2 = tex1Dfetch<int4>(t,2*i+1);
+  uint4 v1 = tex1Dfetch<uint4>(t,2*i);
+  uint4 v2 = tex1Dfetch<uint4>(t,2*i+1);
 
  return make_double4(
  		      __hiloint2double(v1.y, v1.x),

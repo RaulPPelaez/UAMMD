@@ -58,7 +58,7 @@ private:
 
 
 
-#include<PairForces.cu>
+#include"PairForces.cu"
   
 #endif
 

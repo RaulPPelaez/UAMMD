@@ -36,6 +36,7 @@ NeighbourList_Base::NeighbourList_Base(real rcut, real3 L, int N, bool reorder):
 				       utils.cellDim.x*utils.cellDim.y);
   utils.Lhalf = L*0.5;
   utils.cellSize = cellSize;
+  utils.box = BoxUtils(L);
 }
 
 void NeighbourList_Base::reorderParticles(cudaStream_t st){

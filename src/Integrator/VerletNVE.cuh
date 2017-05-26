@@ -16,12 +16,12 @@
 #include "globals/defines.h"
 #include "utils/utils.h"
 #include "Integrator.h"
-#include "VerletNVEGPU.cuh"
-
 
 class VerletNVE: public Integrator{
 public:
+
   VerletNVE();
+  VerletNVE(int N, real3 L, real dt);
   ~VerletNVE();
 
   void update() override;
@@ -29,7 +29,11 @@ public:
   real sumEnergy() override;
 private:
   real E;
-  verlet_nve_ns::Params params;
+  /*For energy*/
+  void *d_temp_storage;
+  size_t temp_storage_bytes;
+  real3 *d_K;
+  
 };
 
 

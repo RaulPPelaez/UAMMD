@@ -20,13 +20,14 @@ namespace NeighbourList{
     int3 cellDim; //ncells in each size
     real3 cellSize;
     real3 invCellSize; /*The inverse of the cell size in each direction*/
+    BoxUtils box;
     //Get linear index of a 3D cell, from 0 to ncells-1
     inline __device__ uint getCellIndex(int3 gridPos) const{
       return dot(gridPos, gridPos2CellIndex);
     }
 
     inline __device__ int3 getCell(real3 r) const{
-      apply_pbc(r); //Reduce to MIC
+      box.apply_pbc(r); //Reduce to MIC
       // return  int( (p+0.5L)/cellSize )
       int3 cell = make_int3((r+Lhalf)*invCellSize);
       //Anti-Traquinazo guard, you need to explicitly handle the case where a particle

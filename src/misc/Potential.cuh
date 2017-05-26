@@ -124,11 +124,12 @@ namespace Potential{
 	if(many_types)  tp = tex1Dfetch<real4>(potParams, ti+ntypes*tj);	
 	else tp = tex1Dfetch<real4>(potParams, 0);
 	
-	const real rc2 = tp.z;	
+	const real rc2 = tp.z;
 	if(r2 >= rc2) return real(0.0);
 		
 	const real epsilon = tp.x;
 	const real sigma2 = tp.y;	
+
 
 	/*Compute force/r or energy*/
 	const real invr2 = sigma2/r2;
@@ -190,7 +191,7 @@ namespace Potential{
       real rc = tp.z;
 
       real shift = 0;
-      if(tp.w != 0){/*Store f_lj(rcut) in shift*/
+      if(tp.w != real(0.0)){/*Store f_lj(rcut) in shift*/
 	real invrc7 = pow(sigma/rc, 7);
 	real invrc13 = pow(sigma/rc, 13);
 	shift = epsilon*(48.0*invrc13 - 24.0*invrc7);

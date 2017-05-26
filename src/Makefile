@@ -5,6 +5,7 @@ CXX=g++
 CC=$(CXX)
 NVCC=/usr/local/cuda-$(CUDA_VERSION)/bin/nvcc
 
+NAME=uammd
 #EXPERIMENTAL=1  #Uncomment to compile with experimental modules
 
 ###############################Put here your system configuration:#####################################
@@ -105,12 +106,12 @@ OBJS_INTERACTOR=
 
 CUOBJS_BDHI= BrownianHydrodynamicsEulerMaruyama.o   BDHI_Cholesky.o BDHI_Lanczos.o BDHI_PSE.o
 
-OBJS_INTEGRATOR=  $(addprefix BDHI/, $(OBJS_BDHI)) VerletNVT.o VerletNVE.o BrownianEulerMaruyama.o 
+OBJS_INTEGRATOR=  $(addprefix BDHI/, $(OBJS_BDHI))
 OBJS_MEASURABLE=  Measurable.o EnergyMeasure.o
 
 
 CUOBJS_INTERACTOR= PairForcesDPD.o ThreeBondedForces.o NeighbourList/Sorter.o NeighbourList/CellList.o NeighbourList/NeighbourList.o
-CUOBJS_INTEGRATOR= $(addprefix BDHI/, $(CUOBJS_BDHI)) VerletNVTGPU.o VerletNVEGPU.o BrownianEulerMaruyamaGPU.o 
+CUOBJS_INTEGRATOR= $(addprefix BDHI/, $(CUOBJS_BDHI)) VerletNVT.o VerletNVE.o BrownianEulerMaruyama.o 
 
 OBJS = $(addprefix Interactor/, $(OBJS_INTERACTOR)) $(addprefix Integrator/, $(OBJS_INTEGRATOR))
 OBJS += $(addprefix Measurable/, $(OBJS_MEASURABLE))
@@ -128,6 +129,7 @@ CUOBJS += $(addprefix Interactor/Experimental/, $(CUOBJS_INTERACTOR_EXPERIMENTAL
 endif
 
 all: main
+	$(MAKE) -C tools/
 
 $(THIRD_PARTY_OBJSS):
 	$(MAKE) -C third_party/
@@ -135,26 +137,24 @@ $(THIRD_PARTY_OBJSS):
 
 main:  $(OBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS)  $(CUOBJS)
 	$(NVCC) $(NVFLAGS) $(LDFLAGS) $(GENCODE_FLAGS) $(INCLUDEFLAGS) -dlink $^  $(LDLIBS) -o gpu.o
-	$(CXX) $(CXXFLAGS)  gpu.o $^  $(LDFLAGS) $(LDLIBS) -o uammd
+	$(CXX) $(CXXFLAGS)  gpu.o $^  $(LDFLAGS) $(LDLIBS) -o $(NAME)
 
 
 
 %.o:%.cu
-	$(NVCC) $(NVFLAGS) -dc $< -o $@
+	$(NVCC) $(NVFLAGS) -c $< -o $@
 %.o:%.cpp
-	$(NVCC) $(NVFLAGS) -x cu -dc $< -o $@
+	$(NVCC) $(NVFLAGS) -x cu -c $< -o $@
 %.o:%.f90
 	gfortran -O3 -c $< -o $@
 
 
 clean:
-	rm -f $(CUOBJS) $(OBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS) uammd
+	rm -f $(CUOBJS) $(OBJS) $(THIRD_PARTY_OBJSS) $(FORTRAN_OBJS) $(NAME)
 
 cleanCPU:
 	rm -f $(OBJS) main
 cleanGPU:
 	rm -f $(CUOBJS) main
 redo: clean all
-
-
 

@@ -1,23 +1,28 @@
 
 
 
-all: wca lj lj_types pse bd
+all: wca lj lj_types pse bd couette poiseuille
 
 wca:
-	make -j4 -C ../ INPUT_FILE=examples/WCA.cpp
-	mv ../uammd WCA
+	make -j4 -C ../ INPUT_FILE=examples/WCA.cpp NAME=examples/WCA
+
 lj:
-	make -j4 -C ../ INPUT_FILE=examples/LJ.cpp
-	mv ../uammd LJ
+	make -j4 -C ../ INPUT_FILE=examples/LJ.cpp NAME=examples/LJ
 lj_types:
-	make -j4 -C ../ INPUT_FILE=examples/LJ_types.cpp
-	mv ../uammd LJ_types
+	make -j4 -C ../ INPUT_FILE=examples/LJ_types.cpp NAME=examples/LJ_types
+
 bd:
-	make -j4 -C ../ INPUT_FILE=examples/BD.cpp
-	mv ../uammd BD
+	make -j4 -C ../ INPUT_FILE=examples/BD.cpp NAME=examples/BD
+
 pse:
-	make -j4 -C ../ INPUT_FILE=examples/PSE_test.cpp
-	mv ../uammd PSE_test
+	make -j4 -C ../ INPUT_FILE=examples/PSE_test.cpp NAME=examples/PSE_test
+
+couette: couette.cpp
+	make -j4 -C ../ INPUT_FILE=examples/couette.cpp NAME=examples/couette
+
+poiseuille: poiseuille.cpp
+	make -j4 -C ../ INPUT_FILE=examples/poiseuille.cpp NAME=examples/poiseuille
+
 
 clean:
-	rm -f  WCA LJ LJ_types BD PSE_test *.o
+	rm -f  WCA LJ LJ_types BD PSE_test couette poiseuille *.o 

@@ -23,7 +23,7 @@ Several interactors can be added to an integrator, for example one interactor fo
 #include"globals/defines.h"
 #include"Interactor/Interactor.h"
 #include"Integrator/Integrator.h"
-
+#include"Measurable/Measurable.h"
 /*A list of all the currently implemented modules*/
 #include"Modules.h"
 
@@ -52,7 +52,7 @@ private:
 
 //This class controls the flow of the simulation
 class Driver{
-protected:
+public:
   //Interactors are added to an integrator
   shared_ptr<Integrator> integrator;
   MeasurableArray measurables;
@@ -66,7 +66,7 @@ protected:
   //undefined behavior.
   void setParameters(); 
   void identifyColors();
-public:
+  //public:
   Writer writer;
   Driver();
   ~Driver();

@@ -46,7 +46,7 @@ BondedForces<BondType>::BondedForces(const char * readFile, BondType bondForce, 
     fori(0, nbondsFP){
       in>>bondListFP[i].i;
       in>>bondListFP[i].pos.x>>bondListFP[i].pos.y>>bondListFP[i].pos.z;
-      bondList[i].bond_info = BondType::readBond(in);
+      bondListFP[i].bond_info = BondType::readBond(in);
 
     }
   }
@@ -193,7 +193,7 @@ namespace Bonded_ns{
 				      const uint* __restrict__ bondEnd,
 				      const uint* __restrict__ bondedParticleIndex,
 				      typename BondedForces<BondType>::Bond * __restrict__ bondList,
-				      BoxUtils box, BondType bondForce){
+				      BondType bondForce){
     extern __shared__ real4 forceTotal[]; /*Each thread*/
     
     /*A block per particle*/
@@ -225,8 +225,7 @@ namespace Bonded_ns{
     
       /*Compute force*/
       r12 =  make_real3(posi-posj);
-      box.apply_pbc(r12);
-
+      //box.apply_pbc(r12);
       
       real fmod = bondForce.force(p, j, r12, bondList[b].bond_info);                  
 
@@ -256,7 +255,7 @@ namespace Bonded_ns{
 						const uint* __restrict__ bondStart,
 						const uint* __restrict__ bondEnd,
 						const typename BondedForces<BondType>::BondFP* __restrict__ bondListFP,
-						BoxUtils box, BondType bondForce, int N){
+						BondType bondForce, int N){
     
     /*Each thread in a block computes the force on particle p due to one (or several) bonds*/
     uint p = blockIdx.x*blockDim.x + threadIdx.x; //This block handles particle p
@@ -279,8 +278,7 @@ namespace Bonded_ns{
 
 	/*Compute force*/
 	r12 =  make_real3(pos)-bond.pos;
-	box.apply_pbc(r12);
-
+	//box.apply_pbc(r12);
 	
 	real fmod = bondForce.force(p, 0, r12, bond.bond_info); //F = -k·(r-r0)·rvec/r
 	f += make_real4(fmod*r12);
@@ -298,7 +296,7 @@ namespace Bonded_ns{
 template<class BondType>
 void BondedForces<BondType>::sumForce(){
 
-  BoxUtils box(L);
+  //BoxUtils box(L);
   if(nbonds>0){
 
     uint Nparticles_with_bonds = bondParticleIndex.size();
@@ -306,7 +304,7 @@ void BondedForces<BondType>::sumForce(){
       TPP*sizeof(real4)>>>(force.d_m, pos.d_m,
 			   bondStart.d_m, bondEnd.d_m,
 			   bondParticleIndex.d_m, bondList.d_m,
-			   box, bondForce);
+			   bondForce);
   }
   
   if(nbondsFP>0){
@@ -314,7 +312,7 @@ void BondedForces<BondType>::sumForce(){
 								      pos.d_m,
 								      bondStartFP, bondEndFP,
 								      bondListFP,
-								   box, bondForce, N);
+								      bondForce, N);
   }
 }
 template<class BondType>

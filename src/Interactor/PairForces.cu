@@ -64,7 +64,7 @@ namespace PairForces_ns{
     inline __device__ void accumulate(real3& total, const real3& current){total += current;}
     /*This function will be called for each particle i, once when all neighbours have been transversed, with the particle index and the value total had the last time accumulate was called*/
     /*Update the force acting on particle pi, pi is in the normal order*/
-    inline __device__ void set(uint pi, const real3 &totalForce){
+    inline __device__ void set(uint pi, const real3 &totalForce){     
       newForce[pi] += make_real4(totalForce.x, totalForce.y, totalForce.z, real(0.0));
     }
     /*Starting value, can also be used to initialize in-kernel parameters, as it is called at the start*/
@@ -107,7 +107,7 @@ void PairForces<NL, Potential>::sumForce(){
     /*transverse the list with it*/
     nl.transverse(ft);    
   }
-
+  cudaDeviceSynchronize();
 
 }
 

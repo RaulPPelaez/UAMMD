@@ -96,6 +96,7 @@ public:
     TexReference texSortPos; /*Texture reference to sorted positions*/
     uint *particleIndex;     /*Indices of particles in the original array*/
     int N;
+    bool D2; /*Two dimensions?*/
   };
   /*Although not a virtual method, this function must exist and be defined exactly like this*/
   /*Defined below, see transverseList below to see how to implement a transverser*/
@@ -175,7 +176,7 @@ namespace NeighbourList{
       //For some reason unroll doesnt help here
       int zi = -1; //For the 2D case
       int zf = 1;
-      if(gcnfGPU.D2){
+      if(nl.D2){
 	zi = zf = 0;
       }      
       for(x=-1; x<=1; x++)
@@ -223,7 +224,7 @@ void CellList::transverse(Transverser &tr, cudaStream_t st){
   nl.texCellEnd = cellEnd.getTexture();
   nl.texSortPos = sortPos.getTexture();
   nl.particleIndex = particleIndex.d_m;
-  
+  nl.D2 = gcnf.D2;
   NeighbourList::transverseList<<<nblocks, nthreads, 0, st>>>(nl, tr);  
 }
 
