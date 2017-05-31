@@ -4,8 +4,8 @@ Raul P. Pelaez 2016. Potentials
 TODO:
 100- Implement a custom interpolation table instead of using tex1D.
  */
-#ifndef POTENTIAL_H
-#define POTENTIAL_H
+#ifndef POTENTIAL_CUH
+#define POTENTIAL_CUH
 #include<functional>
 #include<cuda.h>
 #include"globals/defines.h"

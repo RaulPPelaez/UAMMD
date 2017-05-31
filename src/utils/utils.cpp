@@ -53,7 +53,6 @@ Vector4 initLattice(real3 L, uint N, BRAVAISLAT lat){
   cerr<<" Lattice...";
   Vector<float4> pos(N);
   pos.fill_with(make_float4(0.0f));
-  if(L.z==real(0.0)) lat = sq;
 
   Bravais((float *) pos.data,
 	  lat,/*lattice type*/

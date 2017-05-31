@@ -68,7 +68,7 @@ LDFLAGS= -L$(CUDA_LIBS)
 LDLIBS= -lcuda -lcudart -lpthread -lcurand -lcusolver -lcublas -lgfortran -lgomp -lnvToolsExt -lcufft
 
 ifneq (,$(findstring USE_MKL,$(OPTIONS)))
-	LDLIBS +=  -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
+	LDLIBS +=  -L${MKLROOT}/lib/intel64 -lmkl_intel_ilp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl
 	INCLUDEFLAGS += -DMKL_ILP64 -m64 -I${MKLROOT}/include
 	OPTIONS += USE_CPU_LAPACK_AND_BLAS
 endif

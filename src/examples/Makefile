@@ -1,7 +1,7 @@
 
 
 
-all: wca lj lj_types pse bd couette poiseuille
+all: wca lj lj_types pse bd couette poiseuille pse_logo
 
 wca:
 	make -j4 -C ../ INPUT_FILE=examples/WCA.cpp NAME=examples/WCA
@@ -23,6 +23,9 @@ couette: couette.cpp
 poiseuille: poiseuille.cpp
 	make -j4 -C ../ INPUT_FILE=examples/poiseuille.cpp NAME=examples/poiseuille
 
+pse_logo: PSE_logo.cpp
+	make -j4 -C ../ INPUT_FILE=examples/PSE_logo.cpp NAME=examples/PSE_logo
+
 
 clean:
-	rm -f  WCA LJ LJ_types BD PSE_test couette poiseuille *.o 
+	rm -f  WCA LJ LJ_types BD PSE_test couette poiseuille PSE_logo *.o 
