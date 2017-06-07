@@ -1,5 +1,9 @@
 # **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.2**
 
+<img src="https://github.com/raulppelaez/uammd/blob/development/src/res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/development/src/res/shotlogo.png" width="500">
+
+
+
 
 ## DESCRIPTION
 
@@ -102,8 +106,8 @@ If you dont have cub (thrust comes bundled with the CUDA installation) clone or 
 The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.
 The Makefile expects to find cub in /usr/local/cub, but you can change it. CUB doesnt need to be compiled.
 
-Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp, set number of particles, size of the box, dt, etc, there.
-You can change the integrator at any time during the execution of the simulation, see Driver/SimulationConfig.cpp.
+Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp or any other input file, set number of particles, size of the box, dt, etc, there.
+You can change the integrator at any time during the execution of the simulation, see examples/ for a guide.
 
 Then compile with make and run. You can use the --device X flag to specify a certain GPU.
 
@@ -179,7 +183,7 @@ The procedure to implement a new module is the following:
 	3. Add the new sources in the Makefile.
 	4. Initialize them as needed in Driver/SimulationConfig.cpp as in the examples.
 	
-All the project is compiled with nvcc and relocatable device code, so you can put GPU code anywhere. Although it is advised to keep "__device__" functions as inline and always in the same compilation unit as the kernel that uses them.
+It is advised to keep "__device__" functions as inline and always in the same compilation unit as the kernel that uses them.
 
 -------------------------------
 In globals/globals.h are the definitions of some variables that will be available throughout the entire project. These are mainly parameters. It also contains the position, force and an optional velocity arrays.
