@@ -1,5 +1,9 @@
 # **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.2**
 
+<img src="https://github.com/raulppelaez/uammd/blob/development/src/res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/development/src/res/shotlogo.png" width="500">
+
+
+
 ## DESCRIPTION
 
 -----------------
@@ -101,12 +105,17 @@ If you dont have cub (thrust comes bundled with the CUDA installation) clone or 
 The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.
 The Makefile expects to find cub in /usr/local/cub, but you can change it. CUB doesnt need to be compiled.
 
-Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp, set number of particles, size of the box, dt, etc, there.
-You can change the integrator at any time during the execution of the simulation, see Driver/SimulationConfig.cpp.
+Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp or any other input file, set number of particles, size of the box, dt, etc, there.
+You can change the integrator at any time during the execution of the simulation, see Input file in the wiki for more info.
 
 Then compile with make and run. You can use the --device X flag to specify a certain GPU.
 
 You may need to adequate the Makefile to you particular system
+
+## EXAMPLES
+
+You can find multiple examples of simulations under src/examples, compile them with make. These are well commented and provide examples of multiple different things you can do with UAMMD.
+
 
 ## DEPENDENCIES
 
