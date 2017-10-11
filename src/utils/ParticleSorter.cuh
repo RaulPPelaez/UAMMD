@@ -1,0 +1,204 @@
+/* Raul P. Pelaez 2017. ParticleSorter.
+   
+   A helper class to sort particles according to their positions following a certain rule.
+   This rule can be a morton hash, so the particle positions are sorted to follow a Z-order curve, a cell hash, particle ID...
+
+
+   USAGE:
+   This class is meant to be used by ParticleData, but can be used to sort from others.
+
+   //Create an instance of ParticleSorter:
+   ParticleSorter ps;
+   //Update/create a sorted index list from the positions using a certain hash
+   ps.updateOrderByHash<Sorter::MortonHash>(pos, numberParticles, BoxSize, cudaStream);
+   //Apply new order to some array
+   ps.applyCurrentOrder(array_in, array_out, numberParticles, cudaStream);
+
+   //Sort a key/value pair list with cub
+   ps.sortByKey(key_dobleBuffer, value_dobleBuffer, numberParticles, cudaStream);
+
+   TODO:
+   100-More hashes
+*/
+#ifndef PARTICLESORTER_CUH
+#define PARTICLESORTER_CUH
+
+#include"utils/Box.cuh"
+#include"utils/Grid.cuh"
+#include"System/System.h"
+#include<cub/cub.cuh>
+
+namespace uammd{
+  
+  namespace Sorter{
+    struct MortonHash{
+      /*Interleave a 10 bit number in 32 bits, fill one bit and leave the other 2 as zeros.*/
+      static inline __host__ __device__ uint encodeMorton(const uint &i){
+	uint x = i;
+	x &= 0x3ff;
+	x = (x | x << 16) & 0x30000ff;
+	x = (x | x << 8) & 0x300f00f;
+	x = (x | x << 4) & 0x30c30c3;
+	x = (x | x << 2) & 0x9249249;
+	return x;
+      }
+      /*Fuse three 10 bit numbers in 32 bits, producing a Z order Morton hash*/
+      static inline __host__ __device__ uint hash(const int3 &cell, const Grid &grid){
+	return encodeMorton(cell.x) | (encodeMorton(cell.y) << 1) | (encodeMorton(cell.z) << 2);
+      }      
+    };
+    //The hash is the cell 1D index
+    struct CellHash{
+      static inline __device__ __host__ uint hash(const int3 &cell, const Grid &grid){
+	return cell.x + cell.y*grid.cellDim.x + cell.z*grid.cellDim.x*grid.cellDim.z;
+      }      
+    };
+  
+    /*Assign a hash to each particle*/
+    template<class HashComputer = MortonHash, class InputIterator>
+    __global__ void computeHash(InputIterator pos,
+				int* __restrict__ index,
+				uint* __restrict__ hash , int N,
+				Grid grid){
+      const int i = blockIdx.x*blockDim.x + threadIdx.x;  
+      if(i>=N) return;
+      const real3 p = make_real3(pos[i]);
+    
+      const int3 cell = grid.getCell(p);
+      /*The particleIndex array will be sorted by the hashes, any order will work*/
+      const uint ihash = HashComputer::hash(cell, grid);
+      /*Before ordering by hash the index in the array is the index itself*/
+      index[i] = i;
+      hash[i]  = ihash;
+    }
+    /*In case old position is a texture*/
+    template<class InputIterator, class OutputIterator>
+    __global__ void reorderArray(const InputIterator old,
+				 OutputIterator  __restrict__ sorted,
+				 int* __restrict__ pindex, int N){
+      int i = blockIdx.x*blockDim.x + threadIdx.x;   
+      if(i>=N) return;
+      sorted[i] = old[pindex[i]];
+    }
+
+  }
+
+  class ParticleSorter{
+    bool init = false;
+    void *d_temp_storage = nullptr;
+    int temp_storage_num_elements = 0;
+    size_t temp_storage_bytes = 0; //Additional storage needed by cub  
+    thrust::device_vector<int>  index, index_alt;
+    thrust::device_vector<uint> hash, hash_alt; 
+    /*Radix sort by key using cub, puts sorted versions of index,hash in index_alt, hash_alt*/
+  public: 
+    ParticleSorter(){}
+    void sortByKey(cub::DoubleBuffer<int> &index,
+		   cub::DoubleBuffer<uint> &hash,
+		   int N, cudaStream_t st = 0, int end_bit = sizeof(uint)*8){
+
+
+      //This uses the CUB API to perform a radix sort
+      //CUB orders by key an array pair and copies them onto another pair
+    
+      /**Initialize CUB if more temp storage is needed**/
+      if(N > temp_storage_num_elements){
+	temp_storage_num_elements = N;
+	cudaFree(d_temp_storage);
+	temp_storage_bytes = 0;
+	d_temp_storage = nullptr;
+	/*On first call, this function only computes the size of the required temporal storage*/
+	cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
+					hash,
+					index,
+					N,
+					0, end_bit,
+					st);
+			
+	/*Allocate temporary storage*/
+	cudaMalloc(&d_temp_storage, temp_storage_bytes);
+      }
+
+      /**Perform the Radix sort on the index/hash pair**/
+      cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
+				      hash, 
+				      index,
+				      N,
+				      0, end_bit,
+				      st);
+
+      
+
+    }
+    //Return the most significant bit of an unsigned integral type
+    template <typename T>  int msb(T n){
+      static_assert(std::is_integral<T>::value && !std::is_signed<T>::value,
+		    "msb<T>(): T must be an unsigned integral type.");
+
+      for (T i = std::numeric_limits<T>::digits - 1, mask = 1 << i;
+	   i >= 0;
+	   --i, mask >>= 1){
+	if((n & mask) != 0) return i;
+	}
+      return 0;
+    }
+    
+    template<class HashType = Sorter::MortonHash, class InputIterator>
+    void updateOrderByCellHash(InputIterator pos, int N, Box box, int3 cellDim, cudaStream_t st = 0){
+      if(hash.size() != N){hash.resize(N); hash_alt.resize(N);}
+      if(index.size()!= N){index.resize(N); index_alt.resize(N);}
+
+      
+      int Nthreads=128;
+      int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
+      Grid grid(box, cellDim);
+      Sorter::computeHash<HashType><<<Nblocks, Nthreads, 0, st>>>(pos,
+								  thrust::raw_pointer_cast(index.data()),
+								  thrust::raw_pointer_cast(hash.data()),
+								  N,
+								  grid);
+      auto db_index = cub::DoubleBuffer<int>(
+					     thrust::raw_pointer_cast(index.data()),
+					     thrust::raw_pointer_cast(index_alt.data()));
+      auto db_hash  = cub::DoubleBuffer<uint>(
+					      thrust::raw_pointer_cast(hash.data()),
+					      thrust::raw_pointer_cast(hash_alt.data()));
+
+      uint maxHash = HashType::hash(cellDim, grid);
+
+      //Cub just needs this endbit at least
+      int maxbit = std::max(int(std::log2(maxHash)+0.5), int(std::log2(N)+0.5));
+      //TODO: I do not understand the end_bit variable, sometimes ^^^^^ is not enough, so just leave it at the max for now
+      maxbit = 32;
+      maxbit = std::min(maxbit, 32);
+      
+      this->sortByKey(db_index,
+		      db_hash,
+		      N,
+		      st, maxbit);
+
+      index.swap(index_alt);
+      hash.swap(hash_alt);    
+    }
+
+    //WARNING: _unsorted and _sorted cannot be aliased!
+    template<class InputIterator, class OutputIterator>
+    void applyCurrentOrder(InputIterator d_property_unsorted,
+			   OutputIterator d_property_sorted,
+			   int N, cudaStream_t st = 0){
+      int Nthreads=128;
+      int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
+
+      Sorter::reorderArray<<<Nblocks, Nthreads, 0, st>>>(d_property_unsorted,
+							 d_property_sorted,
+							 thrust::raw_pointer_cast(index.data()),
+							 N);
+    }
+    
+    int * getSortedIndexArray(){
+      return thrust::raw_pointer_cast(index.data());
+    }
+
+  };
+}
+#endif

@@ -1,159 +1,335 @@
-/*Raul P. Pelaez 2016. Two step velocity VerletNVT Integrator derived class implementation
+/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
 
-  An Integrator is intended to be a separated module that handles the update of positions given the forces
+  This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
+  that conserves the temperature, volume and number of particles.
 
-  It takes care of keeping the positions updated.
-  The positions must be provided, they are not created by the module.
-  Also takes care of writing to disk
+  For that several thermostats are (should be, currently only one) implemented:
+
+    -Velocity damping and gaussian noise 
+    - BBK ( TODO)
+    - SPV( TODO)
+ Usage:
  
-  Currently uses a BBK thermostat to maintain the temperature.
-  Solves the following differential equation using a two step velocity verlet algorithm, see GPU code:
-      X[t+dt] = X[t] + v[t]·dt
-      v[t+dt]/dt = -gamma·v[t] - F(X) + sigma·G
-  gamma is a damping constant, sigma = sqrt(2·gamma·T) and G are normal distributed random numbers with var 1.0 and mean 0.0.
+    Create the module as any other integrator with the following parameters:
+    
+    
+    auto sys = make_shared<System>();
+    auto pd = make_shared<ParticleData>(N,sys);
+    auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+    
+    
+    VerletNVT::Parameters par;
+     par.temperature = 1.0;
+     par.dt = 0.01;
+     par.damping = 1.0;
+     par.is2D = false;
 
+    auto verlet = make_shared<VerletNVT>(pd, pg, sys, par);
+      
+    //Add any interactor
+    verlet->addInteractor(...);
+    ...
+    
+    //forward simulation 1 dt:
+    
+    verlet->forwardTime();
+    
 TODO:
-100-Implement thermostat from https://arxiv.org/pdf/1212.1244.pdf (change between them through an argument enum)
-100- Allow velocities from outside
-90-  Implement more thermostats
 
-*/
-#include "VerletNVT.cuh"
-#include<cub/iterator/transform_input_iterator.cuh>
-#include<cub/device/device_reduce.cuh>
-#include"utils/GPUutils.cuh"
-#include"globals/globals.h"
-#include"utils/vector_overloads.h"
-#include"utils/helper_gpu.cuh"
+100- Outsource thermostat logic to a functor (external or internal)
+100-Implement thermostat from https://arxiv.org/pdf/1212.1244.pdf
+ */
+
+#include"VerletNVT.cuh"
+
 
 #ifndef SINGLE_PRECISION
 #define curandGenerateNormal curandGenerateNormalDouble
 #endif
 
+namespace uammd{
 
-VerletNVT::VerletNVT():VerletNVT(gcnf.N, gcnf.L, gcnf.dt, gcnf.gamma){}
 
+  namespace VerletNVT_ns{
+    //Fill the initial velocities of the particles in my group with a gaussian distribution according with my temperature.
+    __global__ void initialVelocities(real3* vel, const real3* noise,
+				      ParticleGroup::IndexIterator indexIterator, //global index of particles in my group
+				      real vamp, bool is2D, int N){
+      int i = blockIdx.x*blockDim.x + threadIdx.x;      
+      if(i>=N) return;
 
-VerletNVT::VerletNVT(int N, real3 L, real dt, real gamma):
-  /*After initializing the base class, you have access to things like N, L...*/
-  Integrator(N, L, dt, 128), 
-  noise(N +((3*N)%2)),
-  gamma(gamma),
-  T(gcnf.T),
-  d_temp_storage(nullptr),
-  temp_storage_bytes(0),
-  d_K(nullptr)
-{
-  cerr<<"Initializing Verlet NVT Integrator..."<<endl;
-
-  cerr<<"\tSet T="<<gcnf.T<<endl;
-
-  this->noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*T);
-  
-  /*Init rng*/
-  curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(rng, grng.next());
-  /*This shit is obscure, curand will only work with an even number of elements*/
-  curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), 0.0, 1.0);
-  if(vel.size()!=N){
-    vel = Vector3(N);
-    noise.download();
-    /*Distribute the velocities according to the temperature*/
-    double vamp = sqrt(3.0*T);
-    /*Create velocities*/
-    vel.fill_with(make_real3(0.0));
-    fori(0,N){
-      vel[i] = vamp*noise[i];
-      if(gcnf.D2) vel[i].z = 0;
+      int index = indexIterator[i];
+      vel[index].x = vamp*noise[i].x;
+      vel[index].y = vamp*noise[i].y;
+      if(!is2D){
+	vel[index].z = vamp*noise[i].z;
+      }
     }
-    vel.upload();
-    curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), 0.0, 1.0);
+    
   }
-  cerr<<"Verlet NVT Integrator\t\tDONE!!\n"<<endl;
-}
-
-VerletNVT::~VerletNVT(){
-  curandDestroyGenerator(rng);
-  cudaFree(d_temp_storage);
-  cudaFree(d_K);
-}
-
-
-namespace VerletNVT_ns{
-
-  /*Integrate the movement*/
-  template<int step>
-  __global__ void integrateGPU(real4 __restrict__  *pos,
-			       real3 __restrict__ *vel,
-			       const real4 __restrict__  *force,
-			       const real3 __restrict__ *noise, int N,
-			       real dt, real gamma, bool D2){
-    int i = blockIdx.x*blockDim.x+threadIdx.x;
-    if(i>=N) return;
-    /*Half step velocity*/
-    vel[i] += (make_real3(force[i])-gamma*vel[i])*dt*real(0.5) + noise[i];
-
-    if(D2) vel[i].z = real(0.0);
-    /*In the first step, upload positions*/
-    if(step==1)
-      pos[i] += make_real4(vel[i])*dt;
-        
-  }
-
-
-};
-
-//The integration process can have two steps
-void VerletNVT::update(){
-  if(steps==0)
-    for(auto forceComp: interactors) forceComp->sumForce();
   
-  steps++;
-  uint nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
-  uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0);
-
-  /**First integration step**/
-  /*Gen noise*/
-  curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), noiseAmp);
-  
-  VerletNVT_ns::integrateGPU<1><<<nblocks, nthreads>>>(pos, vel, force, noise, N, dt, gamma, gcnf.D2);
-  /**Compute all the forces**/
-  /*Reset forces*/
-  cudaMemset((void *)force.d_m, 0, N*sizeof(real4));
-  for(auto forceComp: interactors) forceComp->sumForce();
-
-  /**Second integration step**/
-  /*Gen noise*/
-  curandGenerateNormal(rng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), noiseAmp);
-  VerletNVT_ns::integrateGPU<2><<<nblocks, nthreads>>>(pos, vel, force, noise, N,  dt, gamma, gcnf.D2);
-}
-
-
-namespace VerletNVT_ns{
-
-  /*Returns the squared of each element in a real3*/
-  struct dot_functor{
-    inline __device__ real3 operator() (const real3 &a) const{
-      return a*a;
+  VerletNVT::VerletNVT(shared_ptr<ParticleData> pd,
+		       shared_ptr<ParticleGroup> pg,
+		       shared_ptr<System> sys,		       
+		       VerletNVT::Parameters par):
+    Integrator(pd, pg, sys, "VerletNVT"),
+    dt(par.dt), temperature(par.temperature), damping(par.damping), is2D(par.is2D),
+    steps(0){
+    
+    sys->log<System::MESSAGE>("[VerletNVT] Temperature: %.3f", temperature);
+    sys->log<System::MESSAGE>("[VerletNVT] Time step: %.3f", dt);
+    sys->log<System::MESSAGE>("[VerletNVT] Damping constant: %.3f", damping);
+    if(is2D){
+      sys->log<System::MESSAGE>("[VerletNVT] Working in 2D mode.");
     }
 
-  };
+    this->noiseAmplitude = sqrt(dt*damping*temperature)*0.5;
 
-};
+    //Init rng
+    curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
+    
+    curandSetPseudoRandomGeneratorSeed(curng, sys->rng().next());
+    
+    int numberParticles = pg->getNumberParticles();
+    noise.resize(2*numberParticles);
 
-real VerletNVT::sumEnergy(){  
-  VerletNVT_ns::dot_functor dot_op;
-  cub::TransformInputIterator<real3, VerletNVT_ns::dot_functor, real3*> dot_iter(vel.d_m, dot_op);
-  if(!d_temp_storage){    
-    cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, dot_iter, d_K, N);
-    cudaMalloc(&d_temp_storage, temp_storage_bytes);    
-    if(!d_K)
-      cudaMalloc(&d_K, sizeof(real3));
+    int Nthreads=128;
+    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+
+           
+    //This shit is obscure, curand will only work with an even number of elements
+    real* noise_ptr = (real *) thrust::raw_pointer_cast(noise.data());
+    //Warm cuRNG
+    curandGenerateNormal(curng, noise_ptr, 3*noise.size(), 0.0, 1.0);
+    curandGenerateNormal(curng, noise_ptr, 3*noise.size(), 0.0, 1.0);
+
+    if(pd->isVelAllocated()){
+      sys->log<System::WARNING>("[VerletNVT] Velocity will be overwritten to ensure temperature conservation!");
+    }
+    {
+      auto vel_handle = pd->getVel(access::location::gpu, access::mode::write);
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      
+      real velAmplitude = sqrt(3.0*temperature);
+      
+      auto noise_ptr = thrust::raw_pointer_cast(noise.data());
+      
+      VerletNVT_ns::initialVelocities<<<Nblocks, Nthreads>>>(vel_handle.raw(),
+							     noise_ptr,
+							     groupIterator,
+							     velAmplitude, is2D, numberParticles);
+      curandGenerateNormal(curng, (real*)noise_ptr, 3*numberParticles + ((3*numberParticles)%2), 0.0, 1.0);
+      
+    }
+
+    cudaStreamCreate(&stream);
+    cudaStreamCreate(&forceStream);
+    cudaEventCreateWithFlags(&forceEvent, cudaEventDisableTiming);
   }
-  cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, dot_iter, d_K, N);
-  real3 K;
-  cudaMemcpy(&K, d_K, sizeof(real3), cudaMemcpyDeviceToHost);
 
-  return 0.5f*(K.x+K.y+K.z)/(real)N;
+
+  
+  VerletNVT::~VerletNVT(){
+    curandDestroyGenerator(curng);
+    cudaStreamDestroy(stream);
+    cudaEventDestroy(forceEvent);
+  }
+
+
+
+  namespace VerletNVT_ns{
+
+    //Integrate the movement 1 dt and reset the forces in the first step
+    template<int step>
+      __global__ void integrateGPU(real4 __restrict__  *pos,
+				   real3 __restrict__ *vel,
+				   real4 __restrict__  *force,
+				   const real __restrict__ *mass,
+				   const real3 __restrict__ *noise,
+				   ParticleGroup::IndexIterator indexIterator,
+				   int N,
+				   real dt, real damping, bool is2D){
+	int id = blockIdx.x*blockDim.x+threadIdx.x;
+	if(id>=N) return;
+	//Index of current particle in group
+	int i = indexIterator[id];
+	
+	//Half step velocity
+	//real3 oldVel = make_real3(vel[i]);
+	//real3 newVel = oldVel + (make_real3(force[i])-damping*oldVel)*dt*real(0.5) + noise[id];
+	real invMass = real(1.0);
+	real rsqrtMass = real(1.0);
+	if(mass){
+	  invMass = real(1.0)/mass[i];
+	  rsqrtMass = rsqrtf(mass[i]);
+	}
+	vel[i] += (make_real3(force[i])*invMass-damping*vel[i])*dt*real(0.5) + noise[id]*rsqrtMass;
+	if(is2D) vel[i].z = real(0.0);
+
+	//In the first step, upload positions
+	if(step==1){
+	  //vel[i] = (1-dt*damping*real(0.5))*vel[i]-dt*real(0.5)*make_real3(force[i]) + noise[id];
+	  
+
+	  real3 newPos = make_real3(pos[i]) + vel[i]*dt;
+	  pos[i] = make_real4(newPos, pos[i].w);
+	  //Reset force
+	  force[i] = make_real4(0);
+	}
+	// else{
+	//   vel[i] = ( vel[i] - make_real3(force[i])*dt*real(0.5) + noise[id]*sqrtMass) /(1+dt*damping*real(0.5));
+
+	// }
+
+      }
+
+
+  }    
+  
+
+  //Fill noise array with a gaussian distribution with mean 0 and std noiseAmplitude
+  void VerletNVT::genNoise(cudaStream_t st){
+
+    real * noise_ptr = (real *) thrust::raw_pointer_cast(noise.data());
+    curandSetStream(curng, st);
+    curandGenerateNormal(curng, (real*) noise_ptr,
+			 3*noise.size(),
+			 real(0.0), noiseAmplitude);
+    
+
+  }
+  
+  //Move the particles in my group 1 dt in time.
+  void VerletNVT::forwardTime(){
+    steps++;
+    sys->log<System::DEBUG1>("[VerletNVT] Performing integration step %d", steps);
+    
+    int numberParticles = pg->getNumberParticles();
+    //Handle if the number of particles in my group has changed
+    if(noise.size() != 2*numberParticles)  noise.resize(2*numberParticles);
+
+    
+    int Nthreads=128;
+    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+
+    
+    //First simulation step is special
+    if(steps==1){
+      {
+	auto groupIterator = pg->getIndexIterator(access::location::gpu);
+	auto force = pd->getForce(access::location::gpu, access::mode::write);     
+	fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
+      }
+      for(auto forceComp: interactors) forceComp->sumForce(forceStream);
+      /*Gen noise*/
+      genNoise(stream);
+      cudaDeviceSynchronize();
+    }
+    
+
+
+    
+    //First integration step
+    {
+
+      //An iterator with the global indices of my groups particles
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      //Get all necessary properties
+      auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
+      auto force = pd->getForce(access::location::gpu, access::mode::read);     
+      //Mass is assumed 1 for all particles if it has not been set.
+      real * mass_ptr = nullptr;
+      if(pd->isMassAllocated()){
+	auto mass = pd->getMass(access::location::gpu, access::mode::read);
+	mass_ptr = mass.raw();
+      }
+      //Second half of noise vector is used for first integration step
+      auto noise_ptr = thrust::raw_pointer_cast(noise.data()) + numberParticles;
+      
+      /*First step integration and reset forces*/
+
+      VerletNVT_ns::integrateGPU<1><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
+								      vel.raw(),
+								      force.raw(),
+								      mass_ptr,
+								      noise_ptr,
+								      groupIterator,
+								      numberParticles, dt, damping, is2D);
+    }
+    //Gen noise and compute forces at the same time
+    cudaEventRecord(forceEvent, stream);
+    //Gen noise for two integration steps at once
+    genNoise(stream);
+    //Compute all the forces
+    cudaStreamWaitEvent(forceStream, forceEvent, 0);
+    for(auto forceComp: interactors) forceComp->sumForce(forceStream);
+    cudaEventRecord(forceEvent, forceStream);
+    
+    //Second integration step
+    {
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      
+      auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
+      auto force = pd->getForce(access::location::gpu, access::mode::read);
+      
+      auto noise_ptr = thrust::raw_pointer_cast(noise.data());
+      
+      real * mass_ptr = nullptr;
+      if(pd->isMassAllocated()){
+	auto mass = pd->getMass(access::location::gpu, access::mode::read);
+	mass_ptr = mass.raw();
+      }
+      //Wait untill all forces have been summed
+      cudaStreamWaitEvent(stream, forceEvent, 0);
+      VerletNVT_ns::integrateGPU<2><<<Nblocks, Nthreads, 0 , stream>>>(pos.raw(),
+								       vel.raw(),
+								       force.raw(),
+								       mass_ptr,
+								       noise_ptr,
+								       groupIterator,
+								       numberParticles, dt, damping, is2D);      
+    }
+    
+  }
+  
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

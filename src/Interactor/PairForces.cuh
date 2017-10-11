@@ -1,62 +1,65 @@
 /*Raul P. Pelaez 2017. PairForces definition.
 
   PairForces Module is an interactor that computes short range forces.
-    Computes the interaction between neighbour particles (pairs of particles closer tan rcut).
+  Computes the interaction between neighbour particles (pairs of particles closer tan rcut).
     
   For that, it uses a NeighbourList and computes the force given by Potential for each pair of particles. It sums the force for all neighbours of every particle.
 
-See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces   for more info.
+  See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces   for more info.
 */
 
 #ifndef PAIRFORCES_H
 #define PAIRFORCES_H
-#include"NeighbourList.cuh"
-#include"CellList.cuh"
-#include"Interactor.h"
-#include"globals/defines.h"
-#include"globals/globals.h"
-#include"misc/Potential.cuh"
-#include<functional>
-#include<memory>
+
+#include"Interactor/Interactor.cuh"
+#include"Interactor/NeighbourList/CellList.cuh"
+#include"Interactor/NBody.cuh"
 #include"third_party/type_names.h"
 
-/*This makes the class valid for any NeighbourList*/
-template<class NeighbourList, class Potential>
-class PairForces: public Interactor{
-public:
-  /*Default is parameters for gcnf (all system), and LJ potential*/
-  PairForces();
-  PairForces(real rcut);
-  PairForces(real rcut, real3 L, int N);
-  ~PairForces(){}
-  void sumForce() override;
-  real sumEnergy() override;
-  real sumVirial() override{return 0;}
-  void print_info(){
-    std::cerr<<"\t Using: "<<type_name<NeighbourList>()<<" Neighbour List."<<std::endl;
-    nl.print();
-    std::cerr<<"\t Using: "<<type_name<Potential>()<<" potential."<<std::endl;
-	
-  }
+namespace uammd{
+  /*This makes the class valid for any NeighbourList*/
+  template<class Potential, class NeighbourList = CellList>
+  class PairForces: public Interactor{
+  public:
+    struct Parameters{
+      real rcut;
+      Box box;      
+    };
+    PairForces(shared_ptr<ParticleData> pd,
+	       shared_ptr<ParticleGroup> pg,
+	       shared_ptr<System> sys,
+	       Parameters par,
+	       shared_ptr<Potential> pot = std::make_shared<Potential>());
+    PairForces(shared_ptr<ParticleData> pd,
+	       shared_ptr<System> sys,
+	       Parameters par,
+	       shared_ptr<Potential> pot = std::make_shared<Potential>()):
+      PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, pot, par){
+    }
 
-  template<typename TypeParams = typename Potential::TypeParams>
-  void setPotParams(int namei, int namej, TypeParams params){
-    pot.setPotParams(namei, namej, params);
-  }
+    ~PairForces(){}
+    void sumForce(cudaStream_t st) override;
+    real sumEnergy() override;
+    //real sumVirial() override{ return 0;}
+    
+    void print_info(){
+      sys->log<System::MESSAGE>("[PairForces] Using: %s Neighbour List.", type_name<NeighbourList>());
+      //nl.print();
+      sys->log<System::MESSAGE>("[PairForces] Using: %s potential.", type_name<Potential>());	
+    }
 
-private:
-  NeighbourList nl;
-  Potential pot;
-  Vector3 potParams;
 
-  void *cubTempStorage;
-  size_t cubTempStorageBytes;
-  GPUVector<real> energy;
+  private:
+    shared_ptr<NeighbourList> nl;
+    shared_ptr<NBody> nb;
+    shared_ptr<Potential> pot;    
+    Box box;
+    real rcut;
   
-};
+  };
 
 
-
+}
 
 #include"PairForces.cu"
   
