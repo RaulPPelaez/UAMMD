@@ -17,7 +17,7 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
     
   Timer tim; tim.tic();
   
-  gcnf.T = 1.0;
+  gcnf.T = 0.3;
   gcnf.gamma = 1.0;
   
   gcnf.L = make_real3(128);
@@ -30,7 +30,7 @@ SimulationConfig::SimulationConfig(int argc, char* argv[]): Driver(){
   
   gcnf.nsteps1 = 100000;
   gcnf.nsteps2 = 0;
-  gcnf.print_steps = -1;
+  gcnf.print_steps = 1000;
   gcnf.measure_steps = -1;
 
 

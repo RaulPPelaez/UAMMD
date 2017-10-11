@@ -5,7 +5,8 @@
   NBody needs a transverser with the information of what to compute for each particle given all the others.
  You can see example Transversers at the end of this file. If your problem is very similar to one of this transversers, you can inherit from it or simply use it.
 
-Reference: Fast N-Body Simulation with CUDA. Chapter 31 of GPU Gems 3
+References:
+[1] Fast N-Body Simulation with CUDA. Chapter 31 of GPU Gems 3
 */
 #ifndef NBODY_CUH
 #define NBODY_CUH

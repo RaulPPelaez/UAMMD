@@ -13,8 +13,10 @@
   gamma is a damping constant, sigma = sqrt(2·gamma·T) and G are normal distributed random numbers with var 1.0 and mean 0.0.
 
 TODO:
+100-Implement thermostat from https://arxiv.org/pdf/1212.1244.pdf (change between them through an argument enum)
 100- Allow velocities from outside
 90-  Implement more thermostats
+
 */
 #include "VerletNVT.cuh"
 #include<cub/iterator/transform_input_iterator.cuh>

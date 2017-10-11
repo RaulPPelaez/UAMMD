@@ -17,14 +17,13 @@ template<class T>
 class Vector{
   typedef T* iterator;
 public:
-  uint n; //size of the matrix
+  uint n; //size of the array
   bool initialized;
   bool uploaded;
-  T *data; //The data itself, stored aligned in memory
+  T *data; //The CPU data 
   T *d_m; //device pointer
 
   cudaTextureObject_t tex;
-  //Texture<T> tex;
   //Free the CPU version of the Vector
   void freeCPU(){
     if(!initialized) return;

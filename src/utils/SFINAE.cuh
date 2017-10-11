@@ -1,3 +1,12 @@
+/*Raul P. Pelaez 2017.
+
+  C++ SFINAE utilities.
+
+  This template black magic allows to provide a default functionality for an expected function when this function does not exists. 
+  For example, a template that takes a struct and expects to find a function called "getSize()" inside it.
+    With SFINAE one can call this function even when it is not present and provide a default behavior, maybe getSize() returning 0 when it is not present in the struct.
+
+ */
 #ifndef SFINAE_CUH
 #define SFINAE_CUH
 
@@ -40,7 +49,7 @@ public:
     inline __device__ void getInfo(T &t,int id){infoi = t.getInfo(id);}
 
     /*Size in bytes of the type of myType*/
-    inline __host__ __device__ size_t sizeofInfo(){return sizeof(myType);}
+    static inline __host__ __device__ size_t sizeofInfo(){return sizeof(myType);}
 
     /*Write the info of particle i_load to shared memory*/
     inline __device__ void fillSharedMemory(T &t, void * shInfo, int i_load){
@@ -70,7 +79,7 @@ public:
     
     inline __device__  void getInfo(T &t,int id){}
     /*I dont have any info*/
-    inline __host__ __device__ size_t sizeofInfo(){return 0;}
+    static inline __host__ __device__ size_t sizeofInfo(){return 0;}
     /*I do not write anything to shared memory*/
     inline __device__ void fillSharedMemory(T &t, void * shInfo, int i_load){}
     inline __device__  auto compute(T &t, const int &j,
