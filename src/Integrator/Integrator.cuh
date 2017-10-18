@@ -1,4 +1,11 @@
+/* Raul P. Pelaez 2017. Integrator Base class
 
+   An integrator has the ability to move the simulation one step forward in time.
+   
+For that, it can use any number of interactors.
+
+
+ */
 #ifndef INTEGRATOR_CUH
 #define INTEGRATOR_CUH
 
@@ -33,7 +40,7 @@ namespace uammd{
     }
     virtual void forwardTime() = 0;
 
-    virtual real sumEnergy() = 0;
+    virtual real sumEnergy(){ return 0.0;}
 
 
     //The interactors can be called at any time from the integrator to compute the forces when needed.

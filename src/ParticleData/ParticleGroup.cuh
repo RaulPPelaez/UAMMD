@@ -203,21 +203,15 @@ namespace uammd{
       falls back to a counting iterator if all particles are in group
     */
     struct IndexIterator{
-      bool allParticlesInGroup;
-      int *indices;
-      int numberParticles;
-      IndexIterator(int *indices, int numberParticles, bool allParticlesInGroup):
-	indices(indices),
-	numberParticles(numberParticles),
-	allParticlesInGroup(allParticlesInGroup){    
-
-      }
+      const int *indices;
+      IndexIterator(const int *indices):
+      indices(indices){ }
 
       inline __host__ __device__ int operator()(const int &i) const{
 	return this->operator[](i);
       }
       inline __host__ __device__ int operator[](const int &i) const{	
-	if(allParticlesInGroup) return i;
+	if(indices == nullptr) return i;
 	else{
 	  return indices[i];
 	}
@@ -226,7 +220,7 @@ namespace uammd{
     };
 
     /*Get a raw memory pointer to the index list if it exists*/
-    inline int * getIndicesRawPtr(access::location loc){
+    inline const int * getIndicesRawPtr(access::location loc){
       if(this->allParticlesInGroup) return nullptr;
       this->computeIndexList();
       int *ptr;
@@ -248,13 +242,12 @@ namespace uammd{
     }
     /*Get an iterator with the indices of particles in this group*/
     inline IndexIterator getIndexIterator(access::location loc){
-      int *ptr = nullptr;
+      const int *ptr = nullptr;
       if(!this->allParticlesInGroup){
 	ptr = getIndicesRawPtr(loc);
       }
-      return IndexIterator(ptr,
-		      numberParticles,
-		      allParticlesInGroup);
+      return IndexIterator(ptr);
+			   
     }
 
     template<class Iterator>
@@ -276,8 +269,7 @@ namespace uammd{
 						      access::location loc){      
       return accessIterator<Iterator>(property, this->getIndexIterator(loc));      
     }
-      
-    
+          
     
     int getNumberParticles(){
       return this->numberParticles;

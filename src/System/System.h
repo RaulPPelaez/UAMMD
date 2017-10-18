@@ -38,7 +38,7 @@ namespace uammd{
     int minimumCudaArch = 200;
   };
 
-  constexpr int maxLogLevel = 9;
+  constexpr int maxLogLevel = 7;
   class System{
     Xorshift128plus m_rng;
     SystemParameters sysPar;
@@ -93,7 +93,7 @@ namespace uammd{
 	       DEBUG, DEBUG1, DEBUG2, DEBUG3, DEBUG4, DEBUG5, DEBUG6, DEBUG7};
     template<int level>
     static inline void log(char const *fmt, ...) {
-      if(level<maxLogLevel){
+      if(level<=maxLogLevel){
 	if(level==CRITICAL) {
 	  va_list args;
 	  va_start(args, fmt);

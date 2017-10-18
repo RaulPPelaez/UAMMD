@@ -32,6 +32,10 @@
   auto pos_handle = pd->getPos(access::location::cpu, access::mode::read);
   //Get a raw memory pointer if needed
   real4* pos_ptr = pos_handle.raw();
+
+  To get the indices of particles in the original order (ordered by ID):
+  int * originalOrder = pd->getIndexArrayById(access::location::cpu);
+  particle zero would be: pos.raw()[originalOrder[0]];
     
   CONNECT TO A SIGNAL:
 
@@ -91,15 +95,6 @@ using namespace boost::signals2;
   //  			    ((Charge, charge, real))        
 
 namespace uammd{
-  namespace particle_data_ns{
-    /*Particles start with id corresponding to their position in the array*/
-    __global__ void setStartingIds(int *id, int N){
-      int i = blockIdx.x*blockDim.x+threadIdx.x;
-      if(i>=N) return;
-      id[i] = i;
-    }
-  }
-
   //Get the Name (first letter capital) from a tuple in the property list
 #define PROPNAME_CAPS(tuple) BOOST_PP_TUPLE_ELEM(3, 0 ,tuple)
   //Get the name (no capital) from a tuple in the property list
@@ -135,7 +130,8 @@ namespace uammd{
     signal<void(void)> reorderSignal;
     signal<void(int)> numParticlesChangedSignal;
     ParticleSorter particle_sorter;
-
+    thrust::host_vector<int> originalOrderIndexCPU;
+    bool originalOrderIndexCPUNeedsUpdate;
     Hints hints;
   public:
     ParticleData(int numberParticles, shared_ptr<const System> sys);
@@ -166,16 +162,48 @@ namespace uammd{
 #define IS_ALLOCATED(r, data, tuple) IS_ALLOCATED_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
     
     PROPERTY_LOOP(IS_ALLOCATED)
-    
+
     //Sort the particles to improve a certain kind of access pattern.
     void sortParticles();
-  
+
+    //Return an array that allows to access the particles in an ID ordered manner (as they started)
+    const int * getIdOrderedIndices(access::location dev){
+      sys->log<System::DEBUG>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
+      auto id = getId(access::location::gpu, access::mode::read);
+      int *sortedIndex = particle_sorter.getIndexArrayById(id.raw(), numberParticles);
+      sys->log<System::DEBUG1>("[ParticleData] Id reorder completed.");  
+      if(dev == access::location::gpu){	
+	return sortedIndex;
+      }
+      else{
+	if(originalOrderIndexCPUNeedsUpdate){
+	  sys->log<System::DEBUG1>("[ParticleData] Updating CPU original order array");  
+	  originalOrderIndexCPU.resize(numberParticles);
+	  int * sortedIndexCPU = thrust::raw_pointer_cast(originalOrderIndexCPU.data());
+	  CudaSafeCall(cudaMemcpy(sortedIndexCPU,
+				  sortedIndex,
+				  numberParticles*sizeof(int),
+				  cudaMemcpyDeviceToHost));
+	  originalOrderIndexCPUNeedsUpdate = false;
+	  return sortedIndexCPU;
+	}
+	else{
+	  return thrust::raw_pointer_cast(originalOrderIndexCPU.data());
+	}
+	  
+      }
+      
+
+    }
     //Apply newest order to a certain iterator
     template<class InputIterator, class OutputIterator>
     void applyCurrentOrder(InputIterator in, OutputIterator out, int numElements){
       particle_sorter.applyCurrentOrder(in, out, numElements);
     }
-
+    
+    const int * getCurrentOrderIndexArray(){
+      return particle_sorter.getSortedIndexArray(numberParticles);      
+    }
   
     signal<void(void)>* getReorderSignal(){
       sys->log<System::DEBUG>("[ParticleData] Reorder signal requested");  
@@ -215,15 +243,17 @@ namespace uammd{
 
   ParticleData::ParticleData(int numberParticles, shared_ptr<const System> sys):
     numberParticles(numberParticles),
+    originalOrderIndexCPUNeedsUpdate(true),
     sys(sys)
     PROPERTY_LOOP(INIT_PROPERTIES)
   {
     sys->log<System::MESSAGE>("[ParticleData] Created.");
     id.resize(numberParticles);
     auto id_prop = id.data(access::location::gpu, access::mode::write);
-    int Nthreads=128;
-    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);    
-    particle_data_ns::setStartingIds<<<Nblocks, Nthreads>>>(id_prop.raw(), numberParticles);
+
+    //Fill Ids with 0..numberParticle (id[i] = i)
+    cub::CountingInputIterator<int> ci(0);
+    thrust::copy(ci, ci + numberParticles, thrust::device_ptr<int>(id_prop.raw()));
   }
 
   //Sort the particles to improve a certain kind of access pattern.
@@ -251,14 +281,11 @@ namespace uammd{
     //Apply current order to all allocated properties. See APPLY_CURRENT_ORDER macro
     PROPERTY_LOOP(APPLY_CURRENT_ORDER)
 
+    originalOrderIndexCPUNeedsUpdate = true;
     //Notify all connected entities of the reordering
     this->emitReorder();
     
   }
-
-
-
-
 
 
 
@@ -271,7 +298,8 @@ namespace uammd{
 #define RESIZE_PROPERTY(r, data, tuple) RESIZE_PROPERTY_R(PROPNAME(tuple))
     
     PROPERTY_LOOP(RESIZE_PROPERTY)
-    
+
+    originalOrderIndexCPUNeedsUpdate = true;
     this->emitNumParticlesChanged(Nnew);
   }
 }

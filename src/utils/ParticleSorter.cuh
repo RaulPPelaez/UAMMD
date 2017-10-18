@@ -17,6 +17,9 @@
    //Sort a key/value pair list with cub
    ps.sortByKey(key_dobleBuffer, value_dobleBuffer, numberParticles, cudaStream);
 
+   //Order the id array (without changing it) as keys and a 0..numberparticles array as values,
+   //return this device array. It does not affect the current order.
+   ps.getIndexArrayById(id, numberParticles, cudaStream);
    TODO:
    100-More hashes
 */
@@ -71,6 +74,9 @@ namespace uammd{
       index[i] = i;
       hash[i]  = ihash;
     }
+
+
+    
     /*In case old position is a texture*/
     template<class InputIterator, class OutputIterator>
     __global__ void reorderArray(const InputIterator old,
@@ -85,16 +91,19 @@ namespace uammd{
 
   class ParticleSorter{
     bool init = false;
+    bool originalOrderNeedsUpdate = true;
     void *d_temp_storage = nullptr;
     int temp_storage_num_elements = 0;
-    size_t temp_storage_bytes = 0; //Additional storage needed by cub  
+    size_t temp_storage_bytes = 0; //Additional storage needed by cub
+    thrust::device_vector<int>  original_index;
     thrust::device_vector<int>  index, index_alt;
     thrust::device_vector<uint> hash, hash_alt; 
     /*Radix sort by key using cub, puts sorted versions of index,hash in index_alt, hash_alt*/
   public: 
     ParticleSorter(){}
+    template<class hashType>
     void sortByKey(cub::DoubleBuffer<int> &index,
-		   cub::DoubleBuffer<uint> &hash,
+		   cub::DoubleBuffer<hashType> &hash,
 		   int N, cudaStream_t st = 0, int end_bit = sizeof(uint)*8){
 
 
@@ -178,9 +187,35 @@ namespace uammd{
 		      st, maxbit);
 
       index.swap(index_alt);
-      hash.swap(hash_alt);    
+      hash.swap(hash_alt);
+      originalOrderNeedsUpdate = true;
     }
 
+    //Reorder with a custom key, store in orginal_index
+    void updateOrderById(int *id, int N, cudaStream_t st = 0){
+      int lastN = original_index.size();
+      if(lastN != N){
+	original_index.resize(N);	
+      }
+      cub::CountingInputIterator<int> ci(0);
+      thrust::copy(ci, ci+N, original_index.begin());
+      
+      auto db_index = cub::DoubleBuffer<int>(
+					     thrust::raw_pointer_cast(original_index.data()),
+					     thrust::raw_pointer_cast(index_alt.data()));
+      //store current index in hash
+      thrust::copy(id, id+N, hash.begin());
+      auto db_hash  = cub::DoubleBuffer<int>(
+					     (int*)thrust::raw_pointer_cast(hash.data()),
+					     (int*)thrust::raw_pointer_cast(hash_alt.data()));
+
+      this->sortByKey(db_index,
+		      db_hash,
+		      N,
+		      st);
+
+      original_index.swap(index_alt);      
+    }
     //WARNING: _unsorted and _sorted cannot be aliased!
     template<class InputIterator, class OutputIterator>
     void applyCurrentOrder(InputIterator d_property_unsorted,
@@ -194,11 +229,35 @@ namespace uammd{
 							 thrust::raw_pointer_cast(index.data()),
 							 N);
     }
-    
-    int * getSortedIndexArray(){
+
+    //Get current order keys
+    int * getSortedIndexArray(int N){
+      int lastN = index.size();
+      
+      if(lastN != N){
+	cub::CountingInputIterator<int> ci(lastN);
+        index.resize(N);
+	thrust::copy(ci, ci+(N-lastN), index.begin()+lastN);
+      }
+
       return thrust::raw_pointer_cast(index.data());
     }
 
+    //Update and return reorder with a custom key
+    int * getIndexArrayById(int * id, int N, cudaStream_t st = 0){
+      if(originalOrderNeedsUpdate){
+	this->updateOrderById(id, N, st);
+	originalOrderNeedsUpdate = false;
+      }
+      
+      int lastN = original_index.size();
+      
+      if(lastN != N){
+	original_index.resize(N);
+	thrust::copy(id, id+(N-lastN), original_index.begin()+lastN);
+      }
+      return thrust::raw_pointer_cast(original_index.data());
+    }
   };
 }
 #endif

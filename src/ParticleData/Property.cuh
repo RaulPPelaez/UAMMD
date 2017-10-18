@@ -46,7 +46,6 @@ namespace uammd{
       }
     }
     T* raw(){ return ptr;}
-    
   };
 
 
@@ -127,6 +126,16 @@ namespace uammd{
 	return property_ptr<T>(devicePtr, this->isBeingWritten, this->isBeingRead, mode, dev);
       default:
 	return property_ptr<T>(nullptr, this->isBeingWritten, this->isBeingRead, mode, dev);
+      }
+    }
+    void forceUpdate(access::location dev){
+      switch(dev){
+      case access::location::cpu:
+	this->hostVectorNeedsUpdate = true;
+	break;
+      case access::location::gpu:
+	this->deviceVectorNeedsUpdate = true;
+	break;
       }
     }
     string getName(){ return this->name;}

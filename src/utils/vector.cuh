@@ -1,6 +1,6 @@
 /*Raul P. Pelaez 2016. vector types algebra
 
-*/
+ */
 #ifndef VECTOR_OVERLOADS_H
 #define VECTOR_OVERLOADS_H
 //Include built in ones
@@ -362,6 +362,7 @@ VECATTR float dot(float4 a, float4 b){return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b
 
 
 
+namespace uammd{
 /////////////////REAL4////////////////////////////////
 VECATTR real4 make_real4(real x, real y, real z, real w){
 
@@ -426,10 +427,11 @@ VECATTR real2 make_real2(real4 a){return make_real2(a.x, a.y);}
 VECATTR real2 make_real2(int3 a){ return make_real2(real(a.x), real(a.y));}
 VECATTR real2 make_real2(uint3 a){return make_real2(real(a.x), real(a.y));}
 
-
+}
 ////////////////DOUBLE PRECISION//////////////////////
 #ifndef SINGLE_PRECISION
-VECATTR double3 make_double3(real3 a){return make_double3(a.x, a.y, a.z);}
+VECATTR double3 make_double3(uammd::real3 a){return make_double3(a.x, a.y, a.z);}
+
 #endif
 VECATTR float4 make_float4(double4 a){return make_float4(float(a.x), float(a.y), float(a.z), float(a.w));}
 

@@ -103,7 +103,7 @@ public:
     inline __device__ void getInfo(T &t,int id){infoi = t.getInfo(id);}
 
     /*Size in bytes of the type of myType*/
-    inline __host__ __device__ size_t sizeofInfo(){return sizeof(myType);}
+    static inline __host__ __device__ size_t sizeofInfo(){return sizeof(myType);}
 
     /*Write the info of particle i_load to shared memory*/
     inline __device__ void fillSharedMemory(T &t, void * shInfo, int i_load){

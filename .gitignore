@@ -10,6 +10,7 @@
 
 src/Interactor/Experimental
 *.o
+a.out
 *~
 *.particles
 *.pbc

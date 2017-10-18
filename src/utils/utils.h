@@ -15,7 +15,7 @@ References:
 #include<cstring>
 #include<ostream>
 #include<vector>
-
+namespace uammd{
 std::ostream& operator<<(std::ostream& out, const real3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
@@ -112,5 +112,5 @@ public:
 
 };
 
-
+}
 #endif

@@ -195,8 +195,6 @@ namespace uammd{
     curandGenerateNormal(curng, (real*) noise_ptr,
 			 3*noise.size(),
 			 real(0.0), noiseAmplitude);
-    
-
   }
   
   //Move the particles in my group 1 dt in time.

@@ -465,7 +465,7 @@ namespace uammd{
 	  //For each particle, transverse the 27 neighbour cells using the cell list
 	  // and decide if they need to be included in the neighbour list.
 	  CellList_ns::fillNeighbourList<<<Nblocks, Nthreads, 0, st>>>(sortPos_ptr, //posGroupIterator,
-								       ps.getSortedIndexArray(),
+								       ps.getSortedIndexArray(numberParticles),
 								       cellStart_ptr, cellEnd_ptr,
 								       neighbourList_ptr, numberNeighbours_ptr,
 								       maxNeighboursPerParticle,
@@ -526,7 +526,7 @@ namespace uammd{
       
       CellList_ns::transverseCellList<<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
 						       sortPos_ptr,
-						       ps.getSortedIndexArray(),
+						       ps.getSortedIndexArray(numberParticles),
 						       groupIndex,
 						       cellStart_ptr, cellEnd_ptr,
 						       currentCutOff*currentCutOff,
@@ -598,7 +598,7 @@ namespace uammd{
       sys->log<System::DEBUG3>("[CellList] fill Cell List");      
       Grid grid(box, cellDim);
       CellList_ns::fillCellList<<<Nblocks, Nthreads, 0, st>>>(sortPos_ptr, //posGroupIterator,
-       							      ps.getSortedIndexArray(),
+       							      ps.getSortedIndexArray(numberParticles),
        							      cellStart_ptr,
        							      cellEnd_ptr,
        							      numberParticles,
