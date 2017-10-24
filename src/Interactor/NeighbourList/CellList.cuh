@@ -314,7 +314,7 @@ namespace uammd{
   	    
   	      for(int j=0; j<nincell; j++){
   		int cur_j = j + firstParticle;// sortedIndex[j+firstParticle];
-  		if(cur_j != id && cur_j < N){
+  		if(cur_j < N){
 		  tr.accumulate(quantity, del.compute(tr, groupIndex[sortedIndex[cur_j]], myParticle, sortPos[cur_j]));
   		}//endif
   	      }//endfor
@@ -508,7 +508,7 @@ namespace uammd{
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
       int numberParticles = pg->getNumberParticles();
-      sys->log<System::DEBUG3>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
+      sys->log<System::DEBUG2>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
 
       int3 cellDim = make_int3(currentBox.boxSize/currentCutOff + real(0.5));
       Grid grid(currentBox, cellDim);

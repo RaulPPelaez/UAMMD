@@ -8,6 +8,8 @@
   K - Shear matrix
   dW- Brownian noise vector
   B - B*B^T = M -> i.e Cholesky decomposition B=chol(M) or Square root B=sqrt(M)
+  divM - Divergence of the mobility matrix, zero in 3D.
+
 
   The Mobility matrix is computed via the Rotne Prager Yamakawa tensor.
 
@@ -20,7 +22,7 @@
   -A Lanczos iterative method to reduce M to a smaller Krylov subspace and performing the operation B·dW there, the product M·F is performed in a matrix-free way, recomputing M every time M·v is needed.
 
   BDHI::PSE:
-  -The Positively Split Edwald Method, which takes the computation to fourier space.
+  -The Positively Split Edwald Method, which takes the computation to fourier space. [2]
 
   REFERENCES:
 
@@ -154,10 +156,12 @@ namespace uammd{
       auto d_MF = thrust::raw_pointer_cast(MF.data());
       bdhi->computeMF(d_MF, stream);
 
+
       if(par.temperature>0){
 	auto d_BdW = thrust::raw_pointer_cast(BdW.data());
 	bdhi->computeBdW(d_BdW, stream);
       }
+
       /* divM =  (M(q+dw)-M(q))·dw/d^2*/
       if(par.is2D){
 	auto d_divM = thrust::raw_pointer_cast(divM.data());
@@ -167,6 +171,7 @@ namespace uammd{
       real sqrt2Tdt = sqrt(2*par.dt*par.temperature);
 
       bdhi->finish_step(stream);
+
       /*Update the positions*/
       /* R += KR + MF + sqrt(2dtT)BdW + kTdivM*/
       

@@ -420,7 +420,12 @@ VECATTR real2 make_real2(real x, real y){
   return make_double2(x,y);
 #endif
 }
-
+#ifdef SINGLE_PRECISION
+  VECATTR real2 make_real2(double2 a){return make_real2(a.x, a.y);}
+#else
+  VECATTR real2 make_real2(float2 a){return make_real2(a.x, a.y);}
+#endif
+  
 VECATTR real2 make_real2(real s){ return make_real2(s, s);}
 VECATTR real2 make_real2(real2 a){return make_real2(a.x, a.y);}
 VECATTR real2 make_real2(real4 a){return make_real2(a.x, a.y);}

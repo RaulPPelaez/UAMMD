@@ -6,3 +6,7 @@ all:
 
 bdhi:
 	nvcc  -lineinfo -I ../src -O3 -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  BDHI.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand -lcublas -lcusolver -llapacke -lcblas
+
+
+pse:
+	nvcc  -lineinfo -I ../src -O3 -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  PSE.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand -lcublas -lcusolver -llapacke -lcblas -lcufft -lcudart

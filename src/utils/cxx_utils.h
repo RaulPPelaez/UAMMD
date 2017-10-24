@@ -10,7 +10,28 @@ References:
 
 #ifndef CXX_UTILS_H
 #define CXX_UTILS_H
+#include<cstring>
 namespace uammd{
+
+  namespace printUtils{
+    std::string prettySize(size_t size) {
+      static const char *SIZES[] = { "B", "KB", "MB", "GB" };
+      int div = 0;
+      size_t rem = 0;
+
+      while (size >= 1024 && div < (sizeof(SIZES)/ sizeof (*SIZES))) {
+	rem = (size % 1024);
+	div++;
+	size /= 1024;
+      }
+
+      double size_d = (float)size + (float)rem / 1024.0;
+      std::string result = std::to_string(size_d) + " " + std::string(SIZES[div]);
+      return result;
+    }
+  }
+
+
   
   template <std::size_t ...> struct index_sequence {};
 

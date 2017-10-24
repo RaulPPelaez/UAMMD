@@ -194,6 +194,7 @@ namespace uammd{
     void computeIndexList(bool forceUpdate = false);
   
     void handleReorder(){
+      sys->log<System::DEBUG>("[ParticleGroup] Handling reorder signal in group %s", this->name.c_str());
       if(!allParticlesInGroup){      
 	needsIndexListUpdate = true;
       }
@@ -306,7 +307,8 @@ namespace uammd{
     }
     else{
       /*Connect to reorder signal, index list needs to be updated each time a reorder occurs*/
-      pd->getReorderSignal()->connect(std::bind(&ParticleGroup::handleReorder, this));
+      pd->getReorderSignal()->connect([this](){this->handleReorder();});
+
       /*Allocate*/
       myParticlesIndicesGPU.resize(numberParticles);
       IDFlagsGPU = IDFlagsCPU;

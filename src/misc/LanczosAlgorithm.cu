@@ -42,7 +42,7 @@ namespace uammd{
   }
 
   void LanczosAlgorithm::numElementsChanged(int newN){
-    sys->log<System::DEBUG2>("[LanczosAlgorithm] Number of elements changed.");  
+    sys->log<System::DEBUG3>("[LanczosAlgorithm] Number of elements changed.");  
     this-> N = newN;
     w.resize(N+1, real3());
     V.resize(3*N*max_iter, 0);
@@ -50,7 +50,7 @@ namespace uammd{
   }
   //Increase maximum dimension of Krylov subspace, reserve necessary memory
   void LanczosAlgorithm::increment_max_iter(int inc){
-    sys->log<System::DEBUG2>("[LanczosAlgorithm] Increasing subspace dimension.");  
+    sys->log<System::DEBUG3>("[LanczosAlgorithm] Increasing subspace dimension.");  
     
     V.resize(3*N*(max_iter+inc),0);
     P.resize((max_iter+inc)*(max_iter+inc),0);
@@ -66,7 +66,7 @@ namespace uammd{
 
   //After a certain number of iterations (iter), computes the current result guess sqrt(M)·v, stores in BdW
   void LanczosAlgorithm::compResult(real z2, int N, int iter, real * BdW, cudaStream_t st){
-    sys->log<System::DEBUG2>("[LanczosAlgorithm] Computing result");
+    sys->log<System::DEBUG3>("[LanczosAlgorithm] Computing result");
     real alpha = 1.0;
     real beta = 0.0;
     /**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/

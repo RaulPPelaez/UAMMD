@@ -117,7 +117,6 @@ namespace uammd{
 
     /*See algorithm I in [1]*/
     /************v[0] = z/||z||_2*****/
-    real3 * d_w = thrust::raw_pointer_cast(w.data());
   
     /*If v doesnt come from solveNoise*/
     if(z != d_V){
@@ -138,6 +137,7 @@ namespace uammd{
     int i = -1;
     while(errorStatus == LanczosStatus::SUCCESS){
       i++;
+      real3 * d_w = thrust::raw_pointer_cast(w.data());
       sys->log<System::DEBUG3>("[LanczosAlgorithm] Iteration %d", i);
       /*w = D·vi ---> See i.e BDHI::Lanczos_ns::NbodyFreeMatrixMobilityDot and BDHI::Lanczos_ns::Dotctor on how this works*/
       sys->log<System::DEBUG3>("[LanczosAlgorithm] Computing M·v");
@@ -156,8 +156,8 @@ namespace uammd{
       CublasSafeCall(cublasdot(cublas_handle, 3*N,
 		(real *)d_w, 1,
 		d_V+3*N*i, 1,
-			       &(hdiag[i])));
-
+		&(hdiag[i])));
+      sys->log<System::DEBUG4>("[LanczosAlgorithm] hdiag[%d] %f", i, hdiag[i]);
       /*Allocate more space if needed*/
       if(i == max_iter-1){
 	CudaSafeCall(cudaStreamSynchronize(st));
@@ -191,11 +191,8 @@ namespace uammd{
       steps_needed++;
       if(i >= check_convergence_steps && i>=3){ //Miminum of 3 iterations
 	sys->log<System::DEBUG3>("[LanczosAlgorithm] Checking convergence");
-#ifdef USE_NVTX
-	nvtxRangePushA("COMP_NOISE");
-#endif
 	/*Compute Bz using h and z*/
-	/**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/      
+	/**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
 	this->compResult(1.0/invz2, N, i, (real *)Bz, st);  
 
 	/*The first time the result is computed it is only stored as oldBz*/
@@ -217,7 +214,7 @@ namespace uammd{
 	  //eq. 27 in [1]
 	  real Error = yy/normNoise_prev;	  
 	  //Convergence achieved!
-	  if(Error <= tolerance){	 
+	  if(Error <= tolerance){
 	    if(steps_needed-2 > check_convergence_steps){
 	      check_convergence_steps += 1;	      
 	    }
@@ -225,11 +222,12 @@ namespace uammd{
 	    else{
 	      check_convergence_steps -= 1;
 	    }
-#ifdef USE_NVTX
-	    nvtxRangePop();
-#endif
 	    sys->log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %f",i, Error);
 	    return errorStatus;
+	  }
+	  else{
+	    sys->log<System::DEBUG3>("[LanczosAlgorithm] Convergence not achieved! Error: %f, Tolerance: %f", Error, tolerance);
+	    sys->log<System::DEBUG3>("[LanczosAlgorithm] yy: %f, normNoise_prev: %f", yy, normNoise_prev);
 	  }
 	}
 	sys->log<System::DEBUG3>("[LanczosAlgorithm] Saving current result.");

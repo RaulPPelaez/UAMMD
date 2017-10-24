@@ -154,6 +154,7 @@ namespace uammd{
     
     template<class HashType = Sorter::MortonHash, class InputIterator>
     void updateOrderByCellHash(InputIterator pos, int N, Box box, int3 cellDim, cudaStream_t st = 0){
+      init = true;
       if(hash.size() != N){hash.resize(N); hash_alt.resize(N);}
       if(index.size()!= N){index.resize(N); index_alt.resize(N);}
 
@@ -245,6 +246,7 @@ namespace uammd{
 
     //Update and return reorder with a custom key
     int * getIndexArrayById(int * id, int N, cudaStream_t st = 0){
+      if(!init) return nullptr;
       if(originalOrderNeedsUpdate){
 	this->updateOrderById(id, N, st);
 	originalOrderNeedsUpdate = false;

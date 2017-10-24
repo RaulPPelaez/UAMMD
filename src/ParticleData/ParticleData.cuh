@@ -43,19 +43,19 @@
   In order to hear this signals a user class must:
 
   class User{
-  public:
-  User(std::shared_ptr<ParticleData> pd){
-  pd->getReorderSignal()->
-  connect([this](){this->handle_reorder();});
-  pd->getNumParticlesChangedSignal()->
-  connect([this](int Nnew){this->handle_numChanged(Nnew);});
-  }
-  void handle_reorder(){
-  std::cout<<"A reorder occured!!"<std::endl;
-  }  
-  void handle_numChanged(int Nnew){
-  ctd::cout<<"Particle number changed, now it is: "<<Nnew<<endl;
-  }
+    public:
+     User(std::shared_ptr<ParticleData> pd){
+       pd->getReorderSignal()->
+         connect([this](){this->handle_reorder();});
+       pd->getNumParticlesChangedSignal()->
+         connect([this](int Nnew){this->handle_numChanged(Nnew);});
+     }
+     void handle_reorder(){
+       std::cout<<"A reorder occured!!"<std::endl;
+     }  
+     void handle_numChanged(int Nnew){
+       std::cout<<"Particle number changed, now it is: "<<Nnew<<std::endl;
+     }
   };
 
 
@@ -168,10 +168,11 @@ namespace uammd{
 
     //Return an array that allows to access the particles in an ID ordered manner (as they started)
     const int * getIdOrderedIndices(access::location dev){
-      sys->log<System::DEBUG>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
+      sys->log<System::DEBUG1>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
       auto id = getId(access::location::gpu, access::mode::read);
       int *sortedIndex = particle_sorter.getIndexArrayById(id.raw(), numberParticles);
-      sys->log<System::DEBUG1>("[ParticleData] Id reorder completed.");  
+      if(!sortedIndex) sortedIndex = id.raw();
+      sys->log<System::DEBUG2>("[ParticleData] Id reorder completed.");  
       if(dev == access::location::gpu){	
 	return sortedIndex;
       }

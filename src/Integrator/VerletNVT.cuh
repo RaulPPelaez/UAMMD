@@ -48,7 +48,7 @@ TODO:
 namespace uammd{
   class VerletNVT: public Integrator{
     real noiseAmplitude;
-    real dt, temperature, damping;
+    real dt, temperature, damping;    
     bool is2D;
     curandGenerator_t curng;
     thrust::device_vector<real3> noise;
@@ -64,7 +64,7 @@ namespace uammd{
     struct Parameters{
       real temperature = 0;
       real dt = 0;
-      real damping = 0;
+      real damping = 1.0;
       bool is2D = false;
     };
     VerletNVT(shared_ptr<ParticleData> pd,

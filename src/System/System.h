@@ -38,7 +38,7 @@ namespace uammd{
     int minimumCudaArch = 200;
   };
 
-  constexpr int maxLogLevel = 7;
+  constexpr int maxLogLevel = 6;
   class System{
     Xorshift128plus m_rng;
     SystemParameters sysPar;

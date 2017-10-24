@@ -23,6 +23,7 @@ src/uammd
 src/aradillo.*
 star*
 armadillo*
+*.nvvp
 \#*
 
 

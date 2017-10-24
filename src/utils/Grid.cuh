@@ -20,13 +20,16 @@ namespace uammd{
       int3 gridPos2CellIndex;
       
       int3 cellDim; //ncells in each size
+      real3 cellSize;
       real3 invCellSize; /*The inverse of the cell size in each direction*/
       Box box;
       Grid(Box box, int3 cellDim):
 	box(box),
 	cellDim(cellDim){
 
-	invCellSize = make_real3(cellDim)/box.boxSize;
+	cellSize = box.boxSize/make_real3(cellDim);
+	invCellSize = 1.0/cellSize;
+	
 	gridPos2CellIndex = make_int3( 1,
 				       cellDim.x,
 				       cellDim.x*cellDim.y);

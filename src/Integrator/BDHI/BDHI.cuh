@@ -4,6 +4,7 @@
 #define BDHI_CUH
 
 #include"global/defines.h"
+#include"utils/Box.cuh"
 #include<vector>
 namespace uammd{
   namespace BDHI{
@@ -18,6 +19,7 @@ namespace uammd{
       real tolerance = 1e-3;
       real dt;
       bool is2D = false;
+      Box box;
     };
 
 
@@ -68,7 +70,7 @@ namespace uammd{
       }              
 
     
-    };
+    };    
   }
 }
 
