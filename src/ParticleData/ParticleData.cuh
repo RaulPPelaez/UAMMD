@@ -43,12 +43,19 @@
   In order to hear this signals a user class must:
 
   class User{
+    connection reorderConnection, numParticlesChangedConnection;
     public:
      User(std::shared_ptr<ParticleData> pd){
-       pd->getReorderSignal()->
+       reorderConnection = pd->getReorderSignal()->
          connect([this](){this->handle_reorder();});
-       pd->getNumParticlesChangedSignal()->
+
+       numParticlesChangedConnection = pd->getNumParticlesChangedSignal()->
          connect([this](int Nnew){this->handle_numChanged(Nnew);});
+     }
+     ~User(){
+     //Remember to disconnect when the signal is not needed anymore!
+       reorderConnection.disconnect();
+       numParticlesChangedConnection.disconnect();
      }
      void handle_reorder(){
        std::cout<<"A reorder occured!!"<std::endl;
@@ -71,6 +78,7 @@
 #include"utils/ParticleSorter.cuh"
 
 #include<boost/signals2.hpp>
+//#include<boost/signals2/signal_type.hpp>
 #include<boost/preprocessor.hpp>
 #include <boost/preprocessor/stringize.hpp>
 #include<boost/preprocessor/seq/for_each.hpp>
@@ -78,7 +86,7 @@
 #include<thrust/device_vector.h>
 
 #include"utils/vector.cuh"
-using namespace boost::signals2;
+
 
 //List here all the properties with this syntax:
 //       ((PropertyName, propertyName, TYPE)) \
@@ -95,6 +103,17 @@ using namespace boost::signals2;
   //  			    ((Charge, charge, real))        
 
 namespace uammd{
+
+  template<class T>
+  using signal = typename boost::signals2::signal_type
+    <
+    T,
+      boost::signals2::keywords::mutex_type<boost::signals2::dummy_mutex>
+      >::type;
+
+  using connection = boost::signals2::connection;
+  
+  
   //Get the Name (first letter capital) from a tuple in the property list
 #define PROPNAME_CAPS(tuple) BOOST_PP_TUPLE_ELEM(3, 0 ,tuple)
   //Get the name (no capital) from a tuple in the property list

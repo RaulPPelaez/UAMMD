@@ -53,7 +53,6 @@ namespace uammd{
     //You can identify where each cell starts and end by transversing this vector and searching for when the cell of a particle is  different from the previous one
     template<class InputIterator>
     __global__ void fillCellList(InputIterator sortPos,
-				 const int *sortedIndex,
 				 int *cellStart, int *cellEnd,
 				 int N, Grid grid){
       /*A thread per particle*/
@@ -598,7 +597,6 @@ namespace uammd{
       sys->log<System::DEBUG3>("[CellList] fill Cell List");      
       Grid grid(box, cellDim);
       CellList_ns::fillCellList<<<Nblocks, Nthreads, 0, st>>>(sortPos_ptr, //posGroupIterator,
-       							      ps.getSortedIndexArray(numberParticles),
        							      cellStart_ptr,
        							      cellEnd_ptr,
        							      numberParticles,

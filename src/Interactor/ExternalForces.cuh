@@ -2,7 +2,7 @@
   Computes a force acting on each particle due to an external potential.
   i.e harmonic confinement, gravity...
   
-  Needs a functor transverser with at least one of function out of these three; force, energy, virial that takes any needed parameters and return the force/r, energy of virial of a given particle, i.e:
+  Needs a functor transverser with at least one of function out of these three; force, energy, virial that takes any needed parameters and return the force, energy of virial of a given particle, i.e:
 
 struct HarmonicWall{
   real zwall;
@@ -10,9 +10,9 @@ struct HarmonicWall{
   HarmonicWall(real zwall):zwall(zwall){
   }
   
-  __device__ __forceinline__ real4 force(const real4 &pos){
+  __device__ __forceinline__ real3 force(const real4 &pos){
 
-    return make_real4(0.0f, 0.0f, -k*(pos.z-zwall), 0.0f);
+    return make_real3(0.0f, 0.0f, -k*(pos.z-zwall));
 
   }
 
@@ -122,7 +122,7 @@ namespace uammd{
     //In this case, the pointers to the ith element in each array are dereferenced and passed fo f's () operator
     //Learn about this in [1]
     template<class Functor, class ...T, size_t ...Is>
-    __device__ inline real4 unpackTupleAndCallForce_impl(Functor &f,
+    __device__ inline real3 unpackTupleAndCallForce_impl(Functor &f,
 							 std::tuple<T...> &arrays,
 							 int i, //Element of the array to dereference 
 							 //Nasty variadic template trick
@@ -133,7 +133,7 @@ namespace uammd{
 
     //This function allows to call unpackTuple hiding the make_index_sequence trick
     template<class Functor, class ...T>
-    __device__ inline real4 unpackTupleAndCallForce(Functor &f, int i, std::tuple<T...> &arrays){
+    __device__ inline real3 unpackTupleAndCallForce(Functor &f, int i, std::tuple<T...> &arrays){
       constexpr int n= sizeof...(T); //Number of elements in tuple (AKA arguments in () operator in Functor)
       return unpackTupleAndCallForce_impl(f, arrays, i, make_index_sequence<n>());
     }
@@ -152,7 +152,8 @@ namespace uammd{
       const int myParticleIndex = groupIterator[id];
 
       //Sum the result of calling f(<all the requested input>) to my particle's force
-      force[myParticleIndex] += unpackTupleAndCallForce(f, myParticleIndex, arrays);
+      const real3 F = make_real3(force[myParticleIndex]) + unpackTupleAndCallForce(f, myParticleIndex, arrays);
+      force[myParticleIndex] = make_real4(F); 
     }
 
 

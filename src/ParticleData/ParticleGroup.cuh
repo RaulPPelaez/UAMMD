@@ -173,8 +173,8 @@ namespace uammd{
     size_t temporaryStorageSize = 0;
     int* cubNumSelectedGPU;
 
-
-  
+    connection reorderConnection;
+    
   public:
     /*Defaults to all particles in group*/
     ParticleGroup(shared_ptr<ParticleData> pd, shared_ptr<System> sys, std::string name = std::string("noName"));
@@ -190,6 +190,13 @@ namespace uammd{
 		  shared_ptr<ParticleData> pd, shared_ptr<System> sys,
 		  std::string name = std::string("noName"));
 
+    ~ParticleGroup(){
+      sys->log<System::DEBUG>("Group %s destroyed", name.c_str());
+      reorderConnection.disconnect();
+
+
+      
+    }
     /*Update index list if needed*/
     void computeIndexList(bool forceUpdate = false);
   
@@ -351,7 +358,8 @@ namespace uammd{
       this->allParticlesInGroup = true;    
     }
     else{
-      pd->getReorderSignal()->connect(std::bind(&ParticleGroup::handleReorder, this));
+      reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});      
+      
       /*Create ID list in CPU*/
       thrust::host_vector<bool> IDFlagsCPU(totalParticles);
       //Turn on given member ID's flags
@@ -417,6 +425,7 @@ namespace uammd{
 				 cubNumSelectedGPU, totalParticles);
       this->needsIndexListUpdate = false;
       updateHostVector = true;
+      sys->log<System::DEBUG1>("[ParticleGroup] Updating group %s DONE!", name.c_str());
     }
   }
 

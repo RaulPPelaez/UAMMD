@@ -1,6 +1,7 @@
 
-CPU= -O3 -funroll-loops -m64 -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers -march=native -fPIC
+CPU= -O3 -funroll-loops -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers -march=native -fPIC
 
+DEBUG= -O3
 all:
 	nvcc  -lineinfo -I ../src -O3 -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  LJ.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand
 
@@ -10,3 +11,9 @@ bdhi:
 
 pse:
 	nvcc  -lineinfo -I ../src -O3 -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  PSE.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand -lcublas -lcusolver -llapacke -lcblas -lcufft -lcudart
+
+bd:
+	nvcc  -lineinfo -I ../src -O3 -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  BD.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand
+
+bonds:
+	nvcc   -lineinfo -I ../src $(DEBUG) -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  Bonds.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand 

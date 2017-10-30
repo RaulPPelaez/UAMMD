@@ -38,8 +38,8 @@ namespace uammd{
     ~Integrator(){
       sys->log<System::DEBUG>("[Integrator] %s Destroyed", name.c_str());
     }
+    
     virtual void forwardTime() = 0;
-
     virtual real sumEnergy(){ return 0.0;}
 
 

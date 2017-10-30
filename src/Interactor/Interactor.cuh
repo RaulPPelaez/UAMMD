@@ -18,7 +18,12 @@ namespace uammd{
     shared_ptr<System> sys;
   
   public:
-    
+
+    Interactor(shared_ptr<ParticleData> pd,	       
+	       shared_ptr<System> sys,
+	       std::string name="noName"):
+      Interactor(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, name){}
+
     Interactor(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
