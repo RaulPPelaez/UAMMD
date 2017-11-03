@@ -101,7 +101,7 @@ int main(int argc, char *argv[]){
     fori(0,N){
       pos.raw()[i] = initial[i];
       //Type of particle is stored in .w
-      pos.raw()[i].w = sys->rng().uniform(0,1)>std::stod(argv[7])?0:1;
+      pos.raw()[i].w = sys->rng().uniform(0,1) > std::stod(argv[7])?0:1;
     }    
   }
   
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]){
   using PairForces = PairForces<Potential::LJ>;
 
   //This is the general interface for setting up a potential
-  auto pot = make_shared<Potential::LJ>();
+  auto pot = make_shared<Potential::LJ>(sys);
   {
     //Each Potential describes the pair interactions with certain parameters.
     //The needed ones are in InputPairParameters inside each potential, in this case:
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]){
   
   //You can add as many modules as necessary
   verlet->addInteractor(pairforces);
-  //verlet->addInteractor(nbody);
+    //verlet->addInteractor(nbody);
 
 
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).

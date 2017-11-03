@@ -26,6 +26,7 @@
 #include"utils/Box.cuh"
 #include"PotentialBase.cuh"
 #include"ParameterHandler.cuh"
+#include"third_party/type_names.h"
 namespace uammd{
 
   namespace Potential{
@@ -45,14 +46,24 @@ namespace uammd{
       class Radial{
       public:
 	using InputPairParameters = typename PotentialFunctor::InputPairParameters;
-      private:
+      protected:
+	std::shared_ptr<System> sys;
+	
 	PotentialFunctor pot;
 	ParameterHandle pairParameters;
+	std::string name;
       public:
-	Radial():Radial(PotentialFunctor()){}
-	Radial(PotentialFunctor pot): pot(pot){ }
+	Radial(std::shared_ptr<System> sys):Radial(sys, PotentialFunctor()){}
+	Radial(std::shared_ptr<System> sys, PotentialFunctor pot): pot(pot), sys(sys){
+	  name = type_name_without_namespace<PotentialFunctor>();
+	  sys->log<System::MESSAGE>("[RadialPotential/%s] Initialized", name.c_str());
+	}
+	~Radial(){
+	  sys->log<System::MESSAGE>("[RadialPotential/%s] Destroyed", name.c_str());
+	}
 
 	void setPotParameters(int ti, int tj, InputPairParameters p){
+	  sys->log<System::MESSAGE>("[RadialPotential/%s] Type pair %d %d parameters added", name.c_str(), ti, tj);
 	  pairParameters.add(ti, tj, p);
 	}
 	real getCutOff(){
@@ -137,7 +148,7 @@ namespace uammd{
 
 	//Create and return a transverser
 	forceTransverser getForceTransverser(Box box, shared_ptr<ParticleData> pd){
-	
+	  sys->log<System::DEBUG2>("[RadialPotential/%s] ForceTransverser requested", name.c_str());
 	  auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       
 	  return forceTransverser(pairParameters.getIterator(), force.raw(), box, pot);
@@ -145,7 +156,7 @@ namespace uammd{
 	}
 
 	energyTransverser getEnergyTransverser(Box box, shared_ptr<ParticleData> pd){
-	
+	  sys->log<System::DEBUG2>("[RadialPotential/%s] EnergyTransverser requested", name.c_str());
 	  auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
       
 	  return energyTransverser(pairParameters.getIterator(), energy.raw(), box, pot);

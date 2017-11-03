@@ -24,7 +24,11 @@ namespace uammd{
 					shared_ptr<System> sys,		       
 					Parameters par,
 					shared_ptr<Potential> pot):
-    Interactor(pd, pg, sys, "PairForces/" + type_name<NL>() + "/" + type_name<Potential>()),
+    Interactor(pd, pg, sys,
+	       "PairForces/" +
+	       stringUtils::removePattern(type_name<NL>(), "uammd::") +
+	       "/" +
+	       stringUtils::removePattern(type_name<Potential>(), "uammd::")),
     box(par.box),
     pot(pot),
     nl(nullptr),

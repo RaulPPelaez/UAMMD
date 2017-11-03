@@ -22,6 +22,9 @@
    ps.getIndexArrayById(id, numberParticles, cudaStream);
    TODO:
    100-More hashes
+
+REFERENCES:
+[1] https://stackoverflow.com/questions/18529057/produce-interleaving-bit-patterns-morton-keys-for-32-bit-64-bit-and-128bit
 */
 #ifndef PARTICLESORTER_CUH
 #define PARTICLESORTER_CUH
@@ -34,8 +37,9 @@
 namespace uammd{
   
   namespace Sorter{
+    
     struct MortonHash{
-      /*Interleave a 10 bit number in 32 bits, fill one bit and leave the other 2 as zeros.*/
+      //Interleave a 10 bit number in 32 bits, fill one bit and leave the other 2 as zeros. See [1]
       static inline __host__ __device__ uint encodeMorton(const uint &i){
 	uint x = i;
 	x &= 0x3ff;
@@ -50,7 +54,7 @@ namespace uammd{
 	return encodeMorton(cell.x) | (encodeMorton(cell.y) << 1) | (encodeMorton(cell.z) << 2);
       }      
     };
-    //The hash is the cell 1D index
+    //The hash is the cell 1D index, this pattern is better than random for neighbour transverse, but worse than Morton
     struct CellHash{
       static inline __device__ __host__ uint hash(const int3 &cell, const Grid &grid){
 	return cell.x + cell.y*grid.cellDim.x + cell.z*grid.cellDim.x*grid.cellDim.z;

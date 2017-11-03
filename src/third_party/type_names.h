@@ -38,4 +38,11 @@ std::string type_name() {
     r += "&&";
   return r;
 }
+
+template <class T>
+std::string type_name_without_namespace() {
+  std::string name = type_name<T>();
+  return name.substr(name.find_last_of(':')+1);
+}
+
 #endif

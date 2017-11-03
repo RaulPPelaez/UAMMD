@@ -124,7 +124,9 @@ namespace uammd{
 
     cudaStreamCreate(&stream);
     cudaStreamCreate(&forceStream);
-    cudaEventCreateWithFlags(&forceEvent, cudaEventDisableTiming);
+    cudaEventCreate(&forceEvent);
+    //This line makes the code go much slower, I do not know why    
+    //cudaEventCreateWithFlags(&forceEvent, cudaEventDisableTiming);
   }
 
 
@@ -223,9 +225,6 @@ namespace uammd{
       genNoise(stream);
       cudaDeviceSynchronize();
     }
-    
-
-
     
     //First integration step
     {

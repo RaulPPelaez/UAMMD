@@ -18,11 +18,9 @@ You can visualize the reuslts with superpunto
 #include"uammd.cuh"
 //The rest can be included depending on the used modules
 #include"Integrator/BrownianDynamics.cuh"
-#include"Interactor/PairForces.cuh"
-#include"Interactor/NeighbourList/CellList.cuh"
-#include"Interactor/Potential/Potential.cuh"
-
-#include<thrust/sort.h>
+// #include"Interactor/PairForces.cuh"
+// #include"Interactor/NeighbourList/CellList.cuh"
+// #include"Interactor/Potential/Potential.cuh"
 
 #include"utils/InitialConditions.cuh"
 #include<fstream>
@@ -85,37 +83,37 @@ int main(int argc, char *argv[]){
 
   auto bd = make_shared<BD::EulerMaruyama>(pd, pg, sys, par);
   
-  using PairForces = PairForces<Potential::LJ>;
+  // using PairForces = PairForces<Potential::LJ>;
 
-  //This is the general interface for setting up a potential
-  auto pot = make_shared<Potential::LJ>();
-  {
-    //Each Potential describes the pair interactions with certain parameters.
-    //The needed ones are in InputPairParameters inside each potential, in this case:
-    Potential::LJ::InputPairParameters par;
-    par.epsilon = 1.0;
-    par.shift = false;
+  // //This is the general interface for setting up a potential
+  // auto pot = make_shared<Potential::LJ>();
+  // {
+  //   //Each Potential describes the pair interactions with certain parameters.
+  //   //The needed ones are in InputPairParameters inside each potential, in this case:
+  //   Potential::LJ::InputPairParameters par;
+  //   par.epsilon = 1.0;
+  //   par.shift = false;
 
-    par.sigma = 2;
-    par.cutOff = 2.5*par.sigma;
-    //Once the InputPairParameters has been filled accordingly for a given pair of types,
-    //a potential can be informed like this:
-    pot->setPotParameters(1, 1, par);
+  //   par.sigma = 2;
+  //   par.cutOff = 2.5*par.sigma;
+  //   //Once the InputPairParameters has been filled accordingly for a given pair of types,
+  //   //a potential can be informed like this:
+  //   pot->setPotParameters(1, 1, par);
     
-    par.sigma = 1.0;
-    par.cutOff = 2.5*par.sigma;
-    pot->setPotParameters(0, 0, par);
+  //   par.sigma = 1.0;
+  //   par.cutOff = 2.5*par.sigma;
+  //   pot->setPotParameters(0, 0, par);
     
 
-    par.sigma = 0.5*(2.0+1.0);
-    par.cutOff = 2.5*par.sigma;
-    //the pair 1,0 is registered as well with this call, and assumed to be the same
-    pot->setPotParameters(0, 1, par);
-  }
+  //   par.sigma = 0.5*(2.0+1.0);
+  //   par.cutOff = 2.5*par.sigma;
+  //   //the pair 1,0 is registered as well with this call, and assumed to be the same
+  //   pot->setPotParameters(0, 1, par);
+  // }
 
-  PairForces::Parameters params;
-  params.box = box;  //Box to work on
-  auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
+  // PairForces::Parameters params;
+  // params.box = box;  //Box to work on
+  // auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
 
   //b->addInteractor(pairforces);
   
@@ -130,7 +128,7 @@ int main(int argc, char *argv[]){
   //Sorting the particles will cause the particle arrays to change in order and (possibly) address.
   //This changes will be informed with signals and any module that needs to be aware of such changes
   //will acknowedge it through a callback (see ParticleData.cuh).
-  pd->sortParticles();
+  //pd->sortParticles();
         
   Timer tim;
   tim.tic();
@@ -164,7 +162,7 @@ int main(int argc, char *argv[]){
     //Sort the particles every few steps
     //It is not an expensive thing to do really.
     if(j%500 == 0){
-      pd->sortParticles();
+      //pd->sortParticles();
     }
   }
   

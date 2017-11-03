@@ -311,10 +311,11 @@ namespace uammd{
     if(numberParticles==totalParticles){
       allParticlesInGroup = true;
       numberParticles= totalParticles;
+      //IDFlagsCPU.clean();
     }
     else{
       /*Connect to reorder signal, index list needs to be updated each time a reorder occurs*/
-      pd->getReorderSignal()->connect([this](){this->handleReorder();});
+      reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});
 
       /*Allocate*/
       myParticlesIndicesGPU.resize(numberParticles);

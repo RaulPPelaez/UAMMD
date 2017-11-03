@@ -29,12 +29,32 @@ w will be 1
 #include<string>
 #include<cstdlib>
 
-__host__ __device__ double mod(cufftComplex v){
-
+inline __host__ __device__ double mod(const cufftComplex &v){
   return sqrt(v.x*v.x + v.y*v.y);
 }
 int main(int argc, char *argv[]){
-    
+  if(argc<3){
+    std::cerr<<"ERROR!!: Input missing"<<std::endl;
+    std::cerr<<"Takes a single column signal and outputs its FFT (using cuda) in frequency domain."<<std::endl;
+    std::cerr<<""<<std::endl;
+    std::cerr<<"Usage:"<<std::endl;
+    std::cerr<<""<<std::endl;
+    std::cerr<<"fft [N] [Fs] < signal"<<std::endl;
+    std::cerr<<""<<std::endl;
+    std::cerr<<"N: Number of points in the signal"<<std::endl;
+    std::cerr<<"Fs: Sampling frequency"<<std::endl;
+    std::cerr<<""<<std::endl;
+    std::cerr<<"Example:"<<std::endl;
+    std::cerr<<""<<std::endl;
+    std::cerr<<"seq 0 0.2 10000 |  awk '{print sin($1)}' | fft 10000 5.0 > kk"<<std::endl;
+    std::cerr<<""<<std::endl;
+    std::cerr<<"w=$(grep $( datamash -W max 2 <kk) kk | awk '{print 2*3.1415*$1}')"<<std::endl;
+    std::cerr<<std::endl;
+    std::cerr<<"w will be 1"<<std::endl;    
+    exit(1);
+  }
+  
+  
   int numberElements = std::atoi(argv[1]);
   double Fs = std::stod(argv[2]);
   
@@ -89,7 +109,7 @@ int main(int argc, char *argv[]){
     std::cout<<i*Fs/(numberElements)<<" "<<Aw<<" "<<phase<<"\n";
   }
   std::cout<<std::flush;
-  
 
+  cudaDeviceSynchronize();
   return 0;
 }

@@ -79,42 +79,34 @@ namespace uammd{
       in>>bi.k>>bi.r0;
       return bi;
     }
-    
-  };
-  struct HarmonicPBC{
-      Box box;
-      HarmonicPBC(): box(){}
-      HarmonicPBC(Box box): box(box){}
-    /*Needs a struct called BondInfo with 
-      the parameters that characterize a bond*/
-    struct BondInfo{
-      real r0, k;
-    };
-    /*A device function called force with these arguments that returns f/r for a given bond.
-      Note that this function will be called for ij and ji*/
-    /*In the case of a Fixed Point bond, j will be 0*/
-    inline __device__ real force(int i, int j, real3 &r12, const BondInfo &bi){
-      r12 = box.apply_pbc(r12);
+
+    inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
       real r2 = dot(r12, r12);
       if(r2==real(0.0)) return real(0.0);
-#ifdef SINGLE_PRECISION
-      real invr = rsqrtf(dot(r12, r12));
-#else
-      real invr = rsqrt(dot(r12, r12));
-#endif
-      real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
-      return f;
-    }
 
-    /*A function called readbond that reads a bond from in (the bond file).
-      This function will be called for every line in the file except for the first*/
-    static __host__ BondInfo readBond(std::istream &in){
-      /*BondedForces will read i j, readBond has to read the rest of the line*/
-      BondInfo bi;
-      in>>bi.k>>bi.r0;
-      return bi;
+#ifdef SINGLE_PRECISION
+      real invr = rsqrtf(r2);
+#else
+      real invr = rsqrt(r2);
+#endif
+      const real dr = real(1.0)-bi.r0*invr;
+      
+      return real(0.5)*bi.k*dr*dr;
     }
+    
   };
+    //Same as Harmonic, but applies Periodic boundary conditions to the distance of a pair
+    struct HarmonicPBC: public Harmonic{
+    Box box;
+      HarmonicPBC(Box box): box(box){}
+    inline __device__ real force(int i, int j, real3 &r12, const BondInfo &bi){      
+      return Harmonic::force(i, j, box.apply_pbc(r12), bi);
+    }
+    
+    inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
+      return Harmonic::energy(i, j, box.apply_pbc(r12), bi);
+    }
+    };
 
   struct FENE{
     struct BondInfo{
@@ -125,7 +117,15 @@ namespace uammd{
       real r02 = bi.r0*bi.r0;
     
       return -r02*bi.k/(r02-r2); 
+    }    
+    inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
+      real r2 = dot(r12, r12);
+      real r02 = bi.r0*bi.r0;
+    
+      return -r02*bi.k/(r02-r2); 
     }
+
+    
     static BondInfo readBond(std::istream &in){
       BondInfo bi;
       in>>bi.k>>bi.r0;

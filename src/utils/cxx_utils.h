@@ -13,7 +13,20 @@ References:
 #include<cstring>
 namespace uammd{
 
+
+  namespace stringUtils{
+    inline std::string removePattern(std::string str, std::string pattern){
+      std::string::size_type i = str.find(pattern);
+      while (i != std::string::npos) {
+	str.erase(i, pattern.length());
+	i = str.find(pattern, i);
+      }
+      return str;
+    }
+
+  }
   namespace printUtils{
+    
     std::string prettySize(size_t size) {
       static const char *SIZES[] = { "B", "KB", "MB", "GB" };
       int div = 0;

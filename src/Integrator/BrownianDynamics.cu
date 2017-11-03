@@ -153,7 +153,6 @@ namespace uammd{
 							    sqrt2MTdt,
 							    numberParticles);
 
-
     }
     
 

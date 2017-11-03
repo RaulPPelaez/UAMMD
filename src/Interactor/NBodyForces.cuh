@@ -66,7 +66,10 @@ namespace uammd{
       auto tr = pot->getForceTransverser(box, pd);
       nb->transverse(tr, st);
     } 
-    real sumEnergy() override{return 0.0;}
+    real sumEnergy() override{
+      auto tr = pot->getEnergyTransverser(box, pd);
+      nb->transverse(tr);
+    }
 
     void print_info(){
       sys->log<System::MESSAGE>("[NBodyForces] Transversing with: %s", type_name<Potential>());
