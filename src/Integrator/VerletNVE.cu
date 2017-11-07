@@ -45,7 +45,7 @@ namespace uammd{
 		       shared_ptr<System> sys,		       
 		       VerletNVE::Parameters par):
     Integrator(pd, pg, sys, "VerletNVE"),
-    dt(par.dt), energy(par.energy), is2D(par.is2D),
+    dt(par.dt), energy(par.energy), is2D(par.is2D), initVelocities(par.initVelocities),
     steps(0){
     
     sys->log<System::MESSAGE>("[VerletNVE] Energy: %.3f", energy);
@@ -56,7 +56,7 @@ namespace uammd{
 
     int numberParticles = pg->getNumberParticles();
            
-    if(pd->isVelAllocated()){
+    if(pd->isVelAllocated() && initVelocities){
       sys->log<System::WARNING>("[VerletNVE] Velocity will be overwritten to ensure energy conservation!");
     }
     
@@ -114,22 +114,24 @@ namespace uammd{
     
     int numberParticles = pg->getNumberParticles();
     if(steps==1){
-      //In the first step, compute the force and energy in the system
-      //in order to adapt the initial kinetic energy to match the input total energy
-      //E = U+K 
-      real U = 0.0;
-      for(auto forceComp: interactors) U += forceComp->sumEnergy();
-      real K = abs(energy - U);
-      //Distribute the velocities accordingly
-      real vamp = sqrt(2.0*K/3.0);
-      //Create velocities
-      auto vel  = pd->getVel(access::location::cpu, access::mode::write);
-      auto groupIterator = pg->getIndexIterator(access::location::cpu);
-      forj(0, numberParticles){
-	int i = groupIterator[j];
-	vel.raw()[i].x = vamp*sys->rng().gaussian(0.0, 1.0);
-	vel.raw()[i].y = vamp*sys->rng().gaussian(0.0, 1.0);
-	vel.raw()[i].z = vamp*sys->rng().gaussian(0.0, 1.0);
+      if(initVelocities){
+	//In the first step, compute the force and energy in the system
+	//in order to adapt the initial kinetic energy to match the input total energy
+	//E = U+K 
+	real U = 0.0;
+	for(auto forceComp: interactors) U += forceComp->sumEnergy();
+	real K = abs(energy - U);
+	//Distribute the velocities accordingly
+	real vamp = sqrt(2.0*K/3.0);
+	//Create velocities
+	auto vel  = pd->getVel(access::location::cpu, access::mode::write);
+	auto groupIterator = pg->getIndexIterator(access::location::cpu);
+	forj(0, numberParticles){
+	  int i = groupIterator[j];
+	  vel.raw()[i].x = vamp*sys->rng().gaussian(0.0, 1.0);
+	  vel.raw()[i].y = vamp*sys->rng().gaussian(0.0, 1.0);
+	  vel.raw()[i].z = vamp*sys->rng().gaussian(0.0, 1.0);
+	}
       }
     }
   

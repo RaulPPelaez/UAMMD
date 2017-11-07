@@ -28,6 +28,15 @@ namespace uammd{
   }
 
 
+  template<class InputIterator, class OutputIterator>
+  __global__ void copyGPU(InputIterator d_in, OutputIterator d_out, int N){
+    int id = blockIdx.x*blockDim.x + threadIdx.x;
+    if(id>=N) return;
+  
+    d_out[id] = d_in[id];
+  }
+
+
 }
 
 

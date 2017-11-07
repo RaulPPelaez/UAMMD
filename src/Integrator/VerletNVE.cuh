@@ -50,6 +50,7 @@ namespace uammd{
     real dt;
     real energy;
     bool is2D;
+    bool initVelocities;
     
     cudaStream_t stream;
     int steps;
@@ -63,6 +64,7 @@ namespace uammd{
       real energy = 0;
       real dt = 0;
       bool is2D = false;
+      bool initVelocities = true;
     };
     VerletNVE(shared_ptr<ParticleData> pd,
 	      shared_ptr<ParticleGroup> pg,

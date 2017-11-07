@@ -19,3 +19,6 @@ bd:
 
 bonds:
 	nvcc   -lineinfo -I ../src $(DEBUG) -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  Bonds.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand 
+
+sph:
+	nvcc   -lineinfo -I ../src $(DEBUG) -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11  SPH_test.cu --expt-relaxed-constexpr  -lnvToolsExt -lcurand
