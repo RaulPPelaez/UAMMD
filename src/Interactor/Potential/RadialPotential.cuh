@@ -102,7 +102,7 @@ namespace uammd{
 	  }
 	  /*Starting value, can also be used to initialize in-kernel parameters, as it is called at the start*/
 	  inline __device__ resultType zero(){
-	    typeParameters.zero();
+	    this->typeParameters.zero();
 	    return resultType();}
 	
 	};
@@ -123,9 +123,7 @@ namespace uammd{
 	    auto params = this->typeParameters((int) ri.w, (int) rj.w);
 
 	    return  make_real4(this->pot.force(r2, params)*r12, real(0.0));
-	  }
-
-      
+	  }      
 
 	};
 	

@@ -181,18 +181,19 @@ namespace uammd{
       uint maxHash = HashType::hash(cellDim, grid);
 
       //Cub just needs this endbit at least
-      int maxbit = std::max(int(std::log2(maxHash)+0.5), int(std::log2(N)+0.5));
-      //TODO: I do not understand the end_bit variable, sometimes ^^^^^ is not enough, so just leave it at the max for now
-      maxbit = 32;
+      int maxbit = int(std::log2(maxHash)+0.5)+1;
       maxbit = std::min(maxbit, 32);
       
       this->sortByKey(db_index,
 		      db_hash,
 		      N,
 		      st, maxbit);
-
-      index.swap(index_alt);
-      hash.swap(hash_alt);
+      //Sometimes CUB will not swap the references in the DoubleBuffer
+      if(db_index.selector)
+	index.swap(index_alt);
+      if(db_hash.selector)
+	hash.swap(hash_alt);
+      
       originalOrderNeedsUpdate = true;
     }
 

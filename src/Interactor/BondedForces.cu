@@ -276,9 +276,9 @@ namespace uammd{
 	const real3 posj = make_real3(pos[id2index[j]]);
     
 	//Compute force
-	const real3 r12 =  posi-posj;
+	real3 r12 =  posi-posj;
       
-	const real fmod = bondForce.force(p, j, r12, bondList[b].bond_info);                  
+	const real fmod = bondForce.force(p, j, r12, bondList[b].bond_info);
 
 	f += make_real4(fmod*r12);
 

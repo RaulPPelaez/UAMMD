@@ -151,35 +151,33 @@ namespace uammd{
 				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
 				   real dt, real damping, bool is2D){
-	int id = blockIdx.x*blockDim.x+threadIdx.x;
-	if(id>=N) return;
-	//Index of current particle in group
-	int i = indexIterator[id];
+      const int id = blockIdx.x*blockDim.x+threadIdx.x;
+      if(id>=N) return;
+      //Index of current particle in group
+      const int i = indexIterator[id];
 	
-	//Half step velocity
-	//real3 oldVel = make_real3(vel[i]);
-	//real3 newVel = oldVel + (make_real3(force[i])-damping*oldVel)*dt*real(0.5) + noise[id];
-	real invMass = real(1.0);
-	real rsqrtMass = real(1.0);
-	if(mass){
-	  invMass = real(1.0)/mass[i];
-	  rsqrtMass = rsqrtf(mass[i]);
-	}
-	vel[i] += (make_real3(force[i])*invMass-damping*vel[i])*dt*real(0.5) + noise[id]*rsqrtMass;
-	if(is2D) vel[i].z = real(0.0);
+      //Half step velocity
+      //real3 oldVel = make_real3(vel[i]);
+      //real3 newVel = oldVel + (make_real3(force[i])-damping*oldVel)*dt*real(0.5) + noise[id];
+      real invMass = real(1.0);
+      if(mass){
+	invMass = real(1.0)/mass[i];
+      }
+      vel[i] += (make_real3(force[i])*invMass-damping*vel[i])*dt*real(0.5) + noise[id]*sqrtf(invMass);
+      if(is2D) vel[i].z = real(0.0);
 
-	//In the first step, upload positions
-	if(step==1){
-	  //vel[i] = (1-dt*damping*real(0.5))*vel[i]-dt*real(0.5)*make_real3(force[i]) + noise[id];
+      //In the first step, upload positions
+      if(step==1){
+	//vel[i] = (1-dt*damping*real(0.5))*vel[i]-dt*real(0.5)*make_real3(force[i]) + noise[id];
 	  
 
-	  real3 newPos = make_real3(pos[i]) + vel[i]*dt;
-	  pos[i] = make_real4(newPos, pos[i].w);
-	  //Reset force
-	  force[i] = make_real4(0);
-	}
-	// else{
-	//   vel[i] = ( vel[i] - make_real3(force[i])*dt*real(0.5) + noise[id]*sqrtMass) /(1+dt*damping*real(0.5));
+	const real3 newPos = make_real3(pos[i]) + vel[i]*dt;
+	pos[i] = make_real4(newPos, pos[i].w);
+	//Reset force
+	force[i] = make_real4(0);
+      }
+      // else{
+      //   vel[i] = ( vel[i] - make_real3(force[i])*dt*real(0.5) + noise[id]*sqrtMass) /(1+dt*damping*real(0.5));
 
 	// }
 
@@ -288,7 +286,7 @@ namespace uammd{
 								       groupIterator,
 								       numberParticles, dt, damping, is2D);      
     }
-    
+
   }
   
 }

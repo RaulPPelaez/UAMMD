@@ -99,7 +99,7 @@ namespace uammd{
     struct HarmonicPBC: public Harmonic{
     Box box;
       HarmonicPBC(Box box): box(box){}
-    inline __device__ real force(int i, int j, real3 &r12, const BondInfo &bi){      
+    inline __device__ real force(int i, int j, const real3 &r12, const BondInfo &bi){      
       return Harmonic::force(i, j, box.apply_pbc(r12), bi);
     }
     

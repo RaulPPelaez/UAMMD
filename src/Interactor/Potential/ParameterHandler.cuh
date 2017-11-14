@@ -50,13 +50,18 @@ namespace uammd{
 
 	inline __device__ void zero(){
 	  extern __shared__  PairParameters aux[];
-	  for(int i=threadIdx.x; i<ntypes*ntypes; i+= blockDim.x)
-	    aux[i] = globalMem[i];
+	  if(ntypes==1)
+	    aux[0] = globalMem[0];
+	  else
+	    for(int i=threadIdx.x; i<ntypes*ntypes; i+= blockDim.x)
+	      aux[i] = globalMem[i];
 	  shMem = aux;
 	  __syncthreads();
 
 	}
 	inline __device__ PairParameters operator()(int ti, int tj){
+	  if(ntypes==1) return this->shMem[0];
+	  
 	  if(ti>tj) thrust::swap(ti,tj);
 
 	  int typeIndex = ti+this->ntypes*tj;	

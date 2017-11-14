@@ -40,22 +40,23 @@ namespace uammd{
     struct LJFunctor{
       struct InputPairParameters{
 	real cutOff, sigma, epsilon;
-	bool shift; //Shift the potential so lj(rc) = 0?
+	bool shift = false; //Shift the potential so lj(rc) = 0?
       };
       
       struct PairParameters{
 	real cutOff2;
 	real sigma2, epsilon;
-	real shift; // Contains lj_force(rc)
+	real shift = 0.0; // Contains lj_force(rc)
       };
 
       static inline __host__ __device__ real force(const real &r2, const PairParameters &params){
 	if(r2 >= params.cutOff2) return 0;
-	real invr2 = params.sigma2/r2;
-	real invr6 = invr2*invr2*invr2;
-	real invr8 = invr6*invr2;
+	const real invr2 = params.sigma2/r2;
+	const real invr6 = invr2*invr2*invr2;
+	const real invr8 = invr6*invr2;
       
 	real fmod = params.epsilon*(real(-48.0)*invr6 + real(24.0))*invr8;
+
 
 	if(params.shift != real(0.0)){
 	  fmod += params.shift*sqrtf(invr2);

@@ -2,27 +2,30 @@
 
 This file contains a good example of how UAMMD works and how to configure and launch a simulation.
 
-Runs a Brownian Dynamics simulation with particles starting in a box
+It describes a LJ liquid simulation in a periodic box.
+Two types of LJ particles exist, starting in a random configuration.
+Each type is attracted to a different z plane.
+This makes the particles form a kind of pillars going from one type to the other.
 
+Commented code is available to show other available features.
   
 Needs cli input arguments with a system size, etc, look for "argv"
 
-Run: ./a.out 14 32 0.005 300000 2000 0 0.1 
-
+Or just run: ./a.out 20 128 0.01 1.0 500 -1 1.0
 for a quick test
+You should get ~ 90 FPS on a GTX 980
 
 You can visualize the reuslts with superpunto
 
-*/
+  
+ */
 
 //This include contains the basic needs for an uammd project
 #include"uammd.cuh"
 //The rest can be included depending on the used modules
-#include"Integrator/BrownianDynamics.cuh"
-#include"Interactor/BondedForces.cuh"
-#include"Interactor/AngularBondedForces.cuh"
+#include"Integrator/VerletNVT.cuh"
+#include"Interactor/NeighbourList/CellList.cuh"
 #include"Interactor/PairForces.cuh"
-#include"Interactor/ExternalForces.cuh"
 #include"Interactor/Potential/Potential.cuh"
 #include"utils/InitialConditions.cuh"
 #include<fstream>
@@ -31,29 +34,12 @@ You can visualize the reuslts with superpunto
 using namespace uammd;
 using namespace std;
 
+int main(int argc, char *argv[]){
 
-//The particles fall due to a gravity like force until they reach a wall.
-struct HarmonicWall{
-  real z;
-  HarmonicWall(real z):z(z){}
-
-  __device__ real3 force(const real4 &pos){
-    real3 f = make_real3(0, 0, 5);
-    if(pos.z > z)
-      f.z -= 10;
-    return f;    
+  if(argc<8){
+    std::cerr<<"ERROR, I need some parameters!!\nTry to run me with:\n./a.out 20 128 0.01 1.0 500 -1 1.0"<<std::endl;
+    exit(1);
   }
-  std::tuple<const real4 *> getArrays(shared_ptr<ParticleData> pd){
-    auto pos = pd->getPos(access::location::gpu, access::mode::read);
-    return std::make_tuple(pos.raw());
-  }
-
-
-};
-
-  int main(int argc, char *argv[]){
-
-
   int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
 
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
@@ -71,29 +57,22 @@ struct HarmonicWall{
   auto pd = make_shared<ParticleData>(N, sys);
 
   //Some modules need a simulation box (i.e PairForces for the PBC)
-  Box box(std::stod(argv[2]));
+  Box box(std::stod(argv[2]));//std::stod(argv[2]));
   //Initial positions
   {
     //Ask pd for a property like so:
-    auto pos = pd->getPos(access::location::cpu, access::mode::write);
+    auto pos = pd->getPos(access::location::cpu, access::mode::write);    
+
+    auto initial =  initLattice(box.boxSize*std::stod(argv[4]), N, fcc);
     
-  //Start in a fcc lattice, pos.w contains the particle type
-    auto initial =  initLattice(box.boxSize, N, fcc);
+    //Start in a cubic lattice, pos.w contains the particle type
+    //auto initial = cubicLattice(box.boxSize, N);
     
     fori(0,N){
       pos.raw()[i] = initial[i];
       //Type of particle is stored in .w
-      pos.raw()[i].w = sys->rng().uniform(0,1)>std::stod(argv[6])?0:1;
-    }
-
-    // ifstream in("ini.pos");
-    // real trash;
-    // in>>trash;
-    // fori(0,N){
-    //   in>>pos.raw()[i].x>>pos.raw()[i].y>>pos.raw()[i].z>>trash;
-    // }
-      
-    
+      pos.raw()[i].w = 0;
+    }    
   }
   
 
@@ -101,34 +80,67 @@ struct HarmonicWall{
   //The builtin ones will generally work faster than a custom one. See ParticleGroup.cuh for a list
   
   //A group created with no criteria will contain all the particles  
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  auto pg = make_shared<ParticleGroup>(pd, sys, "All");  
   
   ofstream out("kk");
   
-  BD::EulerMaruyama::Parameters par;
+   // {
+   //   auto pos = pd->getPos(access::location::cpu, access::mode::read);
+   //   out<<"#"<<endl;
+   //   fori(0,N){
+   //     out<<pos.raw()[i]<<endl;
+   //   }
+   // }
+
+  //Some modules need additional parameters, in this case VerletNVT needs dt, temperature...
+  //When additional parameters are needed, they need to be supplied in a form similar to this:
+  
+  VerletNVT::Parameters par;
   par.temperature = std::stod(argv[7]);
-  par.viscosity = 1.0;
-  par.hydrodynamicRadius = 1.0;
   par.dt = std::stod(argv[3]);
+  par.damping = 1.0;  
+  auto verlet = make_shared<VerletNVT>(pd, pg, sys, par);
 
-  auto bd = make_shared<BD::EulerMaruyama>(pd, pg, sys, par);
+
+  //Modules working with pairs of particles usually ask for a Potential object
+  //PairForces decides if it should use a neighbour list or treat the system as NBody,
+  //You can force the use of a certain neighbour list passing its name as a second template argument
+
+  using PairForces = PairForces<Potential::LJ>;
+
+  //This is the general interface for setting up a potential
+  auto pot = make_shared<Potential::LJ>(sys);
+  {
+    //Each Potential describes the pair interactions with certain parameters.
+    //The needed ones are in InputPairParameters inside each potential, in this case:
+    Potential::LJ::InputPairParameters par;
+    par.epsilon = 1.0;
+    par.shift = false;
+
+    par.sigma = 1;
+    par.cutOff = 2.5*par.sigma;
+    //Once the InputPairParameters has been filled accordingly for a given pair of types,
+    //a potential can be informed like this:
+    pot->setPotParameters(0, 0, par);
+  }
+
+  PairForces::Parameters params;
+  params.box = box;  //Box to work on
+  auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
+
+
+  //This NBody module can be used to check the correctness of the PairForces short range results.
+  //Forces the interaction to be processed as an Nbody O(N^2) computation.
+  // using NBodyForces = NBodyForces<Potential::LJ>;
+  // NBodyForces::Parameters nbodyPar;
+  // nbodyPar.box = box;
+  // auto nbody = make_shared<NBodyForces>(pd,pg,sys, nbodyPar ,pot);
   
-  using BondedForces = BondedForces<BondedType::HarmonicPBC>;
+  //You can add as many modules as necessary
+  verlet->addInteractor(pairforces);
+    //verlet->addInteractor(nbody);
 
 
-  //You can use Elastic_Network_Model.cpp to generate some example bonds for the starting configuration.
-  BondedForces::Parameters params;
-  
-  params.file = "bonds.dat";  //Box to work on
-  BondedType::HarmonicPBC bt(box);
-  auto bondedforces = make_shared<BondedForces>(pd, sys, params, bt);
-
-  bd->addInteractor(bondedforces);
-
-
-  auto externalForces = make_shared<ExternalForces<HarmonicWall>>(pd, sys, HarmonicWall(0.6*box.boxSize.z));
-
-  bd->addInteractor(externalForces);
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).
   //A maximum log level is set in System.cuh, every logging event with a level superior to the max will result in
   // absolutely no overhead, so dont be afraid to write System::DEBUGX log calls.
@@ -144,36 +156,34 @@ struct HarmonicWall{
         
   Timer tim;
   tim.tic();
-  int nsteps = std::atoi(argv[4]);
-  int printSteps = std::atoi(argv[5]);
+  int nsteps = std::atoi(argv[5]);
+  int printSteps = std::atoi(argv[6]);
   //Run the simulation
   forj(0,nsteps){
     //This will instruct the integrator to take the simulation to the next time step,
     //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
-    bd->forwardTime();
+    verlet->forwardTime();
 
     //Write results
-    if(j%printSteps==0)
+    if(printSteps > 0 && j%printSteps==1)
     {
       sys->log<System::DEBUG1>("[System] Writing to disk...");
       //continue;
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-      //This allows to access the particles with the starting order so the particles are written in the same order
-      // even after a sorting      
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
-      
-      out<<"#"<<endl;
+      out<<"#Lx="<<0.5*box.boxSize.x<<";Ly="<<0.5*box.boxSize.y<<";Lz="<<0.5*box.boxSize.z<<";"<<endl;
       real3 p;
-      fori(0,N){	
+      fori(0,N){
 	real4 pc = pos.raw()[sortedIndex[i]];
-	p = make_real3(pc);
+	p = box.apply_pbc(make_real3(pc));
 	int type = pc.w;
 	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<endl;
       }
+
     }    
     //Sort the particles every few steps
     //It is not an expensive thing to do really.
-    if(j%1000 == 0){
+    if(j%500 == 0){
       pd->sortParticles();
     }
   }
