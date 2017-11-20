@@ -1,12 +1,10 @@
-/*Raul P. Pelaez 2017. Brownian Euler Maruyama Integrator derived class implementation
-
-  An Integrator is intended to be a separated module that handles the update of positions given the forces
+/*Raul P. Pelaez 2017. Brownian Euler Maruyama Integrator definition
 
   Solves the following differential equation:
       X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*Tdt)·dW·B
    Being:
      X - Positions
-     M - Self Diffusion  coefficient
+     M - Self Diffusion  coefficient -> 1/(6·pi·vis·radius)
      K - Shear matrix
      dW- Noise vector
      B - sqrt(M)
@@ -41,13 +39,33 @@ namespace uammd{
 	curandGenerateNormal(curng, d_noise, noise.size(),  0.0, 1.0);	
       }
 
-      this->selfDiffusion = 1.0/(6.0*M_PI*par.viscosity*par.hydrodynamicRadius);
 
-      this->sqrt2MTdt = sqrt(2.0*selfDiffusion*temperature*dt);
+      this->selfDiffusion = 1.0/(6.0*M_PI*par.viscosity);
 
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] Temperature: %f", temperature);
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] dt: %f", dt);
-      sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
+
+      
+      if(par.hydroDynamicRadius != real(-1.0)){
+	this->selfDiffusion /= par.hydrodynamicRadius;
+	if(pd->isRadiusAllocated()){
+	  sys->log<System::WARNING>("[BD::EulerMaruyama] Assuming all particles have hydrodynamic radius %f",
+				    par.hydrodynamicRadius);
+	}
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
+      }
+      else if(pd->isRadiusAllocated()){
+	  sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f/particleRadius",
+				    selfDiffusion);      
+      }
+      else{
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
+      }
+      
+
+      this->sqrt2MTdt = sqrt(2.0*selfDiffusion*temperature*dt);
+
+
 
       if(par.K.size()==3){
 	Kx = par.K[0];
@@ -80,27 +98,32 @@ namespace uammd{
     namespace EulerMaruyama_ns{
       /*Integrate the movement*/
       __global__ void integrateGPU(real4 __restrict__  *pos,
+				   ParticleGroup::IndexIterator indexIterator,
 				   const real4 __restrict__  *force,
 				   const real3 __restrict__ *dW,
 				   real3 Kx, real3 Ky, real3 Kz,
 				   real selfDiffusion,
+				   real * radius,
 				   real dt,
 				   bool is2D,
 				   real sqrt2MTdt,
 				   int N){
-	uint i = blockIdx.x*blockDim.x+threadIdx.x;
-	if(i>=N) return;
-	/*Half step velocity*/
-    
+	uint id = blockIdx.x*blockDim.x+threadIdx.x;
+	if(id>=N) return;
+
+	int i = indexIterator[id];
+	/*Half step velocity*/	
 	real3 p = make_real3(pos[i]);
 	real3 f = make_real3(force[i]);
 
 	real3 KR = make_real3(dot(Kx, p),
 			      dot(Ky, p),
 			      dot(Kz, p));
-    
+
+	real invRadius = real(1.0);
+	if(radius) invRadius = real(1.0)/radius[i];
 	// X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2·T·dt)·dW·B
-	p += dt*( KR + selfDiffusion*f);
+	p += dt*( KR + selfDiffusion*invRadius*f);
 	if(dW) //When temperature > 0
 	  p += sqrt2MTdt*dW[i];
 
@@ -120,9 +143,15 @@ namespace uammd{
       uint Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
       uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 
+      real * d_radius = nullptr;
+      if(par.hydrodynamicRadius != real(-1.0) && pd->isRadiusAllocated()){
+	auto radius = pd->getRadius(access::location::gpu, access::mode::read);
+	d_radius = radius.raw();
+      }
+      
 
       real3 * d_noise = nullptr;
-      if(temperature>real(0.0)){
+      if(temperature > real(0.0)){
 	curandSetStream(curng, noiseStream);
 	noise.resize(3*numberParticles + ((3*numberParticles)%2));
 	d_noise = (real3*)thrust::raw_pointer_cast(noise.data());
@@ -142,12 +171,13 @@ namespace uammd{
 
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
-      
       EulerMaruyama_ns::integrateGPU<<<Nblocks, Nthreads>>>(pos.raw(),
+							    groupIterator,
 							    force.raw(),
 							    d_noise,
 							    Kx, Ky, Kz,
 							    selfDiffusion,
+							    d_radius,
 							    dt,
 							    is2D,
 							    sqrt2MTdt,

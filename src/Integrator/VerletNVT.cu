@@ -52,17 +52,20 @@ namespace uammd{
 
   namespace VerletNVT_ns{
     //Fill the initial velocities of the particles in my group with a gaussian distribution according with my temperature.
-    __global__ void initialVelocities(real3* vel, const real3* noise,
+    __global__ void initialVelocities(real3* vel, const real* mass, const real3* noise,
 				      ParticleGroup::IndexIterator indexIterator, //global index of particles in my group
 				      real vamp, bool is2D, int N){
-      int i = blockIdx.x*blockDim.x + threadIdx.x;      
-      if(i>=N) return;
-
+      int id = blockIdx.x*blockDim.x + threadIdx.x;      
+      if(id>=N) return;
+      int i = indexIterator[id];
+      
+      real mass_i = real(1.0);
+      if(mass) mass_i = mass[i];
       int index = indexIterator[i];
-      vel[index].x = vamp*noise[i].x;
-      vel[index].y = vamp*noise[i].y;
+      vel[index].x = vamp*noise[i].x/mass_i;
+      vel[index].y = vamp*noise[i].y/mass_i;
       if(!is2D){
-	vel[index].z = vamp*noise[i].z;
+	vel[index].z = vamp*noise[i].z/mass_i;
       }
     }
     
@@ -83,7 +86,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[VerletNVT] Working in 2D mode.");
     }
 
-    this->noiseAmplitude = sqrt(dt*damping*temperature)*0.5;
+    this->noiseAmplitude = sqrt(dt*damping*temperature);
 
     //Init rng
     curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
@@ -113,8 +116,14 @@ namespace uammd{
       real velAmplitude = sqrt(3.0*temperature);
       
       auto noise_ptr = thrust::raw_pointer_cast(noise.data());
+      real * mass_ptr = nullptr;
+      if(pd->isMassAllocated()){
+	auto mass = pd->getMass(access::location::gpu, access::mode::read);
+	mass_ptr = mass.raw();
+      }
       
       VerletNVT_ns::initialVelocities<<<Nblocks, Nthreads>>>(vel_handle.raw(),
+							     mass_ptr,
 							     noise_ptr,
 							     groupIterator,
 							     velAmplitude, is2D, numberParticles);
