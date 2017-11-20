@@ -46,7 +46,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] dt: %f", dt);
 
       
-      if(par.hydroDynamicRadius != real(-1.0)){
+      if(par.hydrodynamicRadius != real(-1.0)){
 	this->selfDiffusion /= par.hydrodynamicRadius;
 	if(pd->isRadiusAllocated()){
 	  sys->log<System::WARNING>("[BD::EulerMaruyama] Assuming all particles have hydrodynamic radius %f",
@@ -63,6 +63,7 @@ namespace uammd{
       }
       
 
+      this->hydrodynamicRadius = hydrodynamicRadius;
       this->sqrt2MTdt = sqrt(2.0*selfDiffusion*temperature*dt);
 
 
@@ -124,8 +125,11 @@ namespace uammd{
 	if(radius) invRadius = real(1.0)/radius[i];
 	// X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2·T·dt)·dW·B
 	p += dt*( KR + selfDiffusion*invRadius*f);
-	if(dW) //When temperature > 0
-	  p += sqrt2MTdt*dW[i];
+	if(dW){ //When temperature > 0
+	  real sqrtInvRadius = real(1.0);
+	  if(radius) sqrtInvRadius = sqrtf(invRadius);
+	  p += sqrt2MTdt*dW[i]*sqrtInvRadius;
+	}
 
 	pos[i].x = p.x;
 	pos[i].y = p.y;
@@ -144,7 +148,7 @@ namespace uammd{
       uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 
       real * d_radius = nullptr;
-      if(par.hydrodynamicRadius != real(-1.0) && pd->isRadiusAllocated()){
+      if(hydrodynamicRadius != real(-1.0) && pd->isRadiusAllocated()){
 	auto radius = pd->getRadius(access::location::gpu, access::mode::read);
 	d_radius = radius.raw();
       }

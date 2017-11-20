@@ -93,6 +93,7 @@ namespace uammd{
     private:
       real3 Kx, Ky, Kz; //shear matrix
       real selfDiffusion;
+      real hydrodynamicRadius;
       real temperature;
       real sqrt2MTdt;
       real dt;

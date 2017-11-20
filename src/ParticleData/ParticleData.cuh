@@ -96,7 +96,8 @@
                             ((Mass, mass, real))       \
 			    ((Force, force, real4))    \
   			    ((Energy, energy, real))   \
-			    ((Vel, vel, real3))
+			    ((Vel, vel, real3))        \
+  			    ((Radius, radius, real))   \
   //			    ((Torque, torque, real4))  \
   //			    ((AngVel, angVel, real4))  \
   //			    ((Dir, dir, real4))        \
