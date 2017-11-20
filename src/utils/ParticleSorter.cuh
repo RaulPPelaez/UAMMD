@@ -210,11 +210,15 @@ namespace uammd{
 					     thrust::raw_pointer_cast(original_index.data()),
 					     thrust::raw_pointer_cast(index_alt.data()));
       //store current index in hash
-      thrust::copy(id, id+N, hash.begin());
-      auto db_hash  = cub::DoubleBuffer<int>(
-					     (int*)thrust::raw_pointer_cast(hash.data()),
-					     (int*)thrust::raw_pointer_cast(hash_alt.data()));
 
+      //thrust::copy will assume cpu copy if the first argument is a raw pointer
+      
+      int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
+      cudaMemcpy(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice);
+
+      auto db_hash  = cub::DoubleBuffer<int>(
+					     d_hash,
+					     (int*)thrust::raw_pointer_cast(hash_alt.data())); 
       this->sortByKey(db_index,
 		      db_hash,
 		      N,

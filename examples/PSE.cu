@@ -39,6 +39,7 @@ int main(int argc, char *argv[]){
 
   if(argc==1){
     std::cerr<<"Run with: ./a.out 14 32 0.01 10000 100 0.0 0.1"<<std::endl;
+    exit(1);
   }
 
   int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
@@ -103,7 +104,7 @@ int main(int argc, char *argv[]){
   using PairForces = PairForces<Potential::LJ>;
 
   //This is the general interface for setting up a potential
-  auto pot = make_shared<Potential::LJ>();
+  auto pot = make_shared<Potential::LJ>(sys);
   {
     //Each Potential describes the pair interactions with certain parameters.
     //The needed ones are in InputPairParameters inside each potential, in this case:

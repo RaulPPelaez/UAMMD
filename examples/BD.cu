@@ -2,7 +2,7 @@
 
 This file contains a good example of how UAMMD works and how to configure and launch a simulation.
 
-Runs a Brownian Dynamics simulation with particles starting in a box. Particles have two different radius.
+Runs a Brownian Dynamics simulation with particles starting in a box. Particles have two different radius
 
   
 Needs cli input arguments with a system size, etc, look for "argv"

@@ -26,7 +26,7 @@ References:
 namespace uammd{
   void LanczosAlgorithm::init(){
     //Init cuBLAS for Lanczos process
-    CublasSafeCall(cublasCreate(&cublas_handle));
+    CublasSafeCall(cublasCreate_v2(&cublas_handle));
     sys->log<System::DEBUG1>("[LanczosAlgorithm] Success!");  
   }
 

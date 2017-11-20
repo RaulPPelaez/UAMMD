@@ -14,17 +14,17 @@ Given a certain box and a number of cells, subdivides the box in that number of 
 
 namespace uammd{
   
-    struct Grid{
-      /*A magic vector that transforms cell coordinates to 1D index when dotted*/
-      /*Simply: 1, ncellsx, ncellsx*ncellsy*/
-      int3 gridPos2CellIndex;
-      
-      int3 cellDim; //ncells in each size
-      real3 cellSize;
-      real3 invCellSize; /*The inverse of the cell size in each direction*/
-      Box box;
-      Grid(): Grid(Box(), make_int3(0,0,0){}
-      Grid(Box box, int3 cellDim):
+  struct Grid{
+    /*A magic vector that transforms cell coordinates to 1D index when dotted*/
+    /*Simply: 1, ncellsx, ncellsx*ncellsy*/
+    int3 gridPos2CellIndex;
+    
+    int3 cellDim; //ncells in each size
+    real3 cellSize;
+    real3 invCellSize; /*The inverse of the cell size in each direction*/
+    Box box;
+    Grid(): Grid(Box(), make_int3(0,0,0)){}
+    Grid(Box box, int3 cellDim):
 	box(box),
 	cellDim(cellDim){
 
@@ -36,9 +36,9 @@ namespace uammd{
 				       cellDim.x,
 				       cellDim.x*cellDim.y);
 	
-      }
-      template<class VecType>
-      inline __host__ __device__ int3 getCell(const VecType &r) const{	
+    }
+    template<class VecType>
+    inline __host__ __device__ int3 getCell(const VecType &r) const{	
 	// return  int( (p+0.5L)/cellSize )
 	int3 cell = make_int3((box.apply_pbc(make_real3(r)) + real(0.5)*box.boxSize)*invCellSize);
 	//Anti-Traquinazo guard, you need to explicitly handle the case where a particle
@@ -52,20 +52,22 @@ namespace uammd{
 	if(cell.y==cellDim.y) cell.y = 0;
 	if(cell.z==cellDim.z) cell.z = 0;
 	return cell;
-      }
+    }
 
-      inline __host__ __device__ int getCellIndex(const int3 &cell) const{
+    inline __host__ __device__ int getCellIndex(const int3 &cell) const{
 	return dot(cell, gridPos2CellIndex);
-      }
-      //Apply pbc to a cell coordinates
-      inline __host__  __device__ void pbc_cell(int3 &cell) const{
-	cell.x = pbc_cell_coord<0>(cell.x);
-	cell.y = pbc_cell_coord<1>(cell.y);
-	cell.z = pbc_cell_coord<2>(cell.z);
-      }
+    }
 
-      template<int coordinate>
-      inline __host__  __device__ int pbc_cell_coord(int cell) const{
+    inline __host__  __device__ int3 pbc_cell(const int3 &cell) const{
+	int3 cellPBC;
+	cellPBC.x = pbc_cell_coord<0>(cell.x);
+	cellPBC.y = pbc_cell_coord<1>(cell.y);
+	cellPBC.z = pbc_cell_coord<2>(cell.z);
+	return cellPBC;
+    }
+
+    template<int coordinate>
+    inline __host__  __device__ int pbc_cell_coord(int cell) const{
 	int ncells = 0;
 	if(coordinate == 0){
 	  ncells = cellDim.x;
@@ -81,9 +83,9 @@ namespace uammd{
 	if(cell <= -1) cell += ncells;
 	else if(cell >= ncells) cell -= ncells;
 	return cell;
-      }
+    }
 
-    };
+  };
 
 }
 

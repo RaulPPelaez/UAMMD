@@ -44,7 +44,9 @@ namespace uammd{
   struct LanczosAlgorithm{  
     LanczosAlgorithm(shared_ptr<System> sys, real tolerance = 1e-3);
     void init();
-    ~LanczosAlgorithm(){}
+    ~LanczosAlgorithm(){
+      cublasDestroy_v2(cublas_handle);
+    }
 
     //Fill the first N values of V and pass it to solve as "v" instead of an external array,
     //this will save a memcpy

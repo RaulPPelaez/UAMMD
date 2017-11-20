@@ -563,9 +563,8 @@ namespace uammd{
 	  for(z=-P.z; z<=P.z; z++)
 	    for(y=-P.y; y<=P.y; y++){
 	      /*Get the other cell*/
-	      cellj = celli+make_int3(x,y,z);
 	      /*Corrected with PBC*/
-	      grid.pbc_cell(cellj);
+	      cellj = grid.pbc_cell(celli+make_int3(x,y,z));	      	      
 
 	      /*Get index of cell j*/
 	      int jcell = grid.getCellIndex(cellj);
