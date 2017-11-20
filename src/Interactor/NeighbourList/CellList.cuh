@@ -332,6 +332,7 @@ namespace uammd{
   class CellList{
   protected:
     thrust::device_vector<int> cellStart, cellEnd;
+    int3 cellDim;
     //The neighbour list has the following format: [ neig0_0, neigh1_0,... neighmaxNeigh_0, neigh0_1..., neighmaxNeigh_numberParticles]
     //The list is strided maxNeighboursPerParticle elements between particles, after numberNeighbours[i], the neighbour list for particle i contains undefined data.
 
@@ -557,7 +558,7 @@ namespace uammd{
 
       //Get the list parameters
       int numberParticles = pg->getNumberParticles();
-      int3 cellDim = make_int3(box.boxSize/cutoff + real(0.5));
+      cellDim = make_int3(box.boxSize/cutoff + real(0.5));
 
       int ncells = cellDim.x*cellDim.y*cellDim.z;
 
