@@ -192,25 +192,35 @@ namespace uammd{
 	/*Cos must stay in range*/
 	if(cijk>real(1.0)) cijk = real(1.0);
 	else if (cijk<real(-1.0)) cijk = -real(1.0);
-      
-	sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
-	/*sijk cant be zero to avoid division by zero*/
-	if(sijk<real(0.000001)) sijk = real(0.000001);
 
 
-	ampli = -kspring * (acosf(cijk) - ang0); //The force amplitude -k·(theta-theta_0)
+	//Approximation for small angle displacements	
+	//sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
+	//sijk cant be zero to avoid division by zero
+	//if(sijk<real(0.000001)) sijk = real(0.000001);
+	//ampli = -kspring * (acosf(cijk) - ang0)/sijk; //The force amplitude -k·(theta-theta_0)
 
-	/*
-
-	  ampli = -kang*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0; //k(1-cos(ang-ang0))
 	
-	*/
+	if(ang0 == real(0.0) && false){
+	  //TODO replace rij for rji so ang0=0 means straight and this can apply
+	  //When ang0=pi means stragiht it is difficult to check if ang0 is pi
+	  ampli = -kspring;
+	}
+	else{
+	  const real theta = acosf(cijk);
+	  const real sinthetao2 = sinf(real(0.5)*theta);
+	  ampli = -kspring*(sintheto2- sinf(ang0*real(0.5)))/sinthetao2;
+	}
+	
+	//ampli = -kang*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0; //k(1-cos(ang-ang0))
+	
+	
 
 	//Magical trigonometric relations to infere the direction of the force
-	a = ampli/sijk;
-	a11 = a*cijk/rij2;
-	a12 = -a*a2;
-	a22 = a*cijk/rkj2;
+
+	a11 = ampli*cijk/rij2;
+	a12 = -ampli*a2;
+	a22 = ampli*cijk/rkj2;
       
 	/*Sum according to my position in the bond*/
 	// i ----- j ------ k
