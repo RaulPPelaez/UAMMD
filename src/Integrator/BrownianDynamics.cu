@@ -48,22 +48,29 @@ namespace uammd{
       
       if(par.hydrodynamicRadius != real(-1.0)){
 	this->selfDiffusion /= par.hydrodynamicRadius;
+	this->hydrodynamicRadius = par.hydrodynamicRadius;
 	if(pd->isRadiusAllocated()){
 	  sys->log<System::WARNING>("[BD::EulerMaruyama] Assuming all particles have hydrodynamic radius %f",
 				    par.hydrodynamicRadius);
 	}
+	else{
+	  sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: %f", par.hydrodynamicRadius);
+	}
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
       }
       else if(pd->isRadiusAllocated()){
-	  sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f/particleRadius",
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: particleRadius");
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f/particleRadius",
 				    selfDiffusion);      
       }
       else{
+	//Default hydrodynamic radius when none is provided is 1
+	this->hydrodynamicRadius = real(1.0);
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: %f", par.hydrodynamicRadius);
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
-      }
-      
+      }      
 
-      this->hydrodynamicRadius = hydrodynamicRadius;
+
       this->sqrt2MTdt = sqrt(2.0*selfDiffusion*temperature*dt);
 
 
