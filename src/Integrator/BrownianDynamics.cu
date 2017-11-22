@@ -66,7 +66,7 @@ namespace uammd{
       else{
 	//Default hydrodynamic radius when none is provided is 1
 	this->hydrodynamicRadius = real(1.0);
-	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: %f", par.hydrodynamicRadius);
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: %f", hydrodynamicRadius);
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
       }      
 
@@ -155,7 +155,7 @@ namespace uammd{
       uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 
       real * d_radius = nullptr;
-      if(hydrodynamicRadius != real(-1.0) && pd->isRadiusAllocated()){
+      if(hydrodynamicRadius == real(-1.0) && pd->isRadiusAllocated()){
 	auto radius = pd->getRadius(access::location::gpu, access::mode::read);
 	d_radius = radius.raw();
       }
