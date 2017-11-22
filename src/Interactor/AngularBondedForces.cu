@@ -3,7 +3,7 @@
 
  */
 
-/********************************THREE BONDED FORCES**********************************/
+
 
 #include"AngularBondedForces.cuh"
 #include"global/defines.h"
@@ -34,7 +34,7 @@ namespace uammd{
     std::ifstream in(par.readFile);
     std::vector<std::vector<int>> isInBonds(numberParticles);
     in>>nbonds;
-    std::vector<ThreeBond> blst(nbonds); //Temporal storage for the bonds in the file
+    std::vector<AngularBond> blst(nbonds); //Temporal storage for the bonds in the file
 
   
     sys->log<System::MESSAGE>("[AngularBondedForces] Detected: %d particle-particle-particle bonds", nbonds);
@@ -106,12 +106,12 @@ namespace uammd{
       Computes the potential: V(theta) = 0.5 K(theta-theta_0)^2
       F(\vec{ri}) = d(V(theta))/d(cos(theta))·d(cos(theta))/d(\vec{ri})
     */
-    __global__ void computeThreeBondedForce(real4* __restrict__ force,
+    __global__ void computeAngularBondedForce(real4* __restrict__ force,
 					    const real4* __restrict__ pos,
 					    const int* __restrict__ bondStart,
 					    const int* __restrict__ bondEnd,
 					    const int* __restrict__ bondedParticleIndex,
-					    const AngularBondedForces::ThreeBond* __restrict__ bondList,
+					    const AngularBondedForces::AngularBond* __restrict__ bondList,
 					    const int * __restrict__ id2index,
 					    Box box){
       extern __shared__ real3 forceTotal[];
@@ -130,17 +130,17 @@ namespace uammd{
       real kspring, ang0; //The bond info
 
       /*         i -------- j -------- k*/
-      /*             rij->      <-rkj  */
+      /*             rij->     rjk ->   */
     
-      real3 rij, rkj; //rij = ri - rj
+      real3 rij, rjk; //rij = ji - ri
   
-      real invsqrij, invsqrkj; //1/|rij|
-      real rij2, rkj2;  //|rij|^2
+      real invsqrij, invsqrjk; //1/|rij|
+      real rij2, rjk2;  //|rij|^2
 
     
       real a2; 
-      real cijk, sijk;
-      real a, a11, a12, a22;
+      real cijk;
+      real a11, a12, a22;
       real ampli;
 
       /*Go through my bonds*/
@@ -177,17 +177,17 @@ namespace uammd{
 
 	/*Compute distances and vectors*/
 	/***rij***/
-	rij =  box.apply_pbc(posi-posj);
+	rij =  box.apply_pbc(posj - posi);
 	rij2 = dot(rij, rij);
 	invsqrij = rsqrt(rij2);
 	/***rkj***/
-	rkj =  box.apply_pbc(posk-posj);
-	rkj2 = dot(rkj, rkj);
-	invsqrkj = rsqrtf(rkj2);
+	rjk =  box.apply_pbc(posk - posj);
+	rjk2 = dot(rjk, rjk);
+	invsqrjk = rsqrtf(rjk2);
 	/********/
       
-	a2 = invsqrij * invsqrkj;
-	cijk = dot(rij, rkj)*a2; //cijk = cos (theta) = rij*rkj / mod(rij)*mod(rkj)
+	a2 = invsqrij * invsqrjk;
+	cijk = dot(rij, rjk)*a2; //cijk = cos (theta) = rij*rkj / mod(rij)*mod(rkj)
 
 	/*Cos must stay in range*/
 	if(cijk>real(1.0)) cijk = real(1.0);
@@ -195,45 +195,46 @@ namespace uammd{
 
 
 	//Approximation for small angle displacements	
-	//sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
+	//const real sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
 	//sijk cant be zero to avoid division by zero
 	//if(sijk<real(0.000001)) sijk = real(0.000001);
 	//ampli = -kspring * (acosf(cijk) - ang0)/sijk; //The force amplitude -k·(theta-theta_0)
 
 	
-	if(ang0 == real(0.0) && false){
+	if(ang0 == real(0.0)){
 	  //TODO replace rij for rji so ang0=0 means straight and this can apply
 	  //When ang0=pi means stragiht it is difficult to check if ang0 is pi
 	  ampli = -kspring;
 	}
 	else{
 	  const real theta = acosf(cijk);
+	  if(theta==real(0.0)){
+	    continue;
+	  }
 	  const real sinthetao2 = sinf(real(0.5)*theta);
-	  ampli = -kspring*(sintheto2- sinf(ang0*real(0.5)))/sinthetao2;
+	  ampli = -kspring*(sinthetao2 - sinf(ang0*real(0.5)))/sinthetao2;
 	}
 	
 	//ampli = -kang*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0; //k(1-cos(ang-ang0))
-	
-	
-
+		
 	//Magical trigonometric relations to infere the direction of the force
 
 	a11 = ampli*cijk/rij2;
-	a12 = -ampli*a2;
-	a22 = ampli*cijk/rkj2;
+	a12 = ampli*a2;
+	a22 = ampli*cijk/rjk2;
       
 	/*Sum according to my position in the bond*/
 	// i ----- j ------ k
 	if(p==i){
-	  f += make_real3(a11*rij + a12*rkj); //Angular spring	
+	  f += make_real3(a12*rjk -a11*rij); //Angular spring	
 	}
 	else if(p==j){
 	  //Angular spring
-	  f -= make_real3(a11*rij + a12*rkj + a22*rkj + a12*rij);	
+	  f -= make_real3((-a11 - a12)*rij + (a12 + a22)*rjk);
 	}
 	else if(p==k){
 	  //Angular spring
-	  f += make_real3(a22*rkj + a12*rij);
+	  f -= make_real3(a12*rij -a22*rjk);
 	}
       }
 
@@ -267,7 +268,7 @@ namespace uammd{
 
       auto id2index = pd->getIdOrderedIndices(access::location::gpu);
       
-      Bonded_ns::computeThreeBondedForce<<<Nparticles_with_bonds,
+      Bonded_ns::computeAngularBondedForce<<<Nparticles_with_bonds,
 	TPP,
 	TPP*sizeof(real3)>>>(force.raw(), pos.raw(),
 			     d_bondStart,
