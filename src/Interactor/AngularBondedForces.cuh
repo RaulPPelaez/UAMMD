@@ -15,8 +15,8 @@
   
 
  */
-#ifndef THREEBONDEDFORCES_CUH
-#define THREEBONDEDFORCES_CUH
+#ifndef ANGULARBONDEDFORCES_CUH
+#define ANGULARBONDEDFORCES_CUH
 
 #include"Interactor.cuh"
 #include"global/defines.h"
@@ -24,7 +24,7 @@
 namespace uammd{
   class AngularBondedForces: public Interactor{
   public:
-    struct ThreeBond{
+    struct AngularBond{
       int i,j,k;
       real kspring,ang;
     };
@@ -44,7 +44,7 @@ namespace uammd{
   private:
   
     int nbonds;
-    thrust::device_vector<ThreeBond> bondList;
+    thrust::device_vector<AngularBond> bondList;
     thrust::device_vector<int> bondStart, bondEnd;
     thrust::device_vector<int> bondParticleIndex; //Particles with bonds
 
