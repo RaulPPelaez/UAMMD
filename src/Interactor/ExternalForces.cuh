@@ -83,7 +83,7 @@ TODO:
 namespace uammd{
  
   template<class Functor>
-  class ExternalForces: public Interactor{
+  class ExternalForces: public Interactor, public ParameterUpdatableDelegate<Functor>{
     cudaStream_t stream;
   public:
 
@@ -92,6 +92,7 @@ namespace uammd{
 		   shared_ptr<System> sys,
 		   Functor tr):Interactor(pd, pg, sys,"ExternalForces/"+type_name<Functor>()),
 			       tr(tr){
+      this->setDelegate(&(this->tr));
     }
     //If no group is provided, a group with all particles is assumed
     ExternalForces(shared_ptr<ParticleData> pd,

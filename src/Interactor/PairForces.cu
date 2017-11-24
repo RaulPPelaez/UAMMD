@@ -34,6 +34,7 @@ namespace uammd{
     nl(nullptr),
     nb(nullptr)
   {
+    this->setDelegate(pot.get());
   }
 
   
