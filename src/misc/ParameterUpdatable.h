@@ -15,31 +15,102 @@
 #include"global/defines.h"
 #include"utils/Box.cuh"
 
+
+//Add here any parameter you want along its type, after adding it here the function updateWHATEVER(type) will
+//be available for all ParameterUpdatable modules
+#define PARAMETER_LIST ((TimeStep, real)) \
+                       ((SimulationTime, real)) \
+                       ((Box, Box)) \
+                       ((Temperature, real)) \
+                       ((Viscosity, real))
+
+
+
+
+//Please dont look at this :(
+
+
+//Auto declare all parameter update functions
+
+#define PARNAME(tuple) BOOST_PP_TUPLE_ELEM(2, 0 ,tuple)
+  //Get the type from a tuple in the property list
+#define PARTYPE(tuple) BOOST_PP_TUPLE_ELEM(2, 1 ,tuple)
+
+#define PARAMETER_LOOP(macro)  BOOST_PP_SEQ_FOR_EACH(macro, _, PARAMETER_LIST)
+
+
+#define DECLARE_UPDATE_FUNCTION_NAME_T(type, name) DECLARE_UPDATE_FUNCTION_NAME_R(type, name)
+#define DECLARE_UPDATE_FUNCTION_NAME_R(type, name) virtual void update  ## name (type) {}
+#define DECLARE_UPDATE_FUNCTION(r,data, tuple) DECLARE_UPDATE_FUNCTION_NAME_T(PARTYPE(tuple), PARNAME(tuple))
+
+
+
+#define DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_T(type, name) DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_R(type, name) 
+#define DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_R(type, name) \
+  virtual void update  ## name (type  val) { if(delegate) delegate->update ## name (val);}
+
+#define DECLARE_UPDATE_FUNCTION_DELEGATE(r,data, tuple) \
+  DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_T(PARTYPE(tuple), PARNAME(tuple))
+
+
+//I warned you not to look :(
+
+
 namespace uammd{
   
   class ParameterUpdatable{
-    
   public:
     
-    virtual void updateTimeStep(real dt){};
+    // virtual void updateTimeStep(real dt){};
     
-    virtual void updateSimulationTime(real t){};
 
-
-    
-    virtual void updateBox(Box box){};
-
-
-
-    virtual void updateTemperature(real T){};
-    virtual void updateViscosity(real vis){};
-
+    PARAMETER_LOOP(DECLARE_UPDATE_FUNCTION)
     
   };
 
+
+  template<class T, bool isParameterUpdatable = std::is_base_of<ParameterUpdatable, T>::value>
+    class ParameterUpdatableDelegate;
+
+  template<class T>
+  class ParameterUpdatableDelegate<T, true>: public virtual ParameterUpdatable{
+  private:
+    T *delegate = nullptr; 
+  public:
+    void setDelegate(T* del){ this->delegate = del;}
+    
+    PARAMETER_LOOP(DECLARE_UPDATE_FUNCTION_DELEGATE)
+  };
+
+  template<class T>
+  class ParameterUpdatableDelegate<T, false>: public virtual ParameterUpdatable{
+  public:
+    void setDelegate(T* del){}
+    
+  };
+
+
+  
+  
   
 
 
 }
+
+
+
+
+#undef PARAMETER_LIST
+#undef PARNAME
+#undef PARTYPE
+#undef PARAMETER_LOOP
+#undef DECLARE_UPDATE_FUNCTION_NAME_T
+#undef DECLARE_UPDATE_FUNCTION_NAME_R
+#undef DECLARE_UPDATE_FUNCTION
+#undef DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_T
+#undef DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_R
+#undef DECLARE_UPDATE_FUNCTION_DELEGATE
+
+
 
 #endif

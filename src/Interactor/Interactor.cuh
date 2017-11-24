@@ -11,7 +11,7 @@
 #include"third_party/type_names.h"
 #include"misc/ParameterUpdatable.h"
 namespace uammd{
-  class Interactor: public ParameterUpdatable{
+  class Interactor: public virtual ParameterUpdatable{
   protected:
     string name;
     shared_ptr<ParticleData> pd;
