@@ -208,6 +208,8 @@ namespace uammd{
   
   //Move the particles in my group 1 dt in time.
   void VerletNVT::forwardTime(){
+    for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
+    
     steps++;
     sys->log<System::DEBUG1>("[VerletNVT] Performing integration step %d", steps);
     
@@ -227,7 +229,7 @@ namespace uammd{
 	auto force = pd->getForce(access::location::gpu, access::mode::write);     
 	fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
       }
-      for(auto forceComp: interactors) forceComp->sumForce(forceStream);
+      for(auto forceComp: interactors)	forceComp->sumForce(forceStream);
       /*Gen noise*/
       genNoise(stream);
       cudaDeviceSynchronize();
