@@ -38,6 +38,12 @@ namespace uammd{
     }
 
     ~PairForces(){}
+
+    void updateBox(Box box){
+      sys->log<System::DEBUG3>("[PairForces] Box updated.");
+      this->box = box;
+    }
+
     void sumForce(cudaStream_t st) override;
     real sumEnergy() override;
     //real sumVirial() override{ return 0;}

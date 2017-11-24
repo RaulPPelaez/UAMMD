@@ -8,9 +8,10 @@
 
 #include<memory>
 #include<vector>
-
+#include"third_party/type_names.h"
+#include"misc/ParameterUpdatable.h"
 namespace uammd{
-  class Interactor{
+  class Interactor: public ParameterUpdatable{
   protected:
     string name;
     shared_ptr<ParticleData> pd;
@@ -36,7 +37,7 @@ namespace uammd{
     ~Interactor(){
       sys->log<System::DEBUG>("[Interactor] %s Destroyed", name.c_str());
     }
-    virtual void compute(){}
+    
     virtual void sumForce(cudaStream_t st) = 0;
     virtual real sumEnergy() = 0;
 
