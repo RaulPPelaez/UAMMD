@@ -36,7 +36,7 @@ using namespace uammd;
 using namespace std;
 
 //An HarmonicWall functor to be used in a ExternalForces module (See ExternalForces.cuh)
-struct HarmonicWall{
+struct HarmonicWall: public ParameterUpdatable{
   real zwall;
   real k = 0.1;
   HarmonicWall(real zwall):zwall(zwall){
@@ -59,7 +59,10 @@ struct HarmonicWall{
     return std::make_tuple(pos.raw());
   }
 
-
+  void updateSimulationTime(real time){
+    //You can be aware of changes in some parameters by making the functor ParameterUpdatable
+    //and overriding the update function you want, see misc/ParameterUpdatable.h for a list    
+  }
 };
 
 
@@ -70,7 +73,7 @@ int main(int argc, char *argv[]){
     std::cerr<<"ERROR, I need some parameters!!\nTry to run me with:\n./a.out 14 90 0.01 1.0 10000 300 0.2"<<std::endl;
     exit(1);
   }
-  int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
+  int N = pow(2, atoi(argv[1]));//atoi(argv[1]));
 
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
   
