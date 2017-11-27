@@ -10,7 +10,7 @@
   There are three types of bonds:
    -particle-particle Bonds (BondedForces)
    -particle-point Bonds (Fixed Point) (BondedForces)
-   -particle-particle-particle bonds (ThreeBodyBondedForces)
+   -particle-particle-particle bonds (AngularBondedForces)
 
 
   The format of the input file is the following, 
@@ -26,7 +26,9 @@
     Where i,j are the indices of the particles. BONDINFO can be any number of rows, as described
     by the BondedType BondedForces is used with, see BondedType::Harmonic for an example.
     
-    In the case of ThreeBondedforces i j k are needed instead of i j. The order doesnt matter, but j must always be the central particle.
+    In the case of AngularBondedforces i j k are needed instead of i j. The order doesnt matter, but j must always be the central particle.
+
+    A bond type can be ParameterUpdatable.
 */
 
 #ifndef BONDEDFORCES_CUH
@@ -46,11 +48,11 @@
 namespace uammd{
   //Functors with different bond potentials
   namespace BondedType{
-  /*BondedForces needs a functor that computes the force of a pair, 
-    you can implement a new one in the input file and pass it as template argument to BondedForces*/
-
-  /*Harmonic bond, a good example on how to implement a bonded force*/
-  struct Harmonic{
+    //BondedForces needs a functor that computes the force of a pair, 
+    // you can implement a new one in the input file and pass it as template argument to BondedForces
+    
+    //Harmonic bond, a good example on how to implement a bonded force
+    struct Harmonic{
     /*Needs a struct called BondInfo with 
       the parameters that characterize a bond*/
     struct BondInfo{
@@ -138,7 +140,7 @@ namespace uammd{
 
   //Two body bonded forces. Handles particle-particle and particle.point bonds
 template<class BondType>
-class BondedForces: public Interactor{
+class BondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
 public:
   
   struct Parameters{

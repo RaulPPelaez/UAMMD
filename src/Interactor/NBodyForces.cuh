@@ -33,7 +33,7 @@ namespace uammd{
   
   //In this case, NBodyForces needs a Potential, which can provide transversers to compute force, energy and virial.
   template<class Potential>
-  class NBodyForces: public Interactor{
+  class NBodyForces: public Interactor, public ParameterUpdatableDelegate<Potential>{
   public:
     struct Parameters{
       Box box;
@@ -47,7 +47,8 @@ namespace uammd{
       pot(pot),
       box(par.box),
       nb(nullptr){
-      nb = std::make_shared<NBody>(pd,pg,sys);
+	this->setDelegate(pot.get());
+	nb = std::make_shared<NBody>(pd,pg,sys);
     }
     NBodyForces(shared_ptr<ParticleData> pd,
 		shared_ptr<System> sys,

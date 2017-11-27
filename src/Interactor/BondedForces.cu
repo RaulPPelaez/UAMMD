@@ -25,6 +25,9 @@ namespace uammd{
 	       "BondedForces/" + type_name<BondType>()),
     bondForce(bondForce), TPP(64){
     
+    //BondedForces does not care about any parameter update, but the BondType might.
+    this->setDelegate(&(this->bondForce));
+
     int numberParticles = pg->getNumberParticles();
     
     sys->log<System::MESSAGE>("[BondedForces] Initialized");
