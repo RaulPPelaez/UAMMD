@@ -111,6 +111,7 @@ namespace uammd{
   void VerletNVE::forwardTime(){
     steps++;
     sys->log<System::DEBUG1>("[VerletNVE] Performing integration step %d", steps);
+    for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
     
     int numberParticles = pg->getNumberParticles();
     if(steps==1){
@@ -133,6 +134,7 @@ namespace uammd{
 	  vel.raw()[i].z = vamp*sys->rng().gaussian(0.0, 1.0);
 	}
       }
+      for(auto forceComp: interactors) 	forceComp->updateTimeStep(dt);      
     }
   
 

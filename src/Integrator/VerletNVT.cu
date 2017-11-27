@@ -229,7 +229,11 @@ namespace uammd{
 	auto force = pd->getForce(access::location::gpu, access::mode::write);     
 	fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
       }
-      for(auto forceComp: interactors)	forceComp->sumForce(forceStream);
+      for(auto forceComp: interactors){
+	forceComp->updateTemperature(temperature);
+	forceComp->updateTimeStep(dt);
+	forceComp->sumForce(forceStream);
+      }
       /*Gen noise*/
       genNoise(stream);
       cudaDeviceSynchronize();
