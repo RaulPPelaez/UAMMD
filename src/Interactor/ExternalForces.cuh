@@ -92,6 +92,7 @@ namespace uammd{
 		   shared_ptr<System> sys,
 		   Functor tr):Interactor(pd, pg, sys,"ExternalForces/"+type_name<Functor>()),
 			       tr(tr){
+      //ExternalForces does not care about any parameter update, but the Functor might.
       this->setDelegate(&(this->tr));
     }
     //If no group is provided, a group with all particles is assumed
@@ -104,12 +105,7 @@ namespace uammd{
     }
   
     void sumForce(cudaStream_t st) override; /*implemented below*/   
-    real sumEnergy() override;
-
-    
-    void print_info(){
-      sys->log<System::MESSAGE>("[ExternalForces] Transversing with: %s", type_name<Functor>());
-    }
+    real sumEnergy() override;   
   
   private:
     Functor tr;
@@ -173,7 +169,7 @@ namespace uammd{
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
 
     ExternalForces_ns::computeGPU<<<Nblocks, Nthreads, 0, st>>>(tr, numberParticles,
-								groupIterator, force.raw(), tr.getArrays(pd));
+								groupIterator, force.raw(), tr.getArrays(pd.get()));
   }
 
 
@@ -184,7 +180,7 @@ namespace uammd{
 
   namespace ExternalForces_ns{
 
-
+    //In case the energy function is not present just do nothing.
     namespace SFINAE{
       template <typename T>
       class has_energy
@@ -273,7 +269,7 @@ namespace uammd{
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
 
     ExternalForces_ns::computeEnergyGPU<<<Nblocks, Nthreads>>>(tr, numberParticles,
-							       groupIterator, energy.raw(), tr.getArrays(pd));
+							       groupIterator, energy.raw(), tr.getArrays(pd.get()));
 
     
     return 0;
