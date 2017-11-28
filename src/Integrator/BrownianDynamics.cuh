@@ -90,9 +90,9 @@ namespace uammd{
 
       void forwardTime() override;
 
-    private:
+    protected:
       real3 Kx, Ky, Kz; //shear matrix
-      real selfDiffusion;
+      real selfMobility;
       real hydrodynamicRadius;
       real temperature;
       real sqrt2MTdt;

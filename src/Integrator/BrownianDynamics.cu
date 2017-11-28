@@ -1,10 +1,10 @@
 /*Raul P. Pelaez 2017. Brownian Euler Maruyama Integrator definition
 
   Solves the following differential equation:
-      X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*Tdt)·dW·B
+      X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*T*dt)·dW·B
    Being:
      X - Positions
-     M - Self Diffusion  coefficient -> 1/(6·pi·vis·radius)
+     M - Self Mobility coefficient -> 1/(6·pi·vis·radius)
      K - Shear matrix
      dW- Noise vector
      B - sqrt(M)
@@ -40,14 +40,14 @@ namespace uammd{
       }
 
 
-      this->selfDiffusion = 1.0/(6.0*M_PI*par.viscosity);
+      this->selfMobility = 1.0/(6.0*M_PI*par.viscosity);
 
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] Temperature: %f", temperature);
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] dt: %f", dt);
 
       
       if(par.hydrodynamicRadius != real(-1.0)){
-	this->selfDiffusion /= par.hydrodynamicRadius;
+	this->selfMobility /= par.hydrodynamicRadius;
 	this->hydrodynamicRadius = par.hydrodynamicRadius;
 	if(pd->isRadiusAllocated()){
 	  sys->log<System::WARNING>("[BD::EulerMaruyama] Assuming all particles have hydrodynamic radius %f",
@@ -56,22 +56,22 @@ namespace uammd{
 	else{
 	  sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: %f", par.hydrodynamicRadius);
 	}
-	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Mobility: %f", selfMobility);
       }
       else if(pd->isRadiusAllocated()){
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: particleRadius");
-	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f/particleRadius",
-				    selfDiffusion);      
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Mobility: %f/particleRadius",
+				    selfMobility);      
       }
       else{
 	//Default hydrodynamic radius when none is provided is 1
 	this->hydrodynamicRadius = real(1.0);
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: %f", hydrodynamicRadius);
-	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Diffusion: %f", selfDiffusion);
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Mobility: %f", selfMobility);
       }      
 
 
-      this->sqrt2MTdt = sqrt(2.0*selfDiffusion*temperature*dt);
+      this->sqrt2MTdt = sqrt(2.0*selfMobility*temperature*dt);
 
 
 
@@ -110,7 +110,7 @@ namespace uammd{
 				   const real4 __restrict__  *force,
 				   const real3 __restrict__ *dW,
 				   real3 Kx, real3 Ky, real3 Kz,
-				   real selfDiffusion,
+				   real selfMobility,
 				   real * radius,
 				   real dt,
 				   bool is2D,
@@ -131,7 +131,7 @@ namespace uammd{
 	real invRadius = real(1.0);
 	if(radius) invRadius = real(1.0)/radius[i];
 	// X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2·T·dt)·dW·B
-	p += dt*( KR + selfDiffusion*invRadius*f);
+	p += dt*( KR + selfMobility*invRadius*f);
 	if(dW){ //When temperature > 0
 	  real sqrtInvRadius = real(1.0);
 	  if(radius) sqrtInvRadius = sqrtf(invRadius);
@@ -187,7 +187,7 @@ namespace uammd{
 							    force.raw(),
 							    d_noise,
 							    Kx, Ky, Kz,
-							    selfDiffusion,
+							    selfMobility,
 							    d_radius,
 							    dt,
 							    is2D,
