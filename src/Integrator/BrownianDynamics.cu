@@ -149,6 +149,15 @@ namespace uammd{
     void EulerMaruyama::forwardTime(){
       steps++;
       sys->log<System::DEBUG1>("[BD::EulerMaruyama] Performing integration step %d", steps);
+
+      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
+
+      if(steps==1){
+	for(auto forceComp: interactors){
+	  forceComp->updateTimeStep(dt);
+	  forceComp->updateTemperature(temperature);	 
+	}
+      }
       int numberParticles = pg->getNumberParticles();
       int BLOCKSIZE = 128;
       uint Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;

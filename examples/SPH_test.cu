@@ -62,7 +62,7 @@ struct HarmonicWall{
   //   return real(0.5)*k*pow(pos.z-zwall, 2);
   // }
 
-  std::tuple<const real4 *> getArrays(shared_ptr<ParticleData> pd){
+  std::tuple<const real4 *> getArrays(ParticleData* pd){
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     return std::make_tuple(pos.raw());
   }

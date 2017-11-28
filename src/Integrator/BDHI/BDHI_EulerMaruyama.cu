@@ -135,6 +135,17 @@ namespace uammd{
 	dR = dt(KR+MF) + sqrt(2*T*dt)·BdW +T·divM·dt
       */
       steps++;
+
+      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*par.dt);
+
+      if(steps==1){
+	for(auto forceComp: interactors){
+	  forceComp->updateTimeStep(par.dt);
+	  forceComp->updateTemperature(par.temperature);
+	  forceComp->updateBox(par.box);	 
+	}
+      }
+
       int numberParticles = pg->getNumberParticles();
 
       int BLOCKSIZE = 128; /*threads per block*/

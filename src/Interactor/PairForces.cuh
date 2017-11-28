@@ -19,7 +19,7 @@
 namespace uammd{
   /*This makes the class valid for any NeighbourList*/
   template<class Potential, class NeighbourList = CellList>
-  class PairForces: public Interactor{
+  class PairForces: public Interactor, public ParameterUpdatableDelegate<Potential>{
   public:
     struct Parameters{
       real rcut;
@@ -38,6 +38,13 @@ namespace uammd{
     }
 
     ~PairForces(){}
+
+    void updateBox(Box box){
+      sys->log<System::DEBUG3>("[PairForces] Box updated.");
+      this->box = box;
+      //In case the potential wants to handle updateBox
+      ParameterUpdatableDelegate<Potential>::updateBox(box);
+    }
     void sumForce(cudaStream_t st) override;
     real sumEnergy() override;
     //real sumVirial() override{ return 0;}
