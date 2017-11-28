@@ -90,7 +90,7 @@ namespace uammd{
     ExternalForces(shared_ptr<ParticleData> pd,
 		   shared_ptr<ParticleGroup> pg,
 		   shared_ptr<System> sys,
-		   Functor tr):Interactor(pd, pg, sys,"ExternalForces/"+type_name<Functor>()),
+		   Functor tr = Functor()):Interactor(pd, pg, sys,"ExternalForces/"+type_name<Functor>()),
 			       tr(tr){
       //ExternalForces does not care about any parameter update, but the Functor might.
       this->setDelegate(&(this->tr));
@@ -98,7 +98,7 @@ namespace uammd{
     //If no group is provided, a group with all particles is assumed
     ExternalForces(shared_ptr<ParticleData> pd,
 		   shared_ptr<System> sys,
-		   Functor tr):ExternalForces(pd, std::make_shared<ParticleGroup>(pd, sys), sys, tr){
+		   Functor tr = Functor()):ExternalForces(pd, std::make_shared<ParticleGroup>(pd, sys), sys, tr){
     }
 
     ~ExternalForces(){
