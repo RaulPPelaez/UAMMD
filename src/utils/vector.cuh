@@ -434,9 +434,8 @@ VECATTR real2 make_real2(uint3 a){return make_real2(real(a.x), real(a.y));}
 
 }
 ////////////////DOUBLE PRECISION//////////////////////
-#ifndef SINGLE_PRECISION
-VECATTR double3 make_double3(uammd::real3 a){return make_double3(a.x, a.y, a.z);}
-
+#ifdef SINGLE_PRECISION
+VECATTR double3 make_double3(uammd::real4 a){return make_double3(a.x, a.y, a.z);}
 #endif
 VECATTR float4 make_float4(double4 a){return make_float4(float(a.x), float(a.y), float(a.z), float(a.w));}
 
