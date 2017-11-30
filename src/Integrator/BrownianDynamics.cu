@@ -149,6 +149,7 @@ namespace uammd{
     void EulerMaruyama::forwardTime(){
       steps++;
       sys->log<System::DEBUG1>("[BD::EulerMaruyama] Performing integration step %d", steps);
+      int numberParticles = pg->getNumberParticles();
 
       for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
 
@@ -158,15 +159,28 @@ namespace uammd{
 	  forceComp->updateTemperature(temperature);	 
 	}
       }
-      int numberParticles = pg->getNumberParticles();
+
+      
       int BLOCKSIZE = 128;
       uint Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
       uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 
+      /*Compute new forces*/
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+
+
+      {
+	auto force = pd->getForce(access::location::gpu, access::mode::write);      
+	fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
+      }
+      for(auto forceComp: interactors) forceComp->sumForce(forceStream);
+
+      
       real * d_radius = nullptr;
       if(hydrodynamicRadius == real(-1.0) && pd->isRadiusAllocated()){
 	auto radius = pd->getRadius(access::location::gpu, access::mode::read);
 	d_radius = radius.raw();
+	sys->log<System::DEBUG3>("[BD::EulerMaruyama] Using particle radius.");
       }
       
 
@@ -179,13 +193,6 @@ namespace uammd{
       }
 
       
-      /*Compute new forces*/
-      auto groupIterator = pg->getIndexIterator(access::location::gpu);
-      {
-	auto force = pd->getForce(access::location::gpu, access::mode::write);      
-	fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
-      }
-      for(auto forceComp: interactors) forceComp->sumForce(forceStream);
     
       
 

@@ -93,8 +93,8 @@ namespace uammd{
     protected:
       real3 Kx, Ky, Kz; //shear matrix
       real selfMobility;
-      real hydrodynamicRadius;
-      real temperature;
+      real hydrodynamicRadius = real(-1.0);
+      real temperature = real(0.0);
       real sqrt2MTdt;
       real dt;
   
