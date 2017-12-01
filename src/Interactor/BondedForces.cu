@@ -376,8 +376,9 @@ namespace uammd{
   /*Perform an integration step*/
   template<class BondType>
   void BondedForces<BondType>::sumForce(cudaStream_t st){
-
+    sys->log<System::DEBUG1>("[BondedForces] Computing Forces...");
     if(nbonds>0){
+      sys->log<System::DEBUG3>("[BondedForces] Computing Particle-Particle...");
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
 
@@ -398,6 +399,7 @@ namespace uammd{
 	      id2index);
     }
     if(nbondsFP>0){
+      sys->log<System::DEBUG3>("[BondedForces] Computing Fixed-Point...");
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
 
