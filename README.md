@@ -6,12 +6,6 @@
 **See the wiki for more info!**  
 **You can find videos on the youtube channel**  http://bit.ly/2r5WoOn
 
-<img src="https://github.com/raulppelaez/uammd/blob/development/src/res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/development/src/res/shotlogo.png" width="500">  
-
-
-**See the wiki for more info!**  
-**You can find videos on the youtube channel**  http://bit.ly/2r5WoOn  
-
 ## DESCRIPTION  
 
 -----------------  
