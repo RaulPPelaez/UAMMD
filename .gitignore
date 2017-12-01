@@ -4,12 +4,13 @@
 
 # Unignore all with extensions
 !*.*
-
+!Makefile
 # Unignore all dirs
 !*/
 
 src/Interactor/Experimental
 *.o
+a.out
 *~
 *.particles
 *.pbc
@@ -22,6 +23,7 @@ src/uammd
 src/aradillo.*
 star*
 armadillo*
+*.nvvp
 \#*
 
 

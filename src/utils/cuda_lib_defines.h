@@ -1,7 +1,5 @@
 /*Raul P. Pelaez 2016. Precision agnostic cublas/cusolver function defines*/
-#include"globals/defines.h"
-#include<cublas_v2.h>
-#include<cusolverDn.h>
+#include"global/defines.h"
 
 
 #if defined SINGLE_PRECISION
@@ -36,3 +34,5 @@
 #define cusolverDngesvd cusolverDnDgesvd
 #define cublasgemm cublasDgemm
 #endif
+
+

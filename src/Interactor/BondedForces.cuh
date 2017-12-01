@@ -10,7 +10,7 @@
   There are three types of bonds:
    -particle-particle Bonds (BondedForces)
    -particle-point Bonds (Fixed Point) (BondedForces)
-   -particle-particle-particle bonds (ThreeBodyBondedForces)
+   -particle-particle-particle bonds (AngularBondedForces)
 
 
   The format of the input file is the following, 
@@ -26,34 +26,33 @@
     Where i,j are the indices of the particles. BONDINFO can be any number of rows, as described
     by the BondedType BondedForces is used with, see BondedType::Harmonic for an example.
     
-    In the case of ThreeBondedforces i j k are needed instead of i j. The order doesnt matter, but j must always be the central particle.
+    In the case of AngularBondedforces i j k are needed instead of i j. The order doesnt matter, but j must always be the central particle.
+
+    A bond type can be ParameterUpdatable.
 */
 
 #ifndef BONDEDFORCES_CUH
 #define BONDEDFORCES_CUH
 
-#include"utils/utils.h"
-#include"Interactor.h"
+#include"Interactor.cuh"
 
-#include"globals/globals.h"
-
+#include"global/defines.h"
 #include<cstdint>
-#include<memory>
-#include<functional>
 #include<vector>
-#include<fstream>
 #include<set>
+#include<fstream>
 #include<algorithm>
 
+#include<thrust/device_vector.h>
 #include"third_party/type_names.h"
-
-/*Functors with different bond potentials*/
-namespace BondedType{
-  /*BondedForces needs a functor that computes the force of a pair, 
-    you can implement a new one in the input file and pass it as template argument to BondedForces*/
-
-  /*Harmonic bond, a good example on how to implement a bonded force*/
-  struct Harmonic{
+namespace uammd{
+  //Functors with different bond potentials
+  namespace BondedType{
+    //BondedForces needs a functor that computes the force of a pair, 
+    // you can implement a new one in the input file and pass it as template argument to BondedForces
+    
+    //Harmonic bond, a good example on how to implement a bonded force
+    struct Harmonic{
     /*Needs a struct called BondInfo with 
       the parameters that characterize a bond*/
     struct BondInfo{
@@ -82,42 +81,34 @@ namespace BondedType{
       in>>bi.k>>bi.r0;
       return bi;
     }
-    
-  };
-  struct HarmonicPBC{
-      BoxUtils box;
-      HarmonicPBC(): box(gcnf.L){}
-      HarmonicPBC(BoxUtils box): box(box){}
-    /*Needs a struct called BondInfo with 
-      the parameters that characterize a bond*/
-    struct BondInfo{
-      real r0, k;
-    };
-    /*A device function called force with these arguments that returns f/r for a given bond.
-      Note that this function will be called for ij and ji*/
-    /*In the case of a Fixed Point bond, j will be 0*/
-    inline __device__ real force(int i, int j, real3 &r12, const BondInfo &bi){
-      box.apply_pbc(r12);
+
+    inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
       real r2 = dot(r12, r12);
       if(r2==real(0.0)) return real(0.0);
-#ifdef SINGLE_PRECISION
-      real invr = rsqrtf(dot(r12, r12));
-#else
-      real invr = rsqrt(dot(r12, r12));
-#endif
-      real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
-      return f;
-    }
 
-    /*A function called readbond that reads a bond from in (the bond file).
-      This function will be called for every line in the file except for the first*/
-    static __host__ BondInfo readBond(std::istream &in){
-      /*BondedForces will read i j, readBond has to read the rest of the line*/
-      BondInfo bi;
-      in>>bi.k>>bi.r0;
-      return bi;
+#ifdef SINGLE_PRECISION
+      real invr = rsqrtf(r2);
+#else
+      real invr = rsqrt(r2);
+#endif
+      const real dr = real(1.0)-bi.r0*invr;
+      
+      return real(0.5)*bi.k*dr*dr;
     }
+    
   };
+    //Same as Harmonic, but applies Periodic boundary conditions to the distance of a pair
+    struct HarmonicPBC: public Harmonic{
+    Box box;
+      HarmonicPBC(Box box): box(box){}
+    inline __device__ real force(int i, int j, const real3 &r12, const BondInfo &bi){      
+      return Harmonic::force(i, j, box.apply_pbc(r12), bi);
+    }
+    
+    inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
+      return Harmonic::energy(i, j, box.apply_pbc(r12), bi);
+    }
+    };
 
   struct FENE{
     struct BondInfo{
@@ -128,7 +119,15 @@ namespace BondedType{
       real r02 = bi.r0*bi.r0;
     
       return -r02*bi.k/(r02-r2); 
+    }    
+    inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
+      real r2 = dot(r12, r12);
+      real r02 = bi.r0*bi.r0;
+    
+      return -r02*bi.k/(r02-r2); 
     }
+
+    
     static BondInfo readBond(std::istream &in){
       BondInfo bi;
       in>>bi.k>>bi.r0;
@@ -139,10 +138,14 @@ namespace BondedType{
 }
 
 
-/*Two body bonded forces. Handles particle-particle and particle.point bonds*/
+  //Two body bonded forces. Handles particle-particle and particle.point bonds
 template<class BondType>
-class BondedForces: public Interactor{
+class BondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
 public:
+  
+  struct Parameters{
+    const char * file; //File containing the bonds
+  };
   struct Bond{
     int i,j;
     typename BondType::BondInfo bond_info;
@@ -154,38 +157,50 @@ public:
     typename BondType::BondInfo bond_info;
   };
 
-  explicit BondedForces(const char * readFile);
-  explicit BondedForces(const char * readFile, BondType bondForce);
-  explicit BondedForces(const char * readFile, BondType bondForce, real3 L, int N);    
+
+  explicit BondedForces(shared_ptr<ParticleData> pd,
+			shared_ptr<System> sys,
+			Parameters par,
+			BondType bondForce);
+  explicit BondedForces(shared_ptr<ParticleData> pd,
+			shared_ptr<System> sys,
+			Parameters par):
+      BondedForces(pd, sys, par, BondType()){}
+  
+    
+
+  
   ~BondedForces();
 
-  void sumForce() override;
+  void sumForce(cudaStream_t st = 0) override;  
   real sumEnergy() override;
-  real sumVirial() override;
-  void print_info(){
-    std::cerr<<"\t Using: "<<type_name<BondType>()<<" Bond force function."<<std::endl;
-  }
-
+  //real sumVirial() override;
   
 private:
   void init();
+  void initParticleParticle();
+  void initFixedPoint();
   
-  uint nbonds;
-  Vector<Bond> bondList;
-  Vector<uint> bondStart, bondEnd;
-  Vector<uint> bondParticleIndex;
+  int nbonds;
+  thrust::device_vector<Bond> bondList;
+  thrust::device_vector<Bond*> bondStart;
+  thrust::device_vector<int> nbondsPerParticle;  
   
-  uint nbondsFP; //Fixed Point
-  Vector<BondFP> bondListFP;
-  Vector<uint> bondStartFP, bondEndFP;
+  int nbondsFP; //Fixed Point
+  thrust::device_vector<BondFP> bondListFP;
+  thrust::device_vector<BondFP*> bondStartFP;
+  thrust::device_vector<int> nbondsPerParticleFP;
 
   BondType bondForce;
   
   int TPP; // Threads per particle
-  int Nblocks, Nthreads;
-};
 
+};
+}
+
+
+#include"BondedForces.cu"
 
 #endif
 
-#include<BondedForces.cu>
+

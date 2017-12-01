@@ -1,57 +1,84 @@
-/*Raul P. Pelaez 2016. Two step velocity VerletNVT Integrator derived class
+/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
 
-  An Integrator is intended to be a separated module that handles the update of positions given the forces
+  This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
+  that conserves the temperature, volume and number of particles.
 
-  It takes care of keeping the positions updated.
-  The positions must be provided, they are not created by the module.
-  Also takes care of writing to disk
+  For that several thermostats are (should be, currently only one) implemented:
+
+    -Velocity damping and gaussian noise 
+    - BBK ( TODO)
+    - SPV( TODO)
+ Usage:
  
-  This is similar to NVE but with a thermostat that keeps T constant by changing E.
+    Create the module as any other integrator with the following parameters:
+    
+    
+    auto sys = make_shared<System>();
+    auto pd = make_shared<ParticleData>(N,sys);
+    auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+    
+    
+    VerletNVT::Parameters par;
+     par.temperature = 1.0;
+     par.dt = 0.01;
+     par.damping = 1.0;
+     par.is2D = false;
 
-  Currently uses a BBK thermostat to maintain the temperature.
-  Solves the following differential equation using a two step velocity verlet algorithm, see GPU code:
-      X[t+dt] = X[t] + v[t]·dt
-      v[t+dt]/dt = -gamma·v[t] - F(X) + sigma·G
-  gamma is a damping constant, sigma = sqrt(2·gamma·T) and G are normal distributed random numbers with var 1.0 and mean 0.0.
-
+    auto verlet = make_shared<VerletNVT>(pd, pg, sys, par);
+      
+    //Add any interactor
+    verlet->addInteractor(...);
+    ...
+    
+    //forward simulation 1 dt:
+    
+    verlet->forwardTime();
+    
 TODO:
-100- Implement more thermostats, allow for selection of a thermostat on creation
 
-*/
+100- Outsource thermostat logic to a functor (external or internal)
+
+ */
 #ifndef VERLETNVT_CUH
 #define VERLETNVT_CUH
-#include"globals/defines.h"
-#include "utils/utils.h"
-#include "Integrator.h"
-#include<curand.h>
 
-class VerletNVT: public Integrator{
-public:
-  VerletNVT();
-  VerletNVT(int N, real3 L, real dt, real gamma);
-  ~VerletNVT();
+#include "Integrator/Integrator.cuh"
+#include <curand.h>
+#include<thrust/device_vector.h>
+namespace uammd{
+  class VerletNVT: public Integrator{
+    real noiseAmplitude;
+    real dt, temperature, damping;    
+    bool is2D;
+    curandGenerator_t curng;
+    thrust::device_vector<real3> noise;
 
-  void update() override;
-  //Returns the kinetic energy
-  real sumEnergy() override;
-
-  void setTemp(real Tnew){
-    this->T = Tnew;
-    this->noiseAmp = sqrt(dt*0.5)*sqrt(2.0*gamma*Tnew);
-  }
-private:
-  Vector3 noise; //Noise in single precision always  
-  real gamma; //Gamma is not stored in gcnf
-  real noiseAmp;
-  real T;
-  curandGenerator_t rng;
+    
+    cudaStream_t forceStream, stream;
+    cudaEvent_t forceEvent;
+    int steps;
 
 
-  /*For energy*/
-  void *d_temp_storage;
-  size_t temp_storage_bytes;
-  real3 *d_K;
-  
-};
+    void genNoise(cudaStream_t st);
+  public:
+    struct Parameters{
+      real temperature = 0;
+      real dt = 0;
+      real damping = 1.0;
+      bool is2D = false;
+    };
+    VerletNVT(shared_ptr<ParticleData> pd,
+	      shared_ptr<ParticleGroup> pg,
+	      shared_ptr<System> sys,
+	      Parameters par);
+    ~VerletNVT();
 
+    virtual void forwardTime() override;
+    virtual real sumEnergy() override{ return 0;};
+  };
+
+}
+
+#include"VerletNVT.cu"
 #endif
+  

@@ -60,14 +60,14 @@ References:
 
 #include "BDHI.cuh"
 #include "utils/utils.h"
-#include "globals/globals.h"
-#include "globals/defines.h"
-#include"NeighbourList/CellList.cuh"
+#include"misc/TabulatedFunction.cuh"
+#include "global/defines.h"
+#include"Interactor/NeighbourList/CellList.cuh"
 #include"misc/LanczosAlgorithm.cuh"
 #include<cufft.h>
 #include<curand_kernel.h>
 #include<thread>
-
+#include"utils/Grid.cuh"
 #ifndef SINGLE_PRECISION
 
 #define cufftComplex cufftDoubleComplex
@@ -78,88 +78,77 @@ References:
 #define curand_normal2 curand_normal2_double
 #endif
 
-namespace BDHI{
-
-
-  struct RPYPSE_nearTextures{
-  private:
-    cudaArray *FGPU, *GGPU;
-    cudaTextureObject_t texF, texG;
-    real vis, rh, psi;
-    real rcut;
-    int ntab;
-    real M0;
-  public:
-    cudaTextureObject_t getFtex(){ return texF;}
-    cudaTextureObject_t getGtex(){ return texG;}
-    RPYPSE_nearTextures(){}
-    RPYPSE_nearTextures(real vis, real rh, real psi, real M0, real rcut, int ntab = 4096);
-
-    double2 FandG(double r);
-
-  private:
-
-    double params2FG(double r,
-		     double f0, double f1, double f2, double f3,
-		     double f4, double f5, double f6, double f7);
-  };
-
+namespace uammd{
+  namespace BDHI{
   
-  class PSE: public BDHI_Method{
-  public:
-    PSE(real vis, real T, real rh, real psi, int N, int max_iter = 100);
-    ~PSE();
-    void setup_step(              cudaStream_t st = 0) override;
-    void computeMF(real3* MF,     cudaStream_t st = 0) override;    
-    void computeBdW(real3* BdW,   cudaStream_t st = 0) override;  
-    void computeDivM(real3* divM, cudaStream_t st = 0) override;
-    void finish_step(             cudaStream_t st = 0) override;
+    class PSE{
+    public:
+      PSE(shared_ptr<ParticleData> pd,
+	  shared_ptr<ParticleGroup> pg,
+	  shared_ptr<System> sys,
+	  BDHI::Parameters par);
+      ~PSE();
+      void setup_step(              cudaStream_t st = 0);
+      void computeMF(real3* MF,     cudaStream_t st = 0);    
+      void computeBdW(real3* BdW,   cudaStream_t st = 0);  
+      void computeDivM(real3* divM, cudaStream_t st = 0);
+      void finish_step(             cudaStream_t st = 0);
 
 
-    template<typename vtype>
-    void Mdot_near(real3 *Mv, vtype *v, cudaStream_t st);
-    template<typename vtype>
-    void Mdot_far(real3 *Mv, vtype *v, cudaStream_t st);
-    template<typename vtype>
-    void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
+      template<typename vtype>
+      void Mdot_near(real3 *Mv, vtype *v, cudaStream_t st);
+      template<typename vtype>
+      void Mdot_far(real3 *Mv, vtype *v, cudaStream_t st);
+      template<typename vtype>
+      void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
 
     
-  private:
-    std::thread Mdot_nearThread, Mdot_farThread, NearNoise_Thread;
+    private:
+      shared_ptr<ParticleData> pd;
+      shared_ptr<ParticleGroup> pg;
+      shared_ptr<System> sys;
+      std::thread Mdot_nearThread, Mdot_farThread, NearNoise_Thread;
     
-    real T;
-    /*Kernel launch parameters*/
-    int Nthreads, Nblocks;
-    real psi; /*Splitting factor*/
+      real temperature;
+      real dt;
+      real M0;
+      real psi; /*Splitting factor*/
     
-    /****Near (real space) part *****/    
-    /*Rodne Prager Yamakawa PSE near real space part textures*/
-    BDHI::RPYPSE_nearTextures nearTexs;
-    real rcut;
-    CellList cl;
-    LanczosAlgorithm lanczos;
+      /****Near (real space) part *****/    
+      /*Rodne Prager Yamakawa PSE near real space part textures*/
+      thrust::device_vector<real2> tableDataRPY; //Storage for tabulatedFunction
+      shared_ptr<TabulatedFunction<real2>> RPY_near;
 
-    /****Far (wave space) part) ******/
-    real kcut; /*Wave space cutoff and corresponding real space grid size */
-			
-    Mesh mesh; /*Grid parameters*/
+      Box box;
+      real rcut;
+      real lanczosTolerance;
+      curandGenerator_t curng;
+      shared_ptr<CellList> cl;
+      shared_ptr<LanczosAlgorithm> lanczos;
+
+      /****Far (wave space) part) ******/
+      real kcut; /*Wave space cutoff and corresponding real space grid size */			
+      Grid grid; /*Wave space Grid parameters*/
     
-    /*Grid interpolation kernel parameters*/
-    int3 P; //Gaussian spreading/interpolation kernel support points*/
-    real3 m, eta; // kernel width and gaussian splitting in each direction
+      /*Grid interpolation kernel parameters*/
+      int3 P; //Gaussian spreading/interpolation kernel support points*/
+      real3 m, eta; // kernel width and gaussian splitting in each direction
 
 
-    cufftHandle cufft_plan_forward, cufft_plan_inverse;
-    GPUVector<real> cufftWorkArea;
+      cufftHandle cufft_plan_forward, cufft_plan_inverse;
+      thrust::device_vector<real> cufftWorkArea;
     
-    Vector3 gridVels;    //Interpolated grid velocities in real space
+      thrust::device_vector<real3> gridVels;    //Interpolated grid velocities in real space
 
-    Vector<cufftComplex> gridVelsFourier;     //Interpolated grid velocities in fourier space
-    GPUVector<real3> fourierFactor;  // Fourier scaing factors to go from F to V in wave space
+      thrust::device_vector<cufftComplex> gridVelsFourier;     //Interpolated grid velocities in fourier space
+      thrust::device_vector<real3> fourierFactor;  // Fourier scaing factors to go from F to V in wave space
 
-    GPUVector<curandState> farNoise;
+      thrust::device_vector<curandState> farNoise;
 
-    cudaStream_t stream, stream2;
-  };
+      cudaStream_t stream, stream2;
+    };
+  }
 }
+
+#include "BDHI_PSE.cu"
 #endif

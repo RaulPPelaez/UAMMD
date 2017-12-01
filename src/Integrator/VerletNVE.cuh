@@ -1,41 +1,83 @@
-/*Raul P. Pelaez 2016. Two step velocity VerletNVE Integrator derived class
+/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
 
-  An Integrator is intended to be a separated module that handles the update of positions given the forces
+  This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
+  that conserves the temperature, volume and number of particles.
 
-  It takes care of keeping the positions updated.
-  The positions must be provided, they are not created by the module.
-  Also takes care of writing to disk
+  For that several thermostats are (should be, currently only one) implemented:
+
+    -Velocity damping and gaussian noise 
+    - BBK ( TODO)
+    - SPV( TODO)
+ Usage:
  
-  
-  Solves the following differential equation using a two step velocity verlet algorithm:
-      X[t+dt] = X[t] +v[t]·dt+0.5·a[t]·dt^2
-      v[t+dt] = v[t] +0.5·(a[t]+a[t+dt])·dt
-*/
-#ifndef VERLETNVE_H
-#define VERLETNVE_H
-#include "globals/defines.h"
-#include "utils/utils.h"
-#include "Integrator.h"
+    Create the module as any other integrator with the following parameters:
+    
+    
+    auto sys = make_shared<System>();
+    auto pd = make_shared<ParticleData>(N,sys);
+    auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+    
+    
+    VerletNVT::Parameters par;
+     par.temperature = 1.0;
+     par.dt = 0.01;
+     par.damping = 1.0;
+     par.is2D = false;
 
-class VerletNVE: public Integrator{
-public:
+    auto verlet = make_shared<VerletNVT>(pd, pg, sys, par);
+      
+    //Add any interactor
+    verlet->addInteractor(...);
+    ...
+    
+    //forward simulation 1 dt:
+    
+    verlet->forwardTime();
+    
+TODO:
 
-  VerletNVE();
-  VerletNVE(int N, real3 L, real dt);
-  ~VerletNVE();
+100- Outsource thermostat logic to a functor (external or internal)
 
-  void update() override;
-  //Returns the kinetic energy
-  real sumEnergy() override;
-private:
-  real E;
-  /*For energy*/
-  void *d_temp_storage;
-  size_t temp_storage_bytes;
-  real3 *d_K;
-  
-};
+ */
+#ifndef VERLETNVE_CUH
+#define VERLETNVE_CUH
 
+#include "Integrator/Integrator.cuh"
+#include <curand.h>
+#include<thrust/device_vector.h>
+namespace uammd{
+  class VerletNVE: public Integrator{
+    real dt;
+    real energy;
+    bool is2D;
+    bool initVelocities;
+    
+    cudaStream_t stream;
+    int steps;
 
+    void * d_tmp_storage;
+    size_t temp_storage_bytes;
+    real3 *d_K;
+    
+  public:
+    struct Parameters{
+      real energy = 0;
+      real dt = 0;
+      bool is2D = false;
+      bool initVelocities = true;
+    };
+    VerletNVE(shared_ptr<ParticleData> pd,
+	      shared_ptr<ParticleGroup> pg,
+	      shared_ptr<System> sys,
+	      Parameters par);
+    ~VerletNVE();
 
+    virtual void forwardTime() override;
+    virtual real sumEnergy() override;
+  };
+
+}
+
+#include"VerletNVE.cu"
 #endif
+  

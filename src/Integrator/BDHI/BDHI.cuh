@@ -1,64 +1,78 @@
-/*Raul P. Pelaez 2017. Brownian Dynamics with Hydrodynamic Interactions virtual method.
-  
-All BDHI methods compute the same terms to solve the differential equation:
-
-  dR = (K·R + M·F)·dt + sqrt(2·dt·T)·B·dW + T·div(M)·dt
-
-This base class allows to code different BDHI methods just by providing functions to compute MF, Bdw and div(M).
-
+/*Raul P. Pelaez 2017. Some Brownian Hydrodynamics utilities and definitions
  */
-
 #ifndef BDHI_CUH
 #define BDHI_CUH
-#include<cuda.h>
-#include<curand.h>
-#include"utils/utils.h"
-#include"globals/globals.h"
-#include"BDHI_common.cuh"
-#include"utils/cuda_lib_defines.h"
-#include"utils/utils.h"
-namespace BDHI{
-  class BDHI_Method{
-  public:
-    BDHI_Method(): M0(0), rh(0), N(0){}
-    void init(real M0, real rh, int N){
-      this->M0 = M0;
-      this->rh = rh;
-      this->N = N;
-      this->init();
-    }
-    void init(){
-      /*Create noise*/
-      curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
-      curandSetPseudoRandomGeneratorSeed(curng, grng.next());
-      /*Create a temporal vector to warm up curand*/
-      GPUVector3 noise(N);
-      //Curand fill with gaussian numbers with mean 0 and var 1
-      /*This shit is obscure, curand will only work with an even number of elements*/
-      curandGenerateNormal(curng, (real*) noise.d_m, 3*N + ((3*N)%2), real(0.0), real(1.0));
-    }
-    
-    BDHI_Method(real M0, real rh, int N):
-      M0(M0), rh(rh), N(N){
-      this->init();
-    }
-    ~BDHI_Method(){
-      curandDestroyGenerator(curng);
-    }
 
-    virtual void setup_step(              cudaStream_t st = 0){}
-    virtual void computeMF(real3* MF,     cudaStream_t st = 0) = 0;
-    virtual void computeBdW(real3* BdW,   cudaStream_t st = 0) = 0;
-    virtual void computeDivM(real3* divM, cudaStream_t st = 0) = 0;
-    virtual void finish_step(              cudaStream_t st = 0){}
-    curandGenerator_t getRNG(){return curng;}
-  protected:
-    curandGenerator_t curng;
-    real M0;
-    real rh;
-    uint BLOCKSIZE = 128; /*CUDA kernel block size, threads per block*/    
-    int N;
-  };
-  
+#include"global/defines.h"
+#include"utils/Box.cuh"
+#include<vector>
+namespace uammd{
+  namespace BDHI{
+    
+    //Parameters that BDHI modules may need
+    struct Parameters{
+      //The 3x3 shear matrix is encoded as an array of 3 real3
+      std::vector<real3> K;
+      real temperature;
+      real viscosity;
+      real hydrodynamicRadius;
+      real tolerance = 1e-3;
+      real dt;
+      bool is2D = false;
+      Box box;
+    };
+
+
+    //The Rotne-Prager-Yamakawa tensor
+    struct RotnePragerYamakawa{
+      real rh;
+      real invrh;
+      RotnePragerYamakawa(real rh): rh(rh){this->invrh = 1.0/rh;}
+      /*RPY tensor as a function of distance, r*/
+      /*M(r) = 0.75*M0*( f(r)*I + g(r)*r(diadic)r )*/
+      /*c12.x = f(r) * 0.75*M0    ->M0 is outside               
+	c12.y = g(r) * 0.75*M0*/
+      inline __host__  __device__  real2  RPY(real r) const{
+	/*Distance in units of rh*/
+	r *= invrh;
+	const real invr  = real(1.0)/r;
+
+	real2 c12;
+
+	if(r >= real(2.0)){
+	  const real invr2 = invr*invr;
+	  c12.x = (real(0.75) + real(0.5)*invr2)*invr;
+	  c12.y = (real(0.75) - real(1.5)*invr2)*invr;
+	}
+	else{
+	  c12.x = real(1.0)-real(0.28125)*r;
+	  if(r>real(0.0))
+	    c12.y = real(0.09375)*r;
+	}
+
+	return c12;
+      }
+      
+      inline __host__  __device__  real2  operator()(real r) const{
+	return RPY(r);
+      }
+      /*Helper function for divergence in RDF,
+      computes {f(r+dw)-f(r), g(r+dw)-g(r)}
+      See diffusionDot for more info
+      */
+      inline __device__ real2  divergenceRDF(real3 rij, real3 dwij) const{
+
+	const real r    = sqrtf(dot(rij, rij));
+	const real3 rpdwij = rij+dwij;
+	const real rpdw = sqrtf(dot(rpdwij, rpdwij));
+
+	return RPY(rpdw)-RPY(r);
+      }              
+
+    
+    };    
+  }
 }
+
+
 #endif

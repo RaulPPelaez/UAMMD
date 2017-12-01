@@ -1,143 +1,294 @@
-/*Raul P. Pelaez 2016. Two step velocity VerletNVE Integrator derived class implementation
+/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
 
-  An Integrator is intended to be a separated module that handles the update of positions given the forces
+  This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
+  that conserves the energy, volume and number of particles.
 
-  It takes care of keeping the positions updated.
-  The positions must be provided, they are not created by the module.
-  Also takes care of writing to disk
+
+ Usage:
  
+    Create the module as any other integrator with the following parameters:
+    
+    
+    auto sys = make_shared<System>();
+    auto pd = make_shared<ParticleData>(N,sys);
+    auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+    
+    
+    VerletNVE::Parameters par;
+     par.energy = 1.0;
+     par.dt = 0.01;
+     par.is2D = false;
+
+    auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
+      
+    //Add any interactor
+    verlet->addInteractor(...);
+    ...
+    
+    //forward simulation 1 dt:
+    
+    verlet->forwardTime();
+    
+ */
+
+#include"VerletNVE.cuh"
+
+
+#ifndef SINGLE_PRECISION
+#define curandGenerateNormal curandGenerateNormalDouble
+#endif
+
+namespace uammd{
   
-  Solves the following differential equation:
-      X[t+dt] = X[t] +v[t]·dt+0.5·a[t]·dt^2
-      v[t+dt] = v[t] +0.5·(a[t]+a[t+dt])·dt
-TODO:
-100- Allow velocities from outside
-100- Allow to set the initial velocity instead of the energy
-*/
-#include "VerletNVE.cuh"
-#include<cub/iterator/transform_input_iterator.cuh>
-#include<cub/device/device_reduce.cuh>
-#include"utils/GPUutils.cuh"
-#include"globals/globals.h"
-#include"utils/vector_overloads.h"
-#include"utils/helper_gpu.cuh"
-
-/*Constructor, Dont forget to initialize the base class Integrator!*/
-/*You can use anything in gcnf at any time*/
-VerletNVE::VerletNVE():
-  VerletNVE(gcnf.N, gcnf.L, gcnf.dt){}
-
-VerletNVE::VerletNVE(int N, real3 L, real dt):
-  Integrator(N, L, dt, 128), E(gcnf.E),
-  d_temp_storage(nullptr),
-  temp_storage_bytes(0),
-  d_K(nullptr)
-{
-  cerr<<"Initializing Verlet NVE Integrator..."<<endl;
-
-  if(vel.size()!=N){
-    /*Create the velocity if you need it*/
-    vel = Vector3(N);  vel.fill_with(make_real3(0.0));  vel.upload();
-  }
+  VerletNVE::VerletNVE(shared_ptr<ParticleData> pd,
+		       shared_ptr<ParticleGroup> pg,
+		       shared_ptr<System> sys,		       
+		       VerletNVE::Parameters par):
+    Integrator(pd, pg, sys, "VerletNVE"),
+    dt(par.dt), energy(par.energy), is2D(par.is2D), initVelocities(par.initVelocities),
+    steps(0){
     
-  cerr<<"\tSet E="<<E<<endl;
-  cerr<<"Verlet NVE Integrator\t\tDONE!!\n"<<endl;
-}
-
-VerletNVE::~VerletNVE(){
-  cudaFree(d_K);
-  cudaFree(d_temp_storage);
-  cerr<<"Destroying VerletNVE...";
-  cerr<<"\tDONE!!"<<endl;
-}
-
-
-
-namespace VerletNVE_ns{
-  template<int step>
-  __global__ void integrateGPU(real4 __restrict__  *pos,
-				real3 __restrict__ *vel,
-				const real4 __restrict__  *force,
-				int N, real dt, bool D2){
-    uint i = blockIdx.x*blockDim.x+threadIdx.x;
-    if(i>=N) return;
-    /*Half step velocity*/
-    vel[i] += make_real3(force[i])*dt*real(0.5);
-    
-    if(D2) vel[i].z = real(0.0); //2D
-    
-    /*In the first step, upload positions*/
-    if(step==1)
-      pos[i] += make_real4(vel[i])*dt;
-  }
-
-
-};
-//The integration process can have two steps
-void VerletNVE::update(){
-  /*Set the energy in the first step*/
-  if(steps==0){
-    /*In the first step, compute the force and energy in the system
-      in order to adapt the initial kinetic energy to match the input total energy
-      E = U+K */
-    real U = 0.0;
-    for(auto forceComp: interactors) U += forceComp->sumEnergy();
-    real K = abs(E-U);
-    /*Distribute the velocities accordingly*/
-    real vamp = sqrt(2.0*K/3.0);
-    /*Create velocities*/
-    vel.fill_with(make_real3(real(0.0)));
-    fori(0,N){
-      vel[i].x = vamp*grng.gaussian(0.0, 1.0);
-      vel[i].y = vamp*grng.gaussian(0.0, 1.0);
-      vel[i].z = vamp*grng.gaussian(0.0, 1.0);
+    sys->log<System::MESSAGE>("[VerletNVE] Energy: %.3f", energy);
+    sys->log<System::MESSAGE>("[VerletNVE] Time step: %.3f", dt);
+    if(is2D){
+      sys->log<System::MESSAGE>("[VerletNVE] Working in 2D mode.");
     }
-    vel.upload();
-    cudaMemset(force.d_m, 0, N*sizeof(real4));
+
+    int numberParticles = pg->getNumberParticles();
+           
+    if(pd->isVelAllocated() && initVelocities){
+      sys->log<System::WARNING>("[VerletNVE] Velocity will be overwritten to ensure energy conservation!");
+    }
+    
+    cudaStreamCreate(&stream);
   }
-  
-  steps++;
-  uint nthreads = BLOCKSIZE<N?BLOCKSIZE:N;
-  uint nblocks = N/nthreads +  ((N%nthreads!=0)?1:0);
 
   
-  /**First integration step**/
-  VerletNVE_ns::integrateGPU<1><<<nblocks, nthreads>>>(pos, vel, force, N, dt, gcnf.D2);
-  /**Reset the force**/
-  /*The integrator is in charge of resetting the force when it needs, an interactor always sums to the current force*/
-  cudaMemset(force.d_m, 0, N*sizeof(real4));
-  /**Compute all the forces**/
-  for(auto forceComp: interactors) forceComp->sumForce();
+  VerletNVE::~VerletNVE(){
+    cudaStreamDestroy(stream);
+    cudaFree(d_K);
+    cudaFree(d_tmp_storage);
+  }
+
+
+
+  namespace VerletNVE_ns{
+
+    //Integrate the movement 0.5 dt and reset the forces in the first step
+    template<int step>
+      __global__ void integrateGPU(real4 __restrict__  *pos,
+				   real3 __restrict__ *vel,
+				   real4 __restrict__  *force,
+				   const real __restrict__ *mass,
+				   ParticleGroup::IndexIterator indexIterator,
+				   int N,
+				   real dt, bool is2D){
+	int id = blockIdx.x*blockDim.x+threadIdx.x;
+	if(id>=N) return;
+	//Index of current particle in group
+	int i = indexIterator[id];
+	
+	//Half step velocity
+	real invMass = real(1.0);
+	if(mass){
+	  invMass = real(1.0)/mass[i];
+	}
+	vel[i] += (make_real3(force[i])*invMass)*dt*real(0.5);
+	if(is2D) vel[i].z = real(0.0);
+	
+	//In the first step, upload positions
+	if(step==1){		  
+	  real3 newPos = make_real3(pos[i]) + vel[i]*dt;
+	  pos[i] = make_real4(newPos, pos[i].w);
+	  //Reset force
+	  force[i] = make_real4(0);
+	}
+      }
+  }    
   
-  /**Second integration step**/
-  VerletNVE_ns::integrateGPU<2><<<nblocks, nthreads>>>(pos, vel, force, N, dt, gcnf.D2);
-}
+  
+  //Move the particles in my group 1 dt in time.
+  void VerletNVE::forwardTime(){
+    steps++;
+    sys->log<System::DEBUG1>("[VerletNVE] Performing integration step %d", steps);
+    for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
+    
+    int numberParticles = pg->getNumberParticles();
+    if(steps==1){
+      if(initVelocities){
+	//In the first step, compute the force and energy in the system
+	//in order to adapt the initial kinetic energy to match the input total energy
+	//E = U+K 
+	real U = 0.0;
+	for(auto forceComp: interactors) U += forceComp->sumEnergy();
+	real K = abs(energy - U);
+	//Distribute the velocities accordingly
+	real vamp = sqrt(2.0*K/3.0);
+	//Create velocities
+	auto vel  = pd->getVel(access::location::cpu, access::mode::write);
+	auto groupIterator = pg->getIndexIterator(access::location::cpu);
+	forj(0, numberParticles){
+	  int i = groupIterator[j];
+	  vel.raw()[i].x = vamp*sys->rng().gaussian(0.0, 1.0);
+	  vel.raw()[i].y = vamp*sys->rng().gaussian(0.0, 1.0);
+	  vel.raw()[i].z = vamp*sys->rng().gaussian(0.0, 1.0);
+	}
+      }
+      for(auto forceComp: interactors) 	forceComp->updateTimeStep(dt);      
+    }
+  
+
+    
+    int Nthreads=128;
+    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+
+    
+    //First simulation step is special
+    if(steps==1){
+      {
+	auto groupIterator = pg->getIndexIterator(access::location::gpu);
+	auto force = pd->getForce(access::location::gpu, access::mode::write);     
+	fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
+      }
+      for(auto forceComp: interactors) forceComp->sumForce(stream);
+      cudaDeviceSynchronize();
+    }
+    
+
+
+    
+    //First integration step
+    {
+      //An iterator with the global indices of my groups particles
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      //Get all necessary properties
+      auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
+      auto force = pd->getForce(access::location::gpu, access::mode::read);     
+      //Mass is assumed 1 for all particles if it has not been set.
+      real * mass_ptr = nullptr;
+      if(pd->isMassAllocated()){
+	auto mass = pd->getMass(access::location::gpu, access::mode::read);
+	mass_ptr = mass.raw();
+      }
+      
+      //First step integration and reset forces
+
+      VerletNVE_ns::integrateGPU<1><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
+									   vel.raw(),
+									   force.raw(),
+									   mass_ptr,
+									   groupIterator,
+									   numberParticles, dt, is2D);
+    }
+
+    for(auto forceComp: interactors) forceComp->sumForce(stream);
+    //Second integration step
+    {
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      
+      auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
+      auto force = pd->getForce(access::location::gpu, access::mode::read);
+            
+      real * mass_ptr = nullptr;
+      if(pd->isMassAllocated()){
+	auto mass = pd->getMass(access::location::gpu, access::mode::read);
+	mass_ptr = mass.raw();
+      }
+      //Wait untill all forces have been summed
+      VerletNVE_ns::integrateGPU<2><<<Nblocks, Nthreads, 0 , stream>>>(pos.raw(),
+									    vel.raw(),
+									    force.raw(),
+									    mass_ptr,
+									    groupIterator,
+									    numberParticles, dt, is2D);      
+    }
+    
+  }
 
 
 
 
 
-namespace VerletNVE_ns{
-  /*Returns the squared of each element in a real3*/
-  struct dot_functor{
-    inline __device__ real3 operator() (const real3 &a) const{
-      return a*a;
+  namespace VerletNVE_ns{
+    __global__ void sumEnergy(real3* vel,
+			      real *Energy,
+			      real *mass,
+			      ParticleGroup::IndexIterator groupIterator,
+			      int numberParticles){
+      const int id = blockIdx.x*blockDim.x + threadIdx.x;
+      if(id >= numberParticles) return;
+      const int i = groupIterator[id];
+      real mass_i = real(1.0);
+      if(mass) mass_i = mass[i];
+      
+      Energy[i] += real(0.5)*dot(vel[i], vel[i])*mass_i;
+      
+
     }
   };
-};
 
-real VerletNVE::sumEnergy(){  
-  VerletNVE_ns::dot_functor dot_op;
-  cub::TransformInputIterator<real3, VerletNVE_ns::dot_functor, real3*> dot_iter(vel.d_m, dot_op);
-  if(!d_temp_storage){    
-    cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, dot_iter, d_K, N);
-    cudaMalloc(&d_temp_storage, temp_storage_bytes);    
-    if(!d_K)
-      cudaMalloc(&d_K, sizeof(real3));
+  real VerletNVE::sumEnergy(){  
+    int numberParticles = pg->getNumberParticles();
+    auto groupIterator = pg->getIndexIterator(access::location::gpu);
+    
+    auto vel = pd->getVel(access::location::gpu, access::mode::read);
+    auto Energy = pd->getEnergy(access::location::gpu, access::mode::write);
+    
+    real * mass_ptr = nullptr;
+    
+    if(pd->isMassAllocated()){
+      auto mass = pd->getMass(access::location::gpu, access::mode::read);
+      mass_ptr = mass.raw();
+    }
+    int Nthreads = 128;
+    int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+    
+    VerletNVE_ns::sumEnergy<<<Nblocks, Nthreads>>>(vel.raw(),
+						   Energy.raw(),
+						   mass_ptr,
+						   groupIterator,
+						   numberParticles);        
+    return 0.0;
   }
-  cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, dot_iter, d_K, N);
-  real3 K;
-  cudaMemcpy(&K, d_K, sizeof(real3), cudaMemcpyDeviceToHost);
 
-  return 0.5f*(K.x+K.y+K.z)/(real)N;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

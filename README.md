@@ -1,4 +1,10 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.2**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.5.alpha**
+
+<img src="https://github.com/raulppelaez/uammd/blob/development/src/res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/development/src/res/shotlogo.png" width="500">  
+
+
+**See the wiki for more info!**  
+**You can find videos on the youtube channel**  http://bit.ly/2r5WoOn
 
 <img src="https://github.com/raulppelaez/uammd/blob/development/src/res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/development/src/res/shotlogo.png" width="500">  
 
@@ -55,16 +61,6 @@ A measurable can compute the energy, the radial function distribution or any arb
 These objects are abstract classes that can be derived to create all kinds of functionality and add new physics. Just create a new class that inherits Interactor, Integrator or Measurable and override the virtual methods with the new functionality.
 
 
-Finally there is a Driver that puts them all together and controls the flow of the simulation.
-
-**The UAMMD input is set when compiling using: make INPUT_FILE=myinput.cpp**
-
-The default input is Driver/SimulationConfig.cpp. Any file containing at least the definition of the constructor of the class "SimulationConfig" is considered an input file. See the wiki/Input-File for more info!
-
-You can specify a different input file implementing the simulation configuration when compiling by:
-
-``` $make INPUT_FILE=my_input.cpp ```
-
 
 # Currently Implemented
 
@@ -97,22 +93,25 @@ See the wiki page for each interactor for more info and instructions!
 
 ----------------------
 
-You can select between single and double precision via Makefile, changing the OPTIONS variable. Single precision is used by default, remember to recompile the entire code when changing the precision. This last step is very important, as failing to do so will result in unexpected behavior.
+You can select between single and double precision via defines.h. Single precision is used by default, remember to recompile the entire code when changing the precision. This last step is very important, as failing to do so will result in unexpected behavior.
 
 
 ## USAGE
 
 -------------------
 If you dont have cub (thrust comes bundled with the CUDA installation) clone or download the v1.5.2 (see dependencies).
-The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.
-The Makefile expects to find cub in /usr/local/cub, but you can change it. CUB doesnt need to be compiled.
+The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.  
 
-Hardcode the configuration (Integrator, Interactor, initial conditions..) in Driver/SimulationConfig.cpp or any other input file, set number of particles, size of the box, dt, etc, there.
-You can change the integrator at any time during the execution of the simulation, see examples/ for a guide.
+**UAMMD does not need to be compiled (it is header only)**.  
 
-Then compile with make and run. You can use the --device X flag to specify a certain GPU.
+To use it in your project, include the modules you need, create a System and ParticleData instances and configure the simulation as you need.  
+See examples/LJ.cu for a tutorial!  
 
-You may need to adequate the Makefile to you particular system
+In order to compile a source file that uses UAMMD, you only have to inform the compiler of the location of the project (with -I) and give the flag "--expt-relaxed-constexpr" to nvcc.  
+See examples/Makefile for an example.  
+
+You can use the --device X flag to specify a certain GPU.  
+
 
 ## DEPENDENCIES
 
@@ -130,13 +129,13 @@ This code makes use of the following CUDA packages:
 	3. cuSolver
 	
 
-## REQUERIMENTS
+## REQUERIMENTS  
 
---------------------
-Needs an NVIDIA GPU with compute capability sm_3.5+
-Needs g++ with full C++11 support, 4.8+ recommended
+--------------------  
+Needs an NVIDIA GPU with compute capability sm_2.0+  
+Needs g++ with full C++11 support, 4.8+ recommended  
 
-## TESTED ON
+## TESTED ON  
 
 ------------
 	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5 and g++ 4.8
@@ -145,57 +144,29 @@ Needs g++ with full C++11 support, 4.8+ recommended
 	 - GTX1080 (sm_61), Tesla P1000 (sm_60) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
      - K40 (sm_35), GTX780(sm_35) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
 
-## BENCHMARK
-
-------------
-
-Current benchmark:
-
-	GTX980 CUDA-7.5
-	N = 2^20
-	L = 128
-	dt = 0.001f
-	1e4 steps
-	PairForces with rcut = 2.5 and no energy measure
-	VerletNVT, no writing to disk, T = 0.1
-	Starting in a cubicLattice
-
-
-#### ------HIGHSCORE---------
-
-	Number of cells: 51 51 51; Total cells: 132651
-	Initializing...
-	DONE!!
-	Initialization time: 0.15172s
-	Computing step: 10000
-	Mean step time: 127.33 FPS
-	Total time: 78.535s
-	real 1m19.039s
-    user 0m53.772s
-	sys  0m25.212s
 
 
 ## NOTES FOR DEVELOPERS
 
 The procedure to implement a new module is the following:
 
-	1. Create a new class that inherits from one of the parents (Interactor, Integrator, Measurable...) and overload the virtual methods. You want as long as the virtual methods are overloaded.
-	2. Include the new header in global/Modules.h
-	3. Add the new sources in the Makefile.
-	4. Initialize them as needed in Driver/SimulationConfig.cpp as in the examples.
+	1. Create a new class that inherits from one of the parents (Interactor, Integrator, Measurable...) and overload the virtual methods. You can do whatever you want as long as the virtual methods are overloaded.	
+	2. Take as input shared_ptr's to a ParticleData and a System at least, use them to interface with UAMMD (ask ParticleData for properties like pos, force, torque..)
+	3. Include the new module in the source file that makes use of it
+		
+See available modules for a tutorial (i.e PairForces.cuh or VerletNVT.cuh)  
 	
-It is advised to keep "__device__" functions as inline and always in the same compilation unit as the kernel that uses them.
 
 -------------------------------
-In globals/globals.h are the definitions of some variables that will be available throughout the entire project. These are mainly parameters. It also contains the position, force and an optional velocity arrays.
 
-In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from global, the Vectors storing the positions, forces and velocities of each particle (when needed). These Vectors start with zero size and are initialized in Driver.cpp. However, your code should check the size of the arrays at startup with Vector::size() and initialize them if the size doesnt match the number of particles (i.e is 0).
 
-Currently the code initializes pos and force Vectors in Driver.cpp, after the parameters are set. Vel should be initialized in the constructor of any module that needs it, see VerletNVT for an example.
+In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from ParticleData when available, the containers storing the positions, forces, velocities... of each particle.  
+These containers start with zero size and are initialized by ParticleData the first time they are asked for.  
+
 
 **Guidelines**
 
-Each module should have its own namespace, or adhere to an existing one, in order to avoid naming conflicts. This allows to name the functions and parameters in a more human readable way.
+Each module should be under the uammd namespace.
 
 If you want to make small changes to an existing module, without changing it. Then you should create a new module that inherits it, and overload the necesary functions.
 
@@ -206,3 +177,13 @@ If you want to make small changes to an existing module, without changing it. Th
 UAMMD was developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.
 
 Acknowledgment is made to NVIDIA Corporation.
+
+## Colaborators
+
+Raul P. Pelaez is the main developer of UAMMD.  
+
+Other people that have contributed to UAMMD:  
+
+Marc Melendez Schofield  
+Sergio Panzuela  
+Nerea Alcazar  
