@@ -1,6 +1,6 @@
 # **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.5**
 
-<img src="https://github.com/raulppelaez/uammd/blob/development/src/res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/development/src/res/shotlogo.png" width="500">  
+<img src="https://github.com/raulppelaez/uammd/blob/master/.res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/master/.res/shotlogo.png" width="500">  
 
 
 **See the wiki for more info!**  
