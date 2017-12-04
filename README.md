@@ -149,6 +149,7 @@ Some things to take into account:
 	2. ParticleData can also change the storage location of the particle arrays, so do not store raw pointers to particle properties, always ask PD for them before using them with ParticleData::get*()
 	3. In the modules where it makes sense, make them be able to handle ParticleGroups (which will contain all particles by default). See PairForces.cuh for an example of a module handling ParticleGroups.
 	4. UAMMD usually uses the lazy initialization scheme, nothing is initialized unless it is absolutely necessary. For example, the CPU version of a particle property (and the GPU version FWIW) will not be allocated until someone asks for it with pd->get*().  
+	5. Using the "real" type and "make_real" type will ensure precision agnostic code, as real is an alias to either float or double depending on the precisio mode.
 	
 Some advice:
 
