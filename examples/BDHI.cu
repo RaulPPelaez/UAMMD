@@ -36,7 +36,12 @@ using namespace std;
 
 int main(int argc, char *argv[]){
 
-
+  if(argc<7){
+    cerr<<"ERROR! Not enough arguments!"<<endl;
+    cerr<<"Run me with: ./a.out 10 25 0.005 20000 1 0 1.0"<<endl;
+    exit(1);
+  }
+    
   int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
 
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
