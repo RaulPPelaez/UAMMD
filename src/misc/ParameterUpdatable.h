@@ -7,6 +7,10 @@
   Interactors are ParameterUpdatable objects.
 
   If a module needs to be aware of a parameter change, it should override the particular virtual method. Wich will do nothing by default.
+
+  If a module needs to delegate the ParameterBehavior to a member (i.e ExternalForces) it must then inherit from ParameterUpdatableDelegate and
+    call setDelegate(&member). From that moment, calls to update*() will be called on member.
+    This will work even when member is not ParameterUpdatable (SFINAE).
  */
 
 #ifndef PARAMETERUPDATABLE_H
