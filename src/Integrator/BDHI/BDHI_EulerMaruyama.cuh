@@ -1,7 +1,7 @@
 /*Raul P. Pelaez 2016. Brownian Euler Maruyama with hydrodynamics Integrator derived class implementation
   
   Solves the following stochastic differential equation:
-      X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*k*T)·B·dW + div(M)
+     X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*kb*T*dt)·B·dW + T·divM·dt(in 2D)
    Being:
      X - Positions
      M - Mobility matrix
@@ -10,22 +10,27 @@
      B - B*B^T = M -> i.e Cholesky decomposition B=chol(M) or Square root B=sqrt(M)
      div(M) - Divergence of the mobility matrix, only non-zero in 2D
 
- The Diffusion matrix is computed via the Rotne Prager Yamakawa tensor
+  The Mobility matrix is computed via the Rotne Prager Yamakawa tensor.
 
- The module offers several ways to compute and sovle the different terms.
+  The module offers several ways to compute and solve the different terms.
+  
+  BDHI::Cholesky:
+  -Computing M·F and B·dW  explicitly storing M and performing a Cholesky decomposition on M.
 
- The brownian Noise can be computed by:
-     -Computing B·dW explicitly performing a Cholesky decomposition on M.
-     -Through a Lanczos iterative method to reduce M to a smaller Krylov subspace and performing the operation there.
+  BDHI::Lanczos:
+  -A Lanczos iterative method to reduce M to a smaller Krylov subspace and performing the operation B·dW there, the product M·F is performed in a matrix-free way, recomputing M every time M·v is needed.
 
-  On the other hand the mobility(diffusion) matrix can be handled in several ways:
-     -Storing and computing it explicitly as a 3Nx3N matrix.
-     -Not storing it and recomputing it when a product M·v is needed.
+  BDHI::PSE:
+  -The Positively Split Edwald Method, which takes the computation to fourier space. [2]
 
 REFERENCES:
 
-1- Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations
-        J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
+
+  1- Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations
+  J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
+  2- Rapid sampling of stochastic displacements in Brownian dynamics simulations 
+  The Journal of Chemical Physics 146, 124116 (2017); doi: http://dx.doi.org/10.1063/1.4978242
+
 
 */
 

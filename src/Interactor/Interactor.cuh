@@ -1,4 +1,20 @@
+/*Raul P. Pelaez 2017. Interactor Base class.
 
+Interactor is an interface for modules that can compute forces and energies.
+For a class to be a valid Interactor, it must override sumForces() and sumEnergy().
+
+An integrator will expect interactors to describe the interaction of particles.
+
+Interactor is also ParameterUpdatable, which means that any Interactor can override any of the available update*() functions.
+
+See the following wiki pages for more info:
+ParameterUpdatable
+Interactor
+Integrator
+
+See PairForces.cuh or examples/LJ.cu for an example.
+
+ */
 
 #ifndef INTERACTOR_CUH
 #define INTERACTOR_CUH

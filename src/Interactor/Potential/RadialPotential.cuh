@@ -2,7 +2,7 @@
 
   A potential must provide:
    -transversers to compute force, energy and virial through get*Transverser(Box box, shared_ptr<ParticleData> pd)
-   -A maximum interaction distance (can be infty)
+   -A maximum interaction distance (can be infty) via a method real getCutOff();
    -Handle particle types (with setPotParameters(i, j, InputParameters p)
    
 

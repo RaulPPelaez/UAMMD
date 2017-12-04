@@ -173,7 +173,6 @@ namespace uammd{
 	bdhi->computeBdW(d_BdW, stream);
       }
 
-      /* divM =  (M(q+dw)-M(q))·dw/d^2*/
       if(par.is2D){
 	auto d_divM = thrust::raw_pointer_cast(divM.data());
 	bdhi->computeDivM(d_divM, stream2);
