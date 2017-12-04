@@ -29,7 +29,7 @@ namespace uammd{
     // }
   
     // cerr<<" Lattice...";
-    std::vector<float4> pos(N, make_real4(0));
+    std::vector<float4> pos(N, make_float4(0));
 
 
     Bravais((float *) pos.data(),

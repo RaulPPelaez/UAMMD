@@ -42,10 +42,11 @@ TODO:
 
 #include"VerletNVT.cuh"
 
-
 #ifndef SINGLE_PRECISION
+
 #define curandGenerateNormal curandGenerateNormalDouble
 #endif
+
 
 namespace uammd{
 

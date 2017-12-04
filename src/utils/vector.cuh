@@ -6,9 +6,6 @@
 //Include built in ones
 #include "cuda_runtime.h"
 
-#define SINGLE_PRECISION
-
-
 #include <math.h>
 #include"global/defines.h"
 
@@ -364,9 +361,13 @@ VECATTR float dot(float4 a, float4 b){return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b
 
 namespace uammd{
 /////////////////REAL4////////////////////////////////
-VECATTR real4 make_real4(real x, real y, real z, real w){
 
+VECATTR real4 make_real4(real x, real y, real z, real w){
+    #ifdef SINGLE_PRECISION
   return make_float4(x,y,z,w);
+  #else
+  return make_double4(x,y,z,w);
+  #endif
 }
 
 VECATTR real4 make_real4(real s){return make_real4(s, s, s, s);}
@@ -436,6 +437,8 @@ VECATTR real2 make_real2(uint3 a){return make_real2(real(a.x), real(a.y));}
 ////////////////DOUBLE PRECISION//////////////////////
 #ifdef SINGLE_PRECISION
 VECATTR double3 make_double3(uammd::real4 a){return make_double3(a.x, a.y, a.z);}
+#else
+VECATTR double3 make_double3(uammd::real3 a){return make_double3(a.x, a.y, a.z);}
 #endif
 VECATTR float4 make_float4(double4 a){return make_float4(float(a.x), float(a.y), float(a.z), float(a.w));}
 

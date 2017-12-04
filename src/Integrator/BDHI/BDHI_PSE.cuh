@@ -74,7 +74,8 @@ References:
 #define cufftReal cufftDoubleReal
 #define cufftExecR2C cufftExecD2Z
 #define cufftExecC2R cufftExecZ2D 
-
+#define CUFFT_C2R CUFFT_Z2D
+#define CUFFT_R2C CUFFT_D2Z
 #define curand_normal2 curand_normal2_double
 #endif
 

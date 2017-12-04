@@ -7,7 +7,9 @@
 #define UAMMD_VERSION "0.5.alpha"
 
 /*Comment to compile for double precision*/
+#ifndef DOUBLE_PRECISION
 #define SINGLE_PRECISION
+#endif
 
 
 #define fori(x,y) for(int i=x; i<int(y); i++)
