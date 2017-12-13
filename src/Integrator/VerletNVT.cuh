@@ -5,7 +5,8 @@
 
   For that several thermostats are (should be, currently only one) implemented:
 
-    -Velocity damping and gaussian noise 
+    - Basic (Velocity damping and gaussian noise)
+    - Gronbech Jensen [1]
     - BBK ( TODO)
     - SPV( TODO)
  Usage:
@@ -17,14 +18,14 @@
     auto pd = make_shared<ParticleData>(N,sys);
     auto pg = make_shared<ParticleGroup>(pd,sys, "All");
     
-    
-    VerletNVT::Parameters par;
+    using NVT = VerletNVT::GronbechJensen;
+    NVT::Parameters par;
      par.temperature = 1.0;
      par.dt = 0.01;
-     par.damping = 1.0;
+     par.viscosity = 1.0;
      par.is2D = false;
 
-    auto verlet = make_shared<VerletNVT>(pd, pg, sys, par);
+    auto verlet = make_shared<NVT>(pd, pg, sys, par);
       
     //Add any interactor
     verlet->addInteractor(...);
@@ -34,9 +35,13 @@
     
     verlet->forwardTime();
     
-TODO:
+-----
+References:
 
-100- Outsource thermostat logic to a functor (external or internal)
+[1] N. Gronbech-Jensen, and O. Farago: "A simple and effective Verlet-type
+algorithm for simulating Langevin dynamics", Molecular Physics (2013).
+http://dx.doi.org/10.1080/00268976.2012.760055 
+
 
  */
 #ifndef VERLETNVT_CUH
@@ -46,39 +51,53 @@ TODO:
 #include <curand.h>
 #include<thrust/device_vector.h>
 namespace uammd{
-  class VerletNVT: public Integrator{
-    real noiseAmplitude;
-    real dt, temperature, damping;    
-    bool is2D;
-    curandGenerator_t curng;
-    thrust::device_vector<real3> noise;
+  namespace VerletNVT{
+    class Basic: public Integrator{
+    protected:
+      real noiseAmplitude;
+      real dt, temperature, viscosity;    
+      bool is2D;
+      curandGenerator_t curng;
+      thrust::device_vector<real3> noise;
 
     
-    cudaStream_t forceStream, stream;
-    cudaEvent_t forceEvent;
-    int steps;
+      cudaStream_t forceStream, stream;
+      cudaEvent_t forceEvent;
+      int steps;
+      
+      void genNoise(cudaStream_t st);
+    public:
+      struct Parameters{
+	real temperature = 0;
+	real dt = 0;
+	real viscosity = 1.0;
+	bool is2D = false;
+      };
+      Basic(shared_ptr<ParticleData> pd,
+	    shared_ptr<ParticleGroup> pg,
+	    shared_ptr<System> sys,
+	    Parameters par);
+      ~Basic();
 
-
-    void genNoise(cudaStream_t st);
-  public:
-    struct Parameters{
-      real temperature = 0;
-      real dt = 0;
-      real damping = 1.0;
-      bool is2D = false;
+      virtual void forwardTime() override;
+      virtual real sumEnergy() override{ return 0;};
     };
-    VerletNVT(shared_ptr<ParticleData> pd,
-	      shared_ptr<ParticleGroup> pg,
-	      shared_ptr<System> sys,
-	      Parameters par);
-    ~VerletNVT();
 
-    virtual void forwardTime() override;
-    virtual real sumEnergy() override{ return 0;};
-  };
+    
+    class GronbechJensen: public Basic{
+    public:
+      using Basic::Basic;
+      using Parameters = Basic::Parameters;
 
+      virtual void forwardTime() override;
+      
+    };
+
+
+  }
 }
 
-#include"VerletNVT.cu"
+#include"VerletNVT/Basic.cu"
+#include"VerletNVT/GronbechJensen.cu"
 #endif
   
