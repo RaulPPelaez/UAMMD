@@ -131,7 +131,7 @@ int main(int argc, char *argv[]){
   auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
   
   //You can add as many modules as necessary
-  //verlet->addInteractor(pairforces);
+  verlet->addInteractor(pairforces);
 
 
 
@@ -152,7 +152,7 @@ int main(int argc, char *argv[]){
   tim.tic();
   int nsteps = std::atoi(argv[5]);
   int printSteps = std::atoi(argv[6]);
-  ofstream velout("vel.dat");
+  //ofstream velout("vel.dat");
   //Run the simulation
   forj(0,nsteps){
     //This will instruct the integrator to take the simulation to the next time step,
@@ -165,19 +165,19 @@ int main(int argc, char *argv[]){
       sys->log<System::DEBUG1>("[System] Writing to disk...");
       //continue;
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-      auto vel = pd->getVel(access::location::cpu, access::mode::read);
+      //auto vel = pd->getVel(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       out<<"#Lx="<<0.5*box.boxSize.x<<";Ly="<<0.5*box.boxSize.y<<";Lz="<<0.5*box.boxSize.z<<";"<<endl;
       real3 p;
-      velout<<"#"<<endl;
+      // velout<<"#"<<endl;
       fori(0,N){
 	real4 pc = pos.raw()[sortedIndex[i]];
-	p = make_real3(pc); //box.apply_pbc(make_real3(pc));
+	p = box.apply_pbc(make_real3(pc));
 	int type = pc.w;
 	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<endl;
-	velout<<vel.raw()[i].x<<" "<<vel.raw()[i].y<<" "<<vel.raw()[i].z<<"\n";
+	//velout<<vel.raw()[i].x<<" "<<vel.raw()[i].y<<" "<<vel.raw()[i].z<<"\n";
       }
-      velout<<flush;
+      //velout<<flush;
 
     }    
     //Sort the particles every few steps

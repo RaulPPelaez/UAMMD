@@ -132,12 +132,13 @@ int main(int argc, char *argv[]){
 
   //Some modules need additional parameters, in this case VerletNVT needs dt, temperature...
   //When additional parameters are needed, they need to be supplied in a form similar to this:
+  using NVT = VerletNVT::GronbechJensen;
   
-  VerletNVT::Parameters par;
+  NVT::Parameters par;
   par.temperature = 0.1;
   par.dt = std::stod(argv[3]);
-  par.damping = 1.0;  
-  auto verlet = make_shared<VerletNVT>(pd, pg, sys, par);
+  par.viscosity = 1.0/(6*M_PI);  
+  auto verlet = make_shared<NVT>(pd, pg, sys, par);
 
   //Harmonic walls acting on different particle groups
   //This two interactors will cause particles in group pg2 to stick to a wall in -Lz/4

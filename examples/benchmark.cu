@@ -94,12 +94,13 @@ int main(int argc, char *argv[]){
 
   //Some modules need additional parameters, in this case VerletNVT needs dt, temperature...
   //When additional parameters are needed, they need to be supplied in a form similar to this:
-  
-  VerletNVT::Parameters par;
+
+  using NVT = VerletNVT::GronbechJensen;
+  NVT::Parameters par;
   par.temperature = std::stod(argv[7]);
   par.dt = std::stod(argv[3]);
-  par.damping = 1.0;  
-  auto verlet = make_shared<VerletNVT>(pd, pg, sys, par);
+  par.viscosity = 1.0;  
+  auto verlet = make_shared<NVT>(pd, pg, sys, par);
 
 
   //Modules working with pairs of particles usually ask for a Potential object
