@@ -72,6 +72,11 @@ public:
     s[1] = x;
     return x + y;
   }
+  /* 32-bit (pseudo)random integer */
+  uint32_t next32(void){
+    return next()%std::numeric_limits<uint32_t>::max();
+  }
+
   /* Random number from a uniform distribution */
   double uniform(double min, double max){
     return min + (next()/((double) RANDOM_MAX))*(max - min);
