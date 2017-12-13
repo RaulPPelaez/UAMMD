@@ -602,6 +602,18 @@ VECATTR double3 make_double3(double a){
   return make_double3(a, a, a);
 }
 
+VECATTR double3 make_double3(double2 xy, double z){
+  return make_double3(xy.x, xy.y, z);
+}
+VECATTR double3 make_double3(double x, double2 yz){
+  return make_double3(x, yz.x, yz.y);
+}
+
+VECATTR double3 make_double3(double3 a){
+  return a;
+}
+
+
 VECATTR double3 make_double3(int3 a){
   return make_double3(a.x, a.y, a.z);
 }
@@ -748,6 +760,29 @@ VECATTR  double2 operator -(const double &b, const double2 &a){
 		      );
 }
 VECATTR  void operator -=(double2 &a, const double &b){a.x -= b; a.y -= b;}
+
+
+
+
+VECATTR  double2 operator +(const double2 &a, const double2 &b){
+  return make_double2(
+		      a.x + b.x,
+		      a.y + b.y
+		      );
+}
+VECATTR  void operator +=(double2 &a, const double2 &b){
+  a.x += b.x;
+  a.y += b.y;
+}
+VECATTR  double2 operator +(const double2 &a, const double &b){
+  return make_double2(
+		      a.x + b,
+		      a.y + b
+		      );
+}
+VECATTR  double2 operator +(const double &b, const double2 &a){ return a+b;}
+VECATTR  void operator +=(double2 &a, const double &b){a.x += b; a.y += b;}
+
 
 VECATTR  double2 operator *(const double2 &a, const double2 &b){
   return make_double2(a.x * b.x, a.y * b.y);
