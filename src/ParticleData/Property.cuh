@@ -22,27 +22,34 @@ namespace uammd{
   template<class T>
   class property_ptr{
     T *ptr;
-    bool &isBeingRead, &isBeingWritten;
+    bool *isBeingRead, *isBeingWritten;
     access::mode mode;
     access::location location;
   public:
-    property_ptr(T* ptr, bool &isBeingWritten, bool &isBeingRead, access::mode mode, access::location loc):
+    property_ptr():
+      ptr(nullptr),
+      isBeingRead(nullptr), isBeingWritten(nullptr), 
+      mode(access::mode::nomode),
+      location(access::location::nodevice){}
+    property_ptr(T* ptr, bool *isBeingWritten, bool *isBeingRead, access::mode mode, access::location loc):
       ptr(ptr),
       isBeingWritten(isBeingWritten),
       isBeingRead(isBeingRead),
       mode(mode), location(loc){
     
       if(mode==access::mode::write || mode==access::mode::readwrite){
-	isBeingWritten = true;
+	*isBeingWritten = true;
       }
       else{
-	isBeingRead = true;
+	*isBeingRead = true;
       }
     }
     ~property_ptr(){
-      if(mode==access::mode::write || mode==access::mode::readwrite) isBeingWritten = false;
-      else{
-	isBeingRead = false;
+      if(ptr){
+	if(mode==access::mode::write || mode==access::mode::readwrite) *isBeingWritten = false;
+	else{
+	  *isBeingRead = false;
+	}
       }
     }
     T* raw(){ return ptr;}
@@ -117,15 +124,15 @@ namespace uammd{
 	  CudaSafeCall(cudaMemcpy(hostPtr, devicePtr, N*sizeof(T), cudaMemcpyDeviceToHost));
 	  hostVectorNeedsUpdate=false;
 	}
-	return property_ptr<T>(hostPtr, this->isBeingWritten, this->isBeingRead, mode, dev);
+	return property_ptr<T>(hostPtr, &this->isBeingWritten, &this->isBeingRead, mode, dev);
       case access::location::gpu:
 	if(deviceVectorNeedsUpdate){
 	  CudaSafeCall(cudaMemcpy(devicePtr, hostPtr, N*sizeof(T), cudaMemcpyHostToDevice));
 	  deviceVectorNeedsUpdate=false;
 	}
-	return property_ptr<T>(devicePtr, this->isBeingWritten, this->isBeingRead, mode, dev);
+	return property_ptr<T>(devicePtr, &this->isBeingWritten, &this->isBeingRead, mode, dev);
       default:
-	return property_ptr<T>(nullptr, this->isBeingWritten, this->isBeingRead, mode, dev);
+	return property_ptr<T>(nullptr, &this->isBeingWritten, &this->isBeingRead, mode, dev);
       }
     }
     void forceUpdate(access::location dev){

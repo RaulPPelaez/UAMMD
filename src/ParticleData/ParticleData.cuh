@@ -174,6 +174,25 @@ namespace uammd{
     PROPERTY_LOOP(GET_PROPERTY)
     
 
+        //Generate getters for all properties except ID
+#define GET_PROPERTY_IF_ALLOC_T(Name,name)  GET_PROPERTY_IF_ALLOC_R(Name,name)
+#define GET_PROPERTY_IF_ALLOC_R(Name, name)					\
+    inline auto get ## Name ## IfAllocated(access::location dev, access::mode mode) -> decltype(name.data(dev,mode)){ \
+      if(!name.isAllocated()){                    \
+	decltype(name.data(dev,mode)) tmp;        \
+	return tmp;	                          \
+      }						  \
+      return this->get ## Name(dev,mode);	  \
+    }						  \
+    
+#define GET_PROPERTY_IF_ALLOC(r, data, tuple) GET_PROPERTY_IF_ALLOC_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
+
+    //Define getProperty() functions for all properties in list
+    PROPERTY_LOOP(GET_PROPERTY_IF_ALLOC)
+    
+
+
+    
     //Generate isPropAllocated for all properties
 #define IS_ALLOCATED_T(Name, name) IS_ALLOCATED_R(Name, name)    
 #define IS_ALLOCATED_R(Name, name)					\
@@ -338,6 +357,9 @@ namespace uammd{
 #undef IS_ALLOCATED_T
 #undef IS_ALLOCATED_R
 #undef IS_ALLOCATED
+#undef GET_PROPERTY_IF_ALLOC
+#undef GET_PROPERTY_IF_ALLOC_T
+#undef GET_PROPERTY_IF_ALLOC_R
 #undef APPLY_CURRENT_ORDER
 #undef APPLY_CURRENT_ORDER_R
 #undef RESIZE_PROPERTY_R
