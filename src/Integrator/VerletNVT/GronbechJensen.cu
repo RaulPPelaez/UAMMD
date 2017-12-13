@@ -1,10 +1,11 @@
 
-/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
+/*Raul P. Pelaez 2017. Verlet NVT Integrator Gronbech Jensen module.
 
   This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
   that conserves the temperature, volume and number of particles.
   
   The algorithm implemented is GronbechJensen[1]
+
  Usage:
  
     Create the module as any other integrator with the following parameters:
@@ -46,12 +47,18 @@ http://dx.doi.org/10.1080/00268976.2012.760055
 #define curandGenerateNormal curandGenerateNormalDouble
 #endif
 
-
+//See Basic.cu for initialization etc, this class is inherited from Basic
 namespace uammd{
   namespace VerletNVT{
     namespace GronbechJensen_ns{
 
       //Integrate the movement 1 dt and reset the forces in the first step
+      //Uses the Gronbech Jensen scheme[1]
+      //  r[t+dt] = r[t] + b·dt·v[t] + b·dt^2/(2·m) + b·dt/(2·m) · noise[t+dt]     
+      //  v[t+dt] = a·v[t] + dt/(2·m)·(a·f[t] + f[t+dt]) + b/m·noise[t+dt]
+      // b = 1/( 1 + \gamma·dt/(2·m))
+      // a = (1 - \gamma·dt/(2·m) ) ·b
+      // \gamma = 6*pi*viscosity*radius
       template<int step>
       __global__ void integrateGPU(real4 __restrict__  *pos,
 				   real3 __restrict__ *vel,
@@ -80,16 +87,20 @@ namespace uammd{
 	const real damping = real(6.0)*real(M_PI)*viscosity*radius_i;
 
 	if(step==1){
-	  real b = real(1.0)/(real(1.0) + damping*dt*invMass*real(0.5));
+	  const real gdthalfinvMass = damping*dt*invMass*real(0.5);
+	  const real b = real(1.0)/(real(1.0) + gdthalfinvMass);
 	
-	  real a = (real(1.0)-damping*dt*real(0.5)*invMass)*b;
+	  const real a = (real(1.0) - gdthalfinvMass)*b;
        
 	
 	  real3 p = make_real3(pos[i]);
-	  p = p +
-	    b*dt*vel[i] +
-	    b*dt*dt*real(0.5)*invMass*make_real3(force[i]) +
-	    b*dt*real(0.5)*invMass*sqrtf(2.0f*radius_i)*noise[id];
+	  p = p + b*dt*(
+			vel[i] +
+			real(0.5)*invMass*(
+					   dt*make_real3(force[i]) +
+					   sqrtf(2.0f*radius_i)*noise[id]
+					   )
+			);
 	
 	  pos[i] = make_real4(p, pos[i].w);
 
@@ -109,7 +120,7 @@ namespace uammd{
 
 
     }    
-      //Move the particles in my group 1 dt in time.
+    //Move the particles in my group 1 dt in time.
     void GronbechJensen::forwardTime(){
       for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
     
@@ -119,11 +130,9 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       //Handle if the number of particles in my group has changed
       if(noise.size() != numberParticles)  noise.resize(numberParticles);
-
     
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
     
       //First simulation step is special
       if(steps==1){
@@ -137,8 +146,6 @@ namespace uammd{
 	  forceComp->updateTimeStep(dt);
 	  forceComp->sumForce(forceStream);
 	}
-	/*Gen noise*/
-	genNoise(stream);
 	cudaDeviceSynchronize();
       }
       genNoise(stream);
@@ -157,7 +164,7 @@ namespace uammd{
 	//Second half of noise vector is used for first integration step
 	auto noise_ptr = thrust::raw_pointer_cast(noise.data());
       
-	/*First step integration and reset forces*/
+	//First step integration and reset forces
 
 	GronbechJensen_ns::integrateGPU<1><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
 								    vel.raw(),
@@ -171,14 +178,12 @@ namespace uammd{
       
       //Gen noise and compute forces at the same time
       cudaEventRecord(forceEvent, stream);
-      //Gen noise for two integration steps at once
-      genNoise(stream);
       //Compute all the forces
       cudaStreamWaitEvent(forceStream, forceEvent, 0);
       for(auto forceComp: interactors) forceComp->sumForce(forceStream);
       cudaEventRecord(forceEvent, forceStream);
     
-      //Second integration step
+      //Second integration step, does not need noise
       {
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
       

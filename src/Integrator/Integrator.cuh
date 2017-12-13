@@ -2,7 +2,10 @@
 
    An integrator has the ability to move the simulation one step forward in time.
    
-For that, it can use any number of interactors.
+   For that, it can use any number of interactors.
+
+Integrator is an UAMMD base module, 
+to create an Integrator module inherit from Integrator and overload the virtual methods.
 
 
  */

@@ -3,9 +3,9 @@
   This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
   that conserves the temperature, volume and number of particles.
 
-  For that several thermostats are (should be, currently only one) implemented:
+  For that several thermostats are implemented:
 
-    - Basic (Velocity damping and gaussian noise)
+    - Basic (Velocity damping and gaussian noise force)
     - Gronbech Jensen [1]
     - BBK ( TODO)
     - SPV( TODO)

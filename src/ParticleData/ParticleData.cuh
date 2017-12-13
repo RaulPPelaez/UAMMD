@@ -36,6 +36,11 @@
   To get the indices of particles in the original order (ordered by ID):
   int * originalOrder = pd->getIndexArrayById(access::location::cpu);
   particle zero would be: pos.raw()[originalOrder[0]];
+
+  //To get a property only if it has been asked for before (i.e if the mass has been set)
+  auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
+  //mass.raw() will be nullptr if mass has not been asked for before. 
+  //Note that this call will never allocate the property
     
   CONNECT TO A SIGNAL:
 
