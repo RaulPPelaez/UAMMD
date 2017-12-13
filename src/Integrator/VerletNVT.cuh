@@ -48,31 +48,34 @@ http://dx.doi.org/10.1080/00268976.2012.760055
 #define VERLETNVT_CUH
 
 #include "Integrator/Integrator.cuh"
-#include <curand.h>
-#include<thrust/device_vector.h>
+
 namespace uammd{
   namespace VerletNVT{
     class Basic: public Integrator{
-    protected:
-      real noiseAmplitude;
-      real dt, temperature, viscosity;    
-      bool is2D;
-      curandGenerator_t curng;
-      thrust::device_vector<real3> noise;
-
-    
-      cudaStream_t forceStream, stream;
-      cudaEvent_t forceEvent;
-      int steps;
-      
-      void genNoise(cudaStream_t st);
     public:
       struct Parameters{
 	real temperature = 0;
 	real dt = 0;
 	real viscosity = 1.0;
 	bool is2D = false;
-      };
+      };      
+    protected:
+      real noiseAmplitude;
+      uint seed;
+      real dt, temperature, viscosity;    
+      bool is2D;
+
+      cudaStream_t stream;
+      int steps;
+
+      //Constructor for derived classes
+      Basic(shared_ptr<ParticleData> pd,
+	    shared_ptr<ParticleGroup> pg,
+	    shared_ptr<System> sys,
+	    Parameters par,
+	    std::string name);
+
+    public:
       Basic(shared_ptr<ParticleData> pd,
 	    shared_ptr<ParticleGroup> pg,
 	    shared_ptr<System> sys,
@@ -86,7 +89,12 @@ namespace uammd{
     
     class GronbechJensen: public Basic{
     public:
-      using Basic::Basic;
+      GronbechJensen(shared_ptr<ParticleData> pd,
+		     shared_ptr<ParticleGroup> pg,
+		     shared_ptr<System> sys,
+		     Basic::Parameters par):
+	Basic(pd, pg, sys, par, "VerletNVT::GronbechJensen"){}
+	
       using Parameters = Basic::Parameters;
 
       virtual void forwardTime() override;

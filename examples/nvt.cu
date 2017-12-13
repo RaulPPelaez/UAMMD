@@ -23,7 +23,6 @@ You can visualize the reuslts with superpunto
 //This include contains the basic needs for an uammd project
 #include"uammd.cuh"
 //The rest can be included depending on the used modules
-//#include"Integrator/VerletNVTGJ.cuh"
 #include"Integrator/VerletNVT.cuh"
 #include"Interactor/NeighbourList/CellList.cuh"
 #include"Interactor/PairForces.cuh"
@@ -48,7 +47,7 @@ int main(int argc, char *argv[]){
   auto sys = make_shared<System>();
 
   //Modules will ask System when they need a random number (i.e for seeding the GPU RNG).
-  ullint seed = 0xf31337Bada55D00dULL;
+  ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
 
   //ParticleData stores all the needed properties the simulation will need.
@@ -64,11 +63,8 @@ int main(int argc, char *argv[]){
     //Ask pd for a property like so:
     auto pos = pd->getPos(access::location::cpu, access::mode::write);    
 
-    auto initial =  initLattice(box.boxSize*std::stod(argv[4]), N, fcc);
-    
-    //Start in a cubic lattice, pos.w contains the particle type
-    //auto initial = cubicLattice(box.boxSize, N);
-    
+    auto initial =  initLattice(box.boxSize*std::stod(argv[4]), N, fcc);    
+
     fori(0,N){
       pos.raw()[i] = initial[i];
       //Type of particle is stored in .w
@@ -134,7 +130,6 @@ int main(int argc, char *argv[]){
   verlet->addInteractor(pairforces);
 
 
-
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).
   //A maximum log level is set in System.cuh, every logging event with a level superior to the max will result in
   // absolutely no overhead, so dont be afraid to write System::DEBUGX log calls.
@@ -152,7 +147,7 @@ int main(int argc, char *argv[]){
   tim.tic();
   int nsteps = std::atoi(argv[5]);
   int printSteps = std::atoi(argv[6]);
-  //ofstream velout("vel.dat");
+  ofstream velout("vel.dat");
   //Run the simulation
   forj(0,nsteps){
     //This will instruct the integrator to take the simulation to the next time step,
@@ -165,19 +160,19 @@ int main(int argc, char *argv[]){
       sys->log<System::DEBUG1>("[System] Writing to disk...");
       //continue;
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-      //auto vel = pd->getVel(access::location::cpu, access::mode::read);
+      auto vel = pd->getVel(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       out<<"#Lx="<<0.5*box.boxSize.x<<";Ly="<<0.5*box.boxSize.y<<";Lz="<<0.5*box.boxSize.z<<";"<<endl;
       real3 p;
-      // velout<<"#"<<endl;
+      velout<<"#"<<endl;
       fori(0,N){
 	real4 pc = pos.raw()[sortedIndex[i]];
-	p = box.apply_pbc(make_real3(pc));
+	p =  box.apply_pbc(make_real3(pc));
 	int type = pc.w;
 	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<endl;
-	//velout<<vel.raw()[i].x<<" "<<vel.raw()[i].y<<" "<<vel.raw()[i].z<<"\n";
+	velout<<vel.raw()[i].x<<" "<<vel.raw()[i].y<<" "<<vel.raw()[i].z<<"\n";
       }
-      //velout<<flush;
+      velout<<flush;
 
     }    
     //Sort the particles every few steps

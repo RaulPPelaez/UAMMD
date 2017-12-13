@@ -10,6 +10,7 @@
      B - sqrt(M)
 */
 #include"BrownianDynamics.cuh"
+#include"third_party/saruprng.cuh"
 
 namespace uammd{
   namespace BD{
@@ -27,18 +28,12 @@ namespace uammd{
       is2D(par.is2D),
       steps(0){
 
+      sys->rng().next32();
+      sys->rng().next32();
+      seed = sys->rng().next32();
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] Initialized");
       
       int numberParticles = pg->getNumberParticles();
-
-      if(temperature>real(0.0)){
-	noise.resize(3*numberParticles + ((3*numberParticles)%2));
-	curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
-	curandSetPseudoRandomGeneratorSeed(curng, sys->rng().next());
-	auto d_noise = thrust::raw_pointer_cast(noise.data());
-	curandGenerateNormal(curng, d_noise, noise.size(),  0.0, 1.0);	
-      }
-
 
       this->selfMobility = 1.0/(6.0*M_PI*par.viscosity);
 
@@ -89,7 +84,6 @@ namespace uammd{
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Starting in 2D mode");
       }
 
-      cudaStreamCreate(&noiseStream);
       cudaStreamCreate(&forceStream);
 
     }
@@ -97,8 +91,6 @@ namespace uammd{
 
     EulerMaruyama::~EulerMaruyama(){
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] Destroyed");
-      if(this->is2D)curandDestroyGenerator(curng);
-      cudaStreamDestroy(noiseStream);
       cudaStreamDestroy(forceStream);		     
     }
 
@@ -108,18 +100,20 @@ namespace uammd{
       __global__ void integrateGPU(real4 __restrict__  *pos,
 				   ParticleGroup::IndexIterator indexIterator,
 				   const real4 __restrict__  *force,
-				   const real3 __restrict__ *dW,
+				   //const real3 __restrict__ *dW,
 				   real3 Kx, real3 Ky, real3 Kz,
 				   real selfMobility,
 				   real * radius,
 				   real dt,
 				   bool is2D,
 				   real sqrt2MTdt,
-				   int N){
+				   int N,
+				   uint stepNum, uint seed){
 	uint id = blockIdx.x*blockDim.x+threadIdx.x;
 	if(id>=N) return;
 
 	int i = indexIterator[id];
+	
 	/*Half step velocity*/	
 	real3 p = make_real3(pos[i]);
 	real3 f = make_real3(force[i]);
@@ -132,10 +126,16 @@ namespace uammd{
 	if(radius) invRadius = real(1.0)/radius[i];
 	// X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2·T·dt)·dW·B
 	p += dt*( KR + selfMobility*invRadius*f);
-	if(dW){ //When temperature > 0
+	if(sqrt2MTdt > real(0.0)){ //When temperature > 0
+	  Saru rng(id, stepNum, seed);
 	  real sqrtInvRadius = real(1.0);
 	  if(radius) sqrtInvRadius = sqrtf(invRadius);
-	  p += sqrt2MTdt*dW[i]*sqrtInvRadius;
+	  const real noiseAmplitude = sqrt2MTdt*sqrtInvRadius;
+	  real3 dW = make_real3(rng.gf(0, noiseAmplitude), 0);
+	  
+	  if(!is2D)   dW.z = rng.gf(0, noiseAmplitude).x;
+	  
+	  p += dW;
 	}
 
 	pos[i].x = p.x;
@@ -182,33 +182,21 @@ namespace uammd{
 	d_radius = radius.raw();
 	sys->log<System::DEBUG3>("[BD::EulerMaruyama] Using particle radius.");
       }
+          
       
-
-      real3 * d_noise = nullptr;
-      if(temperature > real(0.0)){
-	curandSetStream(curng, noiseStream);
-	noise.resize(3*numberParticles + ((3*numberParticles)%2));
-	d_noise = (real3*)thrust::raw_pointer_cast(noise.data());
-	curandGenerateNormal(curng, (real*)d_noise, noise.size(),  0.0, 1.0);	
-      }
-
-      
-    
-      
-
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       EulerMaruyama_ns::integrateGPU<<<Nblocks, Nthreads>>>(pos.raw(),
 							    groupIterator,
 							    force.raw(),
-							    d_noise,
 							    Kx, Ky, Kz,
 							    selfMobility,
 							    d_radius,
 							    dt,
 							    is2D,
 							    sqrt2MTdt,
-							    numberParticles);
+							    numberParticles,
+							    steps, seed);
 
     }
     

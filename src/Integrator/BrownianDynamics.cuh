@@ -56,11 +56,6 @@ See exampleS/BD.cu for an example
 #define BROWNIANEULERMARUYAMAINTEGRATOR_CUH
 #include"global/defines.h"
 #include"Integrator.cuh"
-#include<curand.h>
-
-#ifndef SINGLE_PRECISION
-#define curandGenerateNormal curandGenerateNormalDouble
-#endif
 
 namespace uammd{
   namespace BD{    
@@ -96,16 +91,14 @@ namespace uammd{
       real hydrodynamicRadius = real(-1.0);
       real temperature = real(0.0);
       real sqrt2MTdt;
-      real dt;
-  
-      thrust::device_vector<real> noise;
-      curandGenerator_t curng;
+      real dt;  
 
       bool is2D;
 
-      cudaStream_t noiseStream, forceStream;
+      cudaStream_t forceStream;
       
       int steps;
+      uint seed;
     };
   }
 }

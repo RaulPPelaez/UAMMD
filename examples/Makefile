@@ -8,10 +8,10 @@ DEBUG= -O3
 
 BASIC_LINE= nvcc  $(DOUBLE_PRECISION) -lineinfo -I ../src -O3 -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -arch=sm_52 -x cu -std=c++11 --expt-relaxed-constexpr  
 all:
-	$(BASIC_LINE)  $(FILE) -lcurand
+	$(BASIC_LINE)  $(FILE)
 
 lj:
-	$(BASIC_LINE) LJ.cu -lcurand
+	$(BASIC_LINE) LJ.cu
 
 bdhi:
 	$(BASIC_LINE) BDHI.cu -lcurand -lcublas -lcusolver -llapacke -lcblas -lnvToolsExt

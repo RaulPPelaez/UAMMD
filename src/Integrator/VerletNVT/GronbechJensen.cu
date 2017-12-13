@@ -47,6 +47,7 @@ http://dx.doi.org/10.1080/00268976.2012.760055
 #define curandGenerateNormal curandGenerateNormalDouble
 #endif
 
+#include"third_party/saruprng.cuh"
 //See Basic.cu for initialization etc, this class is inherited from Basic
 namespace uammd{
   namespace VerletNVT{
@@ -65,15 +66,18 @@ namespace uammd{
 				   real4 __restrict__  *force,
 				   const real __restrict__ *mass,
 				   const real __restrict__ *radius,				   
-				   const real3 __restrict__ *noise,
 				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
-				   real dt, real viscosity, bool is2D){
+				   real dt, real viscosity, bool is2D,
+				   real noiseAmplitude,
+				   uint stepNum, uint seed){
 	const int id = blockIdx.x*blockDim.x+threadIdx.x;
 	if(id>=N) return;
+	
 	//Index of current particle in group
 	const int i = indexIterator[id];       
 
+	Saru rng(id, stepNum, seed);
 
 	real invMass = real(1.0);
 	if(mass){
@@ -83,6 +87,9 @@ namespace uammd{
 	if(radius){
 	  radius_i = radius[i];
 	}
+
+	noiseAmplitude *= sqrtf(radius_i)*invMass;
+	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), rng.gf(0, noiseAmplitude).x); //noise[id];
 	
 	const real damping = real(6.0)*real(M_PI)*viscosity*radius_i;
 
@@ -96,17 +103,17 @@ namespace uammd{
 	  real3 p = make_real3(pos[i]);
 	  p = p + b*dt*(
 			vel[i] +
-			real(0.5)*invMass*(
-					   dt*make_real3(force[i]) +
-					   sqrtf(2.0f*radius_i)*noise[id]
-					   )
+			real(0.5)*(
+				   (dt*invMass)*make_real3(force[i]) +
+				   noisei
+				   )
 			);
 	
 	  pos[i] = make_real4(p, pos[i].w);
 
 	  vel[i] = a*vel[i] +
 	    dt*real(0.5)*invMass*a*make_real3(force[i]) +
-	    b*invMass*sqrtf(2.0f*radius_i)*noise[id];
+	    b*noisei;
 	  
 	  if(is2D) vel[i].z = real(0.0);
 	  
@@ -128,8 +135,6 @@ namespace uammd{
       sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
     
       int numberParticles = pg->getNumberParticles();
-      //Handle if the number of particles in my group has changed
-      if(noise.size() != numberParticles)  noise.resize(numberParticles);
     
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
@@ -144,11 +149,10 @@ namespace uammd{
 	for(auto forceComp: interactors){
 	  forceComp->updateTemperature(temperature);
 	  forceComp->updateTimeStep(dt);
-	  forceComp->sumForce(forceStream);
+	  forceComp->sumForce(stream);
 	}
 	cudaDeviceSynchronize();
       }
-      genNoise(stream);
       //First integration step
       {
 
@@ -161,27 +165,20 @@ namespace uammd{
 	//Mass is assumed 1 for all particles if it has not been set.
 	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
 	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
-	//Second half of noise vector is used for first integration step
-	auto noise_ptr = thrust::raw_pointer_cast(noise.data());
       
 	//First step integration and reset forces
-
 	GronbechJensen_ns::integrateGPU<1><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
 								    vel.raw(),
 								    force.raw(),
 								    mass.raw(),
 								    radius.raw(),
-								    noise_ptr,
 								    groupIterator,
-								    numberParticles, dt, viscosity, is2D);
+								    numberParticles, dt, viscosity, is2D,
+								    noiseAmplitude,
+								    steps, seed);
       }      
       
-      //Gen noise and compute forces at the same time
-      cudaEventRecord(forceEvent, stream);
-      //Compute all the forces
-      cudaStreamWaitEvent(forceStream, forceEvent, 0);
-      for(auto forceComp: interactors) forceComp->sumForce(forceStream);
-      cudaEventRecord(forceEvent, forceStream);
+      for(auto forceComp: interactors) forceComp->sumForce(stream);
     
       //Second integration step, does not need noise
       {
@@ -189,23 +186,20 @@ namespace uammd{
       
 	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 	auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
-	auto force = pd->getForce(access::location::gpu, access::mode::read);
-      
-	auto noise_ptr = thrust::raw_pointer_cast(noise.data());
+	auto force = pd->getForce(access::location::gpu, access::mode::read);      
       
 	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
 	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
 
-      	//Wait untill all forces have been summed
-	cudaStreamWaitEvent(stream, forceEvent, 0);
 	GronbechJensen_ns::integrateGPU<2><<<Nblocks, Nthreads, 0 , stream>>>(pos.raw(),
 						vel.raw(),
 						force.raw(),
 						mass.raw(),
 						radius.raw(),
-						noise_ptr,
 						groupIterator,
-						numberParticles, dt, viscosity, is2D);      
+					        numberParticles, dt, viscosity, is2D,
+					        noiseAmplitude,
+						steps, seed);      
       }
 
     }
