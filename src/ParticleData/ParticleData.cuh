@@ -82,12 +82,13 @@
 #include"ParticleData/Property.cuh"
 #include"utils/ParticleSorter.cuh"
 
-#include<boost/signals2.hpp>
+//#include<boost/signals2.hpp>
+#include<third_party/nod/nod.hpp>
 //#include<boost/signals2/signal_type.hpp>
-#include<boost/preprocessor.hpp>
-#include <boost/preprocessor/stringize.hpp>
-#include<boost/preprocessor/seq/for_each.hpp>
-#include<boost/preprocessor/tuple/elem.hpp>
+#include<third_party/boost/preprocessor.hpp>
+#include<third_party/boost/preprocessor/stringize.hpp>
+#include<third_party/boost/preprocessor/seq/for_each.hpp>
+#include<third_party/boost/preprocessor/tuple/elem.hpp>
 #include<thrust/device_vector.h>
 
 #include"utils/vector.cuh"
@@ -111,13 +112,18 @@
 namespace uammd{
 
   template<class T>
-  using signal = typename boost::signals2::signal_type
-    <
-    T,
-      boost::signals2::keywords::mutex_type<boost::signals2::dummy_mutex>
-      >::type;
+  using signal = typename nod::unsafe_signal<T>;
 
-  using connection = boost::signals2::connection;
+  using connection = nod::connection;
+
+  // template<class T>
+  // using signal = typename boost::signals2::signal_type
+  //   <
+  //   T,
+  //     boost::signals2::keywords::mutex_type<boost::signals2::dummy_mutex>
+  //     >::type;
+
+  // using connection = boost::signals2::connection;
   
   
   //Get the Name (first letter capital) from a tuple in the property list

@@ -41,7 +41,7 @@
 #include"System/System.h"
 #include"ParticleData/ParticleData.cuh"
 #include<thrust/device_vector.h>
-#include<cub/cub.cuh>
+#include<third_party/cub/cub.cuh>
 
 #include"third_party/type_names.h"
 namespace uammd{

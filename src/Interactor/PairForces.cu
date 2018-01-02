@@ -12,7 +12,7 @@
   See misc/Potential.cuh and https://github.com/RaulPPelaez/UAMMD/wiki/Potential for more info on potentials and how to implement them.
 */
 
-#include<cub/cub.cuh>
+#include<third_party/cub/cub.cuh>
 
 #include"utils/GPUUtils.cuh"
 

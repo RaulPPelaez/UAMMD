@@ -32,7 +32,7 @@ REFERENCES:
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
 #include"System/System.h"
-#include<cub/cub.cuh>
+#include<third_party/cub/cub.cuh>
 
 namespace uammd{
   
