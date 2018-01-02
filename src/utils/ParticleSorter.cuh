@@ -84,7 +84,7 @@ namespace uammd{
     /*In case old position is a texture*/
     template<class InputIterator, class OutputIterator>
     __global__ void reorderArray(const InputIterator old,
-				 OutputIterator  __restrict__ sorted,
+				 OutputIterator sorted,
 				 int* __restrict__ pindex, int N){
       int i = blockIdx.x*blockDim.x + threadIdx.x;   
       if(i>=N) return;
