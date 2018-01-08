@@ -93,3 +93,13 @@
 #include "util_ptx.cuh"
 #include "util_type.cuh"
 
+//NVCC will complain when compiling with Cuda < 9.0 for these two being redefined
+#if __CUDACC_VER_MAJOR__ < 9000
+#ifdef CubDebug
+#undef CubDebug
+#endif
+#ifdef CubDebugExit
+#undef CubDebugExit
+#endif
+#endif
+
