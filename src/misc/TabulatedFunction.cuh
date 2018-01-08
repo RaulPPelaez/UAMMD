@@ -25,8 +25,6 @@
 
 #include"global/defines.h"
 
-#include<thrust/device_vector.h>
-
 namespace uammd{
 
   template <typename T, typename T2>
@@ -90,14 +88,14 @@ namespace uammd{
       interp()    
     {
 
-      thrust::host_vector<T> tableCPU(Ntable+1);
+      std::vector<T> tableCPU(Ntable+1);
 
       for(int i = 0; i<=Ntable; i++){
 	double x = (i/(double)(Ntable))*(rmax-rmin) + rmin;
 	tableCPU[i] = foo(x);
       }    
       cudaMemcpy(table,
-		 thrust::raw_pointer_cast(tableCPU.data()),
+		 tableCPU.data(),
 		 (Ntable+1)*sizeof(T),
 		 cudaMemcpyHostToDevice);
     
