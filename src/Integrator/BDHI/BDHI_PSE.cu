@@ -1053,4 +1053,5 @@ namespace uammd{
  
     }
   }
+#undef TPP
 }
