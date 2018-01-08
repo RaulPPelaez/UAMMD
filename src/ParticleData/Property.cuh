@@ -131,6 +131,7 @@ namespace uammd{
 	  deviceVectorNeedsUpdate=false;
 	}
 	return property_ptr<T>(devicePtr, &this->isBeingWritten, &this->isBeingRead, mode, dev);
+      case access::location::nodevice:
       default:
 	return property_ptr<T>(nullptr, &this->isBeingWritten, &this->isBeingRead, mode, dev);
       }
@@ -143,6 +144,10 @@ namespace uammd{
       case access::location::gpu:
 	this->deviceVectorNeedsUpdate = true;
 	break;
+      case access::location::nodevice:
+      default:
+	this->deviceVectorNeedsUpdate = false;
+	
       }
     }
     string getName(){ return this->name;}

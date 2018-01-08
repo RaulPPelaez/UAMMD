@@ -39,7 +39,7 @@ namespace uammd{
 
     ~PairForces(){}
 
-    void updateBox(Box box){
+    void updateBox(Box box) override{
       sys->log<System::DEBUG3>("[PairForces] Box updated.");
       this->box = box;
       //In case the potential wants to handle updateBox
