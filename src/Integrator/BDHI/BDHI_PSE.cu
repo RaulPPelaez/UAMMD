@@ -156,6 +156,9 @@ namespace uammd{
       temperature(par.temperature),
       box(par.box), grid(box, int3()),
       psi(1.5){
+      if(box.boxSize.x == real(0.0) && box.boxSize.y == real(0.0) && box.boxSize.z == real(0.0)){
+	sys->log<System::CRITICAL>("[BDHI::PSE] Box of size zero detected, cannot work without a box! (make sure a box parameter was passed)");
+      }
       this->lanczosTolerance = 0.05;
       this->lanczos = std::make_shared<LanczosAlgorithm>(sys, lanczosTolerance);
   
@@ -235,9 +238,14 @@ namespace uammd{
       grid = Grid(box, cellDim);
 
       /*Print information*/
+      sys->log<System::MESSAGE>("[BDHI::PSE] Box Size: %f %f %f", box.boxSize.x, box.boxSize.y, box.boxSize.z);
       sys->log<System::MESSAGE>("[BDHI::PSE] Splitting factor: %f",psi);  
       sys->log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f",rcut);
+      int3 cDSR = make_int3(box.boxSize/rcut + 0.5);
+      sys->log<System::MESSAGE>("[BDHI::PSE] Close range grid size: %d %d %d", cDSR.x, cDSR.y, cDSR.z);
+
       sys->log<System::MESSAGE>("[BDHI::PSE] Far range wave number cut off: %f", kcut);
+      sys->log<System::MESSAGE>("[BDHI::PSE] Far range grid size: %d %d %d", cellDim.x, cellDim.y, cellDim.z);
   
       cudaStreamCreate(&stream);
       cudaStreamCreate(&stream2);
@@ -313,7 +321,8 @@ namespace uammd{
 
       if(cufftStatus != CUFFT_SUCCESS){
 	sys->log<System::CRITICAL>("[BDHI::PSE] Problem setting up cuFFT Forward!");
-      }  
+      }
+      sys->log<System::DEBUG>("[BDHI::PSE] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
       /*Same as above, but with C2R for inverse FFT*/
       cufftStatus = cufftPlanMany(&cufft_plan_inverse,
 				  3, &cdtmp.x, /*Three dimensional FFT*/
