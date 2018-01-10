@@ -74,6 +74,7 @@ namespace uammd{
 
   template<class BondType>
   BondedForces<BondType>::~BondedForces(){
+    cudaDeviceSynchronize();
     sys->log<System::MESSAGE>("[BondedForces] Destroyed");
   }
 
@@ -242,7 +243,7 @@ namespace uammd{
 					const int * __restrict__ id2index){
       extern __shared__ char shMem[];
       
-      real4 *forceTotal = (real4*) shMem; //Each thread has a force
+      real3 *forceTotal = (real3*) shMem; //Each thread has a force
 
       /*
       real4 &posi = *((real4*)(shMem+blockDim.x*sizeof(real4)));
@@ -267,7 +268,7 @@ namespace uammd{
       //Each thread in a block computes the force on particle p due to one (or several) bonds
       
             
-      real4 f = make_real4(real(0.0));
+      real3 f = make_real3(real(0.0));
           
       //__syncthreads();    
       for(int b = threadIdx.x; b<nbonds; b += blockDim.x){
@@ -281,9 +282,7 @@ namespace uammd{
 	//Compute force
 	real3 r12 =  posi-posj;
       
-	const real fmod = bondForce.force(p, j, r12, bondList[b].bond_info);
-
-	f += make_real4(fmod*r12);
+	f += bondForce.force(p, j, r12, bondList[b].bond_info);
 
       }
 
@@ -292,12 +291,12 @@ namespace uammd{
       __syncthreads();
       //TODO Implement a warp reduction
       if(threadIdx.x==0){
-	real4 ft = make_real4(0.0f);
+	real3 ft = make_real3(0.0f);
 	for(int i=0; i<blockDim.x; i++){
 	  ft += forceTotal[i];
 	}
 	/*Write to global memory*/
-	force[id2index[p]] += ft;
+	force[id2index[p]] += make_real4(ft);
       }
 
     }
@@ -311,7 +310,7 @@ namespace uammd{
 						  const int * __restrict__ id2index){
       extern __shared__ char shMem[];
       
-      real4 *forceTotal = (real4*) shMem; //Each thread has a force
+      real3 *forceTotal = (real3*) shMem; //Each thread has a force
 
       /*
       real4 &posi = *((real4*)(shMem+blockDim.x*sizeof(real4)));
@@ -336,7 +335,7 @@ namespace uammd{
       //Each thread in a block computes the force on particle p due to one (or several) bonds
       
             
-      real4 f = make_real4(real(0.0));          
+      real3 f = make_real3(real(0.0));          
 
 
       //__syncthreads();    
@@ -348,9 +347,9 @@ namespace uammd{
 	//Compute force
 	const real3 r12 =  posi - bond.pos;
       
-	const real fmod = bondForce.force(p,-1, r12, bondList[b].bond_info);                  
+        
 
-	f += make_real4(fmod*r12);
+	f += bondForce.force(p,-1, r12, bondList[b].bond_info);
       }
 
       /*The first thread sums all the contributions*/
@@ -358,12 +357,12 @@ namespace uammd{
       __syncthreads();
       //TODO Implement a warp reduction
       if(threadIdx.x==0){
-	real4 ft = make_real4(0.0f);
+	real3 ft = make_real3(0.0f);
 	for(int i=0; i<blockDim.x; i++){
 	  ft += forceTotal[i];
 	}
 	/*Write to global memory*/
-	force[id2index[p]] += ft;
+	force[id2index[p]] += make_real4(ft);
       }
 
     }
@@ -391,7 +390,7 @@ namespace uammd{
 	<<<
 	Nparticles_with_bonds,
 	TPP,
-	TPP*sizeof(real4),//+2*sizeof(int)+sizeof(real)+sizeof(Bond*),
+	TPP*sizeof(real3),//+2*sizeof(int)+sizeof(real)+sizeof(Bond*),
 	st>>>(
 	      force.raw(), pos.raw(),
 	      d_bondStart, d_nbondsPerParticle,
@@ -409,7 +408,7 @@ namespace uammd{
       auto d_bondStart = thrust::raw_pointer_cast(bondStartFP.data());
       auto d_nbondsPerParticle = thrust::raw_pointer_cast(nbondsPerParticleFP.data());      
       BondedForces_ns::computeBondedForcesFixedPoint
-	<<<numberParticlesWithBonds,	TPP, TPP*sizeof(real4), st>>>(
+	<<<numberParticlesWithBonds,	TPP, TPP*sizeof(real3), st>>>(
 								      force.raw(), pos.raw(),
 								      d_bondStart,
 								      d_nbondsPerParticle,

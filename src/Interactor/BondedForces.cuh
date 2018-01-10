@@ -56,14 +56,17 @@ namespace uammd{
     /*Needs a struct called BondInfo with 
       the parameters that characterize a bond*/
     struct BondInfo{
-      real r0, k;
+      real k, r0;
     };
-    /*A device function called force with these arguments that returns f/r for a given bond.
+    /*A device function called force with these arguments that returns the force for a given bond.
       Note that this function will be called for ij and ji*/
-    /*In the case of a Fixed Point bond, j will be 0*/
-    inline __device__ real force(int i, int j, const real3 &r12, const BondInfo &bi){
+    /*In the case of a Fixed Point bond, j will be -1*/
+      //i,j: id of particles in bond
+      //r12: ri-rj
+      //bi: bond information.
+    inline __device__ real3 force(int i, int j, const real3 &r12, const BondInfo &bi){
       real r2 = dot(r12, r12);
-      if(r2==real(0.0)) return real(0.0);
+      if(r2==real(0.0)) return make_real3(0.0);
       
 #ifdef SINGLE_PRECISION
       real invr = rsqrtf(r2);
@@ -71,7 +74,7 @@ namespace uammd{
       real invr = rsqrt(r2);
 #endif
       real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
-      return f;
+      return f*r12;
     }
     /*A function called readbond that reads a bond from in (the bond file).
       This function will be called for every line in the file except for the first*/
@@ -101,7 +104,7 @@ namespace uammd{
     struct HarmonicPBC: public Harmonic{
     Box box;
       HarmonicPBC(Box box): box(box){}
-    inline __device__ real force(int i, int j, const real3 &r12, const BondInfo &bi){      
+    inline __device__ real3 force(int i, int j, const real3 &r12, const BondInfo &bi){      
       return Harmonic::force(i, j, box.apply_pbc(r12), bi);
     }
     
@@ -114,11 +117,11 @@ namespace uammd{
     struct BondInfo{
       real r0, k;
     };
-    inline __device__ real force(int i, int j, const real3 &r12, const BondInfo &bi){
+    inline __device__ real3 force(int i, int j, const real3 &r12, const BondInfo &bi){
       real r2 = dot(r12, r12);
       real r02 = bi.r0*bi.r0;
     
-      return -r02*bi.k/(r02-r2); 
+      return -r02*bi.k/(r02-r2)*r12; 
     }    
     inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
       real r2 = dot(r12, r12);
@@ -202,5 +205,9 @@ private:
 #include"BondedForces.cu"
 
 #endif
+
+
+
+
 
 
