@@ -45,7 +45,8 @@ namespace uammd{
     LanczosAlgorithm(shared_ptr<System> sys, real tolerance = 1e-3);
     void init();
     ~LanczosAlgorithm(){
-      cublasDestroy_v2(cublas_handle);
+      CublasSafeCall(cublasDestroy_v2(cublas_handle));
+      sys->log<System::DEBUG>("[LanczosAlgorithm] Destroyed");
     }
 
     //Fill the first N values of V and pass it to solve as "v" instead of an external array,

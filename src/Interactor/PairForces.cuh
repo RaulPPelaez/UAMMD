@@ -37,7 +37,9 @@ namespace uammd{
       PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, pot, par){
     }
 
-    ~PairForces(){}
+    ~PairForces(){
+      sys->log<System::MESSAGE>("[PairForces] Destroyed.");
+    }
 
     void updateBox(Box box) override{
       sys->log<System::DEBUG3>("[PairForces] Box updated.");
