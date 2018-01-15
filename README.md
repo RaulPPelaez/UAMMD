@@ -84,8 +84,6 @@ You can select between single and double precision via global/defines.h. Single 
 ## USAGE
 
 -------------------
-If you dont have cub (thrust comes bundled with the CUDA installation) clone or download the v1.5.2 (see dependencies).
-The whole cub repository uses 175mb, so I advice to download the v1.5.2 zip only.  
 
 **UAMMD does not need to be compiled (it is header only)**.  
 
@@ -94,26 +92,26 @@ See examples/LJ.cu and examples/Makefile for a tutorial!
 
 In order to compile a source file that uses UAMMD, you only have to inform the compiler of the location of the project (with -I) and give the flag "--expt-relaxed-constexpr" to nvcc.  
 See examples/Makefile for an example.  
+See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for more information.  
 
 You can use the --device X flag to specify a certain GPU.  
-
 
 ## DEPENDENCIES
 
 ---------------------
 Depends on:
 
-	1. CUB       (v1.5.2 used)                  :   https://github.com/NVlabs/cub
-	2. thrust    (v1.8.2 bundled with CUDA used):   https://github.com/thrust/thrust
-	3. CUDA 6.5+ (v7.5 used)                    :   https://developer.nvidia.com/cuda-downloads
-	4. BOOST 1.58.0+                            :   http://www.boost.org/
+	1. thrust                                   :   https://github.com/thrust/thrust
+	1. CUDA 7.5+                                :   https://developer.nvidia.com/cuda-downloads
+
 This code makes use of the following CUDA packages:
 	
 	1. cuRAND
 	2. cuBLAS
 	3. cuSolver
 	
-	
+See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for more information.  
+
 ## REQUERIMENTS  
 
 --------------------  
@@ -128,7 +126,7 @@ Needs a c++ compiler with full C++11 support, 4.8+ recommended
      - GTX980 (sm_52), GTX780 (sm_35), GTX480(sm_20) and GTX580(sm_20) on CentOS 6.5 with CUDA 7.5 and g++ 4.8
 	 - GTX1080 (sm_61), Tesla P1000 (sm_60) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
      - K40 (sm_35), GTX780(sm_35) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
-     - Same as above with CUDA 9.0 and CUDA 8.0
+     - Same as above with CUDA 9.0, CUDA 9.1 (only for sm>20) and CUDA 8.0
 
 
 ## NOTES FOR DEVELOPERS
@@ -149,7 +147,7 @@ Some things to take into account:
 	2. ParticleData can also change the storage location of the particle arrays, so do not store raw pointers to particle properties, always ask PD for them before using them with ParticleData::get*()
 	3. In the modules where it makes sense, make them be able to handle ParticleGroups (which will contain all particles by default). See PairForces.cuh for an example of a module handling ParticleGroups.
 	4. UAMMD usually uses the lazy initialization scheme, nothing is initialized unless it is absolutely necessary. For example, the CPU version of a particle property (and the GPU version FWIW) will not be allocated until someone asks for it with pd->get*().  
-	5. Using the "real" type and "make_real" type will ensure precision agnostic code, as real is an alias to either float or double depending on the precisio mode.
+	5. Using the "real" type and "make_real" type will ensure precision agnostic code, as real is an alias to either float or double depending on the precision mode.
 	
 Some advice:
 
@@ -175,9 +173,9 @@ If you want to make small changes to an existing module, without changing it. Th
 
 ## ACKNOWLEDGMENTS
 
-UAMMD was developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.
+UAMMD was developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.  
 
-Acknowledgment is made to NVIDIA Corporation.
+Acknowledgment is made to NVIDIA Corporation.  
 
 ## Colaborators
 
