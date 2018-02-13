@@ -15,6 +15,9 @@ all:
 lj:
 	$(BASIC_LINE) LJ.cu
 
+dpd:
+	$(BASIC_LINE) DPD.cu
+
 nvt:
 	$(BASIC_LINE) nvt.cu
 
