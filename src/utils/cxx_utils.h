@@ -55,27 +55,27 @@ namespace uammd{
   struct make_index_sequence<0, Is...> : index_sequence<Is...> {};
 
 namespace SFINAE{
+  //This magic macro creates a struct such as has_X<T>::value will be true if
+  // T has a callable member called X and false otherwise
+#define SFINAE_DEFINE_HAS_MEMBER(X)			\
+  template <typename T>  \
+  class has_##X  \
+  {  \
+    typedef char one;  \
+    typedef long two;  \
+  \
+    template <typename C> static one test( decltype(&C::X) ) ;  \
+    template <typename C> static two test(...);  \
+  \
+  public:  \
+    enum { value = sizeof(test<T>(0)) == sizeof(char) };  \
+  };  \
 
+  
+// For Transversers, detects if a Transverser has getSharedMemorySize, therefore needing to allocate extra shared memory when launching a kernel that involves it.
+  SFINAE_DEFINE_HAS_MEMBER(getSharedMemorySize)
 
-
-/*For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser*/
-  template <typename T>
-  class has_getSharedMemorySize
-  {
-    typedef char one;
-    typedef long two;
-
-    template <typename C> static one test( decltype(&C::getSharedMemorySize) ) ;
-    template <typename C> static two test(...);
-
-  public:
-    enum { value = sizeof(test<T>(0)) == sizeof(char) };
-  };
-
-
-
-  /*Delegator can generalize a Transverser to use it as a general transverser
-    even when no getInfo is present*/
+  //This delegator allows to ask a Transverser for the shared memory it needs even when getSharedMemorySize() is not present
   template<class T, bool general = has_getSharedMemorySize<T>::value>
   class SharedMemorySizeDelegator;
 
@@ -100,20 +100,8 @@ namespace SFINAE{
 
 
   
-/*For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser*/
-template <typename T>
-class has_getInfo
-{
-  typedef char one;
-  typedef long two;
-
-  template <typename C> static one test( decltype(&C::getInfo) ) ;
-  template <typename C> static two test(...);
-
-public:
-  enum { value = sizeof(test<T>(0)) == sizeof(char) };
-};
-
+  //For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser
+  SFINAE_DEFINE_HAS_MEMBER(getInfo);
 
 
   /*Delegator can generalize a Transverser to use it as a general transverser
