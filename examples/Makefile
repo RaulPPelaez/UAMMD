@@ -1,4 +1,6 @@
 
+#WARNING: You should probably change the compute architecture for your GPU in BASIC_LINE
+
 FILE=benchmark.cu
 
 CPU= -O3 -funroll-loops -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers -march=native -fPIC
