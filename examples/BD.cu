@@ -55,7 +55,7 @@ int main(int argc, char *argv[]){
   {
     //Ask pd for a property like so:
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
-    auto radius = pd->getRadius(access::location::cpu, access::mode::write);
+    //auto radius = pd->getRadius(access::location::cpu, access::mode::write);
     
   //Start in a fcc lattice, pos.w contains the particle type
     auto initial =  initLattice(box.boxSize, N, fcc);
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]){
       pos.raw()[i] = initial[i];
       //Type of particle is stored in .w
       pos.raw()[i].w = sys->rng().uniform(0,1)>std::stod(argv[6])?0:1;
-      radius.raw()[i] = sys->rng().uniform(0,1)>0.5?1:2;
+      //radius.raw()[i] = sys->rng().uniform(0,1)>0.5?1:2;
     }
 
   }
@@ -80,8 +80,8 @@ int main(int argc, char *argv[]){
   
   BD::EulerMaruyama::Parameters par;
   par.temperature = std::stod(argv[7]);
-  par.viscosity = 1.0;
-  //par.hydrodynamicRadius = 1.0;
+  par.viscosity = 1.0/(6*M_PI);
+  par.hydrodynamicRadius = 1.0;
   par.dt = std::stod(argv[3]);
 
   auto bd = make_shared<BD::EulerMaruyama>(pd, pg, sys, par);
@@ -144,12 +144,12 @@ int main(int argc, char *argv[]){
     bd->forwardTime();
 
     //Write results
-    if(j%printSteps==0)
+    if(j%printSteps==0 && printSteps > 0)
     {
       sys->log<System::DEBUG1>("[System] Writing to disk...");
       //continue;
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-      auto radius = pd->getRadius(access::location::cpu, access::mode::read);
+      //auto radius = pd->getRadius(access::location::cpu, access::mode::read);
       //This allows to access the particles with the starting order so the particles are written in the same order
       // even after a sorting      
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
@@ -160,7 +160,7 @@ int main(int argc, char *argv[]){
 	real4 pc = pos.raw()[sortedIndex[i]];
 	p = make_real3(pc);
 	int type = pc.w;
-	out<<p<<" "<<radius.raw()[sortedIndex[i]]<<" "<<type<<endl;
+	out<<p<<" "<<0.5<<" "<<type<<endl;
       }
     }    
     //Sort the particles every few steps
