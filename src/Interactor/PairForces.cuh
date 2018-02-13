@@ -50,7 +50,10 @@ namespace uammd{
     void sumForce(cudaStream_t st) override;
     real sumEnergy() override;
     //real sumVirial() override{ return 0;}
-    
+    //sumForce and sumEnergy are defined through this function
+    template<class Transverser>
+    void sumTransverser(Transverser &tr, cudaStream_t st);
+
     void print_info(){
       sys->log<System::MESSAGE>("[PairForces] Using: %s Neighbour List.", type_name<NeighbourList>());
       //nl.print();
