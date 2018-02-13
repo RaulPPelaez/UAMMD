@@ -50,6 +50,9 @@ namespace uammd{
     System():System(0, nullptr){}
     System(int argc, char *argv[]){
       this->printWellcome();
+
+      auto seed = 0xf31337Bada55D00dULL^time(NULL);
+      m_rng.setSeed(seed);
       
       int dev = -1;
       //If the device is set from cli
