@@ -36,6 +36,7 @@ TODO:
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
 #include"utils/cxx_utils.h"
+#include"utils/TransverserUtils.h"
 #include"System/System.h"
 #include<thrust/device_vector.h>
 #include<thrust/host_vector.h>
@@ -269,11 +270,11 @@ namespace uammd{
   				       int N, Grid grid){
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=N) return;
-   
 
       /*Initial value of the quantity*/
       auto quantity = tr.zero();
 
+      //The indices provided to getInfo are order agnostic, they will be the indices of the particles inside the group.
       const int ori = groupIndex[sortedIndex[id]];
       const real4 myParticle = sortPos[id];
       int3 cellj;

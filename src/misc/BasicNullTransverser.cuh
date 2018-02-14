@@ -9,10 +9,10 @@
 namespace uammd{
   //Just does nothing, every function has an unspecified number of arguments. Very general.
   struct BasicNullTransverser{
-    template<class ...T> inline __device__ int zero(){ return 0;}
-    template<class ...T> inline __device__ int compute(T...){ return 0;}
-    template<class ...T> inline __device__ void accumulate(T...){}
-    template<class ...T> inline __device__ void set(T...){}       
+    template<class ...T> inline __host__ __device__ int zero(T...){ return 0;}
+    template<class ...T> inline __host__ __device__ int compute(T...){ return 0;}
+    template<class ...T> inline __host__ __device__ void accumulate(T...){}
+    template<class ...T> inline __host__ __device__ void set(T...){}       
   };
 }
 

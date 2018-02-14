@@ -25,6 +25,9 @@ Needs a Transverser telling it what to do with each pair of particles. See the e
 #include"third_party/type_names.h"
 
 #include"utils/cxx_utils.h"
+#include"Interactor/Potential/PotentialUtils.cuh"
+#include"misc/BasicNullTransverser.cuh"
+
 
 namespace uammd{
 
@@ -32,8 +35,8 @@ namespace uammd{
   //See the wiki for more info on transversers. You can see an example in "NBody.cuh" or "RadialPotential.cuh"
   
   //In this case, NBodyForces needs a Potential, which can provide transversers to compute force, energy and virial.
-  template<class Potential>
-  class NBodyForces: public Interactor, public ParameterUpdatableDelegate<Potential>{
+  template<class MyPotential>
+  class NBodyForces: public Interactor, public ParameterUpdatableDelegate<MyPotential>{
   public:
     struct Parameters{
       Box box;
@@ -42,8 +45,8 @@ namespace uammd{
 		shared_ptr<ParticleGroup> pg,
 		shared_ptr<System> sys,
 		Parameters par,
-	        shared_ptr<Potential> pot):
-      Interactor(pd, pg, sys,"NBodyForces/"+type_name<Potential>()),
+	        shared_ptr<MyPotential> pot):
+      Interactor(pd, pg, sys,"NBodyForces/"+type_name<MyPotential>()),
       pot(pot),
       box(par.box),
       nb(nullptr){
@@ -53,7 +56,7 @@ namespace uammd{
     NBodyForces(shared_ptr<ParticleData> pd,
 		shared_ptr<System> sys,
 		Parameters par,
-		shared_ptr<Potential> pot):
+		shared_ptr<MyPotential> pot):
       NBodyForces(pd,
 		  std::make_shared<ParticleGroup>(pd, sys),
 		  sys,
@@ -68,17 +71,21 @@ namespace uammd{
       nb->transverse(tr, st);
     } 
     real sumEnergy() override{
-      auto tr = pot->getEnergyTransverser(box, pd);
-      nb->transverse(tr);
+      auto et = Potential::getIfHasEnergyTransverser<MyPotential>::get(pot, box, pd);
+      //If a null transverser has been issued, just return 0
+      constexpr bool isnull = std::is_same<decltype(et), BasicNullTransverser>::value;
+      if(isnull) return 0.0;
+      nb->transverse(et);
+      return 0.0;
     }
 
     void print_info(){
-      sys->log<System::MESSAGE>("[NBodyForces] Transversing with: %s", type_name<Potential>());
+      sys->log<System::MESSAGE>("[NBodyForces] Transversing with: %s", type_name<MyPotential>());
     }
 
   private:
     
-    shared_ptr<Potential> pot;
+    shared_ptr<MyPotential> pot;
     Box box;
     shared_ptr<NBody> nb;
   };

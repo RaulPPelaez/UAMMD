@@ -29,6 +29,7 @@ You have examples of the usage of Nbody in NBodyForces.cuh, PairForces.cuh and B
 #include"third_party/type_names.h"
 
 #include"utils/cxx_utils.h"
+#include"utils/TransverserUtils.h"
 
 namespace uammd{
 
@@ -56,7 +57,7 @@ namespace uammd{
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){}
     template<class Transverser>
-    void transverse(Transverser &a_tr, cudaStream_t st){
+    inline void transverse(Transverser &a_tr, cudaStream_t st){
       sys->log<System::DEBUG3>("[NBody] Transversing with %s", type_name<Transverser>().c_str());
       int N = pg->getNumberParticles();      
       int Nthreads = 128<N?128:N;
@@ -65,6 +66,7 @@ namespace uammd{
   
       auto groupIterator = pg->getIndexIterator(access::location::gpu);
       
+      //NBody will store the transverser's info in shared memory
       size_t info_size = SFINAE::Delegator<Transverser>::sizeofInfo()+sizeof(real4);
       
   
@@ -163,74 +165,74 @@ namespace uammd{
 	tr.set(id, quantity);
     }
   
+    
+    //Reference: Fast N-Body Simulation with CUDA. Chapter 31 of GPU Gems 3
+//     template<class Transverser, class Iterator>
+//     __global__ void transverseGPUold(Iterator groupIterator, 
+// 				     int numTiles, /*Thread paralellism level, 
+// 						     controls how many elements are stored in 
+// 						     shared memory and
+// 						     computed in parallel between synchronizations*/
+// 				     Transverser tr, uint N){
+//       int tid = blockIdx.x*blockDim.x+threadIdx.x;
+//       /*All threads must pass through __syncthreads, 
+// 	but when N is not a multiple of 32 some threads are assigned a particle i>N.
+// 	This threads cant return, so they are masked to not do any work*/
+//       bool active = true;
+//       if(tid>=N) active = false;
 
-    /*Reference: Fast N-Body Simulation with CUDA. Chapter 31 of GPU Gems 3*/
-    template<class Transverser, class Iterator>
-    __global__ void transverseGPUold(Iterator groupIterator, 
-				     int numTiles, /*Thread paralellism level, 
-						     controls how many elements are stored in 
-						     shared memory and
-						     computed in parallel between synchronizations*/
-				     Transverser tr, uint N){
-      int tid = blockIdx.x*blockDim.x+threadIdx.x;
-      /*All threads must pass through __syncthreads, 
-	but when N is not a multiple of 32 some threads are assigned a particle i>N.
-	This threads cant return, so they are masked to not do any work*/
-      bool active = true;
-      if(tid>=N) active = false;
-
-      int id = groupIterator[tid];
-      /*Each thread handles the interaction between particle id and all the others*/
-      /*Storing blockDim.x positions in shared memory and processing all of them in parallel*/
-      using InfoType = decltype(tr.getInfo(id));
-      extern __shared__ char shMem[];    
-      InfoType *shInfo = (InfoType*) (shMem);
+//       int id = groupIterator[tid];
+//       /*Each thread handles the interaction between particle id and all the others*/
+//       /*Storing blockDim.x positions in shared memory and processing all of them in parallel*/
+//       using InfoType = decltype(tr.getInfo(id));
+//       extern __shared__ char shMem[];    
+//       InfoType *shInfo = (InfoType*) (shMem);
     
     
-      /*Delegator makes it possible to invoke this template even with a simple Transverser
-	(one that doesnt have a getInfo method) by using a little SFINAE trick*/
-      /*Note that in any case there is no overhead for calling Delegator, as the compiler
-	is smart enough to just trash it all in any case*/
-      InfoType infoi;
-      if(active) {
-	/*Get necessary info if needed.
-	  Note that this code is just trashed if Transverser is simple*/
-	infoi = tr.getInfo(id);
-      }
-      /*Get the initial value of the quantity to compute, i.e force*/    
-      auto quantity = tr.zero(id); 
-      /*Distribute the N particles in numTiles tiles.
-	Storing in each tile blockDim.x positions in shared memory*/
-      /*This way all threads are accesing the same memory addresses at the same time*/
-      for(int tile = 0; tile<numTiles; tile++){
-	/*Load this tiles particles positions to shared memory*/
-	const int i_load = tile*blockDim.x+threadIdx.x;
-	if(i_load<N){ /*Even if im not active,
-			my thread may load a position each tile to shared memory.*/
-	  shInfo[threadIdx.x] = tr.getInfo(groupIterator[i_load]);
-	}
-	/*Wait for all threads to arrive*/
-	__syncthreads();
-	/*Go through all the particles in the current tile*/
-#pragma unroll 8
-	for(uint counter = 0; counter<blockDim.x; counter++){
-	  if(!active) break; /*An out of bounds thread must be masked*/
-	  int cur_j = tile*blockDim.x+counter; 
-	  if(cur_j<N){/*If the current particle exists, compute and accumulate*/
-	    /*Compute and accumulate the current pair using:
-	      -positions
-	      -inofi and infoj (handled by Delegator)
-	    */
-	    tr.accumulate(quantity, tr.compute(infoi, shInfo[counter]));
-	  }
-	}/*End of particles in tile loop*/
-	__syncthreads();
+//       /*Delegator makes it possible to invoke this template even with a simple Transverser
+// 	(one that doesnt have a getInfo method) by using a little SFINAE trick*/
+//       /*Note that in any case there is no overhead for calling Delegator, as the compiler
+// 	is smart enough to just trash it all in any case*/
+//       InfoType infoi;
+//       if(active) {
+// 	/*Get necessary info if needed.
+// 	  Note that this code is just trashed if Transverser is simple*/
+// 	infoi = tr.getInfo(id);
+//       }
+//       /*Get the initial value of the quantity to compute, i.e force*/    
+//       auto quantity = tr.zero(id); 
+//       /*Distribute the N particles in numTiles tiles.
+// 	Storing in each tile blockDim.x positions in shared memory*/
+//       /*This way all threads are accesing the same memory addresses at the same time*/
+//       for(int tile = 0; tile<numTiles; tile++){
+// 	/*Load this tiles particles positions to shared memory*/
+// 	const int i_load = tile*blockDim.x+threadIdx.x;
+// 	if(i_load<N){ /*Even if im not active,
+// 			my thread may load a position each tile to shared memory.*/
+// 	  shInfo[threadIdx.x] = tr.getInfo(groupIterator[i_load]);
+// 	}
+// 	/*Wait for all threads to arrive*/
+// 	__syncthreads();
+// 	/*Go through all the particles in the current tile*/
+// #pragma unroll 8
+// 	for(uint counter = 0; counter<blockDim.x; counter++){
+// 	  if(!active) break; /*An out of bounds thread must be masked*/
+// 	  int cur_j = tile*blockDim.x+counter; 
+// 	  if(cur_j<N){/*If the current particle exists, compute and accumulate*/
+// 	    /*Compute and accumulate the current pair using:
+// 	      -positions
+// 	      -inofi and infoj (handled by Delegator)
+// 	    */
+// 	    tr.accumulate(quantity, tr.compute(infoi, shInfo[counter]));
+// 	  }
+// 	}/*End of particles in tile loop*/
+// 	__syncthreads();
 
-      }/*End of tile loop*/
-      /*Write the result to global memory*/
-      if(active)
-	tr.set(id, quantity);
-    }
+//       }/*End of tile loop*/
+//       /*Write the result to global memory*/
+//       if(active)
+// 	tr.set(id, quantity);
+//     }
   }
 
 

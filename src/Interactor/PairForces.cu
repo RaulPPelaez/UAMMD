@@ -101,9 +101,9 @@ namespace uammd{
     cudaStream_t st = 0;
     //This will get the EnergyTransverser of the potential if it is defined, and a null transverser otherwise
     auto et = Potential::getIfHasEnergyTransverser<MyPotential>::get(pot, box, pd);
-
-    //If a null transverser has been issued, just return 0    
-    if(typeid(decltype(et)) == typeid(BasicNullTransverser)) return 0.0;
+    //If a null transverser has been issued, just return 0
+    constexpr bool isnull = std::is_same<decltype(et), BasicNullTransverser>::value;
+    if(isnull) return 0.0;
     else
       this->sumTransverser(et, st);
     return 0;
