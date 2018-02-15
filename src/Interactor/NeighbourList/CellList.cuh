@@ -36,7 +36,7 @@ TODO:
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
 #include"utils/cxx_utils.h"
-#include"utils/TransverserUtils.h"
+#include"utils/TransverserUtils.cuh"
 #include"System/System.h"
 #include<thrust/device_vector.h>
 #include<thrust/host_vector.h>

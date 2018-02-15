@@ -8,7 +8,8 @@ CPU= -O3 -funroll-loops -ffinite-math-only -fno-signaling-nans -fno-math-errno -
 DEBUG= -O3
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
-BASIC_LINE= nvcc  $(DOUBLE_PRECISION) -lineinfo -I  ../src -I ../src/third_party  -O3 -ccbin="g++" -Xcompiler="$(CPU)"  -src-in-ptx -gencode arch=compute_52,code=sm_52 -x cu -std=c++11 --expt-relaxed-constexpr
+CXX=g++
+BASIC_LINE= nvcc  $(DOUBLE_PRECISION) -lineinfo -I  ../src -I ../src/third_party  -O3 -ccbin="$(CXX)" -Xcompiler="$(CPU)"  -src-in-ptx -gencode arch=compute_52,code=sm_52 -x cu -std=c++11 --expt-relaxed-constexpr
 all:
 	$(BASIC_LINE)  $(FILE)
 

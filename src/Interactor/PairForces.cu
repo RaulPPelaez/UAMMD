@@ -17,6 +17,7 @@
 #include"utils/GPUUtils.cuh"
 #include"utils/cxx_utils.h"
 #include"Potential/PotentialUtils.cuh"
+#include"utils/TransverserUtils.cuh"
 namespace uammd{
   template<class MyPotential, class NL>
   PairForces<MyPotential, NL>::PairForces(shared_ptr<ParticleData> pd,

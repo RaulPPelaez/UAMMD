@@ -2,11 +2,22 @@
 
  */
 
-#ifndef TRANSVERSERUTILS_H
-#define TRANSVERSERUTILS_H
+#ifndef TRANSVERSERUTILS_CUH
+#define TRANSVERSERUTILS_CUH
 
 #include"utils/cxx_utils.h"
 namespace uammd{
+  //Defines the most simple and general posible transverser that does nothing. 
+  //This allows to fall back to nothing when a transverser is required.  
+  //Just does nothing, every function has an unspecified number of arguments. Very general.
+  struct BasicNullTransverser{
+    template<class ...T> inline __host__ __device__ int zero(T...){ return 0;}
+    template<class ...T> inline __host__ __device__ int compute(T...){ return 0;}
+    template<class ...T> inline __host__ __device__ void accumulate(T...){}
+    template<class ...T> inline __host__ __device__ void set(T...){}       
+  };
+
+
   namespace SFINAE{
     // For Transversers, detects if a Transverser has getSharedMemorySize, therefore needing to allocate extra shared memory when launching a kernel that involves it.
     SFINAE_DEFINE_HAS_MEMBER(getSharedMemorySize)

@@ -29,7 +29,7 @@ You have examples of the usage of Nbody in NBodyForces.cuh, PairForces.cuh and B
 #include"third_party/type_names.h"
 
 #include"utils/cxx_utils.h"
-#include"utils/TransverserUtils.h"
+#include"utils/TransverserUtils.cuh"
 
 namespace uammd{
 

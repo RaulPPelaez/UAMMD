@@ -12,7 +12,7 @@ References:
 #include "misc/ParameterUpdatable.h"
 #include "third_party/saruprng.cuh"
 #include "utils/Box.cuh"
-
+#include"utils/TransverserUtils.cuh"
 namespace uammd{
   namespace Potential{
     class DPD: public ParameterUpdatable{

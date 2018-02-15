@@ -26,7 +26,7 @@ Needs a Transverser telling it what to do with each pair of particles. See the e
 
 #include"utils/cxx_utils.h"
 #include"Interactor/Potential/PotentialUtils.cuh"
-#include"misc/BasicNullTransverser.cuh"
+#include"utils/TransverserUtils.cuh"
 
 
 namespace uammd{

@@ -64,12 +64,8 @@ int main(int argc, char *argv[]){
     //Ask pd for a property like so:
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     auto vel = pd->getVel(access::location::cpu, access::mode::write);    
-
-    auto initial =  initLattice(box.boxSize, N, fcc);
     
-    //Start in a cubic lattice, pos.w contains the particle type
-    //auto initial = cubicLattice(box.boxSize, N);
-    
+    //Start in a random configuration    
     fori(0,N){
       pos.raw()[i] = make_real4(sys->rng().uniform3(-box.boxSize.x*0.5,box.boxSize.x*0.5), 0);//initial[i];
       //Type of particle is stored in .w
@@ -96,24 +92,27 @@ int main(int argc, char *argv[]){
 
   auto verlet = make_shared<NVE>(pd, pg, sys, par);
 
-  using PairForces = PairForces<Potential::DPD>;
-  
-  //This is the general interface for setting up a potential  
-  Potential::DPD::Parameters dpd_params;
-  //Set too match parameters in [1]
-  dpd_params.cutOff = 1.0; 
-  dpd_params.temperature = 1.0;
-  dpd_params.gamma = 4.0;
-  dpd_params.A = 25.0;
-  dpd_params.dt = par.dt;
-  
-  auto pot = make_shared<Potential::DPD>(sys, dpd_params);
 
-  PairForces::Parameters params;
-  params.box = box;  //Box to work on
-  auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
+  {
+    using PairForces = PairForces<Potential::DPD>;
+  
+    //This is the general interface for setting up a potential  
+    Potential::DPD::Parameters dpd_params;
+    //Set too match parameters in [1]
+    dpd_params.cutOff = 1.0; 
+    dpd_params.temperature = 1.0;
+    dpd_params.gamma = 4.0;
+    dpd_params.A = 25.0;
+    dpd_params.dt = par.dt;
+  
+    auto pot = make_shared<Potential::DPD>(sys, dpd_params);
 
-  verlet->addInteractor(pairforces);
+    PairForces::Parameters params;
+    params.box = box;  //Box to work on
+    auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
+
+    verlet->addInteractor(pairforces);
+  }
 
   sys->log<System::MESSAGE>("RUNNING!!!");
 

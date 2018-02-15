@@ -6,8 +6,7 @@
 #define POTENTIALUTILS_CUH
 
 #include"utils/cxx_utils.h"
-#include"misc/BasicNullTransverser.cuh"
-
+#include"utils/TransverserUtils.cuh"
 namespace uammd{
   namespace Potential{
     //This macro defines a struct called has_EnergyTransverser

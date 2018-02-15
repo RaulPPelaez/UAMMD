@@ -44,9 +44,9 @@ namespace uammd{
 	uint x = i;
 	x &= 0x3ff;
 	x = (x | x << 16) & 0x30000ff;
-	x = (x | x << 8) & 0x300f00f;
-	x = (x | x << 4) & 0x30c30c3;
-	x = (x | x << 2) & 0x9249249;
+	x = (x | x << 8)  & 0x300f00f;
+	x = (x | x << 4)  & 0x30c30c3;
+	x = (x | x << 2)  & 0x9249249;
 	return x;
       }
       /*Fuse three 10 bit numbers in 32 bits, producing a Z order Morton hash*/
@@ -144,7 +144,7 @@ namespace uammd{
 
     }
     //Return the most significant bit of an unsigned integral type
-    template <typename T>  int msb(T n){
+    template <typename T> inline int msb(T n){
       static_assert(std::is_integral<T>::value && !std::is_signed<T>::value,
 		    "msb<T>(): T must be an unsigned integral type.");
 
