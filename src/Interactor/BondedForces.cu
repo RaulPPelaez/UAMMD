@@ -155,7 +155,9 @@ namespace uammd{
     
     bondStart.resize(nParticlesWithBonds, nullptr);
     nbondsPerParticle.resize(nParticlesWithBonds, 0);
-      
+
+    thrust::host_vector<Bond*> h_bondStart = bondStart;
+    thrust::host_vector<int> h_nbondsPerParticle = nbondsPerParticle;
     sys->log<System::DEBUG>("[BondedForces] Filling bondStart");
 
     //Fill helper data structures
@@ -169,17 +171,18 @@ namespace uammd{
       nbondsi++;
       if(inext != i){
 	if(index == 0)
-	  bondStart[0] = thrust::raw_pointer_cast(bondList.data());    
+	  h_bondStart[0] = thrust::raw_pointer_cast(bondList.data());    
 	else
-	  bondStart[index] = thrust::raw_pointer_cast(bondList.data())+b+1-nbondsi;
+	  h_bondStart[index] = thrust::raw_pointer_cast(bondList.data())+b+1-nbondsi;
 	
-	nbondsPerParticle[index] = nbondsi;
+	h_nbondsPerParticle[index] = nbondsi;
 
 	index++;
 	nbondsi = 0;
       }
     }
-
+    bondStart = h_bondStart;
+    nbondsPerParticle = h_nbondsPerParticle;
     int meanBondsPerParticle = thrust::reduce(nbondsPerParticle.begin(), nbondsPerParticle.end())/bondStart.size();
     TPP = std::min((meanBondsPerParticle/32)*32, 128);
     TPP = std::max(TPP, 32);
