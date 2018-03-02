@@ -1,5 +1,6 @@
 
-#WARNING: You should probably change the compute architecture for your GPU in BASIC_LINE
+#WARNING: You should probably change the compute architecture for your GPU in BASIC_LINE or here in ARCH
+ARCH=52 #The target CUDA compute capability
 
 FILE=benchmark.cu
 
@@ -9,7 +10,7 @@ DEBUG= -O3
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 CXX=g++
-BASIC_LINE= nvcc  $(DOUBLE_PRECISION) -lineinfo -I  ../src -I ../src/third_party  -O3 -ccbin="$(CXX)" -Xcompiler="$(CPU)"  -src-in-ptx -gencode arch=compute_52,code=sm_52 -x cu -std=c++11 --expt-relaxed-constexpr
+BASIC_LINE= nvcc  $(DOUBLE_PRECISION) -lineinfo -I  ../src -I ../src/third_party  -O3 -ccbin="$(CXX)" -Xcompiler="$(CPU)"  -src-in-ptx -gencode arch=compute_$(ARCH),code=sm_$(ARCH) -x cu -std=c++11 --expt-relaxed-constexpr
 all:
 	$(BASIC_LINE)  $(FILE)
 
