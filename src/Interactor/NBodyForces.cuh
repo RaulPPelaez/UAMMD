@@ -74,8 +74,10 @@ namespace uammd{
       auto et = Potential::getIfHasEnergyTransverser<MyPotential>::get(pot, box, pd);
       //If a null transverser has been issued, just return 0
       constexpr bool isnull = std::is_same<decltype(et), BasicNullTransverser>::value;
-      if(isnull) return 0.0;
-      nb->transverse(et);
+      if(isnull)
+	return 0.0;
+      else
+	nb->transverse(et, 0);
       return 0.0;
     }
 
