@@ -79,13 +79,16 @@ struct HarmonicWall{
     
   //Start in a fcc lattice, pos.w contains the particle type
     auto initial =  initLattice(box.boxSize, N, fcc);
-    
+    ofstream inout("ini.pos");
+    inout<<N<<endl;
     fori(0,N){
       pos.raw()[i] = initial[i];
+
       //Type of particle is stored in .w
       pos.raw()[i].w = sys->rng().uniform(0,1)>std::stod(argv[6])?0:1;
+      inout<<pos.raw()[i]<<endl;
     }
-
+    int trash = system("/home/raul/bin/ENM ini.pos 5.0 20 10000 10000 10000 > bonds.dat");
     // ifstream in("ini.pos");
     // real trash;
     // in>>trash;
@@ -153,7 +156,7 @@ struct HarmonicWall{
     bd->forwardTime();
 
     //Write results
-    if(j%printSteps==0)
+    if(printSteps>0 && j%printSteps==0)
     {
       sys->log<System::DEBUG1>("[System] Writing to disk...");
       //continue;
