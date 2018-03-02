@@ -149,12 +149,14 @@ public:
   struct Parameters{
     const char * file; //File containing the bonds
   };
-  struct Bond{
+  //Aligning these really improves performance
+  //A particle-particle bond
+  struct __align__(16)  Bond{
     int i,j;
     typename BondType::BondInfo bond_info;
   };
-
-  struct BondFP{
+  //A fixed point bond
+  struct __align__(16) BondFP{
     int i;
     real3 pos;
     typename BondType::BondInfo bond_info;
@@ -174,7 +176,7 @@ public:
 
   
   ~BondedForces();
-
+  void callComputeBondedForces(cudaStream_t st);
   void sumForce(cudaStream_t st = 0) override;  
   real sumEnergy() override;
   //real sumVirial() override;

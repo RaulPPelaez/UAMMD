@@ -9,7 +9,7 @@ TODO:
 */
 
 #include"BondedForces.cuh"
-
+#include<cub/cub.cuh>
 #include<thrust/sort.h>
 #include<thrust/reduce.h>
 #include<fstream>
@@ -237,73 +237,118 @@ namespace uammd{
     }
 
   namespace BondedForces_ns{
-  
-    template<class Bond, class BondType>
-    __global__ void computeBondedForces(real4* __restrict__ force, const real4* __restrict__ pos,
+
+    //I do not really like how this is written now, but it really improves performance...
+    
+    //This version assigns a block for each particle (thread threadIdx.x handles the bond threadIdx.x of particle blockIdx.x) Much faster when particles have many bonds per particle (>32 maybe)
+    template<class Bond, class BondType, int THREADS_PER_BLOCK>
+    __global__ void computeBondedForcesBlockPerParticle(real4* __restrict__ force, const real4* __restrict__ pos,
 					Bond** __restrict__ bondStart,
 					const int* __restrict__ nbondsPerParticle,
 					BondType bondForce,
 					const int * __restrict__ id2index){
-      extern __shared__ char shMem[];
-      
-      real3 *forceTotal = (real3*) shMem; //Each thread has a force
+      //This little trick of unionizing the shared memory for the block shared parameters and the blockreduce storage      // does not seem to help much, at least in a GTX980.
+      struct Shared{
+	Bond const * bondList;
+	int nbonds;
+	int p;
+	real3 posi;
+      };
+      using BlockReduce = cub::BlockReduce<real3, THREADS_PER_BLOCK>;
+      __shared__ union{
+	Shared info;
+	typename BlockReduce::TempStorage temp_storage;
+      } shared;
+       
+      __shared__ int index;
 
-      /*
-      real4 &posi = *((real4*)(shMem+blockDim.x*sizeof(real4)));
-      int &nbonds = *((int*)&posi + sizeof(real4));
-      int &p = *((int*)&nbonds + sizeof(int));
-      Bond* &bondList = *((Bond**)&p+sizeof(int));
-      */
-      
       //Bond list for my particle
-      const Bond *bondList = bondStart[blockIdx.x];
-      //Number of bonds for my particle
-      const int nbonds = nbondsPerParticle[blockIdx.x];
-      //My particle index
-      const int p = bondList[0].i;
-      const real3 posi = make_real3(pos[id2index[p]]);
+      if(threadIdx.x == 0){
+	shared.info.bondList = bondStart[blockIdx.x];
+	//Number of bonds for my particle
+        shared.info.nbonds = nbondsPerParticle[blockIdx.x];
+	//My particle index
+        shared.info.p = shared.info.bondList[0].i;
+	index = id2index[shared.info.p];
+	shared.info.posi = make_real3(pos[index]);
+      }
 
       //A block per particle
       //Instead of launching a thread per particle and discarding those without any bond,
       //I store an additional array of size N_particles_with_bonds that contains the indices
       //of the particles that are involved in at least one bond. And only launch N_particles_with_bonds blocks
       
-      //Each thread in a block computes the force on particle p due to one (or several) bonds
+      //Each thread in a block computes the force on particle p due to one (or several) bonds      
+
+      //My local force accumulator
+      real3 f = make_real3(real(0.0));
       
+      __syncthreads();    
+      for(int b = threadIdx.x; b<shared.info.nbonds; b += blockDim.x){
+	
+	//Read bond info
+	const auto bond = shared.info.bondList[b];
+	//Bring pos of other particle
+	const real3 posj = make_real3(pos[id2index[bond.j]]);
+    
+	//Compute force
+	real3 r12 =  shared.info.posi-posj;
+	//Sum force 
+	f += bondForce.force(shared.info.p, bond.j, r12, bond.bond_info);
+      }
+
+      //Sum the forces of all threads in my block
+      real3 ft;
+      if(threadIdx.x < shared.info.nbonds){
+	ft = BlockReduce(shared.temp_storage).Sum(f);	
+      }
+      __syncthreads();
+      //First thread writes to memory
+      if(threadIdx.x == 0){
+	force[index] += make_real4(ft);
+      }
+      
+    }
+
+
+    //This version assigns a thread for each particle (thread i handles all the bonds of particle i), works well when particles have a low number of bonds (<32 per particle)
+    template<class Bond, class BondType>
+    __global__ void computeBondedForcesThreadPerParticle(real4* __restrict__ force, const real4* __restrict__ pos,
+					   Bond** __restrict__ bondStart,
+					   const int* __restrict__ nbondsPerParticle,
+					   BondType bondForce,
+					   const int * __restrict__ id2index, int N){
+      int id = blockIdx.x*blockDim.x + threadIdx.x;
+      if(id>=N) return;
+      
+      auto bondList = bondStart[id];
+      //Number of bonds for my particle
+      const int nbonds = nbondsPerParticle[id];
+      //My particle index
+      const int p = bondList[0].i;
+      const int index = id2index[p];
+      const real3 posi = make_real3(pos[index]);
             
       real3 f = make_real3(real(0.0));
-          
-      //__syncthreads();    
-      for(int b = threadIdx.x; b<nbonds; b += blockDim.x){
+      
+      for(int b = 0; b<nbonds; b++){
 	
 	//Read bond info
 	const auto bond = bondList[b];
-	const int j = bond.j;
 	//Bring pos of other particle
-	const real3 posj = make_real3(pos[id2index[j]]);
+	const real3 posj = make_real3(pos[id2index[bond.j]]);
     
 	//Compute force
 	real3 r12 =  posi-posj;
       
-	f += bondForce.force(p, j, r12, bondList[b].bond_info);
-
+	f += bondForce.force(p, bond.j, r12, bond.bond_info);
       }
-
-      /*The first thread sums all the contributions*/
-      forceTotal[threadIdx.x] = f;
-      __syncthreads();
-      //TODO Implement a warp reduction
-      if(threadIdx.x==0){
-	real3 ft = make_real3(0.0f);
-	for(int i=0; i<blockDim.x; i++){
-	  ft += forceTotal[i];
-	}
-	/*Write to global memory*/
-	force[id2index[p]] += make_real4(ft);
-      }
-
+   
+      force[index] += make_real4(f);	
     }
-    
+
+
+    //The same approach could be used for Fixed Point bonds as with p-p bonds.
     template<class Bond, class BondType>
     __global__ void computeBondedForcesFixedPoint(real4* __restrict__ force,
 						  const real4* __restrict__ pos,
@@ -311,10 +356,8 @@ namespace uammd{
 						  const int* __restrict__ nbondsPerParticle,
 						  BondType bondForce,
 						  const int * __restrict__ id2index){
-      extern __shared__ char shMem[];
-      
+      extern __shared__ char shMem[];      
       real3 *forceTotal = (real3*) shMem; //Each thread has a force
-
       /*
       real4 &posi = *((real4*)(shMem+blockDim.x*sizeof(real4)));
       int &nbonds = *((int*)&posi + sizeof(real4));
@@ -368,37 +411,59 @@ namespace uammd{
 	force[id2index[p]] += make_real4(ft);
       }
 
-    }
-    
-
-    
- 
+    }     
   }
 
-  /*Perform an integration step*/
+
+  //This function chooses which version of the kernel computeBondedForces to use as a function of the number of bonds per particle
+  template<class BondType>
+  void BondedForces<BondType>::callComputeBondedForces(cudaStream_t st){
+    auto pos = pd->getPos(access::location::gpu, access::mode::read);
+    auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
+
+    auto id2index = pd->getIdOrderedIndices(access::location::gpu);
+      
+    auto d_bondStart = thrust::raw_pointer_cast(bondStart.data());
+    auto d_nbondsPerParticle = thrust::raw_pointer_cast(nbondsPerParticle.data());
+    uint Nparticles_with_bonds = bondStart.size();
+
+    
+    if(TPP<=32 || Nparticles_with_bonds < 5000){ //Empirical magic numbers, could probably be chosen better
+      int Nthreads= 128;
+      int Nblocks=Nparticles_with_bonds/Nthreads + ((Nparticles_with_bonds%Nthreads)?1:0);
+
+      BondedForces_ns::computeBondedForcesThreadPerParticle<Bond, BondType>
+	<<< Nblocks, Nthreads, 0, st>>>(
+	      force.raw(), pos.raw(),
+	      d_bondStart, d_nbondsPerParticle,
+	      bondForce,
+	      id2index, Nparticles_with_bonds);
+    }
+    else{
+      //This is due to cub having blocksize as template parameter, I hate it
+      if(TPP>=128){
+	BondedForces_ns::computeBondedForcesBlockPerParticle<Bond, BondType, 128>
+	  <<<Nparticles_with_bonds, TPP, 0, st>>>(
+		force.raw(), pos.raw(),
+		d_bondStart, d_nbondsPerParticle,
+		bondForce, id2index);
+      }
+      else{
+	BondedForces_ns::computeBondedForcesBlockPerParticle<Bond, BondType, 64>
+	  <<<Nparticles_with_bonds, TPP, 0, st>>>(
+	        force.raw(), pos.raw(),
+		d_bondStart, d_nbondsPerParticle,
+		bondForce, id2index);
+      }
+
+    }
+  }
   template<class BondType>
   void BondedForces<BondType>::sumForce(cudaStream_t st){
     sys->log<System::DEBUG1>("[BondedForces] Computing Forces...");
     if(nbonds>0){
       sys->log<System::DEBUG3>("[BondedForces] Computing Particle-Particle...");
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
-
-      auto id2index = pd->getIdOrderedIndices(access::location::gpu);
-      
-      auto d_bondStart = thrust::raw_pointer_cast(bondStart.data());
-      auto d_nbondsPerParticle = thrust::raw_pointer_cast(nbondsPerParticle.data());
-      uint Nparticles_with_bonds = bondStart.size();
-      BondedForces_ns::computeBondedForces<Bond, BondType>
-	<<<
-	Nparticles_with_bonds,
-	TPP,
-	TPP*sizeof(real3),//+2*sizeof(int)+sizeof(real)+sizeof(Bond*),
-	st>>>(
-	      force.raw(), pos.raw(),
-	      d_bondStart, d_nbondsPerParticle,
-	      bondForce,
-	      id2index);
+      this->callComputeBondedForces(st);
     }
     if(nbondsFP>0){
       sys->log<System::DEBUG3>("[BondedForces] Computing Fixed-Point...");
