@@ -55,6 +55,7 @@ namespace uammd{
       
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Temperature: %f", par.temperature);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Viscosity: %f", par.viscosity);
+      sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Time step: %f", par.dt);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Hydrodynamic Radius: %f", par.hydrodynamicRadius);
       if(par.K.size()==3){
 	real3 Kx = par.K[0];
