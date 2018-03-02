@@ -427,7 +427,7 @@ namespace uammd{
 
 	rebuildNlist = false;
 	//Try to fill the neighbour list until success (the construction will fail if a particle has too many neighbours)
-	int3 cellDim = make_int3(currentBox.boxSize/currentCutOff + real(0.5));
+	int3 cellDim = make_int3(currentBox.boxSize/currentCutOff);
 	Grid grid(currentBox, cellDim);
       
 	int Nthreads=512;
@@ -511,7 +511,7 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
 
-      int3 cellDim = make_int3(currentBox.boxSize/currentCutOff + real(0.5));
+      int3 cellDim = make_int3(currentBox.boxSize/currentCutOff);
       Grid grid(currentBox, cellDim);
       
       int Nthreads=128;
@@ -559,7 +559,7 @@ namespace uammd{
 
       //Get the list parameters
       int numberParticles = pg->getNumberParticles();
-      cellDim = make_int3(box.boxSize/cutoff + real(0.5));
+      cellDim = make_int3(box.boxSize/cutoff);
 
       int ncells = cellDim.x*cellDim.y*cellDim.z;
 

@@ -241,7 +241,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::PSE] Box Size: %f %f %f", box.boxSize.x, box.boxSize.y, box.boxSize.z);
       sys->log<System::MESSAGE>("[BDHI::PSE] Splitting factor: %f",psi);  
       sys->log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f",rcut);
-      int3 cDSR = make_int3(box.boxSize/rcut + 0.5);
+      int3 cDSR = make_int3(box.boxSize/rcut);
       sys->log<System::MESSAGE>("[BDHI::PSE] Close range grid size: %d %d %d", cDSR.x, cDSR.y, cDSR.z);
 
       sys->log<System::MESSAGE>("[BDHI::PSE] Far range wave number cut off: %f", kcut);
