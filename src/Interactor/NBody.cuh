@@ -57,7 +57,7 @@ namespace uammd{
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){}
     template<class Transverser>
-    inline void transverse(Transverser &a_tr, cudaStream_t st){
+    inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
       sys->log<System::DEBUG3>("[NBody] Transversing with %s", type_name<Transverser>().c_str());
       int N = pg->getNumberParticles();      
       int Nthreads = 128<N?128:N;
