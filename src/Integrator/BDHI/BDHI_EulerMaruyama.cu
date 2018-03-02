@@ -56,6 +56,15 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Temperature: %f", par.temperature);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Viscosity: %f", par.viscosity);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Hydrodynamic Radius: %f", par.hydrodynamicRadius);
+      if(par.K.size()==3){
+	real3 Kx = par.K[0];
+	real3 Ky = par.K[1];
+	real3 Kz = par.K[2];
+	sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Shear Matrix: [ %f %f %f; %f %f %f; %f %f %f ]",
+				  Kx.x, Kx.y, Kx.z,
+				  Ky.x, Ky.y, Ky.z,
+				  Kz.x, Kz.y, Kz.z);
+      }
   
       cudaStreamCreate(&stream);
       cudaStreamCreate(&stream2);     
