@@ -16,6 +16,7 @@ References:
 namespace uammd{
   namespace Potential{
     class DPD: public ParameterUpdatable{
+    protected:
       shared_ptr<System> sys;
       int step;
       real rcut;
