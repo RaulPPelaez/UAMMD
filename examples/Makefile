@@ -1,6 +1,7 @@
 
 #WARNING: You should probably change the compute architecture for your GPU in BASIC_LINE or here in ARCH
-ARCH=52 #The target CUDA compute capability
+#The target CUDA compute capability	
+ARCH=52
 
 FILE=benchmark.cu
 
