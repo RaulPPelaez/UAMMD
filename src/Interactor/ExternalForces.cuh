@@ -81,7 +81,16 @@ TODO:
 
 #include"utils/cxx_utils.h"
 namespace uammd{
- 
+
+
+  struct BasicExternalPotential{
+    std::tuple<const real4 *> getArrays(ParticleData *pd){
+      auto pos = pd->getPos(access::location::gpu, access::mode::read);
+      return std::make_tuple(pos.raw());
+    }
+  };
+
+  
   template<class Functor>
   class ExternalForces: public Interactor, public ParameterUpdatableDelegate<Functor>{
     cudaStream_t stream;
