@@ -51,9 +51,9 @@ namespace uammd{
     
 
     //If the cutoff distance is too high, fall back to an NBody interaction
-    int3 ncells = make_int3(box.boxSize/rcut+0.5);
+    int3 ncells = make_int3(box.boxSize/rcut);
 
-    if(ncells.x <=3 || ncells.y <= 3 || ncells.z <=3){
+    if(ncells.x <=3 || ncells.y <= 3 || (ncells.z <=3 && ncells.z>0) ){
       useNeighbourList = false;      
     }
 
