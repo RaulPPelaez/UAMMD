@@ -1,0 +1,82 @@
+! Numbering of variables is:
+! 1=rho (total density), 2-4 (vx, vy, temperature), 5=rho_green, 6=rho_red
+
+&hydroAnalysisOptions ! This first namelist corresponds to the whole 2D grid
+
+   staggeredVelocities = 0 ! Are velocities on a staggered grid or not, (0, +1, or -1)*h/2
+
+   writeSnapshotVTK=T ! Save snapshots of the instantaneous fields
+   subtractMeanFT=F ! Keep this at F
+
+   ! Means file: column 1=y, 2=rho, 3=v_x, 4=v_y, 5=T, 6=rho_green, 7=rho_red
+   storeConserved = F ! Leave at F
+   writeMeansVTK = F ! Write the means to a VTK file
+
+   ! Variances
+   writeVariancesVTK = F ! Should we save a VTK file
+   nVariances = 0 ! How many co-variances to calculate and save, zero to turn off
+   variancePairs = ""
+   
+   ! Static structure factors
+   writeSpectrumVTK = F
+   writeAbsValue = T ! Only write absolute values of complex values to VTK file?
+   writeTheory = -2 ! project onto modes (3 for vtk only, -2 for both VTK and plain text .modes output)
+   nStructureFactors = 0 ! Set to zero to turn off
+   ! Compute rho-rho structure factor which is the usual S(k),
+   ! and also correlations for Brownian "velocities"
+   ! 1=rho-rho, 2=vx-vx, 3=vy-vy, 4=vx-vy
+   structureFactorPairs = "0 1 0 1, 0 2 0 2, 0 3 0 3, 0 2 0 3"
+      ! The zeros have to be here but mean nothing to us
+   vectorStructureFactor = "0 1 2 -1" ! For grouping correlations into a velocity covariance tensor 
+      ! (>0 diag, <0 off-diag, 0=not velocity)
+   
+   ! Dynamic structure factors:
+   paddDynamicFFT = 0 ! -1=no padding, 0=padd with zeros, 1=padd with mirror image
+   writeDynamicFiles=-1 ! 1 to write S(k,w), 0 to write individual k's, -1 for one big file
+   nWavenumbers=0 ! Negative value means specify a range of wavenumbers, zero to turn off S(k,w)
+   ! Specify range of wavenumbers to output, here index kx=2:4, ky=2:4
+   selectedWavenumbers="2 4, 2 4"
+   nSavedSnapshots=100 ! How many snapshots to compute time-correlation functions for
+   
+   outputFolder = "./"
+   filePrefix = "run" ! Prefix for all file names
+   axisToPrint = 2 ! 1=x, 2=y, 3=z axis
+   periodic = T ! Is the system periodic along the y axes
+/
+
+&hydroAnalysisOptions ! This corresponds to the projection along the y axes, which is a 1D grid
+
+   staggeredVelocities = 0 ! Are velocities on a staggered grid or not, (0, +1, or -1)*h/2
+
+   writeSnapshotVTK=F ! Save snapshots of the instantaneous fields
+   subtractMeanFT=F ! Keep this at F
+
+   ! Means file: column 1=y, 2=rho, 3=v_x, 4=v_y, 5=T, 6=rho_green, 7=rho_red
+   storeConserved = F ! Leave at F
+   writeMeansVTK = F ! Write the means to a VTK file
+
+   ! Variances
+   writeVariancesVTK = F ! Should we save a VTK file
+   nVariances = 0 ! How many co-variances to calculate and save, zero to turn off
+   variancePairs = ""
+   
+   ! Static structure factors
+   writeSpectrumVTK = F
+   writeAbsValue = F ! Only write absolute values of complex values to VTK file?
+   nStructureFactors = 0 ! Zero to turn off
+   ! 1=rho-rho, 2=green-green, 3=red-red, 4=red-green
+   structureFactorPairs = "0 1 0 1, 0 5 0 5, 0 6 0 6, 0 5 0 6"
+   
+   ! Dynamic structure factors:
+   paddDynamicFFT = 0 ! -1=no padding, 0=padd with zeros, 1=padd with mirror image
+   writeDynamicFiles=-1 ! 1 to write S(k,w), 0 to write individual k's, -1 for one big file
+   nWavenumbers=0 ! Negative value means specify a range of wavenumbers, zero to turn off S(k,w)
+   selectedWavenumbers="1 4, 0 0" ! Compute S(k,w) for kx=1:4
+   nSavedSnapshots=100
+   
+   outputFolder = "./"
+   filePrefix = "run_proj" ! Prefix for all file names
+   axisToPrint = 1 ! 1=x, 2=y, 3=z axis
+   periodic = T ! Is the system periodic along the y axes
+/
+
