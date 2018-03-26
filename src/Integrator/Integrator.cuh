@@ -29,6 +29,11 @@ namespace uammd{
     std::vector<shared_ptr<Interactor>> interactors;
   public:
 
+    Integrator(shared_ptr<ParticleData> pd,	       
+	       shared_ptr<System> sys,
+	       std::string name="noName"):
+      Integrator(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, name){}
+	  
     Integrator(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
