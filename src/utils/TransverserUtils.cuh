@@ -11,10 +11,10 @@ namespace uammd{
   //This allows to fall back to nothing when a transverser is required.  
   //Just does nothing, every function has an unspecified number of arguments. Very general.
   struct BasicNullTransverser{
-    template<class ...T> inline __host__ __device__ int zero(T...){ return 0;}
-    template<class ...T> inline __host__ __device__ int compute(T...){ return 0;}
-    template<class ...T> inline __host__ __device__ void accumulate(T...){}
-    template<class ...T> inline __host__ __device__ void set(T...){}       
+    template<class ...T> static constexpr inline __host__ __device__ int zero(T...){ return 0;}
+    template<class ...T> static constexpr inline __host__ __device__ int compute(T...){ return 0;}
+    template<class ...T> static inline __host__ __device__ void accumulate(T...){}
+    template<class ...T> static inline __host__ __device__ void set(T...){}       
   };
 
 
@@ -43,6 +43,7 @@ namespace uammd{
 
   
     //For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser
+    //This macro defines a tempalted struct has_getInfo<T> that contains a static value=0 if T has not a getInfo method, and 1 otherwise
     SFINAE_DEFINE_HAS_MEMBER(getInfo);
 
 
@@ -62,26 +63,25 @@ namespace uammd{
     template<class T>
     class Delegator<T, true>{
     public:
-      /*Return type of getInfo*/
+      //Return type of getInfo
       using myType = decltype(((T*)nullptr)->getInfo(0));
 
-      /*In this case getInfo just calls the transversers getInfo*/
+      //In this case getInfo just calls the transversers getInfo
       inline __device__ void getInfo(T &t, const int &id){infoi = t.getInfo(id);}
 
-      /*Size in bytes of the type of myType*/
+      //Size in bytes of the type of myType
       static constexpr inline __host__ __device__ size_t sizeofInfo(){return sizeof(myType);}
 
-      /*Write the info of particle i_load to shared memory*/
+      //Write the info of particle i_load to shared memory
       inline __device__ void fillSharedMemory(T &t, void * shInfo, int i_load){
 	((myType*)shInfo)[threadIdx.x] = t.getInfo(i_load);
       }
-      /*Calls getInfo(j) and compute with 4 arguments, returns the type of zero(), 
-	i.e the quantity*/
+      //Calls getInfo(j) and compute with 4 arguments, returns the type of zero(),  i.e the quantity
       inline __device__ auto compute(T &t, const int &j,
 				     const real4& posi, const real4 &posj)-> decltype(t.zero()){
 	return t.compute(posi, posj, infoi, t.getInfo(j));
       }
-      /*Same as above, but take infoj from the element counter of a shared memory array of type myType*/
+      //Same as above, but take infoj from the element counter of a shared memory array of type myType
       inline __device__ auto computeSharedMem(T &t,
 					      const real4& posi, const real4 &posj,
 					      void* shMem, int counter)-> decltype(t.zero()){
