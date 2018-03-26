@@ -260,7 +260,7 @@ namespace uammd{
     }
 
     //Using a transverser, this kernel processes it by providing it every pair of neighbouring particles    
-    template<class Transverser, class InputIterator, class GroupIndexIterator>
+    template<bool is2D, class Transverser, class InputIterator, class GroupIndexIterator>
     __global__ void transverseCellList(Transverser tr,
   				       InputIterator sortPos,
   				       const int *sortedIndex,
@@ -271,13 +271,10 @@ namespace uammd{
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=N) return;
 
-      /*Initial value of the quantity*/
-      auto quantity = tr.zero();
-
+      
       //The indices provided to getInfo are order agnostic, they will be the indices of the particles inside the group.
       const int ori = groupIndex[sortedIndex[id]];
-      const real4 myParticle = sortPos[id];
-      int3 cellj;
+      const real4 myParticle = sortPos[id];      
       const int3 celli = grid.getCell(myParticle);
       /*Delegator makes possible to call transverseList with a simple Transverser
 	(a transverser that only uses positions, with no getInfo method) by using
@@ -286,44 +283,80 @@ namespace uammd{
 	incurring no additional cost. And with inlining, even when T is general no overhead
         comes from Delegator.
       */
+      //Initial value of the quantity
+      auto quantity = tr.zero();
       SFINAE::Delegator<Transverser> del;      
       del.getInfo(tr, ori);
-      
-      /**Go through all neighbour cells**/
+
+#if 1
+      constexpr int numberNeighbourCells = is2D?9:27;
+
+      for(int i = 0; i<numberNeighbourCells; i++){
+	int3 cellj = celli;
+	cellj.x += i%3-1;
+	cellj.y += (i/3)%3-1;
+	if(is2D)
+	   cellj.z = 0;
+	else
+	  cellj.z += i/9-1;
+	
+	cellj = grid.pbc_cell(cellj);
+		
+	const int icellj = grid.getCellIndex(cellj);
+
+	  
+	const int firstParticle = cellStart[icellj];
+	if(firstParticle != EMPTY_CELL){ //Continue only if there are particles in this cell
+	  //Index of the last particle in the cell's list
+	  const int lastParticle = cellEnd[icellj];	  
+	  const int nincell = lastParticle-firstParticle;
+	  
+	  for(int j=0; j<nincell; j++){
+	    int cur_j = j + firstParticle;// sortedIndex[j+firstParticle];
+	    if(cur_j < N){
+	      tr.accumulate(quantity, del.compute(tr, groupIndex[sortedIndex[cur_j]], myParticle, sortPos[cur_j]));
+	    }//endif
+	  }//endfor
+	}//endif
+      }//endfor
+      tr.set(ori, quantity);
+#else
+      int3 cellj;
+      //Go through all neighbour cells
       //For some reason unroll doesnt help here
       int zi = -1; //For the 2D case
       int zf = 1;
       if(grid.cellDim.z == 1){
-  	zi = zf = 0;
+       	zi = zf = 0;
       }
-      
-      for(int x=-1; x<=1; x++){
-  	cellj.x = grid.pbc_cell_coord<0>(celli.x + x);
-  	for(int z=zi; z<=zf; z++){
-  	  cellj.z = grid.pbc_cell_coord<2>(celli.z + z);
-  	  for(int y=-1; y<=1; y++){
-  	    cellj.y = grid.pbc_cell_coord<1>(celli.y + y);	      
-  	    const int icell  = grid.getCellIndex(cellj);
-  	    
-  	    /*Index of the first particle in the cell's list*/
-  	    const int firstParticle = cellStart[icell];
-  	    if(firstParticle != EMPTY_CELL){ /*Continue only if there are particles in this cell*/
-  	      /*Index of the last particle in the cell's list*/
-  	      const int lastParticle = cellEnd[icell];
-  	      const int nincell = lastParticle-firstParticle;
-  	    
-  	      for(int j=0; j<nincell; j++){
-  		int cur_j = j + firstParticle;// sortedIndex[j+firstParticle];
-  		if(cur_j < N){
-		  tr.accumulate(quantity, del.compute(tr, groupIndex[sortedIndex[cur_j]], myParticle, sortPos[cur_j]));
-  		}//endif
-  	      }//endfor
-  	    }//endif
-  	  }//endfor y	  
-  	}//endfor z
-      }//endfor x
 
+      for(int x=-1; x<=1; x++){
+       	cellj.x = grid.pbc_cell_coord<0>(celli.x + x);
+       	for(int z=zi; z<=zf; z++){
+       	  cellj.z = grid.pbc_cell_coord<2>(celli.z + z);
+       	  for(int y=-1; y<=1; y++){
+       	    cellj.y = grid.pbc_cell_coord<1>(celli.y + y);	      
+       	    const int icell  = grid.getCellIndex(cellj);
+          
+       	    /*Index of the first particle in the cell's list*/
+       	    const int firstParticle = cellStart[icell];
+       	    if(firstParticle != EMPTY_CELL){ /*Continue only if there are particles in this cell*/
+       	      /*Index of the last particle in the cell's list*/
+       	      const int lastParticle = cellEnd[icell];
+       	      const int nincell = lastParticle-firstParticle;
+          
+       	      for(int j=0; j<nincell; j++){
+       		int cur_j = j + firstParticle;// sortedIndex[j+firstParticle];
+       		if(cur_j < N){
+       		  tr.accumulate(quantity, del.compute(tr, groupIndex[sortedIndex[cur_j]], myParticle, sortPos[cur_j]));
+       		}//endif
+       	      }//endfor
+       	    }//endif
+       	  }//endfor y	  
+       	}//endfor z
+      }//endfor x
       tr.set(ori, quantity);
+#endif
     }
 
   }
@@ -427,7 +460,6 @@ namespace uammd{
 
 	rebuildNlist = false;
 	//Try to fill the neighbour list until success (the construction will fail if a particle has too many neighbours)
-	int3 cellDim = make_int3(currentBox.boxSize/currentCutOff);
 	Grid grid(currentBox, cellDim);
       
 	int Nthreads=512;
@@ -510,10 +542,9 @@ namespace uammd{
     void transverseList(Transverser &tr, cudaStream_t st = 0){
       int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
-
-      int3 cellDim = make_int3(currentBox.boxSize/currentCutOff);
+            
       Grid grid(currentBox, cellDim);
-      
+
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       
@@ -524,14 +555,27 @@ namespace uammd{
       auto groupIndex = pg->getIndexIterator(access::location::gpu);
 
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(tr);
-      
-      CellList_ns::transverseCellList<<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
+
+      const bool is2D = grid.cellDim.z == 1;
+
+      if(is2D)
+	CellList_ns::transverseCellList<true><<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
 						       sortPos_ptr,
 						       ps.getSortedIndexArray(numberParticles),
 						       groupIndex,
 						       cellStart_ptr, cellEnd_ptr,
 						       currentCutOff*currentCutOff,
 						       numberParticles, grid);
+      
+      else
+	CellList_ns::transverseCellList<false><<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
+						       sortPos_ptr,
+						       ps.getSortedIndexArray(numberParticles),
+						       groupIndex,
+						       cellStart_ptr, cellEnd_ptr,
+						       currentCutOff*currentCutOff,
+						       numberParticles, grid);
+
 
     }
     
@@ -560,7 +604,8 @@ namespace uammd{
       //Get the list parameters
       int numberParticles = pg->getNumberParticles();
       cellDim = make_int3(box.boxSize/cutoff);
-
+      if(cellDim.z == 0) cellDim.z = 1;
+      
       int ncells = cellDim.x*cellDim.y*cellDim.z;
 
       //Resize if needed
