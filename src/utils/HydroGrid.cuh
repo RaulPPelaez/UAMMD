@@ -1,7 +1,7 @@
 /* Raul P. Pelaez 2018, HydroGrid [1] analyzer UAMMD wrapper 
 
 
-   HydroGrid computes static and dynamic structure factors of a 2D particle simulation.
+   HydroGrid computes static and dynamic structure factors of a 3D particle simulation (2D if cellDim.z = 1).
    It can also output vtk files with the concentration of the system.
 
    This class wraps the calculateConcentration function in HydroGrid, transforming the UAMMD data format to the one HG (HydroGrid) uses.
@@ -18,8 +18,8 @@ USAGE:
 
   HydroGrid::Parameters par;
   par.box = Box(make_real3(Lx, Ly, 0));         //Simulation box
-  par.cellDim = make_int2(ncellsx, ncellsy);    //number of cells to perform the analysis on
-  par.dt = dt*sampleHydrogridSteps;             //Time between calls to hg.update()
+  par.cellDim = make_int3(ncellsx, ncellsy, 1);    //number of cells to perform the analysis on
+  par.dt = dt;                                  //Time between two steps
   par.outputName = "run";                       //Prefix name of HG output files
   par.fistGreenParticle = 0;                    //Index of first green particle (default: 0)
   par.lastGreenParticle = numberParticles/2;    //Last green particle (default: -1, means all particles)
@@ -29,9 +29,9 @@ USAGE:
   ...
   //Simulation loop
   ...
-  hg.update(); //each sampleHydroGridSteps
+  hg.update(step); //Feed HG with data from step "step".
   ...
-  hg.write();  //Write current results to disk
+  hg.write(step);  //Write current results to disk
   ...
   //End of the simulation
 
@@ -53,22 +53,26 @@ References:
 #include "ParticleData/ParticleData.cuh"
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
+#include<fstream>
+#include<cstring>
 
+// #ifndef HYDROGRID_SRC
+// #error "HYDROGRID_SRC must be defined if HydroGrid.cuh is included!"
+// #endif
 
+// #define HG_HEADER HydroGrid.h
 
-void calculateConcentration(std::string outputname,
-			      double lx, // Domain x length
-			      double ly, // Domain y length
-			      int green_start, // Start of "green" particles
-			      int green_end, // End of "green" particles
-			      int mx, // Grid size x
-			      int my, // Grid size y
-			      int step, // Step of simulation
-			      double dt, // Time interval between successive snapshots (calls to updateHydroGrid)
-			      int np, // Number of particles
-			      int option, // option = 0 (initialize), 1 (update), 2 (save), 3 (save+finalize), 4 (finalize only),
-			      double *x_array, double *y_array);
+// #define HG_INCLUDE_FILE <HYDROGRID_SRC##HG_HEADER>
 
+// extern "C" {
+// #include HG_INCLUDE_FILE
+// }
+
+// #undef HG_HEADER
+// #undef HG_INCLUDE_FILE
+extern "C" {
+#include"HydroGrid.h"
+}
 namespace uammd{
 
   class HydroGrid{
@@ -76,13 +80,15 @@ namespace uammd{
     shared_ptr<ParticleData> pd;
     shared_ptr<System> sys;
     std::string name;
-    std::vector<double> rx, ry;
-    int step;
+    std::vector<double> concentration, density, velocity;
+    std::vector<double3> posOld;
+    //int step;
+    double velDimension; //Number of velocity coordinates 
   public:
 
     struct Parameters{
       Box box;                      //Simulation box
-      int2 cellDim;                 //Number of cells for the analysis
+      int3 cellDim;                 //Number of cells for the analysis
       std::string outputName;       //Name prefix of HG output files
       double dt;                    //Simulation time between calls to HG
       int firstGreenParticle = 0;   //Index of first green particle
@@ -95,65 +101,126 @@ namespace uammd{
 	      std::string name="noName"):
       pd(pd), sys(sys), par(par), name(name){
       sys->log<System::MESSAGE>("[HydroGrid] Created.");
-      step = 0;
+      //step = 0;
 
     }
+    void init(){
+      sys->log<System::MESSAGE>("[HydroGrid] Initializing.");
+      sys->log<System::MESSAGE>("[HydroGrid] Box: %f %f %f",par.box.boxSize.x, par.box.boxSize.y, par.box.boxSize.z);
+      sys->log<System::MESSAGE>("[HydroGrid] cells: %d %d %d", par.cellDim.x, par.cellDim.y, par.cellDim.z);
+      sys->log<System::MESSAGE>("[HydroGrid] dt: %f ", par.dt);
+      sys->log<System::MESSAGE>("[HydroGrid] N: %d ", pd->getNumParticles());
 
+      std::ifstream fileinput ("hydroGridOptions.nml");
+      std::string word, wordfile;
+      while(!fileinput.eof()){
+	getline(fileinput,word);
+	wordfile += word + "\n";
+      }
+      fileinput.close();
+      std::string fileOutName = par.outputName + ".hydroGridOptions.nml";
+      std::ofstream fileout(fileOutName.c_str());
+      fileout << wordfile << std::endl;
+      fileout.close();
 
-    void callCalculateConcentration(int option){
+      velDimension = (par.cellDim.z>1)?3:2;
+      double3 boxSize = make_double3(par.box.boxSize);
+      if(par.cellDim.z<=1) boxSize.z = 1;
+      createHydroAnalysis_C((int*)&par.cellDim.x,
+			    3 /*nSpecies*/,
+			    velDimension /*nVelocityDimensions*/,
+			    1 /*isSingleFluid*/,
+			    (double*)&boxSize,
+			    NULL /*heatCapacity*/,
+			    par.dt /*time step*/,
+			    0 /*nPassiveScalars*/,
+			    1 /*structFactMultiplier*/,
+			    1 /*project2D*/);
+
+      
+    }
+    void update(int step){
+      sys->log<System::DEBUG>("[HydroGrid] Update.");
+      int ncells = par.cellDim.x*par.cellDim.y*par.cellDim.z;
+      
+      density.resize(ncells);
+      velocity.resize(velDimension*ncells);
+      concentration.resize(2*ncells); //Red and green particles
+
+      //Compute concentration      
       int numberParticles = pd->getNumParticles();
       if(par.lastGreenParticle == -1) par.lastGreenParticle = numberParticles;
-      rx.resize(numberParticles);
-      ry.resize(numberParticles);
-      
+
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
 
+      
+      particlesToGrid();
+      
+      bool firstUpdate = posOld.size() == 0;
+      if(firstUpdate) posOld.resize(numberParticles, make_double3(0));
+      
       fori(0, numberParticles){
-	real4 pi = pos.raw()[sortedIndex[i]];
-	rx[i] = pi.x;
-	ry[i] = pi.y;
+	posOld[i] = make_double3(pos.raw()[sortedIndex[i]]);
       }
 
-      calculateConcentration(par.outputName,
-			     par.box.boxSize.x,    // Domain x length
-			     par.box.boxSize.y,    // Domain y length
-			     par.firstGreenParticle,  
-			     par.lastGreenParticle,
-			     par.cellDim.x,          // Grid size x
-			     par.cellDim.y,          // Grid size y
-			     step,                 // Step of simulation
-			     par.dt, // Time interval between successive snapshots (calls to updateHydroGrid)
-			     numberParticles,                   // Number of particles
-			     option,            // option = 0 (initialize), 1 (update), 2 (save), 3 (finalize)
-			     rx.data(),
-			     ry.data());
-    }
-    void init(){
-      sys->log<System::DEBUG>("[HydroGrid] Initializing.");
-      sys->log<System::DEBUG>("[HydroGrid] Box: %f %f",par.box.boxSize.x, par.box.boxSize.y);
-      sys->log<System::DEBUG>("[HydroGrid] cells: %d %d.", par.cellDim.x, par.cellDim.y);
-      sys->log<System::DEBUG>("[HydroGrid] dt: %f ", par.dt);
-      sys->log<System::DEBUG>("[HydroGrid] N: %d ", pd->getNumParticles());
 
-      callCalculateConcentration(0);
+      updateHydroAnalysisMixture_C(velocity.data(), density.data(), concentration.data());
+      
+      //This fixes the first step not having the velocity
+      if(firstUpdate){
+	resetHydroAnalysis_C(); // Write to files
+      }
+      
     }
-    void update(){
-      step++;
-      sys->log<System::DEBUG>("[HydroGrid] Update.");
-      callCalculateConcentration(1);
-    }
-    void write(){
+    void write(int step){
       sys->log<System::DEBUG>("[HydroGrid] Writing.");
-      callCalculateConcentration(2);
+      writeToFiles_C(step);
     }
     ~HydroGrid(){
       sys->log<System::DEBUG>("[HydroGrid] Destroying.");
-      callCalculateConcentration(3);
-      
+      writeToFiles_C(-1);
+      destroyHydroAnalysis_C();      
     }
+
+    //Spread particle properties to the grid
+    void particlesToGrid(){
+      int N = pd->getNumParticles();
       
-    
+      auto pos = pd->getPos(access::location::cpu, access::mode::read);
+      const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
+      Grid grid(par.box, par.cellDim);
+      int ncells = par.cellDim.x*par.cellDim.y*par.cellDim.z;      
+
+      std::fill(concentration.begin(), concentration.end(), 0);
+      std::fill(density.begin(), density.end(), 0);
+      std::fill(velocity.begin(), velocity.end(), 0);
+
+      double invCellVolume = grid.invCellSize.x*grid.invCellSize.y;
+      if(grid.cellDim.z > 1)
+	invCellVolume *= grid.invCellSize.z;
+      
+      fori(0,N){
+	double3 vi;
+	double3 pi = make_double3(pos.raw()[sortedIndex[i]]);
+	if(posOld.data())
+	  vi = (pi-posOld[i])/sqrt(par.dt);
+	else
+	  vi = make_double3(0);
+
+	//My particle's cell index in the grid
+	int icell = grid.getCellIndex(grid.getCell(pi));
+	bool isGreen = i>=par.firstGreenParticle && i<=par.lastGreenParticle;
+	concentration[icell + ncells*(isGreen?0:1)] += invCellVolume;
+	density[icell] += invCellVolume;
+
+	velocity[           icell] += invCellVolume*vi.x;
+	velocity[  ncells + icell] += invCellVolume*vi.y;
+	if(velDimension==3)
+	  velocity[2*ncells + icell] += invCellVolume*vi.z;
+      }
+
+    }
 
 
   };

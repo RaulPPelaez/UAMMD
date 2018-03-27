@@ -21,5 +21,5 @@ BASIC_LINE= nvcc  $(DOUBLE_PRECISION) -lineinfo -I  $(UAMMD_SRC) -I $(UAMMD_SRC)
 all: hg
 
 hg:
-	$(BASIC_LINE) hydroGridAnalysis.cu  -L$(HYDROGRID_SRC) -lCallHydroGrid
+	$(BASIC_LINE) -I$(HYDROGRID_SRC) hydroGridAnalysis.cu  -L$(HYDROGRID_SRC) -lCallHydroGrid
 	cp $(HYDROGRID_SRC)/libCallHydroGrid.so .

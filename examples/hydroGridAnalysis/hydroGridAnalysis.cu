@@ -144,8 +144,8 @@ int main(int argc, char *argv[]){
   //HydroGrid configuration
   HydroGrid::Parameters hgpar;
   hgpar.box = box;                           //Simulation box
-  hgpar.cellDim = make_int2(128, 128);       //cells to perform HG analysis
-  hgpar.dt = par.dt*printSteps;              //Time between update calls
+  hgpar.cellDim = make_int3(128, 128, 1);       //cells to perform HG analysis
+  hgpar.dt = par.dt;                         //Time between steps
   hgpar.outputName = "run";                  //Name prefix of HG output
   hgpar.firstGreenParticle=0;                //Index of first particle to label as green
   hgpar.lastGreenParticle = N/2;             //Last particle to label as green        
@@ -166,8 +166,8 @@ int main(int argc, char *argv[]){
       sys->log<System::DEBUG1>("[System] Writing to disk...");
 
       //Update HG and write current results
-      hg.update();
-      hg.write();
+      hg.update(j);
+      hg.write(j);
 
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       //This allows to access the particles with the starting order so the particles are written in the same order
