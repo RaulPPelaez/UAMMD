@@ -78,7 +78,7 @@ int main(int argc, char *argv[]){
     fori(0,N){
       pos.raw()[i] = initial[i];
       //Type of particle is stored in .w
-      pos.raw()[i].w = 0;
+      pos.raw()[i].w = sys->rng().next()%3;
     }
 
   }
@@ -144,11 +144,10 @@ int main(int argc, char *argv[]){
   //HydroGrid configuration
   HydroGrid::Parameters hgpar;
   hgpar.box = box;                           //Simulation box
-  hgpar.cellDim = make_int3(128, 128, 1);       //cells to perform HG analysis
+  hgpar.cellDim = make_int3(128, 128, 1);    //cells to perform HG analysis
   hgpar.dt = par.dt;                         //Time between steps
   hgpar.outputName = "run";                  //Name prefix of HG output
-  hgpar.firstGreenParticle=0;                //Index of first particle to label as green
-  hgpar.lastGreenParticle = N/2;             //Last particle to label as green        
+  hgpar.useColors = true;                    //Use pos.w as HydroGrid species
   HydroGrid hg(pd, sys, hgpar);
 
   

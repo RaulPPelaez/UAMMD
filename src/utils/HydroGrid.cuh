@@ -4,12 +4,12 @@
    HydroGrid computes static and dynamic structure factors of a 3D particle simulation (2D if cellDim.z = 1).
    It can also output vtk files with the concentration of the system.
 
-   This class wraps the calculateConcentration function in HydroGrid, transforming the UAMMD data format to the one HG (HydroGrid) uses.
-
+   This class wraps the functions in HydroGrid.h, transforming the UAMMD data format to the one HG (HydroGrid) uses.
 
    HG is configured in an input file called hydroGridOptions.nml, see [1].
 
-   HG can label some particles in the system as "green", being the rest "red" in order to compute cross spectra.
+   HG can label particles according to their colors and compute correlations between them. Use the option useColors to activate this. For this to work, colors should go from 0 to nColors (being nColors the number of distinct colors).
+
 
 USAGE:
 
@@ -21,8 +21,7 @@ USAGE:
   par.cellDim = make_int3(ncellsx, ncellsy, 1);    //number of cells to perform the analysis on
   par.dt = dt;                                  //Time between two steps
   par.outputName = "run";                       //Prefix name of HG output files
-  par.fistGreenParticle = 0;                    //Index of first green particle (default: 0)
-  par.lastGreenParticle = numberParticles/2;    //Last green particle (default: -1, means all particles)
+  par.useColors = true;                         //Use pos.w as HydroGrid species
 
   HydroGrid hg(pd, sys, parameters); //pd-> ParticleData instance, sys-> System instance
   hg.init();
@@ -55,7 +54,7 @@ References:
 #include"utils/Grid.cuh"
 #include<fstream>
 #include<cstring>
-
+#include<set>
 // #ifndef HYDROGRID_SRC
 // #error "HYDROGRID_SRC must be defined if HydroGrid.cuh is included!"
 // #endif
@@ -83,7 +82,8 @@ namespace uammd{
     std::vector<double> concentration, density, velocity;
     std::vector<double3> posOld;
     //int step;
-    double velDimension; //Number of velocity coordinates 
+    double velDimension; //Number of velocity coordinates
+    int nSpecies;        //Number of species (different particle colors)
   public:
 
     struct Parameters{
@@ -91,8 +91,7 @@ namespace uammd{
       int3 cellDim;                 //Number of cells for the analysis
       std::string outputName;       //Name prefix of HG output files
       double dt;                    //Simulation time between calls to HG
-      int firstGreenParticle = 0;   //Index of first green particle
-      int lastGreenParticle  = -1;  //-1 means all particles are green, default behavior
+      bool useColors = false;       //Use pos.w as HydroGrid species
     } par;  
     HydroGrid(shared_ptr<ParticleData> pd,
 
@@ -123,11 +122,19 @@ namespace uammd{
       fileout << wordfile << std::endl;
       fileout.close();
 
+      {
+	int numberParticles = pd->getNumParticles();
+	auto pos = pd->getPos(access::location::cpu, access::mode::read);
+	std::set<int> colors;
+	fori(0, numberParticles) colors.insert(int(pos.raw()[i].w));
+	nSpecies = colors.size();
+      }
+      sys->log<System::MESSAGE>("[HydroGrid] nSpecies: %d ", nSpecies);
       velDimension = (par.cellDim.z>1)?3:2;
       double3 boxSize = make_double3(par.box.boxSize);
       if(par.cellDim.z<=1) boxSize.z = 1;
       createHydroAnalysis_C((int*)&par.cellDim.x,
-			    3 /*nSpecies*/,
+			    nSpecies+1 /*nSpecies*/,
 			    velDimension /*nVelocityDimensions*/,
 			    1 /*isSingleFluid*/,
 			    (double*)&boxSize,
@@ -145,11 +152,11 @@ namespace uammd{
       
       density.resize(ncells);
       velocity.resize(velDimension*ncells);
-      concentration.resize(2*ncells); //Red and green particles
+      concentration.resize(nSpecies*ncells); //An array for each species
 
       //Compute concentration      
       int numberParticles = pd->getNumParticles();
-      if(par.lastGreenParticle == -1) par.lastGreenParticle = numberParticles;
+
 
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
@@ -190,7 +197,7 @@ namespace uammd{
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       Grid grid(par.box, par.cellDim);
-      int ncells = par.cellDim.x*par.cellDim.y*par.cellDim.z;      
+      int ncells = par.cellDim.x*par.cellDim.y*par.cellDim.z;
 
       std::fill(concentration.begin(), concentration.end(), 0);
       std::fill(density.begin(), density.end(), 0);
@@ -202,7 +209,10 @@ namespace uammd{
       
       fori(0,N){
 	double3 vi;
-	double3 pi = make_double3(pos.raw()[sortedIndex[i]]);
+	real4 pci =pos.raw()[sortedIndex[i]];
+	double3 pi = make_double3(pci);
+	int color = 0;
+	if(par.useColors) color = int(pci.w);
 	if(posOld.data())
 	  vi = (pi-posOld[i])/sqrt(par.dt);
 	else
@@ -210,8 +220,7 @@ namespace uammd{
 
 	//My particle's cell index in the grid
 	int icell = grid.getCellIndex(grid.getCell(pi));
-	bool isGreen = i>=par.firstGreenParticle && i<=par.lastGreenParticle;
-	concentration[icell + ncells*(isGreen?0:1)] += invCellVolume;
+	concentration[icell + ncells*color] += invCellVolume;
 	density[icell] += invCellVolume;
 
 	velocity[           icell] += invCellVolume*vi.x;
