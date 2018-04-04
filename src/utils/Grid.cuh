@@ -24,21 +24,26 @@ namespace uammd{
     real3 invCellSize; /*The inverse of the cell size in each direction*/
     Box box;
     Grid(): Grid(Box(), make_int3(0,0,0)){}
-    Grid(Box box, int3 cellDim):
-	box(box),
-	cellDim(cellDim){
 
-	cellSize = box.boxSize/make_real3(cellDim);
-	invCellSize = 1.0/cellSize;
-	if(box.boxSize.z == real(0.0)) invCellSize.z = 0;
+    Grid(Box box, real3 minCellSize):
+      Grid(box, make_int3(box.boxSize/minCellSize)){}    
+    Grid(Box box, real minCellSize):
+      Grid(box, make_real3(minCellSize)){}
+    
+    Grid(Box box, int3 cellDim):
+      box(box),
+      cellDim(cellDim){
+
+      cellSize = box.boxSize/make_real3(cellDim);
+      invCellSize = 1.0/cellSize;
+      if(box.boxSize.z == real(0.0)) invCellSize.z = 0;
 	
-	gridPos2CellIndex = make_int3( 1,
-				       cellDim.x,
-				       cellDim.x*cellDim.y);
-	
+      gridPos2CellIndex = make_int3( 1,
+				     cellDim.x,
+				     cellDim.x*cellDim.y);	
     }
     template<class VecType>
-    inline __host__ __device__ int3 getCell(const VecType &r) const{	
+    inline __host__ __device__ int3 getCell(const VecType &r) const{
 	// return  int( (p+0.5L)/cellSize )
 	int3 cell = make_int3((box.apply_pbc(make_real3(r)) + real(0.5)*box.boxSize)*invCellSize);
 	//Anti-Traquinazo guard, you need to explicitly handle the case where a particle
@@ -85,6 +90,7 @@ namespace uammd{
 	return cell;
     }
 
+    inline __host__ __device__ int getNumberCells() const{ return cellDim.x*cellDim.y*cellDim.z;}
   };
 
 }
