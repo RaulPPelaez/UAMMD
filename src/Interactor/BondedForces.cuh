@@ -68,11 +68,7 @@ namespace uammd{
       real r2 = dot(r12, r12);
       if(r2==real(0.0)) return make_real3(0.0);
       
-#ifdef SINGLE_PRECISION
-      real invr = rsqrtf(r2);
-#else
       real invr = rsqrt(r2);
-#endif
       real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
       return f*r12;
     }
@@ -89,11 +85,7 @@ namespace uammd{
       real r2 = dot(r12, r12);
       if(r2==real(0.0)) return real(0.0);
 
-#ifdef SINGLE_PRECISION
-      real invr = rsqrtf(r2);
-#else
       real invr = rsqrt(r2);
-#endif
       const real dr = real(1.0)-bi.r0*invr;
       
       return real(0.5)*bi.k*dr*dr;
@@ -104,7 +96,7 @@ namespace uammd{
     struct HarmonicPBC: public Harmonic{
     Box box;
       HarmonicPBC(Box box): box(box){}
-    inline __device__ real3 force(int i, int j, const real3 &r12, const BondInfo &bi){      
+    inline __device__ real3 force(int i, int j, const real3 &r12, const BondInfo &bi){
       return Harmonic::force(i, j, box.apply_pbc(r12), bi);
     }
     

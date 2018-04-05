@@ -391,7 +391,7 @@ namespace uammd{
 	auto bond = bondList[b];	
     
 	//Compute force
-	const real3 r12 =  posi - bond.pos;
+	real3 r12 =  posi - bond.pos;
       
         
 
