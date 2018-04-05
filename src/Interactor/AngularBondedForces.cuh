@@ -24,7 +24,7 @@
 namespace uammd{
   class AngularBondedForces: public Interactor{
   public:
-    struct AngularBond{
+    struct __align__(16) AngularBond{
       int i,j,k;
       real kspring,ang;
     };
@@ -44,9 +44,9 @@ namespace uammd{
   private:
   
     int nbonds;
-    thrust::device_vector<AngularBond> bondList;
-    thrust::device_vector<int> bondStart, bondEnd;
-    thrust::device_vector<int> bondParticleIndex; //Particles with bonds
+    thrust::device_vector<AngularBond> bondList;   //[All bonds involving the first particle with bonds, involving the second...] each bonds stores the id of the three particles in the bond. The id of the first/second... particle  with bonds is particlesWithBonds[i]
+    thrust::device_vector<int> bondStart, bondEnd; //bondStart[i], Where the list of bonds of particle with bond number i start (the id of particle i is particlesWithBonds[i].
+    thrust::device_vector<int> particlesWithBonds; //IDs of particles involved in at least one bonds
 
     int TPP; //Threads per particle
 
