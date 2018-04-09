@@ -286,6 +286,7 @@ namespace uammd{
 
     
     cudaEvent_t event;
+    
   public:
     
     //Returns the index of the first neigbour of particle index
@@ -336,15 +337,6 @@ namespace uammd{
     }
 
 
-    void handleNumParticlesChanged(int Nnew){
-      sys->log<System::DEBUG>("[CellList] Number particles changed signal handled.");
-      int numberParticles = pg->getNumberParticles();
-      if(neighbourList.size()){
-	neighbourList.resize(numberParticles*maxNeighboursPerParticle);
-	numberNeighbours.resize(numberParticles);
-      }
-      force_next_update = true;
-    }
 
     NeighbourListData getNeighbourList(cudaStream_t st = 0){
       if(currentCutOff.x != currentCutOff.y or
@@ -549,6 +541,16 @@ namespace uammd{
     const int *getCellStart(){return thrust::raw_pointer_cast(cellStart.data());}
     const int *getCellEnd(){return thrust::raw_pointer_cast(cellEnd.data());}
 
+  protected:
+    void handleNumParticlesChanged(int Nnew){
+      sys->log<System::DEBUG>("[CellList] Number particles changed signal handled.");
+      int numberParticles = pg->getNumberParticles();
+      if(neighbourList.size()){
+	neighbourList.resize(numberParticles*maxNeighboursPerParticle);
+	numberNeighbours.resize(numberParticles);
+      }
+      force_next_update = true;
+    }
   };
 
 
