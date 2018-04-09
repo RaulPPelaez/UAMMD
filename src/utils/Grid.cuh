@@ -30,10 +30,11 @@ namespace uammd{
     Grid(Box box, real minCellSize):
       Grid(box, make_real3(minCellSize)){}
     
-    Grid(Box box, int3 cellDim):
+    Grid(Box box, int3 in_cellDim):
       box(box),
-      cellDim(cellDim){
+      cellDim(in_cellDim){
 
+      if(cellDim.z == 0) cellDim.z = 1;
       cellSize = box.boxSize/make_real3(cellDim);
       invCellSize = 1.0/cellSize;
       if(box.boxSize.z == real(0.0)) invCellSize.z = 0;
