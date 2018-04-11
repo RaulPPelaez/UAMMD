@@ -99,15 +99,17 @@ namespace uammd{
     ExternalForces(shared_ptr<ParticleData> pd,
 		   shared_ptr<ParticleGroup> pg,
 		   shared_ptr<System> sys,
-		   Functor tr = Functor()):Interactor(pd, pg, sys,"ExternalForces/"+type_name<Functor>()),
+		   std::shared_ptr<Functor> tr = std::make_shared<Functor>()):
+      Interactor(pd, pg, sys,"ExternalForces/"+type_name<Functor>()),
 			       tr(tr){
       //ExternalForces does not care about any parameter update, but the Functor might.
-      this->setDelegate(&(this->tr));
+      this->setDelegate(this->tr.get());
     }
     //If no group is provided, a group with all particles is assumed
     ExternalForces(shared_ptr<ParticleData> pd,
 		   shared_ptr<System> sys,
-		   Functor tr = Functor()):ExternalForces(pd, std::make_shared<ParticleGroup>(pd, sys), sys, tr){
+		   std::shared_ptr<Functor> tr = std::make_shared<Functor>()):
+      ExternalForces(pd, std::make_shared<ParticleGroup>(pd, sys), sys, tr){
     }
 
     ~ExternalForces(){
@@ -117,7 +119,7 @@ namespace uammd{
     real sumEnergy() override;   
   
   private:
-    Functor tr;
+    std::shared_ptr<Functor> tr;
   };
 
 
@@ -177,8 +179,8 @@ namespace uammd{
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
 
-    ExternalForces_ns::computeGPU<<<Nblocks, Nthreads, 0, st>>>(tr, numberParticles,
-								groupIterator, force.raw(), tr.getArrays(pd.get()));
+    ExternalForces_ns::computeGPU<<<Nblocks, Nthreads, 0, st>>>(*tr, numberParticles,
+								groupIterator, force.raw(), tr->getArrays(pd.get()));
   }
 
 
@@ -277,8 +279,8 @@ namespace uammd{
     auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
 
-    ExternalForces_ns::computeEnergyGPU<<<Nblocks, Nthreads>>>(tr, numberParticles,
-							       groupIterator, energy.raw(), tr.getArrays(pd.get()));
+    ExternalForces_ns::computeEnergyGPU<<<Nblocks, Nthreads>>>(*tr, numberParticles,
+							       groupIterator, energy.raw(), tr->getArrays(pd.get()));
 
     
     return 0;

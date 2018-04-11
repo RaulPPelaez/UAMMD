@@ -143,8 +143,10 @@ int main(int argc, char *argv[]){
   //Harmonic walls acting on different particle groups
   //This two interactors will cause particles in group pg2 to stick to a wall in -Lz/4
   //And the ones in pg3 to +Lz/4
-  auto extForces = make_shared<ExternalForces<HarmonicWall>>(pd, pg2, sys, HarmonicWall(-box.boxSize.z*0.25));
-  auto extForces2 = make_shared<ExternalForces<HarmonicWall>>(pd, pg3, sys, HarmonicWall(box.boxSize.z*0.25));
+  auto extForces = make_shared<ExternalForces<HarmonicWall>>(pd, pg2, sys,
+							     make_shared<HarmonicWall>(-box.boxSize.z*0.25));
+  auto extForces2 = make_shared<ExternalForces<HarmonicWall>>(pd, pg3, sys,
+							      make_shared<HarmonicWall>(box.boxSize.z*0.25));
   // auto extForces3 = make_shared<ExternalForces<HarmonicWall>>(pd, pg4, sys, HarmonicWall(-20));
   
   //Add interactors to integrator.

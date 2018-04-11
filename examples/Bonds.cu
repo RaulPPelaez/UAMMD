@@ -129,7 +129,8 @@ struct HarmonicWall{
   bd->addInteractor(bondedforces);
 
 
-  auto externalForces = make_shared<ExternalForces<HarmonicWall>>(pd, sys, HarmonicWall(0.6*box.boxSize.z));
+  auto externalForces = make_shared<ExternalForces<HarmonicWall>>(pd, sys,
+								  make_shared<HarmonicWall>(0.6*box.boxSize.z));
 
   bd->addInteractor(externalForces);
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).
