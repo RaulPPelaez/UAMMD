@@ -182,7 +182,6 @@ namespace uammd{
       SFINAE::Delegator<Transverser> del;      
       del.getInfo(tr, ori);
 
-#if 1
       constexpr int numberNeighbourCells = is2D?9:27;
 
       for(int i = 0; i<numberNeighbourCells; i++){
@@ -214,43 +213,6 @@ namespace uammd{
 	}//endif
       }//endfor
       tr.set(ori, quantity);
-#else
-      int3 cellj;
-      //Go through all neighbour cells
-      //For some reason unroll doesnt help here
-      int zi = -1; //For the 2D case
-      int zf = 1;
-      if(grid.cellDim.z == 1){
-       	zi = zf = 0;
-      }
-
-      for(int x=-1; x<=1; x++){
-       	cellj.x = grid.pbc_cell_coord<0>(celli.x + x);
-       	for(int z=zi; z<=zf; z++){
-       	  cellj.z = grid.pbc_cell_coord<2>(celli.z + z);
-       	  for(int y=-1; y<=1; y++){
-       	    cellj.y = grid.pbc_cell_coord<1>(celli.y + y);	      
-       	    const int icell  = grid.getCellIndex(cellj);
-          
-       	    /*Index of the first particle in the cell's list*/
-       	    const int firstParticle = cellStart[icell];
-       	    if(firstParticle != EMPTY_CELL){ /*Continue only if there are particles in this cell*/
-       	      /*Index of the last particle in the cell's list*/
-       	      const int lastParticle = cellEnd[icell];
-       	      const int nincell = lastParticle-firstParticle;
-          
-       	      for(int j=0; j<nincell; j++){
-       		int cur_j = j + firstParticle;// sortedIndex[j+firstParticle];
-       		if(cur_j < N){
-       		  tr.accumulate(quantity, del.compute(tr, groupIndex[sortedIndex[cur_j]], myParticle, sortPos[cur_j]));
-       		}//endif
-       	      }//endfor
-       	    }//endif
-       	  }//endfor y	  
-       	}//endfor z
-      }//endfor x
-      tr.set(ori, quantity);
-#endif
     }
 
   }
