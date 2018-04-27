@@ -38,6 +38,7 @@ USAGE:
 
 
    getOption will return an std::istringstream, so you can work with its output as such.
+   A second argument can be passed to getOption containing either InputFile::Required or InputFile::Optional (the latter being the default). If Required is passed and the option is not found, a CRITICAL log event will be issued and the program will terminate.
 
  */
 #ifndef INPUT_FILE_H
@@ -59,6 +60,8 @@ namespace uammd{
     std::string fileName;
     std::vector<std::pair<string,string>> options;
   public:
+    enum OptionType{Required, Optional};
+    
     InputFile(std::string name, shared_ptr<System> sys):fileName(name),
 							sys(sys){
       struct stat stat_buf;
@@ -94,7 +97,7 @@ namespace uammd{
 
     }
 
-    std::stringstream getOption(std::string op){
+    std::stringstream getOption(std::string op, OptionType type = OptionType::Optional){
       sys->log<System::DEBUG>("[InputFile] Looking for option %s in file %s",  op.c_str(), fileName.c_str());
       for(auto s: options){
 	if(std::get<0>(s).compare(op)==0){
@@ -104,6 +107,9 @@ namespace uammd{
 	}
       }
       sys->log<System::DEBUG>("[InputFile] Option not found!");
+      if(type == OptionType::Required){
+	sys->log<System::CRITICAL>("[InputFile] Option %s not found in %s!",op.c_str(), fileName.c_str());
+      }
       std::stringstream bad_ss(std::string(""));
       bad_ss.setstate(std::ios::failbit);
       return  bad_ss;
