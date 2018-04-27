@@ -111,7 +111,7 @@ namespace uammd{
   namespace Bonded_ns{
     //Custom kernel to compute and sum the force in a three particle angle spring
     /*
-      Computes the potential: V(theta) = 0.5 K(theta-theta_0)^2
+      Computes the potential: V(theta) = 2.0 K(sin(theta/2)-sin(theta_0/2))^2
       F(\vec{ri}) = d(V(theta))/d(cos(theta))·d(cos(theta))/d(\vec{ri})
     */
     __global__ void computeAngularBondedForce(real4* __restrict__ force,

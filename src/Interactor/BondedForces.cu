@@ -45,6 +45,9 @@ namespace uammd{
       bondList.resize(nbonds*2);//Allocate 2*nbonds, see init for explication
       thrust::host_vector<Bond> h_bondList = bondList;
       fori(0, nbonds){
+	if(in.eof()){
+	  sys->log<System::CRITICAL>("[BondedForces] ERROR! Bond file ended too soon! Expected %d lines, found %d", nbonds, i);
+	}
 	in>>h_bondList[i].i>>h_bondList[i].j;
 	h_bondList[i].bond_info = BondType::readBond(in);
       }

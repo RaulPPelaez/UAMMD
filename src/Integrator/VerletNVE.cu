@@ -47,8 +47,12 @@ namespace uammd{
     Integrator(pd, pg, sys, "VerletNVE"),
     dt(par.dt), energy(par.energy), is2D(par.is2D), initVelocities(par.initVelocities),
     steps(0){
+
+    if(initVelocities)
+      sys->log<System::MESSAGE>("[VerletNVE] Energy: %.3f", energy);
+    else
+      sys->log<System::MESSAGE>("[VerletNVE] Not enforcing input energy.");
     
-    sys->log<System::MESSAGE>("[VerletNVE] Energy: %.3f", energy);
     sys->log<System::MESSAGE>("[VerletNVE] Time step: %.3f", dt);
     if(is2D){
       sys->log<System::MESSAGE>("[VerletNVE] Working in 2D mode.");
