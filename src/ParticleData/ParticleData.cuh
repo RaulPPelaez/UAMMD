@@ -218,11 +218,11 @@ namespace uammd{
 
     //Return an array that allows to access the particles in an ID ordered manner (as they started)
     const int * getIdOrderedIndices(access::location dev){
-      sys->log<System::DEBUG1>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
+      sys->log<System::DEBUG5>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
       auto id = getId(access::location::gpu, access::mode::read);
       int *sortedIndex = particle_sorter.getIndexArrayById(id.raw(), numberParticles);
       if(!sortedIndex) sortedIndex = id.raw();
-      sys->log<System::DEBUG2>("[ParticleData] Id reorder completed.");  
+      sys->log<System::DEBUG6>("[ParticleData] Id reorder completed.");  
       if(dev == access::location::gpu){	
 	return sortedIndex;
       }

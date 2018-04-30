@@ -39,6 +39,12 @@ namespace uammd{
 	sys->log<System::MESSAGE>("[Potential::DPD] Created");
 	step = 0;
 	sigma = sqrt(2.0*gamma*temperature)/sqrt(dt);
+	
+	sys->log<System::MESSAGE>("[Potential::DPD] Temperature: %f", temperature);
+	sys->log<System::MESSAGE>("[Potential::DPD] Cut off: %f", rcut);
+	sys->log<System::MESSAGE>("[Potential::DPD] aij: %f", A);
+	sys->log<System::MESSAGE>("[Potential::DPD] sigma: %f", sigma);
+	sys->log<System::MESSAGE>("[Potential::DPD] gamma: %f", gamma);
       }
 
       ~DPD(){

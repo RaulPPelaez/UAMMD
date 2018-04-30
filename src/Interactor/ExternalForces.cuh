@@ -168,7 +168,7 @@ namespace uammd{
   }
   template<class Functor>
   void ExternalForces<Functor>::sumForce(cudaStream_t st){
-    sys->log<System::DEBUG2>("[ExternalForces] Computing forces...");
+    sys->log<System::DEBUG1>("[ExternalForces] Computing forces...");
     
     int numberParticles = pg->getNumberParticles();
     
