@@ -29,12 +29,18 @@ namespace uammd{
       return  r + offset*boxSize;
     }
     template< class vecType>
-    inline __device__ __host__ bool isInside(const vecType &pos){
+    inline __device__ __host__ bool isInside(const vecType &pos) const{
       real3 boxSizehalf = real(0.5)*boxSize;
       if(pos.x <= -boxSizehalf.x || pos.x > boxSizehalf.x) return false;
       if(pos.y <= -boxSizehalf.y || pos.y > boxSizehalf.y) return false;
       if(pos.z <= -boxSizehalf.z || pos.z > boxSizehalf.z) return false;
       return true;
+    }
+    inline __device__ __host__ real getVolume() const{
+      if(boxSize.z != real(0.0))
+	return boxSize.x*boxSize.y*boxSize.z;
+      else
+	return boxSize.x*boxSize.y;
     }
   };
 
