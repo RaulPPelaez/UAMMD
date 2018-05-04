@@ -95,7 +95,7 @@
 
 
 //List here all the properties with this syntax:
-//       ((PropertyName, propertyName, TYPE)) \
+/*       ((PropertyName, propertyName, TYPE))				\      */
 //The preprocessor ensures that they are included wherever is needed
 #define ALL_PROPERTIES_LIST ((Pos, pos, real4))     \
                             ((Id, id, int))	       \
@@ -103,11 +103,13 @@
 			    ((Force, force, real4))    \
   			    ((Energy, energy, real))   \
 			    ((Vel, vel, real3))        \
-  			    ((Radius, radius, real))   \
-  //			    ((Torque, torque, real4))  \
-  //			    ((AngVel, angVel, real4))  \
-  //			    ((Dir, dir, real4))        \
-  //  			    ((Charge, charge, real))        
+  			    ((Radius, radius, real))
+/*
+			    ((Torque, torque, real4))  \
+  			    ((AngVel, angVel, real4))  \
+  			    ((Dir, dir, real4))        \
+    			    ((Charge, charge, real))        
+*/
 
 namespace uammd{
 

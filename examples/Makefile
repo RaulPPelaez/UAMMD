@@ -5,7 +5,7 @@ ARCH=52
 
 FILE=benchmark.cu
 
-CPU= -O3 -funroll-loops -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers -march=native -fPIC
+CPU= -O3 -funroll-loops -ffinite-math-only -fno-signaling-nans -fno-math-errno -fno-signed-zeros -frename-registers -march=native -fPIC -Wall -Wextra -Wno-unused-parameter
 
 DEBUG= -O3
 LOG_LEVEL=6

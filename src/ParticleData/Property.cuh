@@ -62,7 +62,7 @@ namespace uammd{
   private:  
     thrust::device_vector<T> deviceVector, deviceVector_alt;
     std::vector<T> hostVector;
-    int N = 0;
+    uint N = 0;
     bool deviceVectorNeedsUpdate = false, hostVectorNeedsUpdate= true;
     string name;
     bool isBeingWritten = false, isBeingRead= false;
@@ -76,7 +76,7 @@ namespace uammd{
     typedef T valueType;
     Property(): Property(0, "noName", nullptr){}
     Property(string name, const shared_ptr<const System> &sys): Property(0, name, sys){}
-    Property(int N, string name, const shared_ptr<const System> &sys):N(N), name(name), sys(sys){
+    Property(uint N, string name, const shared_ptr<const System> &sys):N(N), name(name), sys(sys){
       if(N==0) return;
       deviceVector.resize(N);    
     }

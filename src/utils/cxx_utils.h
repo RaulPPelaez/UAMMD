@@ -28,11 +28,11 @@ namespace uammd{
     //Transform size in bytes to a pretty string in B, KB, MB...
     std::string prettySize(size_t size) {
       static const char *SIZES[] = { "B", "KB", "MB", "GB" };
-      int div = 0;
+      uint div = 0;
       size_t rem = 0;
 
-      while (size >= 1024 && div < (sizeof(SIZES)/ sizeof (*SIZES))) {
-	rem = (size % 1024);
+      while (size >= 1024u && div < (sizeof(SIZES)/ sizeof (*SIZES))) {
+	rem = (size % 1024u);
 	div++;
 	size /= 1024;
       }

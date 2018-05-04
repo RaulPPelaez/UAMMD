@@ -39,13 +39,13 @@ namespace uammd{
 	    0.0f, /*Color*/
 	    NULL, NULL, /*Basis and vector files*/
 	    false); /*Keep aspect ratio*/
-    for(int i = 0; i<N; i++){
+    for(uint i = 0u; i<N; i++){
       pos[i] += make_float4(0.56f, 0.56f, 0.56f, 0.0f);
       if(L.z==real(0.0)) pos[i].z = 0.0f;
     }
 
     std::vector<real4> pos_real(N);
-    for(int i = 0; i<N; i++)
+    for(uint i = 0u; i<N; i++)
       pos_real[i] = make_real4(pos[i].x, pos[i].y, pos[i].z, real(0.0));
 
     //  cerr<<"\tDONE!"<<endl;

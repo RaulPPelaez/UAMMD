@@ -325,7 +325,7 @@ namespace uammd{
 	auto cellStart_ptr = thrust::raw_pointer_cast(cellStart.data());
 	auto cellEnd_ptr = thrust::raw_pointer_cast(cellEnd.data());
 
-	auto groupIndex = pg->getIndexIterator(access::location::gpu);
+	//auto groupIndex = pg->getIndexIterator(access::location::gpu);
 
 	int flag;
 	do{
@@ -452,9 +452,10 @@ namespace uammd{
       // cellDim = make_int3(box.boxSize/cutoff);
       // if(box.boxSize.z == real(0.0) || cellDim.z == 0) cellDim.z = 1;
       
-      int ncells = grid.getNumberCells(); //cellDim.x*cellDim.y*cellDim.z;
+      uint ncells = grid.getNumberCells(); //cellDim.x*cellDim.y*cellDim.z;
 
       //Resize if needed
+
       if(cellStart.size()!= ncells) cellStart.resize(ncells);
       if(cellEnd.size()!= ncells) cellEnd.resize(ncells);
       
