@@ -98,15 +98,15 @@ namespace uammd{
     }
 
     std::stringstream getOption(std::string op, OptionType type = OptionType::Optional){
-      sys->log<System::DEBUG>("[InputFile] Looking for option %s in file %s",  op.c_str(), fileName.c_str());
+      sys->log<System::DEBUG1>("[InputFile] Looking for option %s in file %s",  op.c_str(), fileName.c_str());
       for(auto s: options){
 	if(std::get<0>(s).compare(op)==0){
-	  sys->log<System::DEBUG>("[InputFile] Option found!");
+	  sys->log<System::DEBUG1>("[InputFile] Option found!");
 	  std::stringstream ret(std::get<1>(s));	
 	  return ret;
 	}
       }
-      sys->log<System::DEBUG>("[InputFile] Option not found!");
+      sys->log<System::DEBUG1>("[InputFile] Option not found!");
       if(type == OptionType::Required){
 	sys->log<System::CRITICAL>("[InputFile] Option %s not found in %s!",op.c_str(), fileName.c_str());
       }
