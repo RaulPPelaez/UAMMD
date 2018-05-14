@@ -45,7 +45,7 @@ namespace uammd{
       
       struct PairParameters{
 	real cutOff2;
-	real sigma2, epsilon;
+	real sigma2, epsilonDivSigma2;
 	real shift = 0.0; // Contains lj_force(rc)
       };
 
@@ -55,7 +55,7 @@ namespace uammd{
 	const real invr6 = invr2*invr2*invr2;
 	const real invr8 = invr6*invr2;
       
-	real fmod = params.epsilon*(real(-48.0)*invr6 + real(24.0))*invr8;
+	real fmod = params.epsilonDivSigma2*(real(-48.0)*invr6 + real(24.0))*invr8;
 
 
 	if(params.shift != real(0.0)){
@@ -70,14 +70,14 @@ namespace uammd{
 	real invr2 = params.sigma2/r2;
 	real invr6 = invr2*invr2*invr2;
       
-	real E = params.epsilon*real(2.0)*invr6*(invr6-real(1.0));
-
+	real E = params.epsilonDivSigma2*params.sigma2*real(2.0)*invr6*(invr6-real(1.0));
+	
 	if(params.shift != real(0.0)){
 	  //With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
 	  real rc = sqrtf(params.cutOff2);
 	  real invrc2 = real(params.sigma2)/(params.cutOff2);
 	  real invrc6 = invrc2*invrc2*invrc2;
-	  E += -(sqrtf(r2)-rc)*params.shift - real(2.0)*params.epsilon*invrc6*(invrc6-real(1.0));
+	  E += -(sqrtf(r2)-rc)*params.shift - real(2.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
 	}
 	return E;      
       }
@@ -90,7 +90,7 @@ namespace uammd{
 	PairParameters params;
 	params.cutOff2 = in_par.cutOff*in_par.cutOff;
 	params.sigma2 = in_par.sigma*in_par.sigma;
-	params.epsilon = in_par.epsilon;
+	params.epsilonDivSigma2 = in_par.epsilon/params.sigma2;
 
 	if(in_par.shift){
 	  real invCutOff2 = params.sigma2/params.cutOff2;
@@ -98,7 +98,7 @@ namespace uammd{
 	  real invrc7 = invrc6*sqrtf(invCutOff2);
 	  real invrc13 = invrc7*invrc6;
       
-	  params.shift = params.epsilon*(real(48.0)*invrc13 - real(24.0)*invrc7);
+	  params.shift = params.epsilonDivSigma2*(real(48.0)*invrc13 - real(24.0)*invrc7);
 	}
 	else params.shift = real(0.0);
 	return params;

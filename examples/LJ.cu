@@ -179,7 +179,7 @@ int main(int argc, char *argv[]){
     par.cutOff = 2.5*par.sigma;
     pot->setPotParameters(0, 0, par);
     
-
+    par.epsilon = 4.0;
     par.sigma = 0.5*(2.0+1.0);
     par.cutOff = 2.5*par.sigma;
     //the pair 1,0 is registered as well with this call, and assumed to be the same
@@ -239,7 +239,7 @@ int main(int argc, char *argv[]){
 	real4 pc = pos.raw()[sortedIndex[i]];
 	p = box.apply_pbc(make_real3(pc));
 	int type = pc.w;
-	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<endl;
+	out<<p<<" "<<0.5*(type==1?2:1)*pow(2,1/6.)<<" "<<type<<endl;
       }
 
     }    
