@@ -63,16 +63,16 @@ namespace uammd{
     //Process a line of the file and store option/arguments if necessary
     //TODO: this could be prettier...
     void process_line(std::string &line){
+
+      auto first_char = line.find_first_not_of(" \t\n");
+      //Ignore empty lines
+      if(first_char == std::string::npos) return;
       //Ignore comments
-      if(line.find_first_of("#")!=std::string::npos){
+      if(line[first_char]=='#'){
 	sys->log<System::DEBUG4>("[InputFile] Comment!");
 	return;
       }
-      //Ignore empty lines
-      if(line.find_first_not_of(" \t\n")==std::string::npos){
-	sys->log<System::DEBUG4>("[InputFile] Blank line!");
-	return;
-      }
+
       else{
 	std::string word;
 	sys->log<System::DEBUG4>("[InputFile] Processing line!");
