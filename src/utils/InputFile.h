@@ -59,6 +59,48 @@ namespace uammd{
     size_t maxFileSizeToStore = 1e7; //10 mb
     std::string fileName;
     std::vector<std::pair<string,string>> options;
+
+    //Process a line of the file and store option/arguments if necessary
+    //TODO: this could be prettier...
+    void process_line(std::string &line){
+      //Ignore comments
+      if(line.find_first_of("#")!=std::string::npos){
+	sys->log<System::DEBUG4>("[InputFile] Comment!");
+	return;
+      }
+      //Ignore empty lines
+      if(line.find_first_not_of(" \t\n")==std::string::npos){
+	sys->log<System::DEBUG4>("[InputFile] Blank line!");
+	return;
+      }
+      else{
+	std::string word;
+	sys->log<System::DEBUG4>("[InputFile] Processing line!");
+	//Given an option
+	//in>>std::ws;
+	auto first_non_space = line.find_first_not_of(" \t");
+	line = line.substr(first_non_space, line.size());
+	sys->log<System::DEBUG4>("[InputFile] remove left whitespaces: \"%s\"", line.c_str());
+	auto space_after_option = line.find_first_of(" \t");
+	if(space_after_option == std::string::npos){
+	  word = line;
+	  line = std::string();
+	}
+	else{	   
+	  word = line.substr(0, space_after_option);	    
+	  line = line.substr(space_after_option, line.size());
+	  auto start_of_args = line.find_first_not_of(" \t\n");
+	  if(start_of_args == std::string::npos){
+	    line = std::string();
+	  }
+	  else{
+	    line = line.substr(start_of_args, line.size());
+	  }
+	}
+	sys->log<System::DEBUG3>("[InputFile] option \"%s\" registered with args \"%s\"",  word.c_str(), line.c_str());
+	options.emplace_back(std::make_pair(word, line));	
+      }
+    }
   public:
     enum OptionType{Required, Optional};
     
@@ -73,36 +115,26 @@ namespace uammd{
       }
       //Store options and arguments
       std::ifstream in(fileName);
-      std::string line, tmp, word;     
-      while(in>>word){
-	//Ignore comments
-	if(word.find_first_of("#")!=std::string::npos) getline(in, line);
-	else{
-	  //Given an option
-	  in>>std::ws;
-	  int next = in.peek();
-	  //If the option has no arguments
-	  if(next == '\n' || next == EOF){
-	    options.emplace_back(std::make_pair(word, std::string()));
-	    continue;
-	  }
-	  else{
-	    //Otherwise store the rest of the line
-	    getline(in,tmp);
-	    options.emplace_back(std::make_pair(word, tmp));
-	  }
-	}
-      
+      std::string line;
+      while(!getline(in,line).eof()){
+	process_line(line);
       }
-
+      //process last line
+      process_line(line);
     }
 
-    std::stringstream getOption(std::string op, OptionType type = OptionType::Optional){
+    
+    //Returns a reference because g++-4.8 doesnt allow to std::move an stringstream... 
+    std::istringstream& getOption(std::string op, OptionType type = OptionType::Optional){
+      static std::istringstream ret;
+      ret.str();
+      ret.clear();
       sys->log<System::DEBUG1>("[InputFile] Looking for option %s in file %s",  op.c_str(), fileName.c_str());
       for(auto s: options){
 	if(std::get<0>(s).compare(op)==0){
 	  sys->log<System::DEBUG1>("[InputFile] Option found!");
-	  std::stringstream ret(std::get<1>(s));	
+	  //std::stringstream ret(std::get<1>(s));
+	  ret.str(std::get<1>(s));
 	  return ret;
 	}
       }
@@ -110,9 +142,12 @@ namespace uammd{
       if(type == OptionType::Required){
 	sys->log<System::CRITICAL>("[InputFile] Option %s not found in %s!",op.c_str(), fileName.c_str());
       }
-      std::stringstream bad_ss(std::string(""));
-      bad_ss.setstate(std::ios::failbit);
-      return  bad_ss;
+      //std::stringstream bad_ss(std::string(""));
+      //bad_ss.setstate(std::ios::failbit);      
+      //return  bad_ss;
+      ret.setstate(std::ios::failbit);
+      return ret;
+      
     }
 
   };
