@@ -287,13 +287,12 @@ namespace uammd{
 	the scaling factor to go from forces to velocities in fourier space*/
       fourierFactor.resize(ncells);
 
-      int BLOCKSIZE = 128;      
       /*Launch a thread per cell/node*/
-      dim3 NthreadsCells = BLOCKSIZE;
+      dim3 NthreadsCells = dim3(8,8,8) ;
       dim3 NblocksCells;
-      NblocksCells. x=  grid.cellDim.x/NthreadsCells.x + 1;
-      NblocksCells. y=  grid.cellDim.y/NthreadsCells.y + 1;
-      NblocksCells. z=  grid.cellDim.z/NthreadsCells.z + 1;
+      NblocksCells.x= grid.cellDim.x/NthreadsCells.x +((grid.cellDim.x%NthreadsCells.x)?1:0);
+      NblocksCells.y= grid.cellDim.y/NthreadsCells.y +((grid.cellDim.y%NthreadsCells.y)?1:0);
+      NblocksCells.z= grid.cellDim.z/NthreadsCells.z +((grid.cellDim.z%NthreadsCells.z)?1:0);
 
       PSE_ns::fillFourierScalingFactor<<<NblocksCells, NthreadsCells, 0, stream2>>>
 	(thrust::raw_pointer_cast(fourierFactor.data()), grid,
@@ -946,11 +945,11 @@ namespace uammd{
 
       sys->log<System::DEBUG2>("[BDHI::PSE] Wave space velocity scaling");
       /*Scale the wave space grid forces, transforming in velocities -> B·FFTf·S·F*/
-      dim3 NthreadsCells = 128;
+      dim3 NthreadsCells = dim3(8,8,8) ;
       dim3 NblocksCells;
-      NblocksCells. x=  grid.cellDim.x/NthreadsCells.x + 1;
-      NblocksCells. y=  grid.cellDim.y/NthreadsCells.y + 1;
-      NblocksCells. z=  grid.cellDim.z/NthreadsCells.z + 1;
+      NblocksCells.x= grid.cellDim.x/NthreadsCells.x +((grid.cellDim.x%NthreadsCells.x)?1:0);
+      NblocksCells.y= grid.cellDim.y/NthreadsCells.y +((grid.cellDim.y%NthreadsCells.y)?1:0);
+      NblocksCells.z= grid.cellDim.z/NthreadsCells.z +((grid.cellDim.z%NthreadsCells.z)?1:0);
       auto d_fourierFactor = thrust::raw_pointer_cast(fourierFactor.data());
       PSE_ns::forceFourier2Vel<<<NblocksCells, NthreadsCells, 0, st>>>
 	((PSE_ns::cufftComplex3*) d_gridVelsFourier,
