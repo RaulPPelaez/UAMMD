@@ -139,7 +139,7 @@ class BondedForces: public Interactor, public ParameterUpdatableDelegate<BondTyp
 public:
   
   struct Parameters{
-    const char * file; //File containing the bonds
+    std::string file; //File containing the bonds
   };
   //Aligning these really improves performance
   //A particle-particle bond

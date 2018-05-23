@@ -38,7 +38,7 @@ namespace uammd{
     /*Read the bond list from the file*/
     std::ifstream in(par.file);
     if(!in.good()){
-      sys->log<System::CRITICAL>("[BondedForces] Bond file %s not found!!", par.file);
+      sys->log<System::CRITICAL>("[BondedForces] Bond file %s not found!!", par.file.c_str());
     }
     in>>nbonds;
     if(nbonds>0){
