@@ -446,14 +446,14 @@ namespace uammd{
       //This is due to cub having blocksize as template parameter, I hate it
       if(TPP>=128){
 	BondedForces_ns::computeBondedForcesBlockPerParticle<Bond, BondType, 128>
-	  <<<Nparticles_with_bonds, TPP, 0, st>>>(
+	  <<<Nparticles_with_bonds, 128, 0, st>>>(
 		force.raw(), pos.raw(),
 		d_bondStart, d_nbondsPerParticle,
 		bondForce, id2index);
       }
       else{
 	BondedForces_ns::computeBondedForcesBlockPerParticle<Bond, BondType, 64>
-	  <<<Nparticles_with_bonds, TPP, 0, st>>>(
+	  <<<Nparticles_with_bonds, 64, 0, st>>>(
 	        force.raw(), pos.raw(),
 		d_bondStart, d_nbondsPerParticle,
 		bondForce, id2index);
