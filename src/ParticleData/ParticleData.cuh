@@ -316,7 +316,7 @@ namespace uammd{
     {      
       auto posPtr     = pos.data(access::gpu, access::write);
       if(hints.orderByHash || !hints.orderByType){
-	int3 cellDim = make_int3(hints.hash_box.boxSize/hints.hash_cutOff + real(0.5));
+	int3 cellDim = make_int3(hints.hash_box.boxSize/hints.hash_cutOff);
 	particle_sorter.updateOrderByCellHash(posPtr.raw(), numberParticles, hints.hash_box, cellDim);
       }
       
