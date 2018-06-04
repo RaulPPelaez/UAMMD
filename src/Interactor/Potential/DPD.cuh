@@ -13,14 +13,28 @@ References:
 #include "third_party/saruprng.cuh"
 #include "utils/Box.cuh"
 #include"utils/TransverserUtils.cuh"
+#include"third_party/type_names.h"
+
 namespace uammd{
   namespace Potential{
-    class DPD: public ParameterUpdatable{
+    struct DefaultDissipation{
+      real gamma;
+      DefaultDissipation(real gamma):gamma(gamma){}
+      template<class ...T> real dissipativeStrength(T...) const{
+	return gamma;
+      }
+
+      template<class T>
+      DefaultDissipation operator=(T gamma){return DefaultDissipation(gamma);}
+
+    };
+    template<class DissipativeStrength = DefaultDissipation>
+    class DPD_impl: public ParameterUpdatable{
     protected:
       shared_ptr<System> sys;
       int step;
       real rcut;
-      real gamma; //Dissipative force strength 
+      DissipativeStrength gamma; //Dissipative force strength 
       real temperature;
       real sigma; //Random force strength, must be such as sigma = sqrt(2*kT*gamma)/sqrt(dt)
       real dt;
@@ -29,25 +43,26 @@ namespace uammd{
       struct Parameters{
 	real cutOff = 1;
 	real dt = 0;
-	real gamma = 1;
+	DissipativeStrength gamma;
 	real temperature;
 	real A = 1;
       };
       
-      DPD(shared_ptr<System> sys, Parameters par):
+      DPD_impl(shared_ptr<System> sys, Parameters par):
 	sys(sys), rcut(par.cutOff), dt(par.dt), gamma(par.gamma), temperature(par.temperature), A(par.A){
 	sys->log<System::MESSAGE>("[Potential::DPD] Created");
 	step = 0;
-	sigma = sqrt(2.0*gamma*temperature)/sqrt(dt);
+	sigma = sqrt(2.0*temperature)/sqrt(dt);
 	
 	sys->log<System::MESSAGE>("[Potential::DPD] Temperature: %f", temperature);
 	sys->log<System::MESSAGE>("[Potential::DPD] Cut off: %f", rcut);
 	sys->log<System::MESSAGE>("[Potential::DPD] aij: %f", A);
-	sys->log<System::MESSAGE>("[Potential::DPD] sigma: %f", sigma);
-	sys->log<System::MESSAGE>("[Potential::DPD] gamma: %f", gamma);
+	//sys->log<System::MESSAGE>("[Potential::DPD] sigma: %f", sigma);
+	printGamma();
       }
+      void printGamma();
 
-      ~DPD(){
+      ~DPD_impl(){
 	sys->log<System::MESSAGE>("[Potential::DPD] Destroyed");
       }
       
@@ -55,15 +70,15 @@ namespace uammd{
     
       virtual void updateTemperature(real newTemp) override{
 	temperature = newTemp;
-	sigma = sqrt(2.0*gamma*temperature)/sqrt(dt);
+	sigma = sqrt(2.0*temperature)/sqrt(dt);
       }
 
       virtual void updateTimeStep(real newdt) override{
 	dt = newdt;
-	sigma = sqrt(2.0*gamma*temperature)/sqrt(dt);
+	sigma = sqrt(2.0*temperature)/sqrt(dt);
       }
 
-      
+
       struct ForceTransverser{
       private:
 	real4* pos;
@@ -75,7 +90,8 @@ namespace uammd{
 	int N;
 	real invrcut;
 	//DPD force parameters
-	real gamma, sigma;
+	DissipativeStrength gamma;
+	real sigma;
 	real A;
 	
       public:
@@ -84,7 +100,7 @@ namespace uammd{
 			 Box box,
 			 int N,
 			 real rcut,
-			 real gamma, real sigma, real A):
+			 DissipativeStrength gamma, real sigma, real A):
 	  pos(pos), vel(vel), force(force),
 	  step(step), seed(seed),
 	  box(box),
@@ -100,8 +116,7 @@ namespace uammd{
 	inline __device__ returnInfo zero(){ return make_real3(0);}
 	
 	inline __device__ returnInfo compute(const real4 &pi, const real4 &pj,
-					     const Info &infoi, const Info &infoj){
-	  
+					     const Info &infoi, const Info &infoj){	 
 	  real3 rij = box.apply_pbc(make_real3(pi) - make_real3(pj));
 	  real3 vij = make_real3(infoi.vel) - make_real3(infoj.vel);
 
@@ -127,10 +142,10 @@ namespace uammd{
 	  const real Fc = A*wr*invrmod;	
 
 	  const real wd = wr*wr; //Wd must be such as wd = wr^2 to ensure fluctuation dissipation balance
-	
-	  const real Fd = -gamma*wd*invrmod*invrmod*dot(rij, vij);
+	  const real g = gamma.dissipativeStrength(i, j, pi, pj, infoi.vel, infoj.vel);
+	  const real Fd = -g*wd*invrmod*invrmod*dot(rij, vij);
 	  
-	  const real Fr = rng.gf(real(0.0), sigma*wr*invrmod).x;
+	  const real Fr = rng.gf(real(0.0), sigma*sqrt(g)*wr*invrmod).x;
 	
 	  return (Fc+Fd+Fr)*rij;
 	}
@@ -142,6 +157,7 @@ namespace uammd{
       
       };
 
+      
       ForceTransverser getForceTransverser(Box box, shared_ptr<ParticleData> pd){
 
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
@@ -157,5 +173,17 @@ namespace uammd{
       }        
       //Notice that no getEnergyTransverser is present, this is not a problem as modules using this potential will fall back to a BasicNullTransverser when the method getEnergyTransverser is not found and the energy will not be computed altogether.
     };
+
+    template<>
+    void DPD_impl<DefaultDissipation>::printGamma(){
+      sys->log<System::MESSAGE>("[Potential::DPD] gamma: %f", gamma.gamma);
+    }
+    template<class T>
+    void DPD_impl<T>::printGamma(){
+      sys->log<System::MESSAGE>("[Potential::DPD] Using %s for dissipation", type_name<T>().c_str());
+    }
+
+    using DPD = DPD_impl<>;
   }
+  
 }
