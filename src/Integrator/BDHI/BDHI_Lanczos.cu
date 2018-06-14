@@ -25,7 +25,7 @@ namespace uammd{
     Lanczos::Lanczos(shared_ptr<ParticleData> pd,
 		     shared_ptr<ParticleGroup> pg,
 		     shared_ptr<System> sys,		       
-		     BDHI::Parameters par):
+		     Parameters par):
       pd(pd), pg(pg), sys(sys),
       hydrodynamicRadius(par.hydrodynamicRadius),
       temperature(par.temperature),

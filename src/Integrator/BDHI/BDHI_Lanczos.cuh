@@ -21,10 +21,11 @@ namespace uammd{
   namespace BDHI{
     class Lanczos{
     public:
+      using Parameters = BDHI::Parameters;
       Lanczos(shared_ptr<ParticleData> pd,
 	      shared_ptr<ParticleGroup> pg,
 	      shared_ptr<System> sys,
-	      BDHI::Parameters par);
+	      Parameters par);
       ~Lanczos();
       void setup_step(              cudaStream_t st = 0){};
       void computeMF(real3* MF,     cudaStream_t st = 0);    

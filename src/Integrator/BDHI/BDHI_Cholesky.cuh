@@ -30,10 +30,11 @@ namespace uammd{
   namespace BDHI{
     class Cholesky{
     public:
+      using Parameters = BDHI::Parameters;
       Cholesky(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
-	       BDHI::Parameters par);
+	       Parameters par);
       ~Cholesky();
       void init();
       void setup_step(              cudaStream_t st = 0);

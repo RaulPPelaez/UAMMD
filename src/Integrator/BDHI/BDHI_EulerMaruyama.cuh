@@ -52,7 +52,7 @@ namespace uammd{
   template<class Method>
   class EulerMaruyama: public Integrator{
   public:
-    using Parameters = BDHI::Parameters;
+    using Parameters = typename Method::Parameters;
     EulerMaruyama(shared_ptr<ParticleData> pd,
 		  shared_ptr<ParticleGroup> pg,
 		  shared_ptr<System> sys,		       

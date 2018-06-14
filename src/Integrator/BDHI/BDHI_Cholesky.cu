@@ -80,7 +80,7 @@ namespace uammd{
     Cholesky::Cholesky(shared_ptr<ParticleData> pd,
 		       shared_ptr<ParticleGroup> pg,
 		       shared_ptr<System> sys,		       
-		       BDHI::Parameters par):
+		       Parameters par):
       pd(pd), pg(pg), sys(sys),
       par(par),
       rpy(par.hydrodynamicRadius){
