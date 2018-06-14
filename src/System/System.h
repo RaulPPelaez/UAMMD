@@ -10,6 +10,7 @@
 
 #include"global/defines.h"
 #include"utils/utils.h"
+#include"utils/debugTools.cuh"
 #include"sysutils.h"
 #include<cstring>
 #include<ostream>
@@ -55,7 +56,8 @@ namespace uammd{
     System():System(0, nullptr){}
     System(int argc, char *argv[]){
       this->printWellcome();
-
+      CudaCheckError();
+      cudaDeviceSynchronize();
       auto seed = 0xf31337Bada55D00dULL^time(NULL);
       m_rng.setSeed(seed);
       
@@ -87,13 +89,13 @@ namespace uammd{
 
       if(sysPar.cuda_arch < sysPar.minimumCudaArch)
 	log<System::CRITICAL>("[System] Unsupported Configuration, the GPU must have at least compute capability %d (%d.%d found)", sysPar.minimumCudaArch, deviceProp.major, deviceProp.minor);
-      
-
+      CudaCheckError();
     }
     
 
     void finish(){
-
+      CudaCheckError();
+      cudaDeviceSynchronize();
       this->printFarewell();
 
     }

@@ -12,6 +12,7 @@
 
 #include"System/System.h"
 #include"utils/GPUUtils.cuh"
+#include"utils/debugTools.cuh"
 #include<thrust/device_vector.h>
 
 
@@ -75,17 +76,29 @@ namespace uammd{
   public:
     typedef T valueType;
     Property(): Property(0, "noName", nullptr){}
-    Property(string name, const shared_ptr<const System> &sys): Property(0, name, sys){}
-    Property(uint N, string name, const shared_ptr<const System> &sys):N(N), name(name), sys(sys){
+    Property(std::string name, const shared_ptr<const System> &sys): Property(0, name, sys){}
+    Property(int N, std::string name, const shared_ptr<const System> &sys):N(N), name(name), sys(sys)
+    {
+      sys->log<System::DEBUG>("[Property] Property %s created with size %d", name.c_str(), N);
+      CudaCheckError();
       if(N==0) return;
       deviceVector.resize(N);    
     }
-    ~Property(){}
+    ~Property() = default;
     void resize(int Nnew){
-      sys->log<System::DEBUG>("[Property] Resizing GPU version of %s", name.c_str());
+      sys->log<System::DEBUG>("[Property] Resizing GPU version of %s to %d particles", name.c_str(), Nnew);
       this->N = Nnew;
-      deviceVector.resize(Nnew);
-      if(deviceVector_alt.size()>0) deviceVector_alt.resize(Nnew);
+      try{
+	deviceVector.resize(Nnew);
+      }
+      catch(const thrust::system_error &e){
+	sys->log<System::CRITICAL>("[Property] Thrust failed at deviceVector.resize(%d) with address %p with the message: %s",
+				   Nnew, thrust::raw_pointer_cast(deviceVector.data()), e.what());
+      }
+      if(deviceVector_alt.size()>0){
+	sys->log<System::DEBUG1>("[Property] Resizing alt GPU version of %s", name.c_str(), Nnew);
+	deviceVector_alt.resize(Nnew);
+      }
       //Only resize CPU memory if it has been created
       if(hostVector.size() > 0){
 	hostVector.resize(Nnew);

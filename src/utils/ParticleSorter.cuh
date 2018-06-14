@@ -32,6 +32,7 @@ REFERENCES:
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
 #include"System/System.h"
+#include"utils/debugTools.cuh"
 #include<third_party/cub/cub.cuh>
 
 namespace uammd{
@@ -104,7 +105,10 @@ namespace uammd{
     thrust::device_vector<uint> hash, hash_alt; 
     /*Radix sort by key using cub, puts sorted versions of index,hash in index_alt, hash_alt*/
   public: 
-    ParticleSorter(){}
+    ParticleSorter() = default;
+    ~ParticleSorter(){
+      CudaSafeCall(cudaFree(d_temp_storage));
+    }
     template<class hashType>
     void sortByKey(cub::DoubleBuffer<int> &index,
 		   cub::DoubleBuffer<hashType> &hash,
@@ -117,28 +121,28 @@ namespace uammd{
       /**Initialize CUB if more temp storage is needed**/
       if(N > temp_storage_num_elements){
 	temp_storage_num_elements = N;
-	cudaFree(d_temp_storage);
+	CudaSafeCall(cudaFree(d_temp_storage));
 	temp_storage_bytes = 0;
 	d_temp_storage = nullptr;
 	/*On first call, this function only computes the size of the required temporal storage*/
-	cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-					hash,
-					index,
-					N,
-					0, end_bit,
-					st);
+	CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
+						     hash,
+						     index,
+						     N,
+						     0, end_bit,
+						     st));
 			
 	/*Allocate temporary storage*/
-	cudaMalloc(&d_temp_storage, temp_storage_bytes);
+	CudaSafeCall(cudaMalloc(&d_temp_storage, temp_storage_bytes));
       }
 
       /**Perform the Radix sort on the index/hash pair**/
-      cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-				      hash, 
-				      index,
-				      N,
-				      0, end_bit,
-				      st);
+      CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
+						   hash, 
+						   index,
+						   N,
+						   0, end_bit,
+						   st));
 
       
 
@@ -204,7 +208,14 @@ namespace uammd{
 	original_index.resize(N);	
       }
       cub::CountingInputIterator<int> ci(0);
-      thrust::copy(ci, ci+N, original_index.begin());
+      try{
+	thrust::copy(ci, ci+N, original_index.begin());       
+      }
+      catch(thrust::system_error &e){
+	fprintf(stderr,"[ParticleSorter] Thrust could not copy ID vector. Error: %s", e.what());
+	exit(1);
+      }
+	
       
       auto db_index = cub::DoubleBuffer<int>(
 					     thrust::raw_pointer_cast(original_index.data()),
@@ -214,7 +225,7 @@ namespace uammd{
       //thrust::copy will assume cpu copy if the first argument is a raw pointer
       
       int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
-      cudaMemcpy(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice);
+      CudaSafeCall(cudaMemcpy(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice));
 
       auto db_hash  = cub::DoubleBuffer<int>(
 					     d_hash,
@@ -247,7 +258,14 @@ namespace uammd{
       if(lastN != N){
 	cub::CountingInputIterator<int> ci(lastN);
         index.resize(N);
-	thrust::copy(ci, ci+(N-lastN), index.begin()+lastN);
+	try{
+	  thrust::copy(ci, ci+(N-lastN), index.begin()+lastN);
+	}
+	catch(thrust::system_error &e){
+	  fprintf(stderr, "[ParticleSorter] Thrust failed in %s(%d). Error: %s", __FILE__, __LINE__, e.what());
+	  exit(1);
+	}
+
       }
 
       return thrust::raw_pointer_cast(index.data());
@@ -265,7 +283,13 @@ namespace uammd{
       
       if(lastN != N){
 	original_index.resize(N);
-	thrust::copy(id, id+(N-lastN), original_index.begin()+lastN);
+	try{
+	  thrust::copy(id, id+(N-lastN), original_index.begin()+lastN);
+	}
+	catch(thrust::system_error &e){
+	  fprintf(stderr, "[ParticleSorter] Thrust failed in %s(%d). Error: %s", __FILE__, __LINE__, e.what());
+	  exit(1);
+	}
       }
       return thrust::raw_pointer_cast(original_index.data());
     }

@@ -215,6 +215,7 @@ namespace uammd{
 
     ~ParticleGroup(){
       sys->log<System::DEBUG>("Group %s destroyed", name.c_str());
+      CudaCheckError();
       reorderConnection.disconnect();
       if(st) cudaStreamDestroy(st);
     }

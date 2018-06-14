@@ -90,6 +90,7 @@
 #include<third_party/boost/preprocessor/seq/for_each.hpp>
 #include<third_party/boost/preprocessor/tuple/elem.hpp>
 #include<thrust/device_vector.h>
+#include <thrust/system_error.h>
 
 #include"utils/vector.cuh"
 
@@ -169,7 +170,8 @@ namespace uammd{
   public:
     ParticleData(int numberParticles, shared_ptr<const System> sys);
     ~ParticleData(){
-      sys->log<System::DEBUG>("[ParticleData] Destroyed");      
+      sys->log<System::DEBUG>("[ParticleData] Destroyed");
+      CudaCheckError();
     }
 
     
@@ -300,13 +302,19 @@ namespace uammd{
     sys(sys)
     PROPERTY_LOOP(INIT_PROPERTIES)
   {
-    sys->log<System::MESSAGE>("[ParticleData] Created.");
+    sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);
     id.resize(numberParticles);
+    CudaCheckError();
     auto id_prop = id.data(access::location::gpu, access::mode::write);
 
     //Fill Ids with 0..numberParticle (id[i] = i)
     cub::CountingInputIterator<int> ci(0);
-    thrust::copy(ci, ci + numberParticles, thrust::device_ptr<int>(id_prop.raw()));
+    try{
+      thrust::copy(ci, ci + numberParticles, thrust::device_ptr<int>(id_prop.raw()));
+    }
+    catch(thrust::system_error &e){
+      sys->log<System::CRITICAL>("[ParticleData] Thrust could not copy ID vector. Error: %s", e.what());
+    }
   }
 
   //Sort the particles to improve a certain kind of access pattern.

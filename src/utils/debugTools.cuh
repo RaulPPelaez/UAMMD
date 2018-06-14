@@ -5,10 +5,11 @@
 #define DEBUGTOOLS_CUH
 
 
-#define USE_NVTX
+//#define USE_NVTX
 #define CUDA_ERROR_CHECK
-
-
+#ifdef UAMMD_DEBUG
+#define CUDA_ERROR_CHECK_SYNC
+#endif
 
 #ifdef USE_NVTX
 
@@ -56,7 +57,7 @@ inline void __cudaSafeCall( cudaError err, const char *file, const int line )
 
 inline void __cudaCheckError( const char *file, const int line )
 {
-  #ifdef CUDA_ERROR_CHECK
+  #ifdef CUDA_ERROR_CHECK_SYNC
   cudaError err = cudaGetLastError();
   if ( cudaSuccess != err )
     {
