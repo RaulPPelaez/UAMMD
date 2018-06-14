@@ -67,6 +67,7 @@ namespace uammd{
   //After a certain number of iterations (iter), computes the current result guess sqrt(M)·v, stores in BdW
   void LanczosAlgorithm::compResult(real z2, int N, int iter, real * BdW, cudaStream_t st){
     sys->log<System::DEBUG3>("[LanczosAlgorithm] Computing result");
+    iter++;
     real alpha = 1.0;
     real beta = 0.0;
     /**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
@@ -85,15 +86,18 @@ namespace uammd{
     memset(h_P, 0, iter*iter*sizeof(real));
   
     /*Compute eigenvalues and eigenvectors of a triangular symmetric matrix*/
-    auto info = LAPACKE_steqr(LAPACK_COL_MAJOR, 'i',
+    auto info = LAPACKE_steqr(LAPACK_COL_MAJOR, 'I',
 			      iter, &htemp[0], &htemp[0]+iter,
 			      h_P, iter);
+    if(info!=0){
+      sys->log<System::CRITICAL>("[LanczosAlgorithm] Could not diagonalize tridiagonal krylov matrix, steqr failed with code %d", info);      
+    }
 
     /***Hdiag_temp = Hdiag·P·e1****/
     forj(0,iter){
       htemp[j] = sqrt(htemp[j])*P[iter*j];
     }
-   
+
 
     /***** Htemp = H^1/2·e1 = Pt· hdiag_temp ****/
     /*Compute with blas*/
@@ -105,13 +109,29 @@ namespace uammd{
 	       beta,
 	       &htemp[0]+iter, 1);
 
-    
     auto d_htempGPU = thrust::raw_pointer_cast(htempGPU.data());
     CudaSafeCall(cudaMemcpy(d_htempGPU, &htemp[0] + iter, iter*sizeof(real), cudaMemcpyHostToDevice));
-   
-
+    
     CublasSafeCall(cublasSetStream(cublas_handle, st));
     real * d_V = thrust::raw_pointer_cast(V.data());
+    
+    // thrust::host_vector<real> h_V = V;
+    // fori(0, iter){
+    //   std::cerr<<h_V[3*N*i]*z2<<" ";
+    // }
+    // std::cerr<<std::endl;
+    // fori(0, iter){
+    //   std::cerr<<h_V[3*N*i+1]*z2<<" ";
+    // }
+    // std::cerr<<std::endl;
+    // fori(1,iter+1){
+    //   forj(1,3*N)
+    // 	if(h_V[3*N*i+j] != real(0.0)){
+    // 	  std::cerr<<i<<" "<<j<<" "<<h_V[3*N*i+j]<<std::endl;
+    // 	}
+    //   if(htemp[iter+i] != real(0.0)) 	  std::cerr<<i<<" "<<htemp[iter+i]<<std::endl;
+    // }
+    
     /*y = ||z||_2 * Vm · H^1/2 · e1 = Vm · (z2·hdiag_temp)*/
     beta = 0.0;
     CublasSafeCall(cublasgemv(cublas_handle, CUBLAS_OP_N,
@@ -120,7 +140,8 @@ namespace uammd{
 			      d_V, 3*N,
 			      d_htempGPU, 1,
 			      &beta,
-			      BdW, 1));  
+			      BdW, 1));
+    //sys->log<System::MESSAGE>("[LanczosAlgorithm] H**1/2[0][0] = %e %e %e %e", htemp[iter], htemp[iter+1], htemp[iter+2], htemp[iter+3]);
   }
 
 }

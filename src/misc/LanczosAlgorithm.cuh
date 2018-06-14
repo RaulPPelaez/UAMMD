@@ -30,7 +30,7 @@
 #include"utils/cuda_lib_defines.h"
 #include<thrust/device_vector.h>
 #include"System/System.h"
-#include"utils/debugTools.cuh"
+//#include"utils/debugTools.cuh"
 #include"utils/cublasDebug.h"
 #include<memory>
 namespace uammd{
@@ -38,7 +38,8 @@ namespace uammd{
     SUCCESS,   //Everything is fine
       SIZE_MISMATCH,  // V was asked with a certain size and provided to solve with a different one
       CUBLAS_ERROR,
-      CUDA_ERROR //Error in memcpy, malloc ...
+      CUDA_ERROR, //Error in memcpy, malloc ...
+      UNKNOWN_ERROR
       };
 
   struct LanczosAlgorithm{  
@@ -160,7 +161,7 @@ namespace uammd{
 		(real *)d_w, 1,
 		d_V+3*N*i, 1,
 		&(hdiag[i])));
-      sys->log<System::DEBUG4>("[LanczosAlgorithm] hdiag[%d] %f", i, hdiag[i]);
+      sys->log<System::DEBUG4>("[LanczosAlgorithm] hdiag[%d] %e", i, hdiag[i]);
       /*Allocate more space if needed*/
       if(i == max_iter-1){
 	CudaSafeCall(cudaStreamSynchronize(st));
@@ -179,15 +180,25 @@ namespace uammd{
 	/*h[i+1][i] = h[i][i+1] = norm(w)*/
 	CublasSafeCall(cublasnrm2(cublas_handle, 3*N, (real*)d_w, 1, &(hsup[i])));
 	/*v_(i+1) = w·1/ norm(w)*/
+	real tol = 1e-3*hdiag[i]*invz2;
+	if(hsup[i]<tol) hsup[i] = real(0.0);
 	if(hsup[i]>real(0.0)){
 	  real invw2 = 1.0/hsup[i];
 	  CublasSafeCall(cublasscal(cublas_handle, 3*N, &invw2,  (real *)d_w, 1));
 	}
-	else{/*If norm(w) = 0 that means all elements of w are zero, so set the first to 1*/
+	else{/*If norm(w) = 0 that means all elements of w are zero, so set w = e1*/
+	  //CudaSafeCall(cudaMemset(d_w, 0, 3*N*sizeof(real)));
+	  try{
+	    thrust::fill(w.begin(), w.end(), real3());
+	  }
+	  catch(thrust::system_error &e){
+	    sys->log<System::CRITICAL>("[LanczosAlgorithm] thurst::fill failed with error: %s", e.what());
+	  }
 	  real one = 1;
 	  CudaSafeCall(cudaMemcpyAsync(d_w, &one , sizeof(real), cudaMemcpyHostToDevice, st));
 	}
-	CudaSafeCall(cudaMemcpyAsync(d_V+3*N*(i+1), d_w, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
+	sys->log<System::DEBUG4>("[LanczosAlgorithm] norm(w) = %e in iteration %d! z2 = %e, tol= %e", hsup[i], i,1.0/invz2, tol);
+	CudaSafeCall(cudaMemcpyAsync(d_V+3*N*(i+1), (real *)d_w, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
       }
       
       /*Check convergence if needed*/
@@ -196,7 +207,7 @@ namespace uammd{
 	sys->log<System::DEBUG3>("[LanczosAlgorithm] Checking convergence");
 	/*Compute Bz using h and z*/
 	/**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
-	this->compResult(1.0/invz2, N, i, (real *)Bz, st);  
+	this->compResult(1.0/invz2, N, i, (real *)Bz, st);
 
 	/*The first time the result is computed it is only stored as oldBz*/
 	if((i-check_convergence_steps)>0){
@@ -205,17 +216,22 @@ namespace uammd{
 	  */
 	  /*oldBz = Bz-oldBz*/
 	  real * d_oldBz = (real*) thrust::raw_pointer_cast(oldBz.data());
-	  real a=-1.0;	
+	  real a=-1.0;
 	  CublasSafeCall(cublasaxpy(cublas_handle, 3*N,
 				    &a,
 				    Bz, 1,
 				    d_oldBz, 1));
 
-	  /*yy = ||||Bz_i - Bz_{i-1}||_2*/
+	  /*yy = ||Bz_i - Bz_{i-1}||_2*/
 	  real yy;	  
 	  CublasSafeCall(cublasnrm2(cublas_handle, 3*N,  d_oldBz, 1, &yy));
 	  //eq. 27 in [1]
-	  real Error = yy/normNoise_prev;	  
+	  real Error = yy/normNoise_prev;
+	  if(isnan(Error)){
+	    sys->log<System::DEBUG>("[LanczosAlgorithm] Error is nan!!!");
+	    errorStatus = LanczosStatus::UNKNOWN_ERROR;
+	    return errorStatus;
+	  }
 	  //Convergence achieved!
 	  if(Error <= tolerance){
 	    if(steps_needed-2 > check_convergence_steps){
@@ -225,7 +241,7 @@ namespace uammd{
 	    else{
 	      check_convergence_steps -= 1;
 	    }
-	    sys->log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %f",i, Error);
+	    sys->log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %e",i, Error);
 	    return errorStatus;
 	  }
 	  else{
