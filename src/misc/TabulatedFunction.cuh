@@ -24,6 +24,7 @@
 #define TABULATEDFUNCTION_CUH
 
 #include"global/defines.h"
+#include"utils/debugTools.cuh"
 
 namespace uammd{
 
@@ -57,7 +58,7 @@ namespace uammd{
 
   struct LinearInterpolation{
     template<class T>
-    inline __host__  __device__ T operator()(T *table, int Ntable, real dr, real r){
+    inline __host__  __device__ T operator()(const T *table, int Ntable, real dr, real r) const{
       int i = r*Ntable;
       real r0 = i*dr;    
       T v0 = table[i];
@@ -68,7 +69,6 @@ namespace uammd{
       return lerp(v0, v1, t);    
     }
   };
-
  
   template<class T, class Interpolation = LinearInterpolation>
   struct TabulatedFunction{
@@ -94,17 +94,17 @@ namespace uammd{
 	double x = (i/(double)(Ntable))*(rmax-rmin) + rmin;
 	tableCPU[i] = foo(x);
       }    
-      cudaMemcpy(table,
-		 tableCPU.data(),
-		 (Ntable+1)*sizeof(T),
-		 cudaMemcpyHostToDevice);
+      CudaSafeCall(cudaMemcpy(table,
+			      tableCPU.data(),
+			      (Ntable+1)*sizeof(T),
+			      cudaMemcpyHostToDevice));
     
     }
-    ~TabulatedFunction(){ }
+    ~TabulatedFunction() = default;
     __host__ __device__ T operator()(real rs){
       real r = (rs-rmin)*invInterval;
       if(rs >= rmax) return T();
-      if(r < real(0.0)) return table[0];
+      if(r <= real(0.0)) return table[0];
       return interp(table, Ntable, drNormalized, r);
     }
  
