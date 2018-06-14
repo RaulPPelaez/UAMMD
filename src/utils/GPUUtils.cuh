@@ -6,8 +6,6 @@
 #define GPUUTILS_CUH
 
 
-#include<iostream>
-#include"utils/debugTools.cuh"
 namespace uammd{
 
   //Fill any iterator with the same value. It is much faster than cudaMemset
