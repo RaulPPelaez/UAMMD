@@ -84,10 +84,14 @@ namespace uammd{
   
     class PSE{
     public:
+
+      struct Parameters: BDHI::Parameters{
+	real psi = 0.5;
+      };
       PSE(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys,
-	  BDHI::Parameters par);
+	  Parameters par);
       ~PSE();
       void setup_step(              cudaStream_t st = 0);
       void computeMF(real3* MF,     cudaStream_t st = 0);    
@@ -108,8 +112,10 @@ namespace uammd{
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
       shared_ptr<System> sys;
-      std::thread Mdot_nearThread, Mdot_farThread, NearNoise_Thread;
-    
+      //std::thread Mdot_nearThread, Mdot_farThread, NearNoise_Thread;
+
+      ullint seed;
+      
       real temperature;
       real dt;
       real M0;
