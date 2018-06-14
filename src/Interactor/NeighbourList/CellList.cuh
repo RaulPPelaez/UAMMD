@@ -295,7 +295,8 @@ namespace uammd{
     }
     ~CellList(){
       sys->log<System::DEBUG>("[CellList] Destroyed");
-      cudaFree(tooManyNeighboursFlagGPU);
+      CudaSafeCall(cudaFreeHost(tooManyNeighboursFlagGPU));
+      CudaCheckError();
     }
 
 
