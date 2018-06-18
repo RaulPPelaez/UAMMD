@@ -19,13 +19,15 @@ namespace uammd{
   namespace Potential{
     struct DefaultDissipation{
       real gamma;
-      DefaultDissipation(real gamma):gamma(gamma){}
-      template<class ...T> real dissipativeStrength(T...) const{
+      __device__ __host__ DefaultDissipation():DefaultDissipation(1.0){}
+      __device__ __host__ DefaultDissipation(real gamma):gamma(gamma){}
+      template<class ...T> __device__ __host__ real dissipativeStrength(T...) const{
 	return gamma;
       }
-
+      
+      
       template<class T>
-      DefaultDissipation operator=(T gamma){return DefaultDissipation(gamma);}
+      inline __device__ __host__ DefaultDissipation operator=(T gamma){return DefaultDissipation(gamma);}
 
     };
     template<class DissipativeStrength = DefaultDissipation>
@@ -43,7 +45,7 @@ namespace uammd{
       struct Parameters{
 	real cutOff = 1;
 	real dt = 0;
-	DissipativeStrength gamma;
+	DissipativeStrength gamma; //1.0 by default
 	real temperature;
 	real A = 1;
       };
@@ -140,7 +142,7 @@ namespace uammd{
 	  const real wr = real(1.0) - rmod*invrcut; //This weight function is arbitrary as long as wd = wr*wr
 	  
 	  const real Fc = A*wr*invrmod;	
-
+	  
 	  const real wd = wr*wr; //Wd must be such as wd = wr^2 to ensure fluctuation dissipation balance
 	  const real g = gamma.dissipativeStrength(i, j, pi, pj, infoi.vel, infoj.vel);
 	  const real Fd = -g*wd*invrmod*invrmod*dot(rij, vij);
