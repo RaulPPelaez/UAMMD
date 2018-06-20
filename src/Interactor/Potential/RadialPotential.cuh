@@ -50,12 +50,13 @@ namespace uammd{
 	std::shared_ptr<System> sys;
 	
 	PotentialFunctor pot;
-	ParameterHandle pairParameters;
+      shared_ptr<ParameterHandle> pairParameters;
 	std::string name;
       public:
 	Radial(std::shared_ptr<System> sys):Radial(sys, PotentialFunctor()){}
 	Radial(std::shared_ptr<System> sys, PotentialFunctor pot): pot(pot), sys(sys){
 	  name = type_name_without_namespace<PotentialFunctor>();
+	  pairParameters = std::make_shared<ParameterHandle>();
 	  sys->log<System::MESSAGE>("[RadialPotential/%s] Initialized", name.c_str());
 	}
 	~Radial(){
@@ -64,10 +65,10 @@ namespace uammd{
 
 	void setPotParameters(int ti, int tj, InputPairParameters p){
 	  sys->log<System::MESSAGE>("[RadialPotential/%s] Type pair %d %d parameters added", name.c_str(), ti, tj);
-	  pairParameters.add(ti, tj, p);
+	  pairParameters->add(ti, tj, p);
 	}
 	real getCutOff(){
-	  return pairParameters.getCutOff();
+	  return pairParameters->getCutOff();
 	}
 
 	//Most of the code is identical for energy, force and virial transversers.
@@ -97,7 +98,7 @@ namespace uammd{
 	  inline __device__ void accumulate(resultType& total, const resultType& current){total += current;}
 	  /*This function will be called for each particle i, once when all neighbours have been transversed, with the particle index and the value total had the last time accumulate was called*/
 	  /*Update the force acting on particle pi, pi is in the normal order*/
-	  inline __device__ void set(int pi, const resultType &total){     
+	  inline __device__ void set(int pi, const resultType &total){	   	    	    
 	    result[pi] += total;
 	  }
 	  /*Starting value, can also be used to initialize in-kernel parameters, as it is called at the start*/
@@ -121,7 +122,7 @@ namespace uammd{
 	    if(r2 == real(0.0)) return make_real4(0);
 	    
 	    auto params = this->typeParameters((int) ri.w, (int) rj.w);
-
+	    
 	    return  make_real4(this->pot.force(r2, params)*r12, real(0.0));
 	  }      
 
@@ -149,7 +150,7 @@ namespace uammd{
 	  sys->log<System::DEBUG2>("[RadialPotential/%s] ForceTransverser requested", name.c_str());
 	  auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       
-	  return forceTransverser(pairParameters.getIterator(), force.raw(), box, pot);
+	  return forceTransverser(pairParameters->getIterator(), force.raw(), box, pot);
 
 	}
 
@@ -157,7 +158,7 @@ namespace uammd{
 	  sys->log<System::DEBUG2>("[RadialPotential/%s] EnergyTransverser requested", name.c_str());
 	  auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
       
-	  return energyTransverser(pairParameters.getIterator(), energy.raw(), box, pot);
+	  return energyTransverser(pairParameters->getIterator(), energy.raw(), box, pot);
 	}
 
       };

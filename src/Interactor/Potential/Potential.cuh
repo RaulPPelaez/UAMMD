@@ -43,7 +43,7 @@ namespace uammd{
 	bool shift = false; //Shift the potential so lj(rc) = 0?
       };
       
-      struct PairParameters{
+      struct __align__(16) PairParameters{
 	real cutOff2;
 	real sigma2, epsilonDivSigma2;
 	real shift = 0.0; // Contains lj_force(rc)
