@@ -34,7 +34,7 @@ namespace uammd{
 	       shared_ptr<System> sys,
 	       Parameters par,
 	       shared_ptr<Potential> pot = std::make_shared<Potential>()):
-      PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, pot, par){
+      PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par, pot){
     }
 
     ~PairForces(){
