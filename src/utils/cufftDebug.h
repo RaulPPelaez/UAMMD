@@ -28,8 +28,9 @@ const char* cufftGetErrorString(cufftResult_t err){
   case   CUFFT_NO_WORKSPACE:              return "CUFFT_NO_WORKSPACE   \n";
   case   CUFFT_NOT_IMPLEMENTED:           return "CUFFT_NOT_IMPLEMENTED \n";
   case   CUFFT_LICENSE_ERROR:             return "CUFFT_LICENSE_ERROR  \n";
+#ifdef CUFFT_NOT_SUPPORTED
   case   CUFFT_NOT_SUPPORTED:             return "CUFFT_NOT_SUPPORTED  \n";
-
+#endif
   default: return "CUFFT Unknown error code\n";
   }
 }
