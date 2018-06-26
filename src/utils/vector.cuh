@@ -414,6 +414,8 @@ VECATTR real3 make_real3(real2 a, real z){return make_real3(a.x, a.y, z);}
 VECATTR real3 make_real3(int3 a){ return make_real3(real(a.x), real(a.y), real(a.z));}
 VECATTR real3 make_real3(uint3 a){return make_real3(real(a.x), real(a.y), real(a.z));}
 
+
+  
 //////////////////REAL2///////////////////////////
 
 
@@ -834,6 +836,10 @@ VECATTR double3 cross(double3 a, double3 b){
   return make_double3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
 
+
+VECATTR float3 sqrt(const float3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
+VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
+      
 
 //////////////////////////////////////////////////////////
 
