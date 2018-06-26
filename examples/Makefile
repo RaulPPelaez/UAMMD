@@ -6,7 +6,8 @@ ARCH=
 #Uncomment to compile in double precision mode, single by default
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
-#C++ compiler, I tested up to clang++-4.0
+#C++ compiler, I tested up to clang++-5.0
+#CXX=clang++-5.0
 CXX=g++
 
 #Cuda version (assumed to be in /usr/local/cuda*) You can change this in CUDA_ROOT
@@ -21,7 +22,7 @@ CUDA_ROOT=/usr/local/cuda-$(CUDA_VER)
 #The file that will be compiled with all:
 FILE=benchmark.cu
 
-LOG_LEVEL=6
+LOG_LEVEL=5
 
 #Uncomment to add debug flags to nvcc
 #DEBUG= -lineinfo -src-in-ptx -g -G
@@ -46,10 +47,13 @@ BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OP
 all: test
 	$(BASIC_LINE)  $(FILE)
 
-test: lj dpd nvt bdhi pse bd bonds sph
+test: lj ljMult dpd nvt bdhi pse bd bonds sph
 
 lj:
 	$(BASIC_LINE) LJ.cu -o lj
+
+ljMult:
+	$(BASIC_LINE) LJMultipleTypes.cu -o ljMult
 
 dpd:
 	$(BASIC_LINE) DPD.cu -o dpd
@@ -76,7 +80,7 @@ sph:
 	$(BASIC_LINE) SPH_test.cu -lcurand -o sph
 
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult
 
 
 
