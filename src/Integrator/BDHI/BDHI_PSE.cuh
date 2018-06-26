@@ -65,7 +65,7 @@ References:
 #include"Interactor/NeighbourList/CellList.cuh"
 #include"misc/LanczosAlgorithm.cuh"
 #include<cufft.h>
-#include<curand_kernel.h>
+//#include<curand_kernel.h>
 #include<thread>
 #include"utils/Grid.cuh"
 #ifndef SINGLE_PRECISION
@@ -76,7 +76,7 @@ References:
 #define cufftExecC2R cufftExecZ2D 
 #define CUFFT_C2R CUFFT_Z2D
 #define CUFFT_R2C CUFFT_D2Z
-#define curand_normal2 curand_normal2_double
+//#define curand_normal2 curand_normal2_double
 #endif
 
 namespace uammd{
@@ -145,12 +145,12 @@ namespace uammd{
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<real> cufftWorkArea;
     
-      thrust::device_vector<real3> gridVels;    //Interpolated grid velocities in real space
-
+      //thrust::device_vector<real3> gridVels;    //Interpolated grid velocities in real space
+      
       thrust::device_vector<cufftComplex> gridVelsFourier;     //Interpolated grid velocities in fourier space
       thrust::device_vector<real3> fourierFactor;  // Fourier scaing factors to go from F to V in wave space
 
-      thrust::device_vector<curandState> farNoise;
+      //thrust::device_vector<curandState> farNoise;
 
       cudaStream_t stream, stream2;
     };

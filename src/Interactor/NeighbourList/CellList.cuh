@@ -168,7 +168,16 @@ namespace uammd{
       
       //The indices provided to getInfo are order agnostic, they will be the indices of the particles inside the group.
       const int ori = groupIndex[sortedIndex[id]];
-      const real4 myParticle = sortPos[id];      
+#if CUB_PTX_ARCH < 300
+      constexpr auto cubModifier = cub::LOAD_DEFAULT;
+#else
+      constexpr auto cubModifier = cub::LOAD_LDG;
+#endif
+
+      cub::CacheModifiedInputIterator<cubModifier, real4> pos_itr(sortPos);
+      
+      //const real4 myParticle = sortPos[id];
+      const real4 myParticle = pos_itr[id];
       const int3 celli = grid.getCell(myParticle);
       /*Delegator makes possible to call transverseList with a simple Transverser
 	(a transverser that only uses positions, with no getInfo method) by using
@@ -207,7 +216,7 @@ namespace uammd{
 	  for(int j=0; j<nincell; j++){
 	    int cur_j = j + firstParticle;// sortedIndex[j+firstParticle];
 	    if(cur_j < N){
-	      tr.accumulate(quantity, del.compute(tr, groupIndex[sortedIndex[cur_j]], myParticle, sortPos[cur_j]));
+	      tr.accumulate(quantity, del.compute(tr, groupIndex[sortedIndex[cur_j]], myParticle, pos_itr[cur_j]));
 	    }//endif
 	  }//endfor
 	}//endif
