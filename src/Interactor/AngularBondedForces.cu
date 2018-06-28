@@ -217,7 +217,7 @@ namespace uammd{
 	if(ang0 == real(0.0)){
 	  //TODO replace rij for rji so ang0=0 means straight and this can apply
 	  //When ang0=pi means stragiht it is difficult to check if ang0 is pi
-	  ampli = -kspring;
+	  ampli = -real(2.0)*kspring;
 	}
 	else{
 	  const real theta = acosf(cijk);
@@ -225,7 +225,7 @@ namespace uammd{
 	    continue;
 	  }
 	  const real sinthetao2 = sinf(real(0.5)*theta);
-	  ampli = -kspring*(sinthetao2 - sinf(ang0*real(0.5)))/sinthetao2;
+	  ampli = -real(2.0)*kspring*(sinthetao2 - sinf(ang0*real(0.5)))/sinthetao2;
 	}
 	
 	//ampli = -kang*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0; //k(1-cos(ang-ang0))
