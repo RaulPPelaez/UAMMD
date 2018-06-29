@@ -814,6 +814,27 @@ VECATTR  void operator *=(double2 &a, const double &b){
 }
 
 
+
+VECATTR  double2 operator /(const double2 &a, const double2 &b){
+  return make_double2(a.x / b.x, a.y / b.y);
+}
+VECATTR  void operator /=(double2 &a, const double2 &b){
+  a.x /= b.x;
+  a.y /= b.y;
+}
+VECATTR  double2 operator /(const double2 &a, const double &b){
+  return make_double2(a.x / b, a.y / b);
+}
+VECATTR  double2 operator /(const double &b, const double2 &a){
+  return make_double2(b/a.x, b/a.y);
+}
+VECATTR  void operator /=(double2 &a, const double &b){
+  a.x /= b;
+  a.y /= b;
+}
+
+
+
 ////////////////////////////
 
 VECATTR double3 floorf(double3 v){return make_double3(floor(v.x), floor(v.y), floor(v.z));}
