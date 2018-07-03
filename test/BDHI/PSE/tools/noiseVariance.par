@@ -85,7 +85,7 @@ timestamp color 1
 timestamp rot 0
 timestamp font 0
 timestamp char size 1.000000
-timestamp def "Tue Jun 26 17:05:38 2018"
+timestamp def "Tue Jul  3 12:24:00 2018"
 with string
     string on
     string loctype view
@@ -95,7 +95,7 @@ with string
     string font 0
     string just 0
     string char size 1.500000
-    string def "D\s0\N=1/(6·\xph\0R\sh\N)·(1-2.837/L)"
+    string def "D\s0\N=kT/(6·\xph\0R\sh\N)·(1-2.837·R\sh\N/L)"
 r0 off
 link r0 to g0
 r0 type above
@@ -165,7 +165,7 @@ with g0
     xaxis  bar color 1
     xaxis  bar linestyle 1
     xaxis  bar linewidth 2.0
-    xaxis  label "\xx\0"
+    xaxis  label "\xx\0·R\sh\N"
     xaxis  label layout para
     xaxis  label place auto
     xaxis  label char size 1.750000
@@ -264,7 +264,7 @@ with g0
     altyaxis  off
     legend on
     legend loctype view
-    legend 0.85, 0.8
+    legend 1, 0.8
     legend box color 1
     legend box pattern 1
     legend box linewidth 2.0
@@ -286,9 +286,9 @@ with g0
     frame background color 0
     frame background pattern 0
     s0 hidden false
-    s0 type xydy
+    s0 type xy
     s0 symbol 1
-    s0 symbol size 1.280000
+    s0 symbol size 1.030000
     s0 symbol color 1
     s0 symbol pattern 1
     s0 symbol fill color 1
@@ -300,7 +300,7 @@ with g0
     s0 symbol skip 0
     s0 line type 0
     s0 line linestyle 1
-    s0 line linewidth 1.0
+    s0 line linewidth 2.0
     s0 line color 1
     s0 line pattern 1
     s0 baseline type 0
@@ -325,19 +325,19 @@ with g0
     s0 errorbar place both
     s0 errorbar color 1
     s0 errorbar pattern 1
-    s0 errorbar size 0.760000
-    s0 errorbar linewidth 3.0
+    s0 errorbar size 0.280000
+    s0 errorbar linewidth 2.0
     s0 errorbar linestyle 1
-    s0 errorbar riser linewidth 3.0
+    s0 errorbar riser linewidth 2.0
     s0 errorbar riser linestyle 1
     s0 errorbar riser clip off
     s0 errorbar riser clip length 0.100000
-    s0 comment "diff.x"
-    s0 legend  "X"
+    s0 comment "results_1e-3/noiseVariance.test"
+    s0 legend  "x"
     s1 hidden false
-    s1 type xydy
+    s1 type xy
     s1 symbol 2
-    s1 symbol size 1.280000
+    s1 symbol size 1.030000
     s1 symbol color 2
     s1 symbol pattern 1
     s1 symbol fill color 2
@@ -349,7 +349,7 @@ with g0
     s1 symbol skip 0
     s1 line type 0
     s1 line linestyle 1
-    s1 line linewidth 1.0
+    s1 line linewidth 2.0
     s1 line color 2
     s1 line pattern 1
     s1 baseline type 0
@@ -374,19 +374,19 @@ with g0
     s1 errorbar place both
     s1 errorbar color 2
     s1 errorbar pattern 1
-    s1 errorbar size 0.760000
-    s1 errorbar linewidth 3.0
+    s1 errorbar size 0.280000
+    s1 errorbar linewidth 2.0
     s1 errorbar linestyle 1
-    s1 errorbar riser linewidth 3.0
+    s1 errorbar riser linewidth 2.0
     s1 errorbar riser linestyle 1
     s1 errorbar riser clip off
     s1 errorbar riser clip length 0.100000
-    s1 comment "diff.y"
-    s1 legend  "Y"
+    s1 comment "results_1e-3/noiseVariance.test"
+    s1 legend  "y"
     s2 hidden false
-    s2 type xydy
+    s2 type xy
     s2 symbol 3
-    s2 symbol size 1.280000
+    s2 symbol size 1.030000
     s2 symbol color 3
     s2 symbol pattern 1
     s2 symbol fill color 3
@@ -398,7 +398,7 @@ with g0
     s2 symbol skip 0
     s2 line type 0
     s2 line linestyle 1
-    s2 line linewidth 1.0
+    s2 line linewidth 2.0
     s2 line color 3
     s2 line pattern 1
     s2 baseline type 0
@@ -423,12 +423,61 @@ with g0
     s2 errorbar place both
     s2 errorbar color 3
     s2 errorbar pattern 1
-    s2 errorbar size 0.760000
-    s2 errorbar linewidth 3.0
+    s2 errorbar size 0.280000
+    s2 errorbar linewidth 2.0
     s2 errorbar linestyle 1
-    s2 errorbar riser linewidth 3.0
+    s2 errorbar riser linewidth 2.0
     s2 errorbar riser linestyle 1
     s2 errorbar riser clip off
     s2 errorbar riser clip length 0.100000
-    s2 comment "diff.z"
-    s2 legend  "Z"
+    s2 comment "results_1e-3/noiseVariance.test"
+    s2 legend  "z"
+    s3 hidden false
+    s3 type xy
+    s3 symbol 4
+    s3 symbol size 0.280000
+    s3 symbol color 4
+    s3 symbol pattern 1
+    s3 symbol fill color 4
+    s3 symbol fill pattern 0
+    s3 symbol linewidth 2.0
+    s3 symbol linestyle 1
+    s3 symbol char 65
+    s3 symbol char font 0
+    s3 symbol skip 0
+    s3 line type 1
+    s3 line linestyle 1
+    s3 line linewidth 2.0
+    s3 line color 4
+    s3 line pattern 1
+    s3 baseline type 0
+    s3 baseline off
+    s3 dropline off
+    s3 fill type 0
+    s3 fill rule 0
+    s3 fill color 1
+    s3 fill pattern 1
+    s3 avalue off
+    s3 avalue type 2
+    s3 avalue char size 1.000000
+    s3 avalue font 0
+    s3 avalue color 1
+    s3 avalue rot 0
+    s3 avalue format general
+    s3 avalue prec 3
+    s3 avalue prepend ""
+    s3 avalue append ""
+    s3 avalue offset 0.000000 , 0.000000
+    s3 errorbar on
+    s3 errorbar place both
+    s3 errorbar color 4
+    s3 errorbar pattern 1
+    s3 errorbar size 0.280000
+    s3 errorbar linewidth 2.0
+    s3 errorbar linestyle 1
+    s3 errorbar riser linewidth 2.0
+    s3 errorbar riser linestyle 1
+    s3 errorbar riser clip off
+    s3 errorbar riser clip length 0.100000
+    s3 comment "results_1e-3/noiseVariance.test"
+    s3 legend  ""

@@ -9,7 +9,6 @@ map font 8 to "Courier", "Courier"
 map font 10 to "Courier-Bold", "Courier-Bold"
 map font 11 to "Courier-BoldOblique", "Courier-BoldOblique"
 map font 9 to "Courier-Oblique", "Courier-Oblique"
-map font 14 to "Courier-Regular", "Courier-Regular"
 map font 15 to "Dingbats-Regular", "Dingbats-Regular"
 map font 4 to "Helvetica", "Helvetica"
 map font 6 to "Helvetica-Bold", "Helvetica-Bold"
@@ -50,10 +49,6 @@ map font 51 to "URWPalladioL-Bold", "URWPalladioL-Bold"
 map font 52 to "URWPalladioL-BoldItalic", "URWPalladioL-BoldItalic"
 map font 53 to "URWPalladioL-Italic", "URWPalladioL-Italic"
 map font 54 to "URWPalladioL-Roman", "URWPalladioL-Roman"
-map font 55 to "Utopia-Bold", "Utopia-Bold"
-map font 56 to "Utopia-BoldItalic", "Utopia-BoldItalic"
-map font 57 to "Utopia-Italic", "Utopia-Italic"
-map font 58 to "Utopia-Regular", "Utopia-Regular"
 map font 13 to "ZapfDingbats", "ZapfDingbats"
 map color 0 to (255, 255, 255), "white"
 map color 1 to (0, 0, 0), "black"
@@ -90,7 +85,27 @@ timestamp color 1
 timestamp rot 0
 timestamp font 0
 timestamp char size 1.000000
-timestamp def "Fri Jun 15 18:30:40 2018"
+timestamp def "Tue Jul  3 12:08:29 2018"
+with string
+    string on
+    string loctype view
+    string 0.67, 0.6
+    string color 1
+    string rot 0
+    string font 0
+    string just 0
+    string char size 1.500000
+    string def "PSE \xx\0·R\sh\N="
+with string
+    string on
+    string loctype view
+    string 0.4, 0.767156862745
+    string color 1
+    string rot 0
+    string font 0
+    string just 0
+    string char size 1.250000
+    string def "M\s0\N=1/(6\xph\0R\sh\N)·(1-2.837·R\sh\N/L)"
 r0 off
 link r0 to g0
 r0 type above
@@ -137,13 +152,13 @@ g0 fixedpoint xy 0.000000, 0.000000
 g0 fixedpoint format general general
 g0 fixedpoint prec 6, 6
 with g0
-    world 0.01, 1, 100, 10000
+    world 0.01, 1, 32, 1000
     stack world 0, 0, 0, 0
     znorm 1
     view 0.150000, 0.150000, 1.150000, 0.850000
     title "Pull two particles in x axis F[0].x = 1, F[1].x=-1"
     title font 0
-    title size 1.500000
+    title size 1.750000
     title color 1
     subtitle ""
     subtitle font 0
@@ -267,7 +282,7 @@ with g0
     legend box fill color 0
     legend box fill pattern 1
     legend font 0
-    legend char size 1.000000
+    legend char size 1.250000
     legend color 1
     legend length 4
     legend vgap 1
@@ -377,7 +392,7 @@ with g0
     s1 errorbar riser clip off
     s1 errorbar riser clip length 0.100000
     s1 comment "0.100000.pvsvel"
-    s1 legend  "PSE \xx\0=0.1"
+    s1 legend  "0.1"
     s2 hidden false
     s2 type xy
     s2 symbol 2
@@ -426,7 +441,7 @@ with g0
     s2 errorbar riser clip off
     s2 errorbar riser clip length 0.100000
     s2 comment "/home/raul/test/uammd/test/1.000000.pvsvel"
-    s2 legend  "PSE \xx\0=0.2"
+    s2 legend  "0.2"
     s3 hidden false
     s3 type xy
     s3 symbol 3
@@ -475,7 +490,7 @@ with g0
     s3 errorbar riser clip off
     s3 errorbar riser clip length 0.100000
     s3 comment "pairMobility_pullForce.psi0.300000.test"
-    s3 legend  "PSE \xx\0=0.3"
+    s3 legend  "0.3"
     s4 hidden false
     s4 type xy
     s4 symbol 4
@@ -524,7 +539,7 @@ with g0
     s4 errorbar riser clip off
     s4 errorbar riser clip length 0.100000
     s4 comment "pairMobility_pullForce.psi0.400000.test"
-    s4 legend  "PSE \xx\0=0.4"
+    s4 legend  "0.4"
     s5 hidden false
     s5 type xy
     s5 symbol 5
@@ -573,7 +588,7 @@ with g0
     s5 errorbar riser clip off
     s5 errorbar riser clip length 0.100000
     s5 comment "pairMobility_pullForce.psi0.500000.test"
-    s5 legend  "PSE \xx\0=0.5"
+    s5 legend  "0.5"
     s6 hidden false
     s6 type xy
     s6 symbol 6
@@ -622,7 +637,7 @@ with g0
     s6 errorbar riser clip off
     s6 errorbar riser clip length 0.100000
     s6 comment "pairMobility_pullForce.psi0.600000.test"
-    s6 legend  "PSE \xx\0=0.6"
+    s6 legend  "0.6"
     s7 hidden false
     s7 type xy
     s7 symbol 7
@@ -671,7 +686,7 @@ with g0
     s7 errorbar riser clip off
     s7 errorbar riser clip length 0.100000
     s7 comment "pairMobility_pullForce.psi0.700000.test"
-    s7 legend  "PSE \xx\0=0.7"
+    s7 legend  "0.7"
     s8 hidden false
     s8 type xy
     s8 symbol 8
@@ -720,7 +735,7 @@ with g0
     s8 errorbar riser clip off
     s8 errorbar riser clip length 0.100000
     s8 comment "pairMobility_pullForce.psi0.800000.test"
-    s8 legend  "PSE \xx\0=0.8"
+    s8 legend  "0.8"
     s9 hidden false
     s9 type xy
     s9 symbol 9
@@ -769,7 +784,7 @@ with g0
     s9 errorbar riser clip off
     s9 errorbar riser clip length 0.100000
     s9 comment "pairMobility_pullForce.psi0.900000.test"
-    s9 legend  "PSE \xx\0=0.9"
+    s9 legend  "0.9"
     s10 hidden false
     s10 type xy
     s10 symbol 10
@@ -818,53 +833,4 @@ with g0
     s10 errorbar riser clip off
     s10 errorbar riser clip length 0.100000
     s10 comment "pairMobility_pullForce.psi1.000000.test"
-    s10 legend  "PSE \xx\0=1.0"
-    s11 hidden false
-    s11 type xy
-    s11 symbol 0
-    s11 symbol size 0.280000
-    s11 symbol color 12
-    s11 symbol pattern 1
-    s11 symbol fill color 12
-    s11 symbol fill pattern 0
-    s11 symbol linewidth 2.0
-    s11 symbol linestyle 1
-    s11 symbol char 65
-    s11 symbol char font 0
-    s11 symbol skip 0
-    s11 line type 1
-    s11 line linestyle 1
-    s11 line linewidth 2.0
-    s11 line color 12
-    s11 line pattern 1
-    s11 baseline type 0
-    s11 baseline off
-    s11 dropline off
-    s11 fill type 0
-    s11 fill rule 0
-    s11 fill color 1
-    s11 fill pattern 1
-    s11 avalue off
-    s11 avalue type 2
-    s11 avalue char size 1.000000
-    s11 avalue font 0
-    s11 avalue color 1
-    s11 avalue rot 0
-    s11 avalue format general
-    s11 avalue prec 3
-    s11 avalue prepend ""
-    s11 avalue append ""
-    s11 avalue offset 0.000000 , 0.000000
-    s11 errorbar on
-    s11 errorbar place both
-    s11 errorbar color 12
-    s11 errorbar pattern 1
-    s11 errorbar size 1.000000
-    s11 errorbar linewidth 2.0
-    s11 errorbar linestyle 1
-    s11 errorbar riser linewidth 2.0
-    s11 errorbar riser linestyle 1
-    s11 errorbar riser clip off
-    s11 errorbar riser clip length 0.100000
-    s11 comment "pairMobility_pullForce.test"
-    s11 legend  ""
+    s10 legend  "1.0"
