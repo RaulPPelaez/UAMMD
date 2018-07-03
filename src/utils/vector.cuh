@@ -888,6 +888,10 @@ VECATTR  int3 operator -(const int3 &a, const int3 &b){
   return make_int3(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
+VECATTR  void operator -=(int3 &a, const int3 &b){
+  a.x -= b.x;  a.y -= b.y;  a.z -= b.z;
+}
+
 VECATTR  int3 operator -(const int3 &a, const int &b){
   return make_int3(a.x - b, a.y - b, a.z - b);
 }
