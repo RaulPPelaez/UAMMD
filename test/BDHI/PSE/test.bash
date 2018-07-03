@@ -16,7 +16,7 @@ fi
 temperature=2.0
 viscosity=0.3
 hydrodynamicRadius=0.1
-#make clean pse
+make clean pse
 
 for tolerance in 1e-3 # 1e-1 5e-2 1e-2 5e-3 1e-3 1e-7
 do    
