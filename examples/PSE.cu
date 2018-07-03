@@ -3,10 +3,17 @@
 This file contains a good example of how UAMMD works and how to configure and launch a simulation.
 
 Runs a Brownian Hydrodynamics simulation with particles starting in a periodic box at low temperature.
+Optionally a LJ interaction between the particles can be activated.
   
 Needs cli input arguments with a system size, etc, look for "argv"
 
-Or just run: ./a.out 14 32 0.001 1000 10000 0.0 0.1
+the input arguments now are:
+ ./pse n L dt nsteps printSteps T psi WCA_switch tolerance hydrodynamicRadius
+
+ n -> numberParticles = 2^n
+ The particles will start in a cube of size L*0.8
+
+Or just run: ./pse 15 60 0.01 50000 200 0.2 1.0 1.5 5e-2 0.5
 for a quick test
 
 You can visualize the reuslts with superpunto
@@ -34,16 +41,16 @@ You can visualize the reuslts with superpunto
 using namespace uammd;
 using namespace std;
 
+using uammd::real;
 
 int main(int argc, char *argv[]){
 
   if(argc==1){
-    std::cerr<<"Run with: ./a.out 12 64 0.01 10000 100 0.0 0.1 1"<<std::endl;
+    std::cerr<<"Run with: ./pse 15 60 0.01 50000 200 0.2 1.0 1.5 5e-2 0.5"<<std::endl;
     exit(1);
   }
 
   int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
-  cerr<<N<<endl;
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
   
   auto sys = make_shared<System>();
@@ -66,12 +73,12 @@ int main(int argc, char *argv[]){
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     
     //Start in a fcc lattice, pos.w contains the particle type
-    //auto initial =  initLattice(box.boxSize, N, sc);
-    
+    auto initial =  initLattice(box.boxSize*0.8, N, fcc);    
     fori(0,N){
-      pos.raw()[i] = make_real4(sys->rng().uniform3(-box.boxSize.x*0.5, box.boxSize.x*0.5), 0);
+      //pos.raw()[i] = make_real4(sys->rng().uniform3(-box.boxSize.x*0.5, box.boxSize.x*0.5), 0);
+      pos.raw()[i] = initial[i];
       //Type of particle is stored in .w
-      pos.raw()[i].w = sys->rng().uniform(0,1)>std::stod(argv[6])?0:1;
+      pos.raw()[i].w = 0;//sys->rng().uniform(0,1)>std::stod(argv[6])?0:1;
     }    
   }
   
@@ -83,15 +90,16 @@ int main(int argc, char *argv[]){
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
   
   ofstream out("kk");
+  double hydrodynamicRadius =  std::stod(argv[10]);
   
   BDHI::PSE::Parameters par;
-  par.temperature = std::stod(argv[7]);
+  par.temperature = std::stod(argv[6]);
   par.viscosity = 1.0;
-  par.hydrodynamicRadius =  std::stod(argv[11]);
+  par.hydrodynamicRadius =  hydrodynamicRadius;
   par.dt = std::stod(argv[3]);
   par.box = box;
-  par.tolerance = std::stod(argv[10]);
-  par.psi=std::stod(argv[8]);
+  par.tolerance = std::stod(argv[9]);
+  par.psi=std::stod(argv[7]);
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
    
   /*
@@ -112,8 +120,8 @@ int main(int argc, char *argv[]){
     par.epsilon = 1.0;
     par.shift = false;    
         
-    par.sigma = 2.0;
-    par.cutOff =par.sigma*pow(2, 1/6.);
+    par.sigma = 2.0*hydrodynamicRadius;
+    par.cutOff =par.sigma*2.5;//pow(2, 1/6.);
     
     pot->setPotParameters(0, 0, par);
   }
@@ -122,7 +130,7 @@ int main(int argc, char *argv[]){
   params.box = box;  //Box to work on
   auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
 
-  if(atoi(argv[9])>0)bdhi->addInteractor(pairforces);
+  if(atoi(argv[8])>0)bdhi->addInteractor(pairforces);
   
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).
   //A maximum log level is set in System.cuh, every logging event with a level superior to the max will result in
@@ -164,7 +172,7 @@ int main(int argc, char *argv[]){
 	real4 pc = pos.raw()[sortedIndex[i]];
 	p = make_real3(pc);
 	int type = pc.w;
-	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<endl;
+	out<<p<<" "<<hydrodynamicRadius<<" "<<type<<endl;
       }
     }
     //Sort the particles every few steps
