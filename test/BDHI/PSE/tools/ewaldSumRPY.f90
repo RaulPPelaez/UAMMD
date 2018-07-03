@@ -45,6 +45,9 @@
     lx = 64.d0 !Box size
     ly = 64.d0 !Box size
     lz = 64.d0 !Box size
+
+    read(*,*) a, lx, ly, lz
+    
     volume = lx * ly * lz
     nPoints = 1000 !
     eta = 1.0d0 !viscosity is not used
@@ -129,7 +132,7 @@
 
        !Divided by the Stokes force
        ! write(*,*) x2, 1.d0/(g0)
-       write(*,*) x2, 1.d0/(g0+g1+g2)*(1-2.837297d0/lx)
+       write(*,*) x2, 1.d0/(g0+g1+g2)*(1-2.837297d0*a/lx)
     end do
 
 

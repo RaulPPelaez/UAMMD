@@ -55,10 +55,12 @@ namespace uammd{
   public:
     NBody(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){}
+	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){
+      sys->log<System::MESSAGE>("[NBody] Created");
+    }
     template<class Transverser>
     inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
-      sys->log<System::DEBUG3>("[NBody] Transversing with %s", type_name<Transverser>().c_str());
+      sys->log<System::DEBUG2>("[NBody] Transversing with %s", type_name<Transverser>().c_str());
       int N = pg->getNumberParticles();      
       int Nthreads = 128<N?128:N;
       int Nblocks  = (N+Nthreads-1)/Nthreads;

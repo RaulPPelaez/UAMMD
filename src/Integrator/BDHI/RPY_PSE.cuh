@@ -20,16 +20,17 @@ namespace uammd{
   namespace BDHI{
     struct RPYPSE_near{
     private:
-      real vis, rh, psi;
-      real rcut;
-      real M0;
+      double rh, psi;
+      double normalization; //Divide F and G by this.
+      double rcut;
+
     public:
-      RPYPSE_near(real vis, real rh, real psi, real M0, real rcut);
-
-      double2 FandG(double r2);
-
-      __device__ __host__ inline real2 operator()(double r2){
-	return make_real2(this->FandG(r2));
+      RPYPSE_near(real rh, real psi, real normalization, real rcut):
+	rh(rh), psi(psi), normalization(normalization), rcut(rcut){}
+      
+      double2 FandG(double r);
+      __device__ __host__ inline real2 operator()(double r){
+	return make_real2(this->FandG(r)/normalization);
       }
 
     private:
@@ -39,18 +40,17 @@ namespace uammd{
 		       double f4, double f5, double f6, double f7);
     };
 
-
-
-
-    RPYPSE_near::RPYPSE_near(real vis, real rh, real psi, real m0, real rcut):
-      vis(vis), rh(rh), psi(psi), rcut(rcut){	 
-      this->M0 = 6*M_PI*m0;  
-    }
-
-    double2 RPYPSE_near::FandG(double r2){
-      double r = sqrt(r2);
+    
+    double2 RPYPSE_near::FandG(double r){
+      double r2 = r*r;
       if(r>=rcut) return make_double2(0.0, 0.0);
-      if(r==real(0.0)) return make_double2(1.0, 1.0);
+      if(r<=real(0.0)){
+      /*(6*pi*vis*a)*Mr(0) = F(0)(I-r^r) + G(0)(r^r) = F(0) = (6*pi*vis*a)*Mii_r . 
+	See eq. A4 in [1] and RPYPSE_nearTextures*/
+	double pi = M_PI;
+	double f0 = (1.0/(4*sqrt(pi)*psi*rh))*(1-exp(-4*rh*rh*psi*psi)+4*sqrt(pi)*rh*psi*std::erfc(2*rh*psi));
+	return make_double2(f0, 0);
+      }
       double a2mr = 2*rh-r;
       double a2pr = 2*rh+r;
 
@@ -132,8 +132,8 @@ namespace uammd{
       
       g7 = -3.0*(4.0*r4*psi4+1.0)/(64.0*rh*r3*psi4);
         
-      return {params2FG(r, f0, f1, f2, f3, f4, f5, f6, f7)/(vis*rh*M0),
-	  params2FG(r, g0, g1, g2, g3, g4, g5, g6, g7)/(vis*rh*M0)};
+      return {params2FG(r, f0, f1, f2, f3, f4, f5, f6, f7),
+	  params2FG(r, g0, g1, g2, g3, g4, g5, g6, g7)};
     }
 
 

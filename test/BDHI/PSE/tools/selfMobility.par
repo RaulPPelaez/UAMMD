@@ -9,7 +9,6 @@ map font 8 to "Courier", "Courier"
 map font 10 to "Courier-Bold", "Courier-Bold"
 map font 11 to "Courier-BoldOblique", "Courier-BoldOblique"
 map font 9 to "Courier-Oblique", "Courier-Oblique"
-map font 14 to "Courier-Regular", "Courier-Regular"
 map font 15 to "Dingbats-Regular", "Dingbats-Regular"
 map font 4 to "Helvetica", "Helvetica"
 map font 6 to "Helvetica-Bold", "Helvetica-Bold"
@@ -50,10 +49,6 @@ map font 51 to "URWPalladioL-Bold", "URWPalladioL-Bold"
 map font 52 to "URWPalladioL-BoldItalic", "URWPalladioL-BoldItalic"
 map font 53 to "URWPalladioL-Italic", "URWPalladioL-Italic"
 map font 54 to "URWPalladioL-Roman", "URWPalladioL-Roman"
-map font 55 to "Utopia-Bold", "Utopia-Bold"
-map font 56 to "Utopia-BoldItalic", "Utopia-BoldItalic"
-map font 57 to "Utopia-Italic", "Utopia-Italic"
-map font 58 to "Utopia-Regular", "Utopia-Regular"
 map font 13 to "ZapfDingbats", "ZapfDingbats"
 map color 0 to (255, 255, 255), "white"
 map color 1 to (0, 0, 0), "black"
@@ -90,17 +85,17 @@ timestamp color 1
 timestamp rot 0
 timestamp font 0
 timestamp char size 1.000000
-timestamp def "Wed Jun 13 17:12:25 2018"
+timestamp def "Tue Jul  3 11:57:34 2018"
 with string
     string on
     string loctype view
-    string 0.95, 0.642156862745
+    string 0.89, 0.642156862745
     string color 1
     string rot 0
     string font 0
     string just 0
     string char size 2.000000
-    string def "\xx\0"
+    string def "\xx\0·R\sh\N"
 with string
     string on
     string loctype view

@@ -65,7 +65,7 @@ int main(int argc, char *argv[]){
     //Ask pd for a property like so:
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     
-  //Start in a fcc lattice, pos.w contains the particle type
+    //Start in a fcc lattice, pos.w contains the particle type
     //auto initial =  initLattice(box.boxSize, N, sc);
     
     fori(0,N){
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]){
   BDHI::PSE::Parameters par;
   par.temperature = std::stod(argv[7]);
   par.viscosity = 1.0;
-  par.hydrodynamicRadius = 1.0;
+  par.hydrodynamicRadius =  std::stod(argv[11]);
   par.dt = std::stod(argv[3]);
   par.box = box;
   par.tolerance = std::stod(argv[10]);
@@ -136,7 +136,9 @@ int main(int argc, char *argv[]){
   //This changes will be informed with signals and any module that needs to be aware of such changes
   //will acknowedge it through a callback (see ParticleData.cuh).
   pd->sortParticles();
-        
+
+  bdhi->forwardTime();
+  bdhi->forwardTime();
   Timer tim;
   tim.tic();
   int nsteps = std::atoi(argv[4]);
@@ -146,7 +148,6 @@ int main(int argc, char *argv[]){
     //This will instruct the integrator to take the simulation to the next time step,
     //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
     bdhi->forwardTime();
-
     //Write results
     if(j%printSteps==0)
     {
@@ -154,18 +155,18 @@ int main(int argc, char *argv[]){
       //continue;
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       //This allows to access the particles with the starting order so the particles are written in the same order
-      // even after a sorting      
+      // even after a sorting
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       
       out<<"#"<<endl;
       real3 p;
-      fori(0,N){	
+      fori(0,N){
 	real4 pc = pos.raw()[sortedIndex[i]];
 	p = make_real3(pc);
 	int type = pc.w;
 	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<endl;
       }
-    }    
+    }
     //Sort the particles every few steps
     //It is not an expensive thing to do really.
     if(j%500 == 0){

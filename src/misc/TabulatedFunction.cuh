@@ -1,4 +1,4 @@
-/*Raul P. Pelaez. Tabulated Function
+/*Raul P. Pelaez 2018. Tabulated Function
   
   A tabulated function allows to precompute a function on a certain range and access to it later on the GPU using
   interpolation.
@@ -58,11 +58,21 @@ namespace uammd{
 
   struct LinearInterpolation{
     template<class T>
-    inline __host__  __device__ T operator()(const T *table, int Ntable, real dr, real r) const{
+    inline  __device__ T operator()(const T *table, int Ntable, real dr, real r) const{
       int i = r*Ntable;
-      real r0 = i*dr;    
-      T v0 = table[i];
-      T v1 = table[i+1];
+      real r0 = i*dr;
+      
+ #if CUB_PTX_ARCH < 300
+       constexpr auto cubModifier = cub::LOAD_DEFAULT;
+ #else
+       constexpr auto cubModifier = cub::LOAD_LDG;
+ #endif
+    
+      cub::CacheModifiedInputIterator<cubModifier, T> table_itr(table);
+
+
+      T v0 = table_itr[i];
+      T v1 = table_itr[i+1];
     
       real t = (r - r0)*(real)Ntable;
 
@@ -77,6 +87,7 @@ namespace uammd{
     real drNormalized;
     T *table;
     Interpolation interp;
+
     template<class Functor>
     TabulatedFunction(T* table, int N, real rmin, real rmax, Functor foo):
       Ntable(N-1),
@@ -87,21 +98,20 @@ namespace uammd{
       invInterval(1.0/(rmax-rmin)),
       interp()    
     {
-
+   
       std::vector<T> tableCPU(Ntable+1);
-
       for(int i = 0; i<=Ntable; i++){
 	double x = (i/(double)(Ntable))*(rmax-rmin) + rmin;
 	tableCPU[i] = foo(x);
-      }    
+      }
       CudaSafeCall(cudaMemcpy(table,
-			      tableCPU.data(),
-			      (Ntable+1)*sizeof(T),
-			      cudaMemcpyHostToDevice));
-    
+       			      tableCPU.data(),
+       			      (Ntable+1)*sizeof(T),
+       			      cudaMemcpyHostToDevice));
+      
     }
     ~TabulatedFunction() = default;
-    __host__ __device__ T operator()(real rs){
+    __device__ T operator()(real rs){
       real r = (rs-rmin)*invInterval;
       if(rs >= rmax) return T();
       if(r <= real(0.0)) return table[0];

@@ -59,7 +59,8 @@ When storing real space quantities V[...].x/y/z are real numbers, whereas fourie
 In other words, V is interpreted as an array of real3 when in real space and cufftComplex3 when in fourier space.
 
 
-
+Notes:
+Storing F and G functions in r^2 scale (a.i. table(r^2) = F(sqrt(r^2))) creates artifacts due to the linear interpolation of a cuadratic scale, so it is best to just store table(sqrt(r^2)) = F(r). The cost of the sqrt seems neglegible and gives a really good change in accuracy.
  
 References:
 
@@ -69,8 +70,8 @@ References:
            -  http://www.sciencedirect.com/science/article/pii/S0021999111005092
 
 TODO: 
-100- Treat near textures as table potentials, manually interpolate using PotentialTable
-100- Use native cufft memory layout
+70- Use native cufft memory layout
+10- Abstract NUFFT logic to a class for later reuse.
 
 Special thanks to Marc Melendez and Florencio Balboa.
 */
@@ -81,7 +82,7 @@ Special thanks to Marc Melendez and Florencio Balboa.
 #include"third_party/saruprng.cuh"
 #include<vector>
 #include<algorithm>
-
+#include<fstream>
 #include"utils/debugTools.cuh"
 #include"utils/cufftDebug.h"
 #include"utils/curandDebug.h"
@@ -90,6 +91,33 @@ namespace uammd{
   namespace BDHI{
 
     namespace PSE_ns{
+
+      //Looks for the closest (equal or greater) number of nodes of the form 2^a*3^b*5^c
+      int3 nextFFTWiseSize3D(int3 size){
+	int* cdim = &size.x;
+	/*Store up to 2^5·3^5·5^5 in tmp*/    
+	int n= 5;
+	std::vector<int> tmp(n*n*n, 0);
+	int max_dim = std::max({size.x, size.y, size.z});
+    
+	do{
+	  tmp.resize(n*n*n, 0);
+	  fori(0,n)forj(0,n)for(int k=0; k<n;k++)
+	    tmp[i+n*j+n*n*k] = pow(2,i)*pow(3,j)*pow(5,k);
+	  n++;
+	  /*Sort this array in ascending order*/
+	  std::sort(tmp.begin(), tmp.end());      
+	}while(tmp.back()<max_dim); /*if n=5 is not enough, include more*/
+	
+	/*Now look for the nearest value in tmp that is greater than each cell dimension*/
+	forj(0,3){
+	  int i = 0;
+	  while(tmp[i]<cdim[j]) i++;
+	  cdim[j] = tmp[i];
+	}
+	return size;
+      }
+      
 
       /*A convenient struct to pack 3 complex numbers, that is 6 real numbers*/
       struct cufftComplex3{
@@ -190,8 +218,14 @@ namespace uammd{
       
       if(box.boxSize.x == real(0.0) && box.boxSize.y == real(0.0) && box.boxSize.z == real(0.0)){
 	sys->log<System::CRITICAL>("[BDHI::PSE] Box of size zero detected, cannot work without a box! (make sure a box parameter was passed)");
-      }      
-      this->lanczosTolerance = par.tolerance;
+      }
+      if(box.boxSize.x != box.boxSize.y || box.boxSize.y != box.boxSize.z || box.boxSize.x != box.boxSize.z){
+	sys->log<System::WARNING>("[BDHI::PSE] Non cubic boxes are not really tested!");
+      }
+
+
+      //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
+      this->lanczosTolerance = par.tolerance; //std::min(0.05f, sqrt(par.tolerance));
       this->lanczos = std::make_shared<LanczosAlgorithm>(sys, lanczosTolerance);
   
       seed = sys->rng().next();
@@ -200,130 +234,122 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
 
       /* M = Mr + Mw */
-      sys->log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", 1.0/(6*M_PI*par.viscosity*par.hydrodynamicRadius));
+      sys->log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", 1.0/(6*M_PI*par.viscosity*par.hydrodynamicRadius)*(1-2.837297*par.hydrodynamicRadius/box.boxSize.x));
   
-      /*Compute M0*/
-      double pi = M_PI;
-      double a = par.hydrodynamicRadius;
-      double prefac = (1.0/(24*sqrt(pi*pi*pi)*psi*a*a*par.viscosity));
-      /*M0 = Mr(0) = F(0)(I-r^r) + G(0)(r^r) = F(0) = Mii_r . 
-	See eq. 14 in [1] and RPYPSE_nearTextures*/
-      this->M0 = prefac*(1-exp(-4*a*a*psi*psi)+4*sqrt(pi)*a*psi*std::erfc(2*a*psi));  
-
+      const double pi = M_PI;
+      const double a = par.hydrodynamicRadius;
+      
       /****Initialize near space part: Mr *******/
-      real er = par.tolerance; /*Short range error tolerance*/
+      const real er = par.tolerance; /*Short range error tolerance*/
       /*Near neighbour list cutoff distance, see sec II:C in [1]*/
-      rcut = a*sqrt(-log(er))/psi;
-
-      real Lmin =std::min({box.boxSize.x, box.boxSize.y, box.boxSize.z});
-      if(int(Lmin/rcut)<3){
-	rcut = Lmin/3;	
+      rcut = sqrt(-log(er))/psi;
+      
+      if(0.5*box.boxSize.x < rcut){
+	sys->log<System::WARNING>("[BDHI::PSE] A real space cut off (%e) larger than half the box size (%e) can cause mobility artifacts!, try increasing the splitting parameter (%e)", rcut, 0.5*box.boxSize.x, psi);
+	rcut = box.boxSize.x*0.5;
       }
 
       /*Initialize the neighbour list */
       this->cl = std::make_shared<CellList>(pd, pg, sys);
   
       /*Initialize the near RPY textures*/
-      RPYPSE_near rpy(par.viscosity, par.hydrodynamicRadius, psi, M0, rcut);
-
-      real textureTolerance = par.tolerance;
-      int nPointsTable = int(rcut*rcut/textureTolerance)+1;
-      nPointsTable = std::max(4096, nPointsTable);
-      sys->log<System::MESSAGE>("[BDHI::PSE] Number of real RPY texture points: %d", nPointsTable);
-      tableDataRPY.resize(nPointsTable+1);
-      RPY_near = std::make_shared<TabulatedFunction<real2>>(thrust::raw_pointer_cast(tableDataRPY.data()),
-							    nPointsTable, 0.0, rcut*rcut, rpy);
-      
+      {
+	RPYPSE_near rpy(par.hydrodynamicRadius, psi, (6*M_PI*a*par.viscosity), rcut);
+	
+	real textureTolerance = a*par.tolerance; //minimum distance described
+	int nPointsTable = int(rcut/textureTolerance + 0.5);
+	
+	nPointsTable = std::max(4096, nPointsTable);
+	sys->log<System::MESSAGE>("[BDHI::PSE] Number of real RPY texture points: %d", nPointsTable);
+	tableDataRPY.resize(nPointsTable+1);     
+	RPY_near = std::make_shared<TabulatedFunction<real2>>(thrust::raw_pointer_cast(tableDataRPY.data()),
+							      nPointsTable,
+							      0.0, //minimum distance
+							      rcut,//maximum distance
+							      rpy //Function to tabulate
+							      );
+      }
       /****Initialize wave space part: Mw ******/
-      real ew = par.tolerance; /*Long range error tolerance*/
-      /*Maximum wave number for the far calculation*/
-      kcut = 2*psi*sqrt(-log(ew))/a;
+      const real ew = par.tolerance; /*Long range error tolerance*/
+      /*Maximum wave number for the far calculation*/      
+      kcut = 2*psi*sqrt(-log(ew));
       
       /*Corresponding real space grid size*/
-      double hgrid = 2*pi/kcut;
+      const double hgrid = 2*pi/kcut;
       /*Create a grid with cellDim cells*/
       /*This object will contain useful information about the grid,
 	mainly number of cells, cell size and usual parameters for
 	using it in the gpu, as invCellSize*/  
       int3 cellDim = make_int3(2*box.boxSize/hgrid)+1;
-      int minCellDim = std::min({cellDim.x, cellDim.y, cellDim.z});
       
-      if(cellDim.x<=2)cellDim.x = 3;
-      if(cellDim.y<=2)cellDim.y = 3;
-      if(cellDim.z<=2)cellDim.z = 3;
+      if(cellDim.x<3)cellDim.x = 3;
+      if(cellDim.y<3)cellDim.y = 3;
+      if(cellDim.z<3)cellDim.z = 3;
 
-      /*FFT likes a number of cells as cellDim.i = 2^n·3^l·5^m */
-      {
-	int* cdim = &cellDim.x;
-	/*Store up to 2^5·3^5·5^5 in tmp*/    
-	int n= 5;
-	std::vector<int> tmp(n*n*n, 0);
-	int max_dim = *std::max_element(cdim, cdim+2);
-    
-	do{
-	  tmp.resize(n*n*n, 0);
-	  fori(0,n)forj(0,n)for(int k=0; k<n;k++)
-	    tmp[i+n*j+n*n*k] = pow(2,i)*pow(3,j)*pow(5,k);
-	  n++;
-	  /*Sort this array in ascending order*/
-	  std::sort(tmp.begin(), tmp.end());      
-	}while(tmp.back()<max_dim); /*if n=5 is not enough, include more*/
-	int i=0;
-	
-	/*Now look for the nearest value in tmp that is greater than each cell dimension*/
-	forj(0,3){
-	  i = 0;
-	  while(tmp[i]<cdim[j]) i++;
-	  cdim[j] = tmp[i];
-	}
-      }
+      /*FFT likes a number of cells as cellDim.i = 2^n·3^l·5^m */      
+      cellDim = PSE_ns::nextFFTWiseSize3D(cellDim);
+      
       /*Store grid parameters in a Mesh object*/
       grid = Grid(box, cellDim);
 
       /*Print information*/
       sys->log<System::MESSAGE>("[BDHI::PSE] Box Size: %f %f %f", box.boxSize.x, box.boxSize.y, box.boxSize.z);
-      sys->log<System::MESSAGE>("[BDHI::PSE] Splitting factor: %f",psi);  
-      sys->log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f",rcut);
-      int3 cDSR = make_int3(box.boxSize/rcut);
-      sys->log<System::MESSAGE>("[BDHI::PSE] Close range grid size: %d %d %d", cDSR.x, cDSR.y, cDSR.z);
-
+      sys->log<System::MESSAGE>("[BDHI::PSE] Unitless splitting factor ξ·a: %f", psi*par.hydrodynamicRadius);  
+      sys->log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f", rcut);
       sys->log<System::MESSAGE>("[BDHI::PSE] Far range wave number cut off: %f", kcut);
       sys->log<System::MESSAGE>("[BDHI::PSE] Far range grid size: %d %d %d", cellDim.x, cellDim.y, cellDim.z);
-  
       CudaSafeCall(cudaStreamCreate(&stream));
       CudaSafeCall(cudaStreamCreate(&stream2));
   
-      /*The quantity spreaded to the grid in real space*/
+      /*The quantity spreaded to the grid in real or wave space*/
       /*The layout of this array is
-	fx000, fy000, fz000, fx001, fy001, fz001..., fxnnn, fynnn, fznnn. n=ncells-1*/
+	fx000, fy000, fz000, fx001, fy001, fz001..., fxnnn, fynnn, fznnn. n=ncells-1
+	When used in real space each f is a real number, whereas in wave space each f will be a complex number.
+	See cufftC2R of R2C in place in Mdot_far
+      */
       /*Can be Force when spreading particles to the grid and
 	velocities when interpolating from the grid to the particles*/
       int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
-      //gridVels.resize(ncells, real3());
-      /*Same but in wave space, in MF it will be the forces that get transformed to velocities*/
-      /*3 complex numbers per cell*/
       gridVelsFourier.resize(3*ncells, cufftComplex());
 
       /*Grid spreading/interpolation parameters*/
       /*Gaussian spreading/interpolation kernel support points neighbour distance
-	See sec. 2.1 in [2]*/
-      
+	See eq. 19 and sec 4.1 in [2]*/
+
+      //m = C·sqrt(pi·P), from sec 4.1 we choose C=0.976
+      constexpr double C = 0.976;
       double m = 1;
-      while(erfc(m/sqrt(2)) > 0.01*par.tolerance) m+= 0.01;
+      /*I have empirically found that 0.1*tolerance here gives the desired overal accuracy*/
+      while(erfc(m/sqrt(2)) > 0.1*par.tolerance) m+= 0.01;
 
-      sys->log<System::MESSAGE>("[BDHI_PSE] %e", sqrt(-log(par.tolerance-erfc(m/sqrt(2)))*2)*m/M_PI);
+      //This is P in [2]
+      int support;
+      //Support must be odd
+      while( (support = int(pow(m/C, 2)/M_PI+0.5)+1 ) % 2 == 0) m+=par.tolerance;      
       
-      this->P = make_int3(int(floor((int(m*m/M_PI)+1)/2)))+1;
+      //P is in each direction, nearest neighbours -> P=1
+      this->P = make_int3(support/2);
+                 
+      //If P is too large for the grid set it to the grid size-1 (or next even number)
+      int minCellDim = std::min({cellDim.x, cellDim.y, cellDim.z});
+      if(support>minCellDim){
+	support = minCellDim;
+	if(support%2==0) support--; //minCellDim will be 3 at least
+	
+	P = make_int3(support/2);
+	m = C*sqrt(M_PI*support);
 
-      if((2*P.x+1)>minCellDim) P = make_int3(minCellDim/2);
+      }
       
       sys->log<System::MESSAGE>("[BDHI_PSE] Gaussian kernel support in each direction: %d", this->P.x);
       
       
-      double3 pw = make_double3(2*P+1);/*Number of support points*/
+      double3 pw = make_double3(support);/*Number of support points*/
+      
       double3 h = make_double3(grid.cellSize); /*Cell size*/
       /*Number of standard deviations in the grid's Gaussian kernel support*/
-      double3 gaussM = make_double3(m); //0.976*sqrt(M_PI)*make_double3(sqrt(pw.x), sqrt(pw.y), sqrt(pw.z));
+      double3 gaussM = make_double3(m);
+      
       /*Standard deviation of the Gaussian kernel*/
       double3 w   = pw*h/2.0;
       /*Gaussian splitting parameter*/
@@ -345,42 +371,45 @@ namespace uammd{
 	 par.hydrodynamicRadius, par.viscosity, psi, eta);
         
 
-      /*Set up cuFFT*/
-      int3 cdtmp = {grid.cellDim.x, grid.cellDim.y, grid.cellDim.z};
-      /*I want to make three 3D FFTs, each one using one of the three interleaved coordinates*/
-      CufftSafeCall(cufftPlanMany(&cufft_plan_forward,
-				  3, &cdtmp.x, /*Three dimensional FFT*/
-				  &cdtmp.x,
-				  /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
-				  3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
-				  /*Same format in the output*/
-				  &cdtmp.x,
-				  3, 1,
-				  /*Perform 3 direct Batched FFTs*/
-				  CUFFT_R2C, 3));
 
-      sys->log<System::DEBUG>("[BDHI::PSE] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
-      /*Same as above, but with C2R for inverse FFT*/
-      CufftSafeCall(cufftPlanMany(&cufft_plan_inverse,
-				  3, &cdtmp.x, /*Three dimensional FFT*/
-				  &cdtmp.x,
-				  /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
-				  3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
-				  &cdtmp.x,
-				  3, 1,
-				  /*Perform 3 inverse batched FFTs*/
-				  CUFFT_C2R, 3));
-
+      CufftSafeCall(cufftCreate(&cufft_plan_forward));
+      CufftSafeCall(cufftCreate(&cufft_plan_inverse));
+      
       /*I will be handling workspace memory*/
       CufftSafeCall(cufftSetAutoAllocation(cufft_plan_forward, 0));
       CufftSafeCall(cufftSetAutoAllocation(cufft_plan_inverse, 0));
 
-      /*Allocate cuFFT work area*/
+      //Required storage for the plans
       size_t cufftWorkSizef = 0, cufftWorkSizei = 0;
+      /*Set up cuFFT*/
+      int3 cdtmp = {grid.cellDim.x, grid.cellDim.y, grid.cellDim.z};
+      /*I want to make three 3D FFTs, each one using one of the three interleaved coordinates*/
+      CufftSafeCall(cufftMakePlanMany(cufft_plan_forward,
+				      3, &cdtmp.x, /*Three dimensional FFT*/
+				      &cdtmp.x,
+				      /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
+				      3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
+				      /*Same format in the output*/
+				      &cdtmp.x,
+				      3, 1,
+				      /*Perform 3 direct Batched FFTs*/
+				      CUFFT_R2C, 3,
+				      &cufftWorkSizef));
 
-      CufftSafeCall(cufftGetSize(cufft_plan_forward, &cufftWorkSizef));
-      CufftSafeCall(cufftGetSize(cufft_plan_inverse, &cufftWorkSizei));
+      sys->log<System::DEBUG>("[BDHI::PSE] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
+      /*Same as above, but with C2R for inverse FFT*/
+      CufftSafeCall(cufftMakePlanMany(cufft_plan_inverse,
+				      3, &cdtmp.x, /*Three dimensional FFT*/
+				      &cdtmp.x,
+				      /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
+				      3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
+				      &cdtmp.x,
+				      3, 1,
+				      /*Perform 3 inverse batched FFTs*/
+				      CUFFT_C2R, 3,
+				      &cufftWorkSizei));
 
+      /*Allocate cuFFT work area*/
       size_t cufftWorkSize = std::max(cufftWorkSizef, cufftWorkSizei);
 
       sys->log<System::DEBUG>("[BDHI::PSE] Necessary work space for cuFFT: %s", printUtils::prettySize(cufftWorkSize).c_str());
@@ -388,8 +417,9 @@ namespace uammd{
       CudaSafeCall(cudaMemGetInfo(&free_mem, &total_mem));
 
       if(free_mem<cufftWorkSize){
-	sys->log<System::CRITICAL>("[BDHI::PSE] Not enough memory in device to allocate cuFFT free %s, nedded: %s!!, try lowering the splitting parameter!",
-				   printUtils::prettySize(free_mem).c_str(), printUtils::prettySize(cufftWorkSize).c_str());
+	sys->log<System::CRITICAL>("[BDHI::PSE] Not enough memory in device to allocate cuFFT free %s, needed: %s!!, try lowering the splitting parameter!",
+				   printUtils::prettySize(free_mem).c_str(),
+				   printUtils::prettySize(cufftWorkSize).c_str());
       }
 
       cufftWorkArea.resize(cufftWorkSize/sizeof(real)+1);
@@ -444,6 +474,9 @@ namespace uammd{
       /*Ensure the result array is set to zero*/
       fillWithGPU<<<Nblocks, Nthreads>>>(Mv, make_real3(0.0), numberParticles);
       
+      /*Update the list if needed*/
+      cl->updateNeighbourList(box, rcut, st);
+      
       Mdot_near<vtype>(Mv, v, st);
       //Mdot_farThread = std::thread(&PSE::Mdot_far<vtype>, this, Mv, v, stream2);
       //Mdot_far<vtype>(Mv, v, stream2);
@@ -471,24 +504,25 @@ namespace uammd{
       struct RPYNearTransverser{
 	typedef real3 computeType; /*Each particle outputs a real3*/
 	typedef real3 infoType;    /*And needs a real3 with information*/
+	
 	/*Constructor*/
 	RPYNearTransverser(vtype* v,
 			   real3 *Mv,
 			   /*RPY_near(r) = F(r)·(I-r^r) + G(r)·r^r*/
-			   TabulatedFunction<real2> FandG,
-			   real M0, /*RPY_near(0)*/
+			   TabulatedFunction<real2> FandG,		
 			   real rcut,/*cutoff distance*/
 			   Box box/*Contains information and methods about the box, like apply_pbc*/
 			   ):
-	  v(v), Mv(Mv), FandG(FandG), M0(M0), rcut(rcut), box(box){
+	  v(v), Mv(Mv), FandG(FandG), box(box){
 	  rcut2 = (rcut*rcut);
+	  
 	}
     
 	/*Start with Mv[i] = 0*/
 	inline __device__ computeType zero(){ return computeType();}
 
 	/*Get element pi from v*/
-	inline __device__ infoType getInfo(int pi){    
+	inline __device__ infoType getInfo(int pi){
 	  return make_real3(v[pi]); /*Works for realX */
 	}
 	/*Compute the dot product Mr_ij(3x3)·vj(3)*/
@@ -497,32 +531,32 @@ namespace uammd{
 	  /*Distance between the pair inside the primary box*/
 	  real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));      
       
-	  const real r2 = dot(rij, rij);      
-	  /*If i==j */
-	  if(r2==real(0.0)){
-	    /*M_ii·vi = M0*I·vi */
-	    return make_real3(vj);
-	  }
-	  if(r2 > rcut2) return computeType();
-      
-	  /*M0 := Mii := RPY_near(0) is multiplied once at the end*/
+	  const real r2 = dot(rij, rij);
+	  
+	  //The table takes care of this case
+	  //if(r2 >= rcut2) return computeType();
+	  
 	  /*Fetch RPY coefficients from a table, see RPYPSE_near*/
-	  /* Mreal(r) = M0*(F(r)·I + (G(r)-F(r))·rr) */
-      
-	  const real2 fg = FandG(r2);
+	  /* Mreal(r) = (F(r)·I + (G(r)-F(r))·rr)/(6*pi*vis*a) */
+	  //f and g are divided by 6*pi*vis*a in the texture
+	  const real2 fg = FandG(sqrt(r2));
 	  const real f = fg.x;
 	  const real g = fg.y;
-
+	  /*If i==j */
+	  if(r2==real(0.0)){
+	    /*M_ii·vi = F(0)*I·vi/(6*pi*vis*a) */
+	    return f*make_real3(vj);
+	  }
 	  /*Update the result with Mr_ij·vj, the current box dot the current three elements of v*/
 	  /*This expression is a little obfuscated, Mr_ij·vj*/
 	  /*
-	    Mr = f(r)*I+(g(r)-f(r))*r(diadic)r - > (M·v)_ß = f(r)·v_ß + (g(r)-f(r))·v·(r(diadic)r)
-	    Where f and g are the RPY coefficients
+	    Mr = (f(r)*I+(g(r)-f(r))*r(diadic)r)/(6*pi*vis*a) - > (M·v)_ß = (f(r)·v_ß + (g(r)-f(r))·v·(r(diadic)r))/(6*pi*vis*a)
+	    Where f and g are the RPY coefficients, which are already divided by 6*pi*vis*a in the table.
 	  */
 	  const real invr2 = real(1.0)/r2;
 	  const real gmfv = (g-f)*dot(rij, vj)*invr2;
 	  /*gmfv = (g(r)-f(r))·( vx·rx + vy·ry + vz·rz )*/
-	  /*((g(r)-f(r))·v·(r(diadic)r) )_ß = gmfv·r_ß*/
+	  /*((g(r)-f(r))·v·(r(diadic)r) )_ß = gmfv·r_ß*/	  
 	  return make_real3(f*vj + gmfv*rij);
 	}
 	/*Just sum the result of each interaction*/
@@ -530,13 +564,12 @@ namespace uammd{
 
 	/*Write the final result to global memory*/
 	inline __device__ void set(int id, const computeType &total){
-	  Mv[id] += M0*make_real3(total);
+	  Mv[id] += make_real3(total);
 	}
 	vtype* v;
 	real3* Mv;    
-	real M0;
 	TabulatedFunction<real2> FandG;
-	real rcut, rcut2;
+	real rcut2;
 	Box box;
       };
     }
@@ -549,15 +582,12 @@ namespace uammd{
       /*Create the Transverser struct*/
       PSE_ns::RPYNearTransverser<vtype> tr(v, Mv,
 					   *RPY_near,
-					   M0, rcut, box);
-      /*Update the list if needed*/
-      cl->updateNeighbourList(box, rcut, st);
+					   rcut, box);
       /*Transvese using tr*/
-      cl->transverseList(tr, st);
+      cl->transverseListWithNeighbourList(tr, st);
 
     }
 
-#define TPP 1
     namespace PSE_ns{
   
 #ifndef SINGLE_PRECISION
@@ -610,6 +640,7 @@ namespace uammd{
       /*Spreads the 3D quantity v (i.e the force) to a regular grid given by utils
 	For that it uses a Peskin Gaussian kernel of the form f(r) = prefactor·exp(-tau·r^2), see [2].
 	Applies the operator S in [1].
+	Launch a block per particle.
       */
       template<typename vtype> /*Can take a real3 or a real4*/
       __global__ void particles2GridD(real4 * __restrict__ pos, /*Particle positions*/
@@ -619,57 +650,59 @@ namespace uammd{
 				      int3 P, /*Gaussian kernel support in each dimension*/
 				      Grid grid, /*Grid information and methods*/
 				      real3 prefactor,/*Prefactor for the kernel, (2*xi*xi/(pi·eta))^3/2*/
-				      real3 tau /*Kernel exponential factor, 2*xi*xi/eta*/
-				      ){
-	/*TPP threads per particle*/
-	int offset = threadIdx.x%TPP;
-	int id = blockIdx.x*blockDim.x + threadIdx.x/TPP;
+				      real3 tau /*Kernel exponential factor, 2*xi*xi/eta*/){
+	const int id = blockIdx.x;
+	const int tid = threadIdx.x;
 	if(id>=N) return;
 
 	/*Get pos and v (i.e force)*/
-	real3 pi = make_real3(pos[id]);
-	real3 vi_pf = make_real3(v[id])*prefactor;
-
-	/*Get my cell*/
-	int3 celli = grid.getCell(pi);
-    
-	int3 cellj;    
-	int x,y,z;
+	__shared__ real3 pi;
+	__shared__ real3 vi_pf;
+	__shared__ int3 celli;
+	if(tid==0){
+	  pi = make_real3(pos[id]);
+	  vi_pf = make_real3(v[id])*prefactor;
+	  /*Get my cell*/
+	  celli = grid.getCell(pi);	  
+	}
 	/*Conversion between cell number and cell center position*/
-	real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize);
+	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize);
+	const int3 supportCells = 2*P + 1;
+	const int numberNeighbourCells = supportCells.x*supportCells.y*supportCells.z;
 
-	/*Transverse the Pth neighbour cells*/
-	for(x=-P.x+offset; x<=P.x; x+=TPP) 
-	  for(z=-P.z; z<=P.z; z++)
-	    for(y=-P.y; y<=P.y; y++){
-	      /*Get the other cell*/
-	      /*Corrected with PBC*/
-	      cellj = grid.pbc_cell(celli+make_int3(x,y,z));	      	      
-
-	      /*Get index of cell j*/
-	      int jcell = grid.getCellIndex(cellj);
-	      /*Distance from particle i to center of cell j*/
-	      real3 rij = pi-make_real3(cellj)*grid.cellSize-cellPosOffset;
-	      rij = grid.box.apply_pbc(rij);
+	__syncthreads();
+	for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
+	  /*Compute neighbouring cell*/
+	  int3 cellj = make_int3(celli.x + i%supportCells.x - P.x,
+				 celli.y + (i/supportCells.x)%supportCells.y - P.y,
+				 celli.z + i/(supportCells.x*supportCells.y) - P.z );
+	  cellj = grid.pbc_cell(cellj);
 	  
-	      real r2 = dot(rij, rij);
+	  /*Distance from particle i to center of cell j*/
+	  const real3 rij = grid.box.apply_pbc(pi-make_real3(cellj)*grid.cellSize-cellPosOffset);	  
+	  const real r2 = dot(rij, rij);
 
-	      /*The weight of particle i on cell j*/
-	      real3 weight = vi_pf*make_real3(exp(-r2*tau.x), exp(-r2*tau.y), exp(-r2*tau.z));
+	  /*The weight of particle i on cell j*/
+	  const real3 weight = vi_pf*make_real3(exp(-r2*tau.x), exp(-r2*tau.y), exp(-r2*tau.z));
 
-	      /*Atomically sum my contribution to cell j*/
-	      real* cellj_vel = &(gridVels[jcell].x);
-	      atomicAdd(cellj_vel,   weight.x);
-	      atomicAdd(cellj_vel+1, weight.y);
-	      atomicAdd(cellj_vel+2, weight.z);
-	    }
+	  /*Get index of cell j*/
+	  const int jcell = grid.getCellIndex(cellj);
+	  
+	  /*Atomically sum my contribution to cell j*/
+	  atomicAdd(&gridVels[jcell].x, weight.x);
+	  atomicAdd(&gridVels[jcell].y, weight.y);
+	  atomicAdd(&gridVels[jcell].z, weight.z);
+	  
+	}
       }
 
+      
       /*Scales fourier transformed forces in the regular grid to obtain velocities,
-	(Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F
+	(Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F	
+	also adds stochastic fourier noise, see addBrownianNoise	
 	 Input: gridForces = FFTf·S·F
-	 Output:gridVels = B·FFTf·S·F
-	 See eq. 19 in [1]
+	 Output:gridVels = B·FFTf·S·F + 1/√σ·√B·dWw
+	 See sec. B.2 in [1]
        */
       /*A thread per fourier node*/
       __global__ void forceFourier2Vel(cufftComplex3 * gridForces, /*Input array*/
@@ -705,7 +738,7 @@ namespace uammd{
 	factor.z *= B.z;	
 	
 	/*Store vel in global memory, note that this is overwritting any previous value in gridVels*/
-	gridVels[icell] = projectFourier(k, factor);
+	gridVels[icell] = projectFourier(k, factor);	  
       }
 
       /*Computes the long range stochastic velocity term
@@ -725,7 +758,7 @@ namespace uammd{
 					   real prefactor,/* sqrt(2·T/dt)*/
 					   //Parameters to seed the RNG
 					   ullint seed,
-					   int step
+					   ullint step
 					   ){
 	/*Get my cell*/
 	int3 cell;
@@ -867,6 +900,7 @@ namespace uammd{
 	}
       }
 
+      
       /*Interpolates a quantity (i.e velocity) from its values in the grid to the particles.
 	For that it uses a Gaussian kernel of the form f(r) = prefactor·exp(-tau·r^2)
 	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw = 
@@ -955,11 +989,6 @@ namespace uammd{
       fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(d_gridVels,
 						make_real3(0), ncells);
       auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
-      // int ncellsF = ncells*3;
-      // Nthreads = BLOCKSIZE<ncellsF?BLOCKSIZE:ncellsF;
-      // Nblocks  =  ncellsF/Nthreads +  ((ncellsF%Nthreads!=0)?1:0); 
-      // fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(d_gridVelsFourier,
-      // 						cufftComplex(), 3*ncells);
       
 
       Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
@@ -968,13 +997,20 @@ namespace uammd{
       /*Gaussian spreading/interpolation kernel parameters, s(r) = prefactor*exp(-tau*r2)
 	See eq. 13 in [2]
       */
-      real3 prefactor = pow(2.0*psi*psi/(M_PI), 1.5)/make_real3(pow(eta.x,1.5), pow(eta.y, 1.5), pow(eta.z, 1.5));
+      real3 prefactorGaussian = pow(2.0*psi*psi/(M_PI), 1.5)/make_real3(pow(eta.x,1.5), pow(eta.y, 1.5), pow(eta.z, 1.5));
       real3 tau       = 2.0*psi*psi/eta;
       sys->log<System::DEBUG2>("[BDHI::PSE] Particles to grid");
       /*Spread force on particles to grid positions -> S·F*/
-      PSE_ns::particles2GridD<<<Nblocks*TPP, Nthreads, 0, st>>>
-	(pos.raw(), v, d_gridVels, numberParticles, P, grid, prefactor, tau);
-
+      //Launch a small block per particle
+      {
+	int3 support = 2*P+1;
+	int threadsPerParticle = 64;
+	int numberNeighbourCells = support.x*support.y*support.z;
+	if(numberNeighbourCells < 64) threadsPerParticle = 32;
+	
+	PSE_ns::particles2GridD<<<numberParticles, threadsPerParticle, 0, st>>>
+	  (pos.raw(), v, d_gridVels, numberParticles, P, grid, prefactorGaussian, tau);
+      }
 
       sys->log<System::DEBUG2>("[BDHI::PSE] Taking grid to wave space");
       /*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
@@ -987,38 +1023,49 @@ namespace uammd{
       }
 
       sys->log<System::DEBUG2>("[BDHI::PSE] Wave space velocity scaling");
-      /*Scale the wave space grid forces, transforming in velocities -> B·FFTf·S·F*/
+      if(temperature > real(0.0))
+	sys->log<System::DEBUG2>("[BDHI::PSE] Wave space brownian noise");
+
+      /*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
+      //Launch a 3D grid of threads, a thread per cell.
+      //Only the second half of the cells in the innermost (x) coordinate need to be processed, the rest are redundant and not used by cufft.
+      
       dim3 NthreadsCells = dim3(8,8,8);
       dim3 NblocksCells;
-      NblocksCells.x= (grid.cellDim.x/NthreadsCells.x + ((grid.cellDim.x%NthreadsCells.x)?1:0));
-      NblocksCells.y= grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
-      NblocksCells.z= grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
+      {
+	int ncellsx = grid.cellDim.x/2+1;
+	NblocksCells.x= (ncellsx/NthreadsCells.x + ((ncellsx%NthreadsCells.x)?1:0));
+	NblocksCells.y= grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
+	NblocksCells.z= grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
+      }
+      //B in [1]
       auto d_fourierFactor = thrust::raw_pointer_cast(fourierFactor.data());
+            
       PSE_ns::forceFourier2Vel<<<NblocksCells, NthreadsCells, 0, st>>>
-	((PSE_ns::cufftComplex3*) d_gridVelsFourier,
-	 (PSE_ns::cufftComplex3*) d_gridVelsFourier,
-	 d_fourierFactor,
-	 grid);
-
-      /*The stochastic part only needs to be computed with T>0*/
+      ((PSE_ns::cufftComplex3*) d_gridVelsFourier, //Input: FFT·S·F
+       (PSE_ns::cufftComplex3*) d_gridVelsFourier, //Output: B·FFT·S·F
+       d_fourierFactor, //B
+       grid);
+      //eq 19 and beyond in [1].
+      //The sqrt(2*T/dt) factor needs to be here because far noise is summed to the M·F term.
+      /*Add the stochastic noise to the fourier velocities if T>0 -> 1/√σ·√B·dWw */
       if(temperature > real(0.0)){
-	//NblocksCells.x *=2;
-	static int counter  = 0;
+	static ullint counter = 0; //Seed the rng differently each call
 	counter++;
 	sys->log<System::DEBUG2>("[BDHI::PSE] Wave space brownian noise");
-	//NblocksCells.x = NblocksCells.x/2+1;
-	//auto d_farNoise = thrust::raw_pointer_cast(farNoise.data());
-	real prefactor = sqrt(2*temperature/dt/(grid.cellSize.x*grid.cellSize.y*grid.cellSize.z));
-	/*Add the stochastic noise to the fourier velocities -> B·FFT·S·F + 1/√σ·√B·dWw*/
-	PSE_ns::fourierBrownianNoise<<<NblocksCells, NthreadsCells, 0, st>>>(
-									     //d_farNoise,
-									     (PSE_ns::cufftComplex3*)d_gridVelsFourier,
-									     d_fourierFactor,
-									     grid, prefactor,
-									     seed,
-									     counter);
-      }
 
+	real prefactor = sqrt(2*temperature/dt/(grid.cellSize.x*grid.cellSize.y*grid.cellSize.z));
+      
+	PSE_ns::fourierBrownianNoise<<<NblocksCells, NthreadsCells, 0, st>>>(
+	            		    //In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw 
+ 			            (PSE_ns::cufftComplex3*)d_gridVelsFourier, 
+				    d_fourierFactor, //B 
+				    grid,
+				    prefactor, // 1/√σ· sqrt(2*T/dt),
+				    seed, //Saru needs two seeds apart from thread id
+				    counter);
+      }
+      
       sys->log<System::DEBUG2>("[BDHI::PSE] Going back to real space");
       /*Take the fourier velocities back to real space ->  FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
       cufftStatus =
@@ -1031,23 +1078,20 @@ namespace uammd{
 
       sys->log<System::DEBUG2>("[BDHI::PSE] Grid to particles");
       /*Interpolate the real space velocities back to the particle positions ->
-	Mw·F = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
+	Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
       PSE_ns::grid2ParticlesD<<<Nblocks, Nthreads, 0, st>>>
 	(pos.raw(), Mv, d_gridVels,
-	 numberParticles, P, grid, prefactor, tau);
+	 numberParticles, P, grid, prefactorGaussian, tau);
+      
       sys->log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
       
     }
 
-
-
-    void PSE::computeMF(real3* MF,     cudaStream_t st){
+    void PSE::computeMF(real3* MF, cudaStream_t st){
       sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       Mdot<real4>(MF, force.raw(), st);
     }
-
-
 
     namespace PSE_ns{
       /*LanczosAlgorithm needs a functor that computes the product M·v*/
@@ -1073,12 +1117,11 @@ namespace uammd{
 	  int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 	  fillWithGPU<<<Nblocks, Nthreads, 0 ,st>>>(Mv, make_real3(0), numberParticles);
 	  /*Perform the dot product*/
-	  cl->transverseList(Mv_tr, st);
+	  cl->transverseListWithNeighbourList(Mv_tr, st);
     
 	}
       };
     }
-
 
     void PSE::computeBdW(real3* BdW, cudaStream_t st){
 
@@ -1088,18 +1131,10 @@ namespace uammd{
       if(temperature == real(0.0)) return;
       int numberParticles = pg->getNumberParticles();
       
-      // int BLOCKSIZE = 128;
-      // int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-      // int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
-      // fillWithGPU<<<Nblocks, Nthreads, 0 ,st>>>(BdW, make_real3(0), numberParticles);
-
-      // return;
-      
-      /****Near part*****/
       /*List transverser for near dot product*/
       PSE_ns::RPYNearTransverser<real3> tr(nullptr, nullptr,
 					   *RPY_near,
-					   M0, rcut, box);
+					   rcut, box);
       /*Functor for dot product*/
       PSE_ns::Dotctor Mvdot_near(tr, cl, numberParticles, st);
       /*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/
@@ -1108,22 +1143,17 @@ namespace uammd{
 			   3*numberParticles + (3*numberParticles)%2,
 			   real(0.0), real(1.0));
 
-      // real n0prev;
-      // cudaMemcpy(&n0prev, noise, sizeof(real), cudaMemcpyDeviceToHost);
-
-      // real n1prev;
-      // cudaMemcpy(&n1prev, noise+1, sizeof(real), cudaMemcpyDeviceToHost);
+      auto status = lanczos->solve(Mvdot_near,
+				   (real *)BdW, noise,
+				   numberParticles,
+				   lanczosTolerance);
       
-      if(lanczos->solve(Mvdot_near, (real *)BdW, noise, numberParticles, lanczosTolerance, 0) != LanczosStatus::SUCCESS){
+      if(status == LanczosStatus::TOO_MANY_ITERATIONS){
+	sys->log<System::WARNING>("[BDHI::PSE] This is probably fine, but Lanczos could not achieve convergence, try increasing the tolerance or switching to double precision.");
+      }
+      else if(status != LanczosStatus::SUCCESS){
 	sys->log<System::CRITICAL>("[BDHI::PSE] Lanczos Algorithm failed!");
       }
-      // real n0;
-      // cudaMemcpy(&n0, BdW, sizeof(real), cudaMemcpyDeviceToHost);
-      // real n1;
-      // cudaMemcpy(&n1, (real*)BdW+1, sizeof(real), cudaMemcpyDeviceToHost);
-      
-      // sys->log<System::MESSAGE>("[BDHI::PSE] M0: %e sqrt(M0): %e, noise[0]: %e %e BdW[0]/noise[0]: %e %e", M0, sqrt(M0), n0prev, n1prev,
-      //n0/n0prev, n1/n1prev);
       
     }
 
@@ -1135,5 +1165,4 @@ namespace uammd{
  
     }
   }
-#undef TPP
 }
