@@ -54,6 +54,7 @@ References:
 [2]  Spectral accuracy in fast Ewald-based methods for particle simulations
            -  http://www.sciencedirect.com/science/article/pii/S0021999111005092
 
+See BDHI_PSE.cu for more info.
  */
 #ifndef BDHI_PSE_CUH
 #define BDHI_PSE_CUH
@@ -65,18 +66,17 @@ References:
 #include"Interactor/NeighbourList/CellList.cuh"
 #include"misc/LanczosAlgorithm.cuh"
 #include<cufft.h>
-//#include<curand_kernel.h>
 #include<thread>
 #include"utils/Grid.cuh"
-#ifndef SINGLE_PRECISION
 
+#ifndef SINGLE_PRECISION
 #define cufftComplex cufftDoubleComplex
 #define cufftReal cufftDoubleReal
 #define cufftExecR2C cufftExecD2Z
 #define cufftExecC2R cufftExecZ2D 
 #define CUFFT_C2R CUFFT_Z2D
 #define CUFFT_R2C CUFFT_D2Z
-//#define curand_normal2 curand_normal2_double
+
 #endif
 
 namespace uammd{
@@ -86,6 +86,9 @@ namespace uammd{
     public:
 
       struct Parameters: BDHI::Parameters{
+	//Splitting parameter, works best between 0.5 and 1.0
+	//lower values will give more importance to the near part (neighbour list) and higher values will
+	// put the weight of the computation in the far part (FFT).
 	real psi = 0.5;
       };
       PSE(shared_ptr<ParticleData> pd,
@@ -138,19 +141,14 @@ namespace uammd{
       Grid grid; /*Wave space Grid parameters*/
     
       /*Grid interpolation kernel parameters*/
-      int3 P; //Gaussian spreading/interpolation kernel support points*/
+      int3 P; //Gaussian spreading/interpolation kernel support points in each direction (total support=2*P+1)*/
       real3 m, eta; // kernel width and gaussian splitting in each direction
 
-
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
-      thrust::device_vector<real> cufftWorkArea;
-    
-      //thrust::device_vector<real3> gridVels;    //Interpolated grid velocities in real space
+      thrust::device_vector<real> cufftWorkArea; //Work space for cufft
       
-      thrust::device_vector<cufftComplex> gridVelsFourier;     //Interpolated grid velocities in fourier space
+      thrust::device_vector<cufftComplex> gridVelsFourier; //Interpolated grid forces/velocities in fourier space
       thrust::device_vector<real3> fourierFactor;  // Fourier scaing factors to go from F to V in wave space
-
-      //thrust::device_vector<curandState> farNoise;
 
       cudaStream_t stream, stream2;
     };
