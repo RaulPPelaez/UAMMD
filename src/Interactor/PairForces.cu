@@ -67,18 +67,21 @@ namespace uammd{
 
       //Update neighbour list. It is smart enough to do it only when it is necessary,
       // so do not fear calling it several times.
-      nl->updateNeighbourList(box, rcut, st);   
+      nl->updateNeighbourList(box, rcut, st);
 
-      sys->log<System::DEBUG3>("[PairForces] Transversing neighbour list");
+      sys->log<System::DEBUG2>("[PairForces] Transversing neighbour list");
     
+      //nl->transverseListWithNeighbourList(tr, st);
       nl->transverseList(tr, st);
+
+      
 
     }
     else{
       if(!nb){
 	nb = std::make_shared<NBody>(pd, pg, sys);
       }
-      sys->log<System::DEBUG3>("[PairForces] Transversing NBody");
+      sys->log<System::DEBUG2>("[PairForces] Transversing NBody");
 	
       nb->transverse(tr, st);
 
