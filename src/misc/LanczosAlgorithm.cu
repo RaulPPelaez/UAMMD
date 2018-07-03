@@ -36,6 +36,12 @@ namespace uammd{
     max_iter(3), check_convergence_steps(3)
   {    
     sys->log<System::DEBUG1>("[LanczosAlgorithm] Initializing");
+#ifdef SINGLE_PRECISION
+    if(tolerance < 1e-6){
+      sys->log<System::WARNING>("[LanczosAlgorithm] Lanczos might not be able to converge with such a low tolerance in single precision. Use double precision or increase the tolerance. I will perform 100 iterations at most");
+    }
+#endif
+
     //Allocate necessary startig space
     this->increment_max_iter(0);
     this->init();

@@ -16,6 +16,13 @@
   J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
 
 
+Some notes:
+
+  From what I have seen, this algorithm converges to an error of ~1e-3 in a few steps (<5) and from that point a lot of iterations are needed to lower the error. 
+  It usually achieves machine precision in under 50 iterations.
+
+  If the matrix does not have a sqrt (not positive definite, not symmetric...) it will usually be reflected as a nan in the current error estimation and leave the algorithm in an UNKNOWN_ERROR state.
+
   TODO:
   80- w can be V.d_m+ 3*N*(i+1), avoiding the cudaMemcpy at the end of each step
 */
@@ -39,6 +46,7 @@ namespace uammd{
       SIZE_MISMATCH,  // V was asked with a certain size and provided to solve with a different one
       CUBLAS_ERROR,
       CUDA_ERROR, //Error in memcpy, malloc ...
+    TOO_MANY_ITERATIONS, //Convergence was not achieved after the maximum number of iterations
       UNKNOWN_ERROR
       };
 
@@ -73,7 +81,7 @@ namespace uammd{
     cublasHandle_t cublas_handle;
     /*Maximum number of Lanczos iterations*/
     int max_iter; //<100 in general, increases as needed
-  
+    int iterationHardLimit = 100; //Do not perform more than this iterations 
     /*Lanczos algorithm auxiliar memory*/
     thrust::device_vector<real3> w; //size N, v in each iteration
     thrust::device_vector<real> V; //size 3Nxmax_iter; Krylov subspace base transformation matrix
@@ -197,20 +205,20 @@ namespace uammd{
 	  real one = 1;
 	  CudaSafeCall(cudaMemcpyAsync(d_w, &one , sizeof(real), cudaMemcpyHostToDevice, st));
 	}
-	sys->log<System::DEBUG4>("[LanczosAlgorithm] norm(w) = %e in iteration %d! z2 = %e, tol= %e", hsup[i], i,1.0/invz2, tol);
+	sys->log<System::DEBUG4>("[LanczosAlgorithm] norm(w) = %e in iteration %d! z2 = %e, threshold= %e", hsup[i], i,1.0/invz2, tol);
 	CudaSafeCall(cudaMemcpyAsync(d_V+3*N*(i+1), (real *)d_w, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
       }
       
       /*Check convergence if needed*/
       steps_needed++;
-      if(i >= check_convergence_steps && i>=3){ //Miminum of 3 iterations
+      if(i >= check_convergence_steps){ //Miminum of 3 iterations
 	sys->log<System::DEBUG3>("[LanczosAlgorithm] Checking convergence");
 	/*Compute Bz using h and z*/
 	/**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
 	this->compResult(1.0/invz2, N, i, (real *)Bz, st);
 
 	/*The first time the result is computed it is only stored as oldBz*/
-	if((i-check_convergence_steps)>0){
+	if((i-check_convergence_steps)>0 && i > 0){
 	  /*Compute error as in eq 27 in [1]
 	    Error = ||Bz_i - Bz_{i-1}||_2 / ||Bz_{i-1}||_2
 	  */
@@ -221,12 +229,12 @@ namespace uammd{
 				    &a,
 				    Bz, 1,
 				    d_oldBz, 1));
-
+	  
 	  /*yy = ||Bz_i - Bz_{i-1}||_2*/
-	  real yy;	  
+	  real yy;
 	  CublasSafeCall(cublasnrm2(cublas_handle, 3*N,  d_oldBz, 1, &yy));
 	  //eq. 27 in [1]
-	  real Error = yy/normNoise_prev;
+	  real Error = abs(yy/normNoise_prev);
 	  if(isnan(Error)){
 	    sys->log<System::DEBUG>("[LanczosAlgorithm] Error is nan!!!");
 	    errorStatus = LanczosStatus::UNKNOWN_ERROR;
@@ -235,18 +243,23 @@ namespace uammd{
 	  //Convergence achieved!
 	  if(Error <= tolerance){
 	    if(steps_needed-2 > check_convergence_steps){
-	      check_convergence_steps += 1;	      
+	      check_convergence_steps += 1;
 	    }
 	    //Or check more often if I performed too many iterations
 	    else{
-	      check_convergence_steps -= 1;
+	      check_convergence_steps = std::max(1, check_convergence_steps - 2);
+	      
 	    }
 	    sys->log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %e",i, Error);
 	    return errorStatus;
 	  }
 	  else{
-	    sys->log<System::DEBUG3>("[LanczosAlgorithm] Convergence not achieved! Error: %f, Tolerance: %f", Error, tolerance);
-	    sys->log<System::DEBUG3>("[LanczosAlgorithm] yy: %f, normNoise_prev: %f", yy, normNoise_prev);
+	    sys->log<System::DEBUG3>("[LanczosAlgorithm] Convergence not achieved! Error: %e, Tolerance: %e", Error, tolerance);
+	    sys->log<System::DEBUG3>("[LanczosAlgorithm] yy: %e, normNoise_prev: %e", yy, normNoise_prev);
+	    if(i>=iterationHardLimit){
+	      sys->log<System::DEBUG>("[LanczosAlgorithm] Convergence not achieved after %d iterations! I will stop trying. Error: %e, Tolerance: %e", i, Error, tolerance);
+	      return LanczosStatus::TOO_MANY_ITERATIONS;
+	    }
 	  }
 	}
 	sys->log<System::DEBUG3>("[LanczosAlgorithm] Saving current result.");
@@ -254,10 +267,6 @@ namespace uammd{
 	real * d_oldBz = (real*) thrust::raw_pointer_cast(oldBz.data());
 	CudaSafeCall(cudaMemcpyAsync(d_oldBz, Bz, N*sizeof(real3), cudaMemcpyDeviceToDevice, st));
 	CublasSafeCall(cublasnrm2(cublas_handle, 3*N, (real*) d_oldBz, 1, &normNoise_prev));
-
-#ifdef USE_NVTX
-	nvtxRangePop();
-#endif      
       }
     }
     return errorStatus;
@@ -266,4 +275,3 @@ namespace uammd{
 }
 #include"LanczosAlgorithm.cu"
 #endif
-
