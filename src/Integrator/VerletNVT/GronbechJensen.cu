@@ -129,6 +129,7 @@ namespace uammd{
     }    
     //Move the particles in my group 1 dt in time.
     void GronbechJensen::forwardTime(){
+      CudaCheckError();
       for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
     
       steps++;
@@ -151,7 +152,7 @@ namespace uammd{
 	  forceComp->updateTimeStep(dt);
 	  forceComp->sumForce(stream);
 	}
-	cudaDeviceSynchronize();
+	CudaSafeCall(cudaDeviceSynchronize());
       }
       //First integration step
       {
@@ -176,10 +177,11 @@ namespace uammd{
 								    numberParticles, dt, viscosity, is2D,
 								    noiseAmplitude,
 								    steps, seed);
+	CudaCheckError();
       }      
       
       for(auto forceComp: interactors) forceComp->sumForce(stream);
-    
+      CudaCheckError();
       //Second integration step, does not need noise
       {
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
@@ -199,7 +201,8 @@ namespace uammd{
 						groupIterator,
 					        numberParticles, dt, viscosity, is2D,
 					        noiseAmplitude,
-						steps, seed);      
+						steps, seed);
+	CudaCheckError();
       }
 
     }
