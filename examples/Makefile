@@ -73,6 +73,9 @@ pse:
 icm:
 	$(BASIC_LINE) ICM.cu  -lcufft -lcudart -o icm
 
+lbm:
+	$(BASIC_LINE) LBM.cu -o lbm -lpng
+
 bd:
 	$(BASIC_LINE) BD.cu -lcurand -o bd
 
