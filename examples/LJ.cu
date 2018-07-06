@@ -26,6 +26,7 @@ You can visualize the reuslts with superpunto
 #include"Interactor/ExternalForces.cuh"
 #include"Interactor/NBodyForces.cuh"
 #include"Interactor/NeighbourList/CellList.cuh"
+#include"Interactor/NeighbourList/VerletList.cuh"
 #include"Interactor/PairForces.cuh"
 #include"Interactor/Potential/Potential.cuh"
 #include"utils/InitialConditions.cuh"
@@ -158,7 +159,7 @@ int main(int argc, char *argv[]){
   //PairForces decides if it should use a neighbour list or treat the system as NBody,
   //You can force the use of a certain neighbour list passing its name as a second template argument
 
-  using PairForces = PairForces<Potential::LJ>;
+  using PairForces = PairForces<Potential::LJ, VerletList>;
 
   //This is the general interface for setting up a potential
   auto pot = make_shared<Potential::LJ>(sys);
