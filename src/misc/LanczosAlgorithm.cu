@@ -50,9 +50,14 @@ namespace uammd{
   void LanczosAlgorithm::numElementsChanged(int newN){
     sys->log<System::DEBUG3>("[LanczosAlgorithm] Number of elements changed.");  
     this-> N = newN;
-    w.resize(N+1, real3());
-    V.resize(3*N*max_iter, 0);
-    oldBz.resize(N+1, real3());  
+    try{
+      w.resize(N+1, real3());
+      V.resize(3*N*max_iter, 0);
+      oldBz.resize(N+1, real3());
+    }
+    catch(thrust::system_error &e){
+      sys->log<System::CRITIAL>("[LanczosAlgorithm] Thrust could not resize temporal storage with error: %s.", e.what());  
+    }
   }
   //Increase maximum dimension of Krylov subspace, reserve necessary memory
   void LanczosAlgorithm::increment_max_iter(int inc){
