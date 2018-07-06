@@ -376,10 +376,14 @@ namespace uammd{
       }
       int numberParticles = pg->getNumberParticles();
       if(rebuildNlist){
+	try{
+	  neighbourList.resize(numberParticles*maxNeighboursPerParticle);
+	  numberNeighbours.resize(numberParticles);
+	}
+	catch(thrust::system_error &e){
+	  sys->log<System::CRITICAL>("[CellList] Thrust could not resize neighbour list with error: %s", e.what());  
+	}
 	
-	neighbourList.resize(numberParticles*maxNeighboursPerParticle);
-	numberNeighbours.resize(numberParticles);
-      
 
 	rebuildNlist = false;
 	//Try to fill the neighbour list until success (the construction will fail if a particle has too many neighbours)      
@@ -423,11 +427,11 @@ namespace uammd{
 								      grid,
 								      tooManyNeighboursFlagGPU);
 	  }
-	  cudaEventRecord(event, st);
-	  cudaEventSynchronize(event);
+	  CudaSafeCall(cudaEventRecord(event, st));
+	  CudaSafeCall(cudaEventSynchronize(event));
 	
 	  //flag = *tooManyNeighboursFlagGPU;
-	  cudaMemcpy(&flag, tooManyNeighboursFlagGPU, sizeof(int), cudaMemcpyDeviceToHost);
+	  CudaSafeCall(cudaMemcpy(&flag, tooManyNeighboursFlagGPU, sizeof(int), cudaMemcpyDeviceToHost));
 	  //If a particle has to many neighbours, increase the maximum neighbours allowed and try again.
 	  if(flag != 0){
 	    this->maxNeighboursPerParticle += 32;//((flag-maxNeighboursPerParticle)/32+1)*32;	  
@@ -436,12 +440,22 @@ namespace uammd{
 
 	    //*tooManyNeighboursFlagGPU = 0;
 	    int zero = 0;
-	    cudaMemcpy(tooManyNeighboursFlagGPU, &zero, sizeof(int), cudaMemcpyHostToDevice);
-	    neighbourList.resize(numberParticles*maxNeighboursPerParticle);
+	    CudaSafeCall(cudaMemcpy(tooManyNeighboursFlagGPU, &zero, sizeof(int), cudaMemcpyHostToDevice));
+	    try{
+	      neighbourList.resize(numberParticles*maxNeighboursPerParticle);
+	    }
+	    catch(thrust::system_error &e){
+	      sys->log<System::CRITICAL>("[CellList] Thrust could not resize neighbour list with error: %s", e.what());	      
+	    }
 
 	  }
 	}while(flag!=0);
       
+      }
+      else{	
+	auto pos = pd->getPos(access::location::gpu, access::mode::read);     
+	auto posGroupIterator = pg->getPropertyInputIterator(pos.raw(), access::location::gpu);
+	ps.applyCurrentOrder(posGroupIterator, sortPos.begin(), numberParticles, st);
       }
       auto neighbourList_ptr = thrust::raw_pointer_cast(neighbourList.data());
       auto numberNeighbours_ptr = thrust::raw_pointer_cast(numberNeighbours.data());
@@ -494,7 +508,7 @@ namespace uammd{
 						       cellStart_ptr, cellEnd_ptr,
 						       numberParticles, grid);
 
-
+      CudaCheckError();
     }
 
     //Use a transverser to transverse the list using the verlet list (constructing a neighbour list if necesary from the cell list)
@@ -504,7 +518,8 @@ namespace uammd{
       sys->log<System::DEBUG2>("[CellList] Transversing Neighbour List with %s", type_name<Transverser>().c_str());
       //Update verlet list if necesary
       this->getNeighbourList(st);
-      int Nthreads=64;
+
+      int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
@@ -523,7 +538,7 @@ namespace uammd{
 			    groupIndex,
 			    neighbourList_ptr, numberNeighbours_ptr, maxNeighboursPerParticle,
 			    numberParticles, grid.box);
-
+      CudaCheckError();
     }
 
     bool needsRebuild(Box box, real3 cutOff){
@@ -572,9 +587,14 @@ namespace uammd{
 
       //Resize if needed
 
-      if(cellStart.size()!= ncells) cellStart.resize(ncells);
-      if(cellEnd.size()!= ncells) cellEnd.resize(ncells);
-      
+      try{
+	if(cellStart.size()!= ncells) cellStart.resize(ncells);
+	if(cellEnd.size()!= ncells) cellEnd.resize(ncells);
+      }
+      catch(thrust::system_error &e){
+	sys->log<System::CRITICAL>("[CellList] Thrust could not resize cell list with error: %s", e.what());	
+      }
+
       auto cellStart_ptr = thrust::raw_pointer_cast(cellStart.data());
       auto cellEnd_ptr = thrust::raw_pointer_cast(cellEnd.data());
       cub::CountingInputIterator<int> it(0);
@@ -585,7 +605,7 @@ namespace uammd{
       //Reset cellStart
       fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(cellStart_ptr, it,
 						CellList_ns::EMPTY_CELL, ncells);
-
+      CudaCheckError();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       
       auto posGroupIterator = pg->getPropertyInputIterator(pos.raw(), access::location::gpu);
@@ -594,12 +614,12 @@ namespace uammd{
       ps.updateOrderByCellHash<Sorter::MortonHash>(posGroupIterator,
 						   numberParticles,
 						   box, grid.cellDim, st);
-
+      CudaCheckError();
       //Now the array is sorted by cell hash
       //Reorder the positions to this sorted order
       sortPos.resize(numberParticles);     
       ps.applyCurrentOrder(posGroupIterator, sortPos.begin(), numberParticles, st);
-      
+      CudaCheckError();
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
 
       //Fill cell list (cellStart and cellEnd) using the sorted array
@@ -611,7 +631,7 @@ namespace uammd{
        							      cellEnd_ptr,
        							      numberParticles,
        							      grid);
-
+      CudaCheckError();
       rebuildNlist = true;
         
     }
