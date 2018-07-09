@@ -56,7 +56,7 @@ namespace uammd{
       oldBz.resize(N+1, real3());
     }
     catch(thrust::system_error &e){
-      sys->log<System::CRITIAL>("[LanczosAlgorithm] Thrust could not resize temporal storage with error: %s.", e.what());  
+      sys->log<System::CRITICAL>("[LanczosAlgorithm] Thrust could not resize temporal storage with error: %s.", e.what());  
     }
   }
   //Increase maximum dimension of Krylov subspace, reserve necessary memory
