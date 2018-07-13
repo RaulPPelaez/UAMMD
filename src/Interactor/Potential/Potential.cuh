@@ -74,10 +74,10 @@ namespace uammd{
 	
 	if(params.shift != real(0.0)){
 	  //With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
-	  real rc = sqrtf(params.cutOff2);
+	  real rc = sqrt(params.cutOff2);
 	  real invrc2 = real(params.sigma2)/(params.cutOff2);
 	  real invrc6 = invrc2*invrc2*invrc2;
-	  E += -(sqrtf(r2)-rc)*params.shift - real(4.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
+	  E += -(sqrt(r2)-rc)*params.shift - real(4.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
 	}
 	return E;      
       }
