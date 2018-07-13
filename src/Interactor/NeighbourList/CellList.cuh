@@ -563,17 +563,24 @@ namespace uammd{
     //Force the cell list to work with a certain grid
     void updateNeighbourList(Grid in_grid, real3 cutOff, cudaStream_t st = 0){
       grid = in_grid;
+      //Two cells per dimension will cause strange behavior that is probably unexpected
+      //If less than 3 cells are to be used it is better to use NBody instead of a cell list
       if(grid.cellDim.x < 3 or
-	 grid.cellDim.y < 3 or
-	 (grid.cellDim.z < 3 and grid.box.boxSize.z != real(0.0))){
-	sys->log<System::CRITICAL>("[CellList] I cannot work with less than 3 cells per dimension!");
+       	 grid.cellDim.y < 3 or
+       	 (grid.cellDim.z < 3 and grid.box.boxSize.z != real(0.0))){
+       	sys->log<System::CRITICAL>("[CellList] I cannot work with less than 3 cells per dimension!");
       }
-      if(grid.cellSize.x < cutOff.x or
-	 grid.cellSize.y < cutOff.y or
-	 grid.cellSize.z < cutOff.z){
-	sys->log<System::CRITICAL>("[CellList] The cell size cannot be smaller than the cut off.");
+      
+      //In the case of 3 cells per direction all the particles are checked anyway      
+      if(grid.cellDim.x != 3 or
+       	 grid.cellDim.y != 3 or
+       	 (grid.cellDim.z != 3 and grid.box.boxSize.z != real(0.0))){
+	if(grid.cellSize.x < cutOff.x or
+	   grid.cellSize.y < cutOff.y or
+	   grid.cellSize.z < cutOff.z){
+	  sys->log<System::CRITICAL>("[CellList] The cell size cannot be smaller than the cut off.");
+	}
       }
-	
       if(this->needsRebuild(grid.box, cutOff) == false) return;      
       
       sys->log<System::DEBUG1>("[CellList] Updating list");
@@ -632,18 +639,18 @@ namespace uammd{
       rebuildNlist = true;
     }
     void updateNeighbourList(Box box, real cutOff, cudaStream_t st = 0){
-      updateNeighbourList(Grid(box, cutOff), make_real3(cutOff), st);
+      updateNeighbourList(box, make_real3(cutOff), st);
     }
     void updateNeighbourList(Box box, real3 cutOff, cudaStream_t st = 0){
       
       Grid a_grid = Grid(box, cutOff);
       
-      int3 cellDim = a_grid.cellDim;
-      if(cellDim.x < 3) cellDim.x = 3;
-      if(cellDim.y < 3) cellDim.y = 3;
-      if(box.boxSize.z > real(0.0) && cellDim.z < 3) cellDim.z = 3;
+       int3 cellDim = a_grid.cellDim;
+       if(cellDim.x < 3) cellDim.x = 3;
+       if(cellDim.y < 3) cellDim.y = 3;
+       if(box.boxSize.z > real(0.0) && cellDim.z < 3) cellDim.z = 3;
 
-      a_grid = Grid(box, cellDim);
+       a_grid = Grid(box, cellDim);
 
       updateNeighbourList(a_grid, cutOff, st);              
     }
