@@ -69,15 +69,15 @@ namespace uammd{
 	if(r2 >= params.cutOff2) return 0;
 	real invr2 = params.sigma2/r2;
 	real invr6 = invr2*invr2*invr2;
-      
-	real E = params.epsilonDivSigma2*params.sigma2*real(2.0)*invr6*(invr6-real(1.0));
+	//This must be multiplied by 2 instead of 4 because sum_i(sum_j(E(rij))) = 2*E_total
+	real E = params.epsilonDivSigma2*params.sigma2*real(4.0)*invr6*(invr6-real(1.0));
 	
 	if(params.shift != real(0.0)){
 	  //With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
-	  real rc = sqrtf(params.cutOff2);
+	  real rc = sqrt(params.cutOff2);
 	  real invrc2 = real(params.sigma2)/(params.cutOff2);
 	  real invrc6 = invrc2*invrc2*invrc2;
-	  E += -(sqrtf(r2)-rc)*params.shift - real(2.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
+	  E += -(sqrt(r2)-rc)*params.shift - real(4.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
 	}
 	return E;      
       }

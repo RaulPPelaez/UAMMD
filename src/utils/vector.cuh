@@ -876,6 +876,14 @@ VECATTR int3 operator /(int3 a, int3 b){
   return make_int3( a.x/b.x, a.y/b.y, a.z/b.z);
 }
 
+VECATTR int3 operator /(int3 a, int b){
+  return make_int3( a.x/b, a.y/b, a.z/b);
+}
+
+VECATTR int3 operator /(int a, int3 b){
+  return make_int3( a/b.x, a/b.y, a/b.z);
+}
+
 VECATTR  int3 operator +(const int3 &a, const int3 &b){
   return make_int3(a.x + b.x, a.y + b.y, a.z + b.z);
 }
@@ -890,6 +898,9 @@ VECATTR  int3 operator -(const int3 &a, const int3 &b){
 
 VECATTR  void operator -=(int3 &a, const int3 &b){
   a.x -= b.x;  a.y -= b.y;  a.z -= b.z;
+}
+VECATTR  void operator /=(int3 &a, const int &b){
+  a.x /= b;  a.y /= b;  a.z /= b;
 }
 
 VECATTR  int3 operator -(const int3 &a, const int &b){

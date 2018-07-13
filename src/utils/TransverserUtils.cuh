@@ -21,7 +21,7 @@ namespace uammd{
   namespace SFINAE{
     // For Transversers, detects if a Transverser has getSharedMemorySize, therefore needing to allocate extra shared memory when launching a kernel that involves it.
     SFINAE_DEFINE_HAS_MEMBER(getSharedMemorySize)
-
+        
     //This delegator allows to ask a Transverser for the shared memory it needs even when getSharedMemorySize() is not present (it will return 0 by default)
     template<class T, bool general = has_getSharedMemorySize<T>::value>
     class SharedMemorySizeDelegator;
@@ -40,7 +40,30 @@ namespace uammd{
     };
 
 
+    //Detects if a type has a member called energy or force.
+    //Use with: SFINAE::has_energy<T>::value or SFINAE::has_force<T>::value
+    SFINAE_DEFINE_HAS_MEMBER(energy)
 
+    //If an object has an energy member function it calls that function, otherwise returns real(0.0)
+    template<class T, bool general = has_energy<T>::value>
+    struct EnergyDelegator;
+
+    template<class T>
+    struct EnergyDelegator<T, true>{
+      template<class ...Types>
+      static inline __device__ __host__ real energy(T &t, Types... args){
+	return t.energy(args...);
+      }
+    };
+
+    template<class T>
+    struct EnergyDelegator<T, false>{      
+      template<class ...Types>
+      static inline __device__ __host__ real energy(T &t, Types... args){return real(0.0); }
+    };
+
+    SFINAE_DEFINE_HAS_MEMBER(force)
+    
   
     //For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser
     //This macro defines a tempalted struct has_getInfo<T> that contains a static value=0 if T has not a getInfo method, and 1 otherwise

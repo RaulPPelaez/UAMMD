@@ -25,7 +25,7 @@ FILE=benchmark.cu
 LOG_LEVEL=5
 
 #Uncomment to add debug flags to nvcc
-#DEBUG= -lineinfo -src-in-ptx -g -G
+#DEBUG=  -src-in-ptx -g -G -DUAMMD_DEBUG
 
 #Flags to $(CXX)
 CPU= -O3 -funroll-loops  -fno-math-errno -fno-signed-zeros  -march=native -fPIC -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-sign-compare
@@ -42,12 +42,12 @@ endif
 
 INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../src -I ../src/third_party
 OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
-BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets  -lineinfo -src-in-ptx
+BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets
 
 all: test
 	$(BASIC_LINE)  $(FILE)
 
-test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph
+test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt
 
 
 benchmark:
@@ -73,6 +73,9 @@ pse:
 icm:
 	$(BASIC_LINE) ICM.cu  -lcufft -lcudart -o icm
 
+lbm:
+	$(BASIC_LINE) LBM.cu -o lbm -lpng
+
 bd:
 	$(BASIC_LINE) BD.cu -lcurand -o bd
 
@@ -82,8 +85,11 @@ bonds:
 sph:
 	$(BASIC_LINE) SPH_test.cu -lcurand -o sph
 
+mcnvt:
+	$(BASIC_LINE) MCNVT.cu  -o mcnvt
+
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt
 
 
 

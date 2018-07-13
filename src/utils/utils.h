@@ -108,6 +108,12 @@ public:
 
   }
 
+  double3 gaussian3(double mean, double std){
+    return make_double3(gaussian(mean, std),
+			gaussian(mean, std),
+			gaussian(mean, std));		      
+  }
+
   void setSeed(uint64_t s0, uint64_t s1){
     s[0] = s0;  s[1] = s1;
   }
