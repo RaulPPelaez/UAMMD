@@ -1152,7 +1152,7 @@ namespace uammd{
 	sys->log<System::WARNING>("[BDHI::PSE] This is probably fine, but Lanczos could not achieve convergence, try increasing the tolerance or switching to double precision.");
       }
       else if(status != LanczosStatus::SUCCESS){
-	sys->log<System::CRITICAL>("[BDHI::PSE] Lanczos Algorithm failed!");
+	sys->log<System::CRITICAL>("[BDHI::PSE] Lanczos Algorithm failed with code %d!", status);
       }
       
     }
