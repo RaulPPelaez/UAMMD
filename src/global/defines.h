@@ -1,10 +1,10 @@
-/* Raul P. Pelaez 2017.
+/* Raul P. Pelaez 2018.
    Some basic defines and aliases for uammd
  */
 #ifndef UAMMD_DEFINES_H
 #define UAMMD_DEFINES_H
 
-#define UAMMD_VERSION "0.5.alpha"
+#define UAMMD_VERSION "0.6"
 
 /*Comment to compile for double precision*/
 #ifndef DOUBLE_PRECISION
