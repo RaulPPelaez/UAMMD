@@ -1,0 +1,4 @@
+
+No official releases have been done yet so the versioning is a little subjective...
+From first release version (1.0) on this file will contain the important changes between releases.
+For the time being, refer to the commit history.
