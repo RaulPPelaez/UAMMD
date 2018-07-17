@@ -80,8 +80,8 @@ mkdir -p figures
 awk '{print $1, $3}' results/eq_state.theo > figures/E.theo
 awk '{print $1, $4}' results/eq_state.theo > figures/P.theo
 
-awk '{print $1, $4}' results/eq_state.langevin > figures/E.langevin
-awk '{print $1, $3}' results/eq_state.langevin > figures/P.langevin
+awk '{print $1, $3}' results/eq_state.langevin > figures/E.langevin
+awk '{print $1, $4}' results/eq_state.langevin > figures/P.langevin
 
 
 xmgrace -graph 0 figures/E.theo -graph 0 figures/E.langevin -graph 1 figures/P.theo -graph 1 figures/P.langevin -par tools/eq_state.par -hdevice EPS -hardcopy -printfile figures/eq_state.eps
