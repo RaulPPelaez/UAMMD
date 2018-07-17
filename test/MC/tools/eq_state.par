@@ -371,7 +371,7 @@ with g1
     s1 errorbar riser linestyle 1
     s1 errorbar riser clip off
     s1 errorbar riser clip length 0.100000
-    s1 comment "figures/P.langevin"
+    s1 comment "figures/P.mc"
     s1 legend  ""
 # Grace project file
 #
@@ -746,5 +746,5 @@ with g0
     s1 errorbar riser linestyle 1
     s1 errorbar riser clip off
     s1 errorbar riser clip length 0.100000
-    s1 comment "figures/E.langevin"
-    s1 legend  "Langevin"
+    s1 comment "figures/E.mc"
+    s1 legend  "MC NVT"
