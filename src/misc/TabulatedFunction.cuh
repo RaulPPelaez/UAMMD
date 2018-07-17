@@ -57,22 +57,13 @@ namespace uammd{
   }
 
   struct LinearInterpolation{
-    template<class T>
-    inline  __device__ T operator()(const T *table, int Ntable, real dr, real r) const{
+    template<class iterator, class T = typename std::iterator_traits<iterator>::value_type>
+    inline  __device__ T operator()(const iterator &table, int Ntable, real dr, real r) const{
       int i = r*Ntable;
-      real r0 = i*dr;
-      
- #if CUB_PTX_ARCH < 300
-       constexpr auto cubModifier = cub::LOAD_DEFAULT;
- #else
-       constexpr auto cubModifier = cub::LOAD_LDG;
- #endif
-    
-      cub::CacheModifiedInputIterator<cubModifier, T> table_itr(table);
+      real r0 = i*dr;      
 
-
-      T v0 = table_itr[i];
-      T v1 = table_itr[i+1];
+      T v0 = table[i];
+      T v1 = table[i+1];
     
       real t = (r - r0)*(real)Ntable;
 
@@ -111,11 +102,20 @@ namespace uammd{
       
     }
     ~TabulatedFunction() = default;
+
+    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
+    __device__ T get(real rs){
+      return this->operator()<modifier>(rs);
+    }
+ 
+    
+    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
     __device__ T operator()(real rs){
       real r = (rs-rmin)*invInterval;
       if(rs >= rmax) return T();
       if(r <= real(0.0)) return table[0];
-      return interp(table, Ntable, drNormalized, r);
+      cub::CacheModifiedInputIterator<modifier, T> table_itr(table);
+      return interp(table_itr, Ntable, drNormalized, r);
     }
  
   };

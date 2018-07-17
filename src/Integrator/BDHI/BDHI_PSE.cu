@@ -539,7 +539,12 @@ namespace uammd{
 	  /*Fetch RPY coefficients from a table, see RPYPSE_near*/
 	  /* Mreal(r) = (F(r)·I + (G(r)-F(r))·rr)/(6*pi*vis*a) */
 	  //f and g are divided by 6*pi*vis*a in the texture
-	  const real2 fg = FandG(sqrt(r2));
+#if CUB_PTX_ARCH < 300
+	  constexpr auto cubModifier = cub::LOAD_DEFAULT;
+#else
+	  constexpr auto cubModifier = cub::LOAD_LDG;
+#endif
+	  const real2 fg = FandG.get<cubModifier>(sqrt(r2));
 	  const real f = fg.x;
 	  const real g = fg.y;
 	  /*If i==j */
