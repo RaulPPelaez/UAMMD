@@ -1,23 +1,22 @@
 /*Raul P. Pelaez 2017. Verlet NVT Integrator module.
 
+
   This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
   that conserves the energy, volume and number of particles.
-
-
- Usage:
  
-    Create the module as any other integrator with the following parameters:
+  Create the module as any other integrator with the following parameters:
     
     
-    auto sys = make_shared<System>();
-    auto pd = make_shared<ParticleData>(N,sys);
-    auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+  auto sys = make_shared<System>();
+  auto pd = make_shared<ParticleData>(N,sys);
+  auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+  
     
-    
-    VerletNVE::Parameters par;
-     par.energy = 1.0;
+  VerletNVE::Parameters par;
+     par.energy = 1.0; //Target energy per particle, can be ommited if initVelocities=false
      par.dt = 0.01;
      par.is2D = false;
+     par.initVelocities=true; //Modify starting velocities to ensure the target energy
 
     auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
       

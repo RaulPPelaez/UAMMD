@@ -16,10 +16,10 @@ USAGE:
    //Read an option of type float
    float cutOff;
    inputFile.getOption("cutOff")>>cutOff;
-   
-   //You can have several arguments for an option
+   //An additional parameter might be passed (Optional or Required, Optional by default) specifying if the option is necessary or not.
+   //If required is specified and the option is not found, InputFile will issue a CRITICAL error
    real3 L;
-   inputFile.getOption("boxSize")>>L.x>>L.y>>L.z;
+   inputFile.getOption("boxSize", InputFile::Required)>>L.x>>L.y>>L.z;
 
    //Or none!
    bool isOptionPresent = bool(inputFile.getOption("someOption"));
