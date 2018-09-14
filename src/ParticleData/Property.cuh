@@ -19,24 +19,29 @@
 namespace uammd{
   //Forward declaration for friend attribute
   class ParticleData;
-
+  template<class T> struct Property;
+  
   template<class T>
   class property_ptr{
     T *ptr;
     bool *isBeingRead, *isBeingWritten;
     access::mode mode;
     access::location location;
+    Property<T> *father_property;
   public:
     property_ptr():
       ptr(nullptr),
-      isBeingRead(nullptr), isBeingWritten(nullptr), 
+      isBeingRead(nullptr), isBeingWritten(nullptr),      
       mode(access::mode::nomode),
-      location(access::location::nodevice){}
-    property_ptr(T* ptr, bool *isBeingWritten, bool *isBeingRead, access::mode mode, access::location loc):
+      location(access::location::nodevice),
+      father_property(nullptr){}
+    property_ptr(T* ptr, bool *isBeingWritten, bool *isBeingRead, access::mode mode, access::location loc,
+		 Property<T> *father_property = nullptr):
       ptr(ptr),
-      isBeingWritten(isBeingWritten),
+      isBeingWritten(isBeingWritten),      
       isBeingRead(isBeingRead),
-      mode(mode), location(loc){
+      mode(mode), location(loc),
+      father_property(father_property){
     
       if(mode==access::mode::write || mode==access::mode::readwrite){
 	*isBeingWritten = true;
@@ -54,6 +59,16 @@ namespace uammd{
       }
     }
     T* raw(){ return ptr;}
+
+    //Swap one of the Property containers for an external one
+    void swapContainer(thrust::device_vector<T> &swappable){
+      father_property->swapGPUContainer(swappable);
+    }
+    void swapContainer(std::vector<T> &swappable){      	        
+      father_property->swapCPUContainer(swappable);
+    }
+    
+    
   };
 
 
@@ -105,11 +120,36 @@ namespace uammd{
 	sys->log<System::DEBUG>("[Property] Resizing CPU version of %s", name.c_str());
       }
     }
-    void swapDeviceData(){
+    void swapInternalBuffers(){
       sys->log<System::DEBUG1>("[Property] Swapping GPU references of %s", name.c_str());
       if(deviceVector_alt.size() != N) deviceVector_alt.resize(N);
       deviceVector.swap(deviceVector_alt);
     }
+    void swapCPUContainer(std::vector<T> &outsideHostVector){
+      sys->log<System::DEBUG1>("[Property] Swapping internal CPU container of property (%s)", name.c_str());      
+      if(this->isBeingRead || this->isBeingWritten)
+	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
+
+      if(outsideHostVector.size() != N) {
+	sys->log<System::DEBUG1>("[Property] Resizing input container, had %d elements, should have %d", outsideHostVector.size(), N);      
+	outsideHostVector.resize(N);
+      }
+    
+      hostVector.swap(outsideHostVector);
+    }
+    void swapGPUContainer(thrust::device_vector<T> &outsideDeviceVector){
+      sys->log<System::DEBUG1>("[Property] Swapping internal GPU container of property (%s)", name.c_str());      
+      if(this->isBeingRead || this->isBeingWritten)
+	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
+
+      if(outsideDeviceVector.size() != N) {
+	sys->log<System::DEBUG1>("[Property] Resizing input container, had %d elements, should have %d", outsideDeviceVector.size(), N);      
+	outsideDeviceVector.resize(N);
+      }
+    
+      deviceVector.swap(outsideDeviceVector);
+    }
+
     property_ptr<T> data(access::location dev, access::mode mode){
       sys->log<System::DEBUG5>("[Property] %s requested from %d (0=cpu, 1=gpu) with access %d (0=r, 1=w, 2=rw)", name.c_str(), dev, mode);  
       if(this->isBeingWritten){

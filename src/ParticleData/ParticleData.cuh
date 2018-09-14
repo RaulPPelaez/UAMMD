@@ -336,7 +336,7 @@ namespace uammd{
 	auto devicePtr     = name.data(access::gpu, access::write);	\
 	auto device_altPtr = name.getAltGPUBuffer();			\
 	particle_sorter.applyCurrentOrder(devicePtr.raw(), device_altPtr, numberParticles); \
-	name.swapDeviceData();						\
+	name.swapInternalBuffers();						\
       }									\
     }    
     //Apply current order to all allocated properties. See APPLY_CURRENT_ORDER macro
