@@ -112,6 +112,7 @@ namespace uammd{
       }
       if(deviceVector_alt.size()>0){
 	sys->log<System::DEBUG1>("[Property] Resizing alt GPU version of %s", name.c_str(), Nnew);
+	
 	deviceVector_alt.resize(Nnew);
       }
       //Only resize CPU memory if it has been created
@@ -130,6 +131,8 @@ namespace uammd{
       if(this->isBeingRead || this->isBeingWritten)
 	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
 
+      //Ensure the GPU version will be up to date the next time it is asked for
+      forceUpdate(access::location::gpu);
       if(outsideHostVector.size() != N) {
 	sys->log<System::DEBUG1>("[Property] Resizing input container, had %d elements, should have %d", outsideHostVector.size(), N);      
 	outsideHostVector.resize(N);
@@ -141,6 +144,8 @@ namespace uammd{
       sys->log<System::DEBUG1>("[Property] Swapping internal GPU container of property (%s)", name.c_str());      
       if(this->isBeingRead || this->isBeingWritten)
 	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
+      //Ensure the CPU version will be up to date the next time it is asked for
+      forceUpdate(access::location::cpu);
 
       if(outsideDeviceVector.size() != N) {
 	sys->log<System::DEBUG1>("[Property] Resizing input container, had %d elements, should have %d", outsideDeviceVector.size(), N);      
