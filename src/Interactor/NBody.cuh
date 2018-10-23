@@ -56,7 +56,7 @@ namespace uammd{
     NBody(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){
-      sys->log<System::MESSAGE>("[NBody] Created");
+      sys->log<System::DEBUG>("[NBody] Created");
     }
     template<class Transverser>
     inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
