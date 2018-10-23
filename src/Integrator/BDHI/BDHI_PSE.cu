@@ -94,26 +94,44 @@ namespace uammd{
 
       //Looks for the closest (equal or greater) number of nodes of the form 2^a*3^b*5^c
       int3 nextFFTWiseSize3D(int3 size){
+	
 	int* cdim = &size.x;
-	/*Store up to 2^5·3^5·5^5 in tmp*/    
-	int n= 5;
-	std::vector<int> tmp(n*n*n, 0);
+
 	int max_dim = std::max({size.x, size.y, size.z});
-    
+	
+	int n= 5;
+	std::vector<int> tmp(n*n*n*n*n, 0);
 	do{
-	  tmp.resize(n*n*n, 0);
-	  fori(0,n)forj(0,n)for(int k=0; k<n;k++)
-	    tmp[i+n*j+n*n*k] = pow(2,i)*pow(3,j)*pow(5,k);
+	  tmp.resize(n*n*n*n*n, 0);
+	  fori(0,n)forj(0,n)for(int k=0; k<n;k++)for(int k7=0; k7<n; k7++)for(int k11=0; k11<n; k11++){
+		int id = i+n*j+n*n*k+n*n*n*k7+n*n*n*n*k11;
+		tmp[id] = 0;
+		//Current fft wise size
+		int number = pow(2,i)*pow(3,j)*pow(5,k)*pow(7, k7)*pow(11, k11);
+		//The fastest FFTs always have at least a factor of 2
+		if(i==0) continue;
+		//I have seen empiracally that factor 11 and 7 only works well with at least a factor 2 involved
+		if((k11>0 && (i==0))) continue;
+		tmp[id] = number;
+	      }
 	  n++;
 	  /*Sort this array in ascending order*/
 	  std::sort(tmp.begin(), tmp.end());      
 	}while(tmp.back()<max_dim); /*if n=5 is not enough, include more*/
-	
-	/*Now look for the nearest value in tmp that is greater than each cell dimension*/
+
+	//I have empirically seen that these sizes produce slower FFTs than they should in several platforms
+	constexpr int forbiddenSizes [] = {28, 98, 150, 154, 162, 196, 242};
+	/*Now look for the nearest value in tmp that is greater than each cell dimension and it is not forbidden*/
 	forj(0,3){
-	  int i = 0;
-	  while(tmp[i]<cdim[j]) i++;
-	  cdim[j] = tmp[i];
+	  fori(0, tmp.size()){	    
+	    if(tmp[i]<cdim[j]) continue;
+	    for(int k =0;k<sizeof(forbiddenSizes)/sizeof(int); k++) if(tmp[i] == forbiddenSizes[k]) continue;
+	    cdim[j] = tmp[i];
+	    break;
+	  }
+	    
+
+	  
 	}
 	return size;
       }
