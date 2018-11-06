@@ -4,7 +4,7 @@
 ARCH=
 
 #Uncomment to compile in double precision mode, single by default
-#DOUBLE_PRECISION=-DDOUBLE_PRECISION
+DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
 #CXX=clang++-5.0
@@ -19,17 +19,14 @@ CUDA_VER:=$(shell ls -d /usr/local/cuda*/ | grep -Eo '\-[0-9]\.[0-9]' | cut -d- 
 endif
 CUDA_ROOT=/usr/local/cuda-$(CUDA_VER)
 
-#The file that will be compiled with all:
-FILE=benchmark.cu
-
 LOG_LEVEL=5
 
 #Uncomment to add debug flags to nvcc
-#DEBUG=  -src-in-ptx -g -G -DUAMMD_DEBUG
+#DEBUG= -lineinfo -src-in-ptx -g -G
 
 #Flags to $(CXX)
-CPU= -O3 -funroll-loops  -fno-math-errno -fno-signed-zeros  -march=native -fPIC -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-sign-compare
-#-ffinite-math-only
+CPU= -O3 -funroll-loops -ffinite-math-only -fno-math-errno -fno-signed-zeros -march=native -fPIC -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-sign-compare
+
 
 #If arch was not set, autodetect all GPUs in the system
 ifeq ($(ARCH),)
@@ -38,61 +35,18 @@ else
 $(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 endif
 
-
-
-INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../src -I ../src/third_party
+UAMMD_ROOT=../../../
+INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I $(UAMMD_ROOT)/src -I $(UAMMD_ROOT)/src/third_party
 OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
 BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets
 
-all: test
-	$(BASIC_LINE)  $(FILE)
-
-test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt
-
-
-benchmark:
-	$(BASIC_LINE) benchmark.cu -o benchmark
-lj:
-	$(BASIC_LINE) LJ.cu -o lj
-
-ljMult:
-	$(BASIC_LINE) LJMultipleTypes.cu -o ljMult
-
-dpd:
-	$(BASIC_LINE) DPD.cu -o dpd
-
-nvt:
-	$(BASIC_LINE) nvt.cu -o nvt
-
-bdhi:
-	$(BASIC_LINE) BDHI.cu -llapacke -lcblas -lcurand -lcublas -lcusolver -lcufft  -lgomp -o bdhi
-
-pse:
-	$(BASIC_LINE) PSE.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o pse
+all: fib
 
 fib:
 	$(BASIC_LINE) FIB.cu -lcurand -lcufft  -o fib
 
-icm:
-	$(BASIC_LINE) ICM.cu  -lcufft -lcudart -o icm
-
-lbm:
-	$(BASIC_LINE) LBM.cu -o lbm -lpng
-
-bd:
-	$(BASIC_LINE) BD.cu -lcurand -o bd
-
-bonds:
-	$(BASIC_LINE)  Bonds.cu -lcurand -o bonds
-
-sph:
-	$(BASIC_LINE) SPH_test.cu -lcurand -o sph
-
-mcnvt:
-	$(BASIC_LINE) MCNVT.cu  -o mcnvt
-
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt
+	rm -f fib
 
 
 
