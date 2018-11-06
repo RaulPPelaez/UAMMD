@@ -24,24 +24,24 @@ namespace uammd{
   template<> struct CUFFT_Real2Complex<double>{static constexpr cufftType value=CUFFT_D2Z;};
   template<> struct CUFFT_Real2Complex<float>{static constexpr cufftType value=CUFFT_R2C;};
 
-  template<class real>
-  void cufftExecReal2Complex(cufftHandle &plan,
-			     cufftReal_t<real>* d_in,
-			     cufftComplex_t<real> *d_out);
+  template<class prec>
+  cufftResult cufftExecReal2Complex(cufftHandle &plan,
+			     cufftReal_t<prec>* d_in,
+			     cufftComplex_t<prec> *d_out);
   template<>
-  void cufftExecReal2Complex<float>(cufftHandle &plan,
+  cufftResult cufftExecReal2Complex<float>(cufftHandle &plan,
 				    cufftReal_t<float>* d_in,
 				    cufftComplex_t<float> *d_out){
 
-    cufftExecR2C(plan, d_in, d_out);
+    return cufftExecR2C(plan, d_in, d_out);
   }
 
   template<>
-  void cufftExecReal2Complex<double>(cufftHandle &plan,
+  cufftResult cufftExecReal2Complex<double>(cufftHandle &plan,
 				     cufftReal_t<double>* d_in,
 				     cufftComplex_t<double> *d_out){
 
-    cufftExecD2Z(plan, d_in, d_out);
+    return cufftExecD2Z(plan, d_in, d_out);
   
   }
 
@@ -51,23 +51,23 @@ namespace uammd{
   template<> struct CUFFT_Complex2Real<float>{static constexpr cufftType value=CUFFT_C2R;};
 
   template<class real>
-  void cufftExecComplex2Real(cufftHandle &plan,
+  cufftResult cufftExecComplex2Real(cufftHandle &plan,
 			     cufftComplex_t<real>* d_in,
 			     cufftReal_t<real> *d_out);
   template<>
-  void cufftExecComplex2Real<float>(cufftHandle &plan,
+  cufftResult cufftExecComplex2Real<float>(cufftHandle &plan,
 				    cufftComplex_t<float> *d_in,
 				    cufftReal_t<float> *d_out){
-    cufftExecC2R(plan, d_in, d_out);
+    return cufftExecC2R(plan, d_in, d_out);
 
   }
 
   template<>
-  void cufftExecComplex2Real<double>(cufftHandle &plan,
+  cufftResult cufftExecComplex2Real<double>(cufftHandle &plan,
 				     cufftComplex_t<double> *d_in,
 				     cufftReal_t<double> *d_out){
 
-    cufftExecZ2D(plan, d_in, d_out);
+    return cufftExecZ2D(plan, d_in, d_out);
   }
 }
 #endif
