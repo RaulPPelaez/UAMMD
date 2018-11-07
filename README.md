@@ -24,8 +24,9 @@ Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for 
 	-Brownian Hydrodynamics (BDHI)  
 	-Dissipative Particle Dynamics (DPD)  
 	-Smoothed Particle Hydrodynamics (SPH)  
+	-Metropolis Monte Carlo (MC)   
 	-Lattice Boltzmann (LBM)(WIP)  
-	-Metropolis Monte Carlo (MC) (WIP)  
+
 		
 
 Multiple building blocks are provided in order for the user to construct a certain simulation, 
@@ -79,8 +80,10 @@ See the wiki page for each interactor for more info and instructions!
 	4.1.1 Using the Cholesky decomposition on the full Mobility matrix to compute the stochastic term. Open Boundaries.
 	4.1.2 Using the Lanczos algorithm and a matrix free method to compute the stochastic term. Open Boundaries.
 	4.1.3 Using the Positively Split Ewald method with rapid stochastic sampling. Periodic Boundary Conditions
+	4.2 Predictor-Corrector with Fluctuating Immerse Boundary (Green-function free)
 	5.Smoothed Particle Hydrodynamics (SPH)
 	6.Lattice Bolztmann with fluctuations and immerse boundary (LBM) (WIP!)
+	7. Markov Chain Monte Carlo (MCMC)
 	
 
 ----------------------
