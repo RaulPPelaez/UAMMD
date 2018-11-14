@@ -9,7 +9,7 @@ References:
 
 #ifndef CXX_UTILS_H
 #define CXX_UTILS_H
-#include<cstring>
+#include<string>
 namespace uammd{
 
   namespace stringUtils{

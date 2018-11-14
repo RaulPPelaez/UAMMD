@@ -3,7 +3,7 @@
  */
 #ifndef SYSUTILS_H
 #define SYSUTILS_H
-
+#include"global/defines.h"
 
 #include<cstring>
 #include<cstdlib>

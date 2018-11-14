@@ -60,7 +60,7 @@ namespace uammd{
 	  sys->log<System::MESSAGE>("[RadialPotential/%s] Initialized", name.c_str());
 	}
 	~Radial(){
-	  sys->log<System::MESSAGE>("[RadialPotential/%s] Destroyed", name.c_str());
+	  sys->log<System::DEBUG>("[RadialPotential/%s] Destroyed", name.c_str());
 	}
 
 	void setPotParameters(int ti, int tj, InputPairParameters p){

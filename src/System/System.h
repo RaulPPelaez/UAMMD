@@ -48,13 +48,16 @@ namespace uammd{
   class System{
     Xorshift128plus m_rng;
     SystemParameters sysPar;
-
+    Timer tim;
     void printWellcome();
-    void printFarewell();
+    void printFarewell();    
   public:
 
-    System():System(0, nullptr){}
+    System():System(0, nullptr){
+      tim.tic();
+    }
     System(int argc, char *argv[]){
+      tim.tic();
       this->printWellcome();
       CudaCheckError();
       cudaDeviceSynchronize();
@@ -76,12 +79,12 @@ namespace uammd{
       cudaDeviceProp deviceProp;
       cudaGetDeviceProperties(&deviceProp, dev);
       
-      log<System::MESSAGE>("Using device: %s with id: %d", deviceProp.name, dev);
+      log<System::MESSAGE>("[System] Using device: %s with id: %d", deviceProp.name, dev);
       
       sysPar.device = dev;
       sysPar.cuda_arch = 100*deviceProp.major + 10*deviceProp.minor;
 
-      log<System::MESSAGE>("Compute capability of the device: %d.%d", deviceProp.major, deviceProp.minor);
+      log<System::MESSAGE>("[System] Compute capability of the device: %d.%d", deviceProp.major, deviceProp.minor);
 
       std::string line;
       fori(0,29) line += "━ ";
@@ -193,6 +196,7 @@ namespace uammd{
     cudaDeviceSynchronize();
     std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     log<System::MESSAGE>("Computation finished at %s",std::ctime(&time));
+    log<System::MESSAGE>("Time elapsed since creation: %fs", tim.toc());
     std::string line;
     fori(0,60) line +="━";
     line +="┛";

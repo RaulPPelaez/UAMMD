@@ -1,7 +1,7 @@
 /*Raul P. Pelaez 2018. cufft precision abstractions
   The names in this file allow to use cuFFT in a precision agnostic way.
 
-  Instead of using cufftDoubleReal and cufftReal use cufftReal_t<double> or cufftReal_t<double>.
+  Instead of using cufftDoubleReal and cufftReal use cufftReal_t<double> or cufftReal_t<float>.
   And so on for several cuFFT functions
 
 */

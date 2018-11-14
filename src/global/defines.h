@@ -3,7 +3,7 @@
  */
 #ifndef UAMMD_DEFINES_H
 #define UAMMD_DEFINES_H
-
+#include"cuda_runtime.h"
 #define UAMMD_VERSION "0.6"
 
 /*Comment to compile for double precision*/

@@ -57,7 +57,7 @@ inline void __cudaSafeCall( cudaError err, const char *file, const int line )
 
 inline void __cudaCheckError( const char *file, const int line )
 {
-  #ifdef CUDA_ERROR_CHECK_SYNC
+
   cudaError err = cudaGetLastError();
   if ( cudaSuccess != err )
     {
@@ -65,7 +65,7 @@ inline void __cudaCheckError( const char *file, const int line )
 	       file, line, cudaGetErrorString( err ) );
       exit( -1 );
     }
-
+#ifdef CUDA_ERROR_CHECK_SYNC
   // More careful checking. However, this will affect performance.
   // Comment away if needed.
   err = cudaDeviceSynchronize();

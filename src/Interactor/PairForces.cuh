@@ -38,7 +38,7 @@ namespace uammd{
     }
 
     ~PairForces(){
-      sys->log<System::MESSAGE>("[PairForces] Destroyed.");
+      sys->log<System::DEBUG>("[PairForces] Destroyed.");
     }
 
     void updateBox(Box box) override{
