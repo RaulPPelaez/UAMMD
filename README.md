@@ -26,7 +26,7 @@ Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for 
 	-Smoothed Particle Hydrodynamics (SPH)  
 	-Metropolis Monte Carlo (MC)   
 	-Lattice Boltzmann (LBM)(WIP)  
-
+	-Fluctuating Hydrodynamics (coupled with particles with Immerse Boundary Method (IBM))  
 		
 
 Multiple building blocks are provided in order for the user to construct a certain simulation, 
@@ -72,19 +72,22 @@ See the wiki page for each interactor for more info and instructions!
 	
 **Integrators:**
 
-	1.Two step velocity verlet NVE
-	2.Two step velocity verlet NVT with a Gornbech Jensen thermostat
-	3.Euler Maruyama Brownian dynamics (BD)	
-	4. Brownian Dynamics with Hydrodynamic interactions (BDHI)
-	4.1 Euler Maruyama w/HI via RPY tensor 
-	4.1.1 Using the Cholesky decomposition on the full Mobility matrix to compute the stochastic term. Open Boundaries.
-	4.1.2 Using the Lanczos algorithm and a matrix free method to compute the stochastic term. Open Boundaries.
-	4.1.3 Using the Positively Split Ewald method with rapid stochastic sampling. Periodic Boundary Conditions
-	4.2 Predictor-Corrector with Fluctuating Immerse Boundary (Green-function free)
-	5.Smoothed Particle Hydrodynamics (SPH)
-	6.Lattice Bolztmann with fluctuations and immerse boundary (LBM) (WIP!)
-	7. Markov Chain Monte Carlo (MCMC)
-	
+* Two step velocity verlet NVE
+* Two step velocity verlet NVT with a Gornbech Jensen thermostat
+* Euler Maruyama Brownian dynamics (BD)	
+* Brownian Dynamics with Hydrodynamic interactions (BDHI)
+   * Euler Maruyama w/HI via RPY tensor 
+	   * Using the Cholesky decomposition on the full Mobility matrix to compute the stochastic term. Open Boundaries.
+	   * Using the Lanczos algorithm and a matrix free method to compute the stochastic term. Open Boundaries.
+	   * Using the Positively Split Ewald method with rapid stochastic sampling. Periodic Boundary Conditions
+  * Predictor-Corrector with Fluctuating Immerse Boundary (FIB) (Green-function free) and Immerse Boundary Method
+* Smoothed Particle Hydrodynamics (SPH)
+* Lattice Bolztmann with fluctuations and immerse boundary (LBM) (WIP!)
+* Markov Chain Monte Carlo (MCMC)
+* Inertial Coupling Method for particles in an incompressible fluctuating fluid (ICM)  
+
+
+
 
 ----------------------
 
@@ -188,7 +191,7 @@ UAMMD was developed at the Departamento de Física Teórica de la Materia Conden
 
 Acknowledgment is made to NVIDIA Corporation for their GPU donations.  
 
-## Colaborators
+## Collaborators
 
 Raul P. Pelaez is the main developer of UAMMD.  
 
@@ -197,4 +200,4 @@ Other people that have contributed to UAMMD:
 Marc Melendez Schofield  
 Sergio Panzuela  
 Nerea Alcazar  
-
+Pablo Ibañez Freire (https://github.com/PabloIbannez)  
