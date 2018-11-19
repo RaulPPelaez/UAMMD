@@ -1,14 +1,14 @@
 
 #The target CUDA compute capability(s), if not set it will be autodetected
 #ARCH ?= 30 35 50 52 60 61
-ARCH=
+ARCH=52
 
 #Uncomment to compile in double precision mode, single by default
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
-#CXX=clang++-5.0
-CXX=g++
+CXX=clang++-5.0
+#CXX=g++
 
 #Cuda version (assumed to be in /usr/local/cuda*) You can change this in CUDA_ROOT
 #If not set it will be autodetected
@@ -47,7 +47,7 @@ BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OP
 all: test
 	$(BASIC_LINE)  $(FILE)
 
-test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt
+test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt fcm
 
 
 benchmark:
@@ -69,6 +69,9 @@ bdhi:
 
 pse:
 	$(BASIC_LINE) PSE.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o pse
+
+fcm:
+	$(BASIC_LINE) FCM.cu  -lcufft  -o fcm
 
 fib:
 	$(BASIC_LINE) FIB.cu -lcurand -lcufft  -o fib
@@ -92,7 +95,7 @@ mcnvt:
 	$(BASIC_LINE) MCNVT.cu  -o mcnvt
 
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm
 
 
 
