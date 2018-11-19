@@ -22,13 +22,27 @@
 
 namespace uammd{
   namespace BDHI{
-  
+
+
+    namespace FCM_ns{      
+      /*A convenient struct to pack 3 complex numbers, that is 6 real numbers*/
+      struct cufftComplex3{
+	cufftComplex x,y,z;
+      };
+
+      inline __device__ __host__ cufftComplex3 operator+(const cufftComplex3 &a, const cufftComplex3 &b){
+	return {a.x + b.x, a.y + b.y, a.z + b.z};
+      }
+      inline __device__ __host__ void operator+=(cufftComplex3 &a, const cufftComplex3 &b){
+	a.x += b.x; a.y += b.y; a.z += b.z;
+      }
+    }
+    
     class FCM{
     public:
-
+      using cufftComplex3 = FCM_ns::cufftComplex3;
       struct Parameters: BDHI::Parameters{
 	int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
-	int support = 0; //Support cells for the gaussian kernel, minimum is 3
       };
       FCM(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
@@ -46,7 +60,6 @@ namespace uammd{
       template<typename vtype>
       void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
 
-    
     private:
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
@@ -78,6 +91,13 @@ namespace uammd{
       thrust::device_vector<real3> fourierFactor;  // Fourier scaing factors to go from F to V in wave space
 
       cudaStream_t stream, stream2;
+
+      void initCuFFT();
+      template<typename vtype>
+      void spreadParticles(vtype *v, cudaStream_t st);
+      void convolveFourier(cudaStream_t st);
+      void interpolateParticles(real3 *Mv, cudaStream_t st);
+
     };
   }
 }

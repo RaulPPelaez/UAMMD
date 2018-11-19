@@ -1,8 +1,14 @@
 /*Raul P. Pelaez 2018. Force Coupling Method BDHI Module.
 
-This code is adapted from PSE, basically the factor sinc(ka/2)^2 is removed from the kernel and the near part is removed.
+  This code implements the algorithm described in [1], using cuFFT to solve te velocity in eq. 24 of [1] and compute the brownian fluctuations of eq. 30 in [1] (it only needs two FFT's). It only includes the stokeslet terms.
+
+  This code is adapted from PSE, basically the factor sinc(ka/2)^2 is removed from the kernel and the near part is removed. Also the spreading/interpolation kernel is now an exponential with different support and std.
+
+  The operator terminology used in the comments (as well as the wave space part of the algorithm) comes from [2], the PSE basic reference.
 References:
 [1] Fluctuating force-coupling method for simulations of colloidal suspensions. Eric E. Keaveny. 2014.
+[2]  Rapid Sampling of Stochastic Displacements in Brownian Dynamics Simulations. Fiore, Balboa, Donev and Swan. 2017.
+
 */
 #include"BDHI_FCM.cuh"
 #include"utils/GPUUtils.cuh"
@@ -62,23 +68,9 @@ namespace uammd{
 	}
 	return size;
       }
-      
-      /*A convenient struct to pack 3 complex numbers, that is 6 real numbers*/
-      struct cufftComplex3{
-	cufftComplex x,y,z;
-      };
-
-      inline __device__ __host__ cufftComplex3 operator+(const cufftComplex3 &a, const cufftComplex3 &b){
-	return {a.x + b.x, a.y + b.y, a.z + b.z};
-      }
-      inline __device__ __host__ void operator+=(cufftComplex3 &a, const cufftComplex3 &b){
-	a.x += b.x; a.y += b.y; a.z += b.z;
-      }
-
       /*This function takes a node index and returns the corresponding wave number*/
       template<class vec3>
       inline __device__ vec3 cellToWaveNumber(const int3 &cell, const int3 &cellDim, const vec3 &L){
-
 	const vec3 pi2invL = real(2.0)*real(M_PI)/L;
 	/*My wave number*/
 	vec3 k = {cell.x*pi2invL.x,
@@ -119,22 +111,32 @@ namespace uammd{
 
       sys->log<System::MESSAGE>("[BDHI::FCM] Self mobility: %f", 1.0/(6*M_PI*par.viscosity*par.hydrodynamicRadius)*(1-2.837297*par.hydrodynamicRadius/box.boxSize.x));
   
-      const double pi = M_PI;
       
-      int3 cellDim = par.cells;
-
-      if(cellDim.x <=0 or
-	 cellDim.y <=0 or
-	 cellDim.z <=0)
-	sys->log<System::CRITICAL>("[BDHI::FCM] You must provide the number of cells!");
-      
-      /*Store grid parameters in a Mesh object*/
+      this->sigma = par.hydrodynamicRadius/sqrt(M_PI); //eq. 8 in [1], \sigma_\Delta
+      int3 cellDim;
+      if(par.cells.x<=0){
+	double minFactor = 1.86; //According to [1] \sigma_\Delta/H = 1.86 gives enough accuracy
+	real h = sigma/minFactor;
+	cellDim = FCM_ns::nextFFTWiseSize3D(make_int3(box.boxSize/h));
+      }
+      else{      
+        cellDim = par.cells;
+      }
       grid = Grid(box, cellDim);
+      
+      //According to [1] the Gaussian kernel can be considered 0 beyond 3*a, so P >= 3*a/h
+      this->P = make_int3(3*par.hydrodynamicRadius/grid.cellSize.x+0.5); 
+      if(this->P.x < 1 ) this->P = make_int3(1);
 
       
-      /*Print information*/
       sys->log<System::MESSAGE>("[BDHI::FCM] Box Size: %f %f %f", box.boxSize.x, box.boxSize.y, box.boxSize.z);
       sys->log<System::MESSAGE>("[BDHI::FCM] Far range grid size: %d %d %d", cellDim.x, cellDim.y, cellDim.z);
+      sys->log<System::MESSAGE>("[BDHI::FCM] Gaussian kernel support: %d", 2*this->P.x+1);
+      sys->log<System::MESSAGE>("[BDHI::FCM] σ_Δ: %f", sigma);
+      sys->log<System::MESSAGE>("[BDHI::FCM] h: %f", grid.cellSize.x);
+      sys->log<System::MESSAGE>("[BDHI::FCM] σ_Δ/h: %f", sigma/grid.cellSize.x);
+      sys->log<System::MESSAGE>("[BDHI::FCM] Cell volume: %e", grid.cellSize.x*grid.cellSize.y*grid.cellSize.z);
+      
       CudaSafeCall(cudaStreamCreate(&stream));
       CudaSafeCall(cudaStreamCreate(&stream2));
   
@@ -148,22 +150,14 @@ namespace uammd{
 	velocities when interpolating from the grid to the particles*/
       int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
       gridVelsFourier.resize(3*ncells, cufftComplex());
+            
+      initCuFFT();
+  
+      CudaSafeCall(cudaDeviceSynchronize());
+      CudaCheckError();
+    }
 
-      
-      //Support must be odd
-      while(par.support%2 == 0 or par.support <3)
-	sys->log<System::CRITICAL>("[BDHI::FCM] Support must be odd, minimum is 3");
-      if(par.support>grid.cellDim.x or
-	 par.support>grid.cellDim.y or
-	 par.support>grid.cellDim.z)
-	sys->log<System::CRITICAL>("[BDHI::FCM] Support must be equal or lower than the number of cells");
-      
-      //P is in each direction, nearest neighbours -> P=1
-      this->P = make_int3(par.support/2);
-      this->sigma = par.hydrodynamicRadius/sqrt(pi);
-      sys->log<System::MESSAGE>("[BDHI::FCM] Gaussian kernel support in each direction: %d", this->P.x);
-      sys->log<System::MESSAGE>("[BDHI::FCM] σ_Δ: %f", sigma);
-      
+    void FCM::initCuFFT(){
       CufftSafeCall(cufftCreate(&cufft_plan_forward));
       CufftSafeCall(cufftCreate(&cufft_plan_inverse));
       
@@ -219,13 +213,7 @@ namespace uammd{
       
       CufftSafeCall(cufftSetWorkArea(cufft_plan_forward, (void*)d_cufftWorkArea));
       CufftSafeCall(cufftSetWorkArea(cufft_plan_inverse, (void*)d_cufftWorkArea));
-
-  
-      CudaSafeCall(cudaDeviceSynchronize());
-      CudaCheckError();
     }
-  
-
 
     FCM::~FCM(){
       CudaSafeCall(cudaDeviceSynchronize());
@@ -235,29 +223,26 @@ namespace uammd{
       CudaSafeCall(cudaStreamDestroy(stream2));
     }
 
-
-
-    /*I dont need to do anything at the begining of a step*/
+    //I dont need to do anything at the begining of a step
     void FCM::setup_step(cudaStream_t st){}
 
-
-    /*Compute M·v = Mw·v*/ 
+    //Compute M·v = Mw·v
     template<typename vtype>
     void FCM::Mdot(real3 *Mv, vtype *v, cudaStream_t st){
       sys->log<System::DEBUG1>("[BDHI::FCM] Mdot....");
-      int numberParticles = pg->getNumberParticles();
-      int BLOCKSIZE = 128;
-      int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-      int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0); 
+      {
+	int numberParticles = pg->getNumberParticles();
+	int BLOCKSIZE = 128;
+	int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
+	int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0); 
 
-      /*Ensure the result array is set to zero*/
-      fillWithGPU<<<Nblocks, Nthreads>>>(Mv, make_real3(0.0), numberParticles);
-      
+	fillWithGPU<<<Nblocks, Nthreads>>>(Mv, make_real3(0.0), numberParticles);
+      }
       Mdot_far<vtype>(Mv, v, st);
       
     }
     namespace FCM_ns{
-  
+      using cufftComplex3 = FCM::cufftComplex3;
 #ifndef SINGLE_PRECISION
       __device__ double atomicAdd(double* address, double val){
 	unsigned long long int* address_as_ull =
@@ -271,16 +256,11 @@ namespace uammd{
 	} while (assumed != old);
 	return __longlong_as_double(old);
       }
-#endif
-      /*** Kernels to compute the wave space contribution of M·F and B·dW *******/
-
-
+#endif      
       /*Apply the projection operator to a wave number with a certain complex factor.
-	res = (I-k^k)·factor
-       */
+	res = (I-\hat{k}^\hat{k})·factor*/
+
       inline __device__ cufftComplex3 projectFourier(const real3 &k, const cufftComplex3 &factor){
-	
-	//const real k2 = dot(k,k);
 	const real invk2 = real(1.0)/dot(k,k);
 
 	cufftComplex3 res;
@@ -303,9 +283,9 @@ namespace uammd{
 	return res;
       }
       
-      /*Spreads the 3D quantity v (i.e the force) to a regular grid given by utils
-	For that it uses a Gaussian kernel of the form f(r) = prefactor·exp(-tau·r^2).
-	Applies the operator S.
+      /*Spreads the 3D quantity v (i.e the force) to a regular grid
+	For that it uses a Gaussian kernel of the form f(r) = prefactor·exp(-tau·r^2). See eq. 8 in [1]
+	i.e. Applies the operator S.
 	Launch a block per particle.
       */
       template<typename vtype> /*Can take a real3 or a real4*/
@@ -315,8 +295,8 @@ namespace uammd{
 				      int N, /*Number of particles*/
 				      int3 P, /*Gaussian kernel support in each dimension*/
 				      Grid grid, /*Grid information and methods*/
-				      real3 prefactor,/*Prefactor for the kernel, (2*xi*xi/(pi·eta))^3/2*/
-				      real3 tau /*Kernel exponential factor, 2*xi*xi/eta*/){
+				      real3 prefactor,/*Prefactor for the kernel*/
+				      real3 tau /*Kernel exponential factor*/){
 	const int id = blockIdx.x;
 	const int tid = threadIdx.x;
 	if(id>=N) return;
@@ -365,9 +345,8 @@ namespace uammd{
       
       /*Scales fourier transformed forces in the regular grid to obtain velocities,
 	(Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F	
-	also adds stochastic fourier noise, see addBrownianNoise	
 	 Input: gridForces = FFTf·S·F
-	 Output:gridVels = B·FFTf·S·F + 1/√σ·√B·dWw
+	 Output:gridVels = B·FFTf·S·F -> B \propto (I-k^k/|k|^2) 
        */
       /*A thread per fourier node*/
       __global__ void forceFourier2Vel(cufftComplex3 * gridForces, /*Input array*/
@@ -411,7 +390,7 @@ namespace uammd{
 	= σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
 	This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds 1/√σ·√B(k)·dWw.
 	Keeping special care that v_k = v*_{N-k}, which implies that dWw_k = dWw*_{N-k}
-    
+	See eq. 30 in [1].
 	Launch a thread per cell grid/fourier node
       */
       __global__ void fourierBrownianNoise(/*Values of vels on each cell*/
@@ -419,7 +398,6 @@ namespace uammd{
 					   Grid grid, /*Grid parameters. Size of a cell, number of cells...*/
 					   real prefactor,/* sqrt(2·T/dt)*/
 					   real vis,
-					   real dV,
 					   //Parameters to seed the RNG					   
 					   ullint seed,
 					   ullint step
@@ -524,7 +502,7 @@ namespace uammd{
 
 	  const real invk2 = real(1.0)/dot(k,k);
 	  /*Get my scaling factor B*/
-	  const real3 B = make_real3(invk2/(vis*dV*double(ncells)));
+	  const real3 B = make_real3(invk2/(vis*real(ncells)));
 	  const real3 Bsq = sqrt(B);
 	  
 	  cufftComplex3 factor = noise;
@@ -555,7 +533,7 @@ namespace uammd{
 
 	  const real invk2 = real(1.0)/dot(k,k);
 	  /*Get my scaling factor B*/
-	  const real3 B = make_real3(invk2/(vis*dV*double(ncells)));
+	  const real3 B = make_real3(invk2/(vis*real(ncells)));
 
 	  const real3 Bsq = sqrt(B);	  
 	  cufftComplex3 factor = noise;
@@ -574,6 +552,7 @@ namespace uammd{
       
       /*Interpolates a quantity (i.e velocity) from its values in the grid to the particles.
 	For that it uses a Gaussian kernel of the form f(r) = prefactor·exp(-tau·r^2)
+	σ = dx*dy*dz; h^3 in [1]
 	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw = 
 	= σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
 
@@ -632,42 +611,20 @@ namespace uammd{
 
     }
     
-    /*Far contribution of M·F and B·dW
+    /*Compute M·F and B·dW in Fourier space
+      σ = dx*dy*dz; h^3 in [1]
       Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw = 
       = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
     */
     template<typename vtype>
-    void FCM::Mdot_far(real3 *Mv, vtype *v, cudaStream_t st){
-
-      sys->log<System::DEBUG1>("[BDHI::FCM] Computing MF wave space....");
+    void FCM::spreadParticles(vtype *v, cudaStream_t st){
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
-  
-      cufftSetStream(cufft_plan_forward, st);
-      cufftSetStream(cufft_plan_inverse, st);
-
-      /*Clean gridVels*/
-      int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
-      int BLOCKSIZE = 128;
-      int Nthreads = BLOCKSIZE<ncells?BLOCKSIZE:ncells;
-      int Nblocks  =  ncells/Nthreads +  ((ncells%Nthreads!=0)?1:0); 
-
-      sys->log<System::DEBUG2>("[BDHI::FCM] Setting vels to zero...");
-      //Note that the same storage space is used for Fourier and real space
-      //The real space is the only one that needs to be cleared.
-      auto d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
-      fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(d_gridVels,
-						make_real3(0), ncells);
-      auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
-      
-
-      Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-      Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0); 
-
-      /*Gaussian spreading/interpolation kernel parameters, s(r) = prefactor*exp(-tau*r2)
-      */
+      real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
+      //Gaussian spreading/interpolation kernel parameters, s(r) = prefactor*exp(-tau*r2)           
       real3 prefactorGaussian = make_real3(pow(2*M_PI*sigma*sigma, -1.5));
       real3 tau  = make_real3(0.5/(sigma*sigma));
+      
       sys->log<System::DEBUG2>("[BDHI::FCM] Particles to grid");
       /*Spread force on particles to grid positions -> S·F*/
       //Launch a small block per particle
@@ -681,80 +638,125 @@ namespace uammd{
 	  (pos.raw(), v, d_gridVels, numberParticles, P, grid, prefactorGaussian, tau);
       }
 
+    }
+    void FCM::convolveFourier(cudaStream_t st){
+      cufftSetStream(cufft_plan_forward, st);
+      cufftSetStream(cufft_plan_inverse, st);
+
+      auto d_gridVels = thrust::raw_pointer_cast(gridVelsFourier.data());
+      auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
+            
       sys->log<System::DEBUG2>("[BDHI::FCM] Taking grid to wave space");
-      /*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
-      auto cufftStatus =
-	cufftExecR2C(cufft_plan_forward,
-		     (cufftReal*)d_gridVels,
-		     (cufftComplex*)d_gridVelsFourier);
-      if(cufftStatus != CUFFT_SUCCESS){
-	sys->log<System::CRITICAL>("[BDHI::FCM] Error in forward CUFFT");
-      }
-
-      sys->log<System::DEBUG2>("[BDHI::FCM] Wave space velocity scaling");
-      if(temperature > real(0.0))
-	sys->log<System::DEBUG2>("[BDHI::FCM] Wave space brownian noise");
-
-      /*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
-      //Launch a 3D grid of threads, a thread per cell.
-      //Only the second half of the cells in the innermost (x) coordinate need to be processed, the rest are redundant and not used by cufft.
-      
-      dim3 NthreadsCells = dim3(8,8,8);
-      dim3 NblocksCells;
       {
-	int ncellsx = grid.cellDim.x/2+1;
-	NblocksCells.x= (ncellsx/NthreadsCells.x + ((ncellsx%NthreadsCells.x)?1:0));
-	NblocksCells.y= grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
-	NblocksCells.z= grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
+	/*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
+	auto cufftStatus =
+	  cufftExecR2C(cufft_plan_forward,
+		       (cufftReal*)d_gridVels,
+		       (cufftComplex*)d_gridVelsFourier);
+	if(cufftStatus != CUFFT_SUCCESS){
+	  sys->log<System::CRITICAL>("[BDHI::FCM] Error in forward CUFFT");
+	}
       }
-
-      auto d_fourierFactor = thrust::raw_pointer_cast(fourierFactor.data());
-      real dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
+      sys->log<System::DEBUG2>("[BDHI::FCM] Wave space convolution");
+      {
+	/*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
+	//Launch a 3D grid of threads, a thread per cell.
+	//Only the second half of the cells in the innermost (x) coordinate need to be processed, the rest are redundant and not used by cufft.
       
-      FCM_ns::forceFourier2Vel<<<NblocksCells, NthreadsCells, 0, st>>>
-      ((FCM_ns::cufftComplex3*) d_gridVelsFourier, //Input: FFT·S·F
-       (FCM_ns::cufftComplex3*) d_gridVelsFourier, //Output: B·FFT·S·F
-       viscosity,
-       dV,
-       grid);
-      //The sqrt(2*T/dt) factor needs to be here because far noise is summed to the M·F term.
-      /*Add the stochastic noise to the fourier velocities if T>0 -> 1/√σ·√B·dWw */
-      if(temperature > real(0.0)){
-	static ullint counter = 0; //Seed the rng differently each call
-	counter++;
-	sys->log<System::DEBUG2>("[BDHI::FCM] Wave space brownian noise");
+	dim3 NthreadsCells = dim3(8,8,8);
+	dim3 NblocksCells;
+	{
+	  int ncellsx = grid.cellDim.x/2+1;
+	  NblocksCells.x= (ncellsx/NthreadsCells.x + ((ncellsx%NthreadsCells.x)?1:0));
+	  NblocksCells.y= grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
+	  NblocksCells.z= grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
+	}
+
 	real dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
-	real prefactor = sqrt(2*temperature/dt/dV);      
-	FCM_ns::fourierBrownianNoise<<<NblocksCells, NthreadsCells, 0, st>>>(
-	            		    //In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw 
- 			            (FCM_ns::cufftComplex3*)d_gridVelsFourier, 
-				    grid,
-				    prefactor, // 1/√σ· sqrt(2*T/dt),
-				    viscosity,
-				    dV,
-				    seed, //Saru needs two seeds apart from thread id
-				    counter);
+            
+	FCM_ns::forceFourier2Vel<<<NblocksCells, NthreadsCells, 0, st>>>
+	  ((cufftComplex3*) d_gridVelsFourier, //Input: FFT·S·F
+	   (cufftComplex3*) d_gridVelsFourier, //Output: B·FFT·S·F
+	   viscosity,
+	   dV,
+	   grid);
+	//The sqrt(2*T/dt) factor needs to be here because far noise is summed to the M·F term.
+	/*Add the stochastic noise to the fourier velocities if T>0 -> 1/√σ·√B·dWw */
+	if(temperature > real(0.0)){
+	  sys->log<System::DEBUG2>("[BDHI::FCM] Wave space brownian noise");
+	  static ullint counter = 0; //Seed the rng differently each call
+	  counter++;
+	  sys->log<System::DEBUG2>("[BDHI::FCM] Wave space brownian noise");
+	  real prefactor = sqrt(2*temperature/(dt*dV));
+	  FCM_ns::fourierBrownianNoise<<<NblocksCells, NthreadsCells, 0, st>>>(
+			//In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw 
+			(cufftComplex3*)d_gridVelsFourier, 
+			grid,
+			prefactor, // 1/√σ· sqrt(2*T/dt),
+			viscosity,
+			seed, //Saru needs two seeds apart from thread id
+			counter);
+	}
       }
-      
       sys->log<System::DEBUG2>("[BDHI::FCM] Going back to real space");
-      /*Take the fourier velocities back to real space ->  FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
-      cufftStatus =
-	cufftExecC2R(cufft_plan_inverse,
-		     (cufftComplex*)d_gridVelsFourier,
-		     (cufftReal*)d_gridVels);
-      if(cufftStatus != CUFFT_SUCCESS){
-	sys->log<System::CRITICAL>("[BDHI::FCM] Error in inverse CUFFT");
+      {
+	/*Take the fourier velocities back to real space ->  FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
+	auto cufftStatus =
+	  cufftExecC2R(cufft_plan_inverse,
+		       (cufftComplex*)d_gridVelsFourier,
+		       (cufftReal*)d_gridVels);
+	if(cufftStatus != CUFFT_SUCCESS){
+	  sys->log<System::CRITICAL>("[BDHI::FCM] Error in inverse CUFFT");
+	}
       }
 
-      sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");
+
+    }
+    void FCM::interpolateParticles(real3 *Mv, cudaStream_t st){
+      sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");	    
+      int numberParticles = pg->getNumberParticles();
+      auto pos = pd->getPos(access::location::gpu, access::mode::read);
+      real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
+
+      //Gaussian spreading/interpolation kernel parameters, s(r) = prefactor*exp(-tau*r2)           
+      real3 prefactorGaussian = make_real3(pow(2*M_PI*sigma*sigma, -1.5));
+      real3 tau  = make_real3(0.5/(sigma*sigma));
+
+      
+      int3 support = 2*P+1;
+      int BLOCKSIZE = 128;
+      int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
+      int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0); 
+
       /*Interpolate the real space velocities back to the particle positions ->
 	Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
       FCM_ns::grid2ParticlesD<<<Nblocks, Nthreads, 0, st>>>
 	(pos.raw(), Mv, d_gridVels,
 	 numberParticles, P, grid, prefactorGaussian, tau);
-      
-      sys->log<System::DEBUG2>("[BDHI::FCM] MF wave space Done");
-      
+    }
+
+    
+    template<typename vtype>
+    void FCM::Mdot_far(real3 *Mv, vtype *v, cudaStream_t st){
+      sys->log<System::DEBUG1>("[BDHI::FCM] Computing MF wave space....");
+      /*Clean gridVels*/
+      {
+	int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
+	int BLOCKSIZE = 128;
+	int Nthreads = BLOCKSIZE<ncells?BLOCKSIZE:ncells;
+	int Nblocks  =  ncells/Nthreads +  ((ncells%Nthreads!=0)?1:0); 
+
+	sys->log<System::DEBUG2>("[BDHI::FCM] Setting vels to zero...");
+	//Note that the same storage space is used for Fourier and real space
+	//The real space is the only one that needs to be cleared.
+	auto d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
+	fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(d_gridVels,
+						  make_real3(0), ncells);
+      }
+
+      spreadParticles(v, st);
+      convolveFourier(st);
+      interpolateParticles(Mv, st);      
     }
 
     void FCM::computeMF(real3* MF, cudaStream_t st){

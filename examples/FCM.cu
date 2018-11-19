@@ -5,12 +5,6 @@
 #include"uammd.cuh"
 #include"Integrator/BDHI/BDHI_EulerMaruyama.cuh"
 #include"Integrator/BDHI/BDHI_FCM.cuh"
-#include"Interactor/PairForces.cuh"
-#include"Interactor/NeighbourList/CellList.cuh"
-#include"Interactor/Potential/Potential.cuh"
-
-#include<thrust/sort.h>
-
 #include"utils/InitialConditions.cuh"
 #include<fstream>
 
@@ -42,7 +36,7 @@ int main(int argc, char *argv[]){
 
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
 
-  double rh =  1.0;
+  double rh =  1;
   ofstream out("kk");
   BDHI::FCM::Parameters par;
   par.temperature = 1.0;
@@ -50,8 +44,6 @@ int main(int argc, char *argv[]){
   par.hydrodynamicRadius =  rh;
   par.dt = 0.001;
   par.box = box;
-  par.cells = make_int3(64);
-  par.support = 5;
   
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
    
@@ -94,3 +86,5 @@ int main(int argc, char *argv[]){
 
   return 0;
 }
+
+
