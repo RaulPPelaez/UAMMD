@@ -400,7 +400,7 @@ namespace uammd{
       //Required storage for the plans
       size_t cufftWorkSizef = 0, cufftWorkSizei = 0;
       /*Set up cuFFT*/
-      int3 cdtmp = {grid.cellDim.x, grid.cellDim.y, grid.cellDim.z};
+      int3 cdtmp = {grid.cellDim.z, grid.cellDim.y, grid.cellDim.x};
       /*I want to make three 3D FFTs, each one using one of the three interleaved coordinates*/
       CufftSafeCall(cufftMakePlanMany(cufft_plan_forward,
 				      3, &cdtmp.x, /*Three dimensional FFT*/
