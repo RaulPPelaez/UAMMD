@@ -85,9 +85,10 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
 
       double rh = par.hydrodynamicRadius;
-      double L = box.boxSize.x;
-      long double M0 = 1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-2.837297l*rh/L+(4.0l/3.0l)*M_PIl*pow(rh/L,3)-27.4l*pow(rh/L,6.0l));
-      sys->log<System::MESSAGE>("[BDHI::FCM] Self mobility: %g", M0);
+      
+      double L = par.box.boxSize.x;
+      long double M0 = 1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-2.837297l*rh/L+(4.0l/3.0l)*M_PIl*pow(rh/L,3.0)-27.4l*pow(rh/L,6.0l));
+      sys->log<System::MESSAGE>("[BDHI::FCM] Self mobility: %g", (double)M0);
       
       if(box.boxSize.x != box.boxSize.y || box.boxSize.y != box.boxSize.z || box.boxSize.x != box.boxSize.z){
 	sys->log<System::WARNING>("[BDHI::FCM] Self mobility will be different for non cubic boxes!");
