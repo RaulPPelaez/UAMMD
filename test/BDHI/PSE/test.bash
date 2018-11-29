@@ -33,12 +33,14 @@ do
     L=$(echo $hydrodynamicRadius | awk '{print 64*$1}')
     gfortran -O3 tools/ewaldSumRPY.f90 -o ewaldSumRPY; echo "$hydrodynamicRadius $L $L $L" | ./ewaldSumRPY | awk '{print $1/'$hydrodynamicRadius', $2}' > theo; rm ewaldSumRPY
 
+
     ./pse pairMobility $temperature $viscosity $hydrodynamicRadius $tolerance > uammd.pairMobility.log 2>&1 
 
     gracebat theo pairMobility_pullForce.psi*.test -par tools/pairMobility.par -hdevice EPS -printfile pairMobility.eps
-    rm theo
+    #    rm theo
+    mv theo pairMobility.theo
 
-    mv selfMobility_pullForce*.test pairMobility_pullForce*.test uammd*log $resultsFolder/
+    mv pairMobility.theo selfMobility_pullForce*.test pairMobility_pullForce*.test uammd*log $resultsFolder/
 
     ./pse selfDiffusion $temperature $viscosity $hydrodynamicRadius $tolerance  > uammd.selfDiffusion.log 2>&1 
     g++ -O3 -std=c++11 tools/msd.cpp tools/Timer.cpp -o msd
