@@ -1,14 +1,14 @@
 
 #The target CUDA compute capability(s), if not set it will be autodetected
 #ARCH ?= 30 35 50 52 60 61
-ARCH=52
+ARCH=
 
 #Uncomment to compile in double precision mode, single by default
-#DOUBLE_PRECISION=-DDOUBLE_PRECISION
+DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
-CXX=clang++-5.0
-#CXX=g++
+#CXX=clang++-5.0
+CXX=g++
 
 #Cuda version (assumed to be in /usr/local/cuda*) You can change this in CUDA_ROOT
 #If not set it will be autodetected

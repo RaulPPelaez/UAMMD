@@ -193,7 +193,7 @@ bool pairMobilityCubicBox_test(double dist){
   while(dir.x == 0 or dir.y == 0 or dir.z == 0) dir = make_real3(rng.gaussian3(0,1));	
   real3 rij = dist*dir/sqrt(dot(dir,dir));
 
-  std::ofstream out("pairMobilityCubicBox.dist"+std::to_string(dist)+".test");
+  std::ofstream out("pairMobilityCubicBox.dist"+std::to_string(dist/rh)+".test");
   double F = 1;
   long double M[9];
 
@@ -245,7 +245,7 @@ bool pairMobility_q2D_test(double dist){
   while(dir.x == 0 or dir.y == 0 or dir.z == 0) dir = make_real3(rng.gaussian3(0,1));	
   real3 rij = dist*dir/sqrt(dot(dir,dir));
 
-  std::ofstream out("pairMobility_q2D.dist"+std::to_string(dist)+".test");
+  std::ofstream out("pairMobility_q2D.dist"+std::to_string(dist/rh)+".test");
   double F = 1;
   long double M[9];
 
@@ -267,7 +267,6 @@ bool pairMobility_q2D_test(double dist){
 bool selfMobility_q2D_test(){
   
   int NL = 40;
-  std::vector<real2> velocities(NL);
 
   real L_min = 8*rh;
   real L_max = 200*rh;
@@ -286,11 +285,11 @@ bool selfMobility_q2D_test(){
     long double M0 = 1.0L/(6.0L*M_PIl*viscosity*rh);
     //From eq 21 and 23 in Vögele, M., & Hummer, G. (2016). Divergent Diffusion Coefficients in Simulations of Fluids and Lipid Membranes. The Journal of Physical Chemistry B, 120(33), 8722–8732. doi:10.1021/acs.jpcb.6b05102
   
-    double Mplane_near = M0 + M0/L*(M_PI*0.5*Lz/L - 4.3878);
-    double Mplane_far = M0 + M0/Lz*(1.5*log(L/Lz) - 2.8897);
+    double Mplane_near = M0 + M0*rh/L*(M_PI*0.5*Lz/L - 4.3878);
+    double Mplane_far = M0 + M0*rh/Lz*(1.5*log(L/Lz) - 2.8897);
     
-    double Mperp_near = M0 + M0/Lz*(3*log(L/Lz) - 2.77939);
-    double Mperp_far = M0 - 2.9252/(6*M_PI*viscosity*L);
+    double Mperp_near = M0 + M0*rh/Lz*(3*log(L/Lz) - 2.77939);
+    double Mperp_far = M0 - M0*2.9252*rh/L;
 
     Mout<<std::setprecision(15)<<Lz/rh<<" ";
     Mtheoout<<std::setprecision(15)<<Lz/rh<<" ";
@@ -322,7 +321,7 @@ bool idealParticlesDiffusion(int N, real3 L, std::string suffix = "test"){
   par.tolerance = tolerance;
   
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
-  std::ofstream out("pos.noise.boxSize"+std::to_string(L.z)+".dt"+std::to_string(par.dt)+"."+suffix);
+  std::ofstream out("pos.noise.boxSize"+std::to_string(L.z/rh)+".dt"+std::to_string(par.dt)+"."+suffix);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     fori(0, pd->getNumParticles()){
@@ -345,9 +344,9 @@ bool idealParticlesDiffusion(int N, real3 L, std::string suffix = "test"){
 }
 
 void selfDiffusionCubicBox_test(){
-  int NL = 10;
+  int NL = 5;
   real L_min = 8*rh;
-  real L_max = 128*rh;
+  real L_max = 64*rh;
   int N=4096;
   forj(0, NL){
     real L = L_min + j*((L_max-L_min)/(real)(NL-1));

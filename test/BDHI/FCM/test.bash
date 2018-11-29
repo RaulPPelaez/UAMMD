@@ -24,8 +24,8 @@ fi
 
 #Any number should produce equivalent results (except for the time step). The resulting plots will be adimensional.
 temperature=1.0
-viscosity=1
-hydrodynamicRadius=1
+viscosity=0.5
+hydrodynamicRadius=2
 tolerance=1e-7
 make fcm
 
