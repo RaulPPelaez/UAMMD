@@ -59,7 +59,7 @@ These objects are abstract classes that can be derived to create all kinds of fu
 
 # Currently Implemented
 
-See the wiki page at [https://github.com/RaulPPelaez/UAMMD/wiki]() for a full list of available modules!
+See the wiki page at https://github.com/RaulPPelaez/UAMMD/wiki for a full list of available modules!
 
 ----------------------
 ## USAGE
