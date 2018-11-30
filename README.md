@@ -59,40 +59,9 @@ These objects are abstract classes that can be derived to create all kinds of fu
 
 # Currently Implemented
 
-See the wiki page for each interactor for more info and instructions!
-
------------------------
-**Interactors:**
-
-	1.Pair Forces: Implements hash (Morton hash) sort neighbour cell list construction algorithm to evaluate pair forces given some potential function, LJ i.e. Ultra fast. In the case of the range of the potential being too large, it falls back to NBodyForces.
-	2.Bonded forces: Allows to join pairs of particles via bonds (i.e a harmonic spring) (Instructions in BondedForces.cuh)
-	3.Angle bonded forces: Allows to join triples of particles via semiflexible springs (Instructions in AngularBondedForces.cuh)
-    4.NBody forces: All particles interact with every other via some potential.
-	5.External forces: A custom interaction function that will be applied to each particle individually.
-	
-**Integrators:**
-
-* Two step velocity verlet NVE
-* Two step velocity verlet NVT with a Gornbech Jensen thermostat
-* Euler Maruyama Brownian dynamics (BD)	
-* Brownian Dynamics with Hydrodynamic interactions (BDHI)
-   * Euler Maruyama w/HI via RPY tensor 
-	   * Using the Cholesky decomposition on the full Mobility matrix to compute the stochastic term. Open Boundaries.
-	   * Using the Lanczos algorithm and a matrix free method to compute the stochastic term. Open Boundaries.
-	   * Using the Positively Split Ewald method with rapid stochastic sampling. Periodic Boundary Conditions
-  * Predictor-Corrector with Fluctuating Immerse Boundary (FIB) (Green-function free) and Immerse Boundary Method
-* Smoothed Particle Hydrodynamics (SPH)
-* Lattice Bolztmann with fluctuations and immerse boundary (LBM) (WIP!)
-* Markov Chain Monte Carlo (MCMC)
-* Inertial Coupling Method for particles in an incompressible fluctuating fluid (ICM)  
-
-
-
+See the wiki page at [https://github.com/RaulPPelaez/UAMMD/wiki]() for a full list of available modules!
 
 ----------------------
-
-UAMMD can be compiled in single or double precision, it works in single precision by default unless you specify otherwise when compiling. See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki.  
-
 ## USAGE
 
 -------------------
@@ -103,6 +72,8 @@ To use it in your project, include the modules you need, create a System and Par
 See examples/LJ.cu and examples/Makefile or [Simulation File](https://github.com/RaulPPelaez/UAMMD/wiki/Simulation-File) in the wiki  
 
 See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for instructions.  
+
+UAMMD can be compiled in single or double precision, it works in single precision by default unless you specify otherwise when compiling. See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki.  
 
 You can use the --device X flag to specify a certain GPU.  
 
@@ -128,19 +99,7 @@ See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD)
 
 --------------------  
 
-Needs a c++ compiler with full C++11 support, 4.8+ recommended  
-UAMMD will run on any GPU with compute capability >= 2.0  
-
-## TESTED ON  
-
-------------
-	 - GTX980 (sm_52)  on Ubuntu 14.04 with CUDA 7.5 and g++ 4.8
-     - GTX980 (sm_52)  on Ubuntu 16.04 with CUDA 7.5 and g++ 5.3.1
-     - GTX980 (sm_52)  on Ubuntu 18.04 with CUDA 9.2 and g++ 5.5 or clang-5.0
-     - GTX980 (sm_52), GTX780 (sm_35), GTX480(sm_20) and GTX580(sm_20) on CentOS 6.5 with CUDA 7.5 and g++ 4.8
-	 - GTX1080 (sm_61), Tesla P1000 (sm_60) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
-     - K40 (sm_35), GTX780(sm_35) on CentOS 6.5 with CUDA 8.0 and g++ 4.8
-     - Same as above with CUDA 9.0, CUDA 9.1, CUDA 9.2 (only for sm>20) and CUDA 8.0
+Apart from CUDA, UAMMD needs a c++ compiler with full C++11 support, 4.8+ recommended  
 
 
 ## NOTES FOR DEVELOPERS
@@ -161,7 +120,7 @@ Some things to take into account:
 	2. ParticleData can also change the storage location of the particle arrays, so do not store raw pointers to particle properties, always ask PD for them before using them with ParticleData::get*()
 	3. In the modules where it makes sense, make them be able to take a ParticleGroup (which will contain all particles by default). See PairForces.cuh for an example of a module handling ParticleGroups. Groups will handle particle reorders and particle number changes, easing working with variable number of particles. A ParticleGroup containing all particles yields no overhead and has a very small memory footprint.  
 	4. UAMMD usually uses the lazy initialization scheme, nothing is initialized unless it is absolutely necessary. For example, the CPU version of a particle property (and the GPU version FWIW) will not be allocated until someone explicitly asks for it with pd->get*().  
-	5. Using the "real" type and "make_real" type will ensure precision agnostic code, as real is an alias to either float or double depending on the precision mode.
+	5. Using the "real" type and "make_real" type will ensure precision agnostic code, as real is an alias to either float or double depending on the precision mode.  
 	
 Some advice:
 
@@ -187,7 +146,7 @@ If you want to make small changes to an existing module without changing it you 
 
 ## ACKNOWLEDGMENTS
 
-UAMMD was developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.  
+UAMMD is being developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.  
 
 Acknowledgment is made to NVIDIA Corporation for their GPU donations.  
 
