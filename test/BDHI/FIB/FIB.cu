@@ -135,7 +135,7 @@ bool selfMobilityCubicBox_test(){
   return true;
 }
 
-void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M, double &true_rh){
+void computePairMobilityMatrix(real3 L, double F, double3 dist, long double *M, double &true_rh){
   int N = 2;
   auto sys = make_shared<System>();
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
@@ -167,7 +167,7 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M, do
       double3 posprev;
       {
 	auto pos = pd->getPos(access::location::cpu, access::mode::write);
-	real3 ori = make_real3(sys->rng().uniform3(-0.5, 0.5))*box.boxSize;
+	double3 ori = sys->rng().uniform3(-0.5, 0.5)*make_double3(box.boxSize);
 	pos.raw()[0] = make_real4(ori,0);
 	pos.raw()[1] = make_real4(ori+dist,0);
 	posprev = make_double3(make_real3(pos.raw()[1]));
@@ -205,7 +205,7 @@ bool pairMobilityCubicBox_test(double dist){
   do{
     dir = make_real3(0);
     while(dir.x == 0 or dir.y == 0 or dir.z == 0) dir = make_real3(rng.gaussian3(0,1));	
-    rij = dist*dir/sqrt(dot(dir,dir));
+    rij = dist*make_double3(dir)/sqrt(dot(dir,dir));
     std::cerr<<rij.x<<endl;
   }while(rij.x<1 or rij.y<1 or rij.z<1);
   std::ofstream out("pairMobilityCubicBox.dist"+std::to_string(dist/rh)+".test");
@@ -224,7 +224,7 @@ bool pairMobilityCubicBox_test(double dist){
     for(int i=0; i<3; i++){
       for(int j=0; j<3; j++){
 	long double r = sqrt(dot(rij, rij)); 
-	real *r01 = &rij.x;
+	double *r01 = &rij.x;
 	long double diadic = 0;
 	if(r>0) diadic = r01[i]*r01[j]/(r*r);
 	M_theo_Linf[3*i+j] = g(r,true_rh)*diadic;	
@@ -256,7 +256,7 @@ bool pairMobility_q2D_test(double dist){
   real3 dir = make_real3(0);
   
   while(dir.x == 0 or dir.y == 0 or dir.z == 0) dir = make_real3(rng.gaussian3(0,1));	
-  real3 rij = dist*dir/sqrt(dot(dir,dir));
+  double3 rij = dist*make_double3(dir)/sqrt(dot(dir,dir));
 
   std::ofstream out("pairMobility_q2D.dist"+std::to_string(dist/rh)+".test");
   double F = 1;
