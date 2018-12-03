@@ -22,8 +22,8 @@ real temperature, viscosity, rh, tolerance;
 
 //FCM kernel M(\vec{r}) = f(r)·I + g(r)·\vec{r}\otimes\vec{r}/r^2
 //M0 = f(0)
-long double f(long double r){return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1+2*rh*rh/(M_PIl*r*r))*erf(r*sqrt(M_PIl)/(2*rh)) - 2*rh/(M_PIl*r)*exp(-M_PIl*r*r/(4*rh*rh)) );}
-long double g(long double r){ return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1-6*rh*rh/(M_PIl*r*r))*erf(r*sqrt(M_PIl)/(2*rh)) + 6*rh/(M_PIl*r)*exp(-M_PIl*r*r/(4*rh*rh)) );}
+long double f(long double r){return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1+2*rh*rh/(M_PIl*r*r))*std::erf(r*sqrt(M_PIl)/(2*rh)) - 2*rh/(M_PIl*r)*exp(-M_PIl*r*r/(4*rh*rh)) );}
+long double g(long double r){ return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1-6*rh*rh/(M_PIl*r*r))*std::erf(r*sqrt(M_PIl)/(2*rh)) + 6*rh/(M_PIl*r)*exp(-M_PIl*r*r/(4*rh*rh)) );}
 
 
 //Self mobility with PBC corrections up to sixth order
@@ -221,8 +221,8 @@ bool pairMobilityCubicBox_test(double dist){
     out<<std::setprecision(15)<<L/rh<<" ";
     computePairMobilityMatrix(make_real3(L), F, rij, M);
     //With the correction this should print something converging to zero very fast for all terms
-    //long double pbc_corr = computeM0PBC(L)*(6.0L*M_PIl*viscosity*rh);
-    for(int j = 0; j<9; j++)    out<<abs(1.0l-M[j]/(M_theo_Linf[j]))<<" ";
+    long double pbc_corr = computeM0PBC(L)*(6.0L*M_PIl*viscosity*rh);
+    for(int j = 0; j<9; j++)    out<<abs(1.0l-M[j]*pbc_corr/(M_theo_Linf[j]))<<" ";
     out<<endl;
   
     CudaCheckError();
@@ -250,7 +250,7 @@ bool pairMobility_q2D_test(double dist){
   long double M[9];
 
   out<<"#rij "<<rij.x<<" "<<rij.y<<" "<<rij.z<<endl;
-  real Lx = 32;
+  real Lx = 32*rh;
   fori(0, NL){
     real Lz = L_min + i*((L_max-L_min)/(real)(NL-1));
     out<<std::setprecision(15)<<Lz/rh<<" ";

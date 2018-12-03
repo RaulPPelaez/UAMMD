@@ -24,7 +24,7 @@ fi
 
 #Any number should produce equivalent results (except for the time step). The resulting plots will be adimensional.
 temperature=1.0
-viscosity=0.5
+viscosity=2
 hydrodynamicRadius=2
 tolerance=1e-7
 make fcm
@@ -118,7 +118,7 @@ function selfDiffusionCubicBox {
 	L=$(echo $i | cut -d. -f3,4 | sed 's+boxSize++')
 	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .test '{print $1}')
 	#PBC corrections up to sixth order in L
-	D0=$(echo 1 | awk '{l='$hydrodynamicRadius'/'$L';print '$temperature'/(6*3.14159265358979*'$viscosity'*'$hydrodynamicRadius')*(1-2.837297*l+(4/3.0)*3.14159265358979*l**3-27.4*l**6);}')
+	D0=$(echo 1 | awk '{l=1/'$L';print '$temperature'/(6*3.14159265358979*'$viscosity'*'$hydrodynamicRadius')*(1-2.837297*l+(4/3.0)*3.14159265358979*l**3-27.4*l**6);}')
 	
 	./msd -N $(grep -n "#" -m 2 $i | cut -d: -f1 | paste -sd" " | awk '{print $2-$1-1}') -Nsteps $(grep -c "#" $i)  $i 2>/dev/null | awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd 
 	
@@ -131,9 +131,9 @@ function selfDiffusionCubicBox {
 
 	maxDeviation=$(cat results/selfDiffusionCubicBox.test |
 			   awk '{print $2, $3, $4}' |
-			   tr ' ' '\n' | 
-			   datamash -W max 1 |
-			   awk '{print 1-$1}')
+			   tr ' ' '\n' |
+			   awk '{print sqrt((1-$1)**2)}' | 
+			   datamash -W max 1 )
 	
 	echo "Maximum deviation from expected diffusion: $maxDeviation"
 	mv pos.noise* uammd.selfDiffusion.log results/
