@@ -119,6 +119,10 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::FIB] Mesh dimensions: %d %d %d", cellDim.x, cellDim.y, cellDim.z);
       sys->log<System::MESSAGE>("[BDHI::FIB] Temperature: %f", temperature);
       sys->log<System::MESSAGE>("[BDHI::FIB] Self mobility: %f", this->getSelfMobility());
+      if(box.boxSize.x != box.boxSize.y || box.boxSize.y != box.boxSize.z || box.boxSize.x != box.boxSize.z){
+	sys->log<System::WARNING>("[BDHI::FCM] Self mobility will be different for non cubic boxes!");
+      }
+
       sys->log<System::MESSAGE>("[BDHI::FIB] Random Finite Diference delta: %e", deltaRFD);
       sys->log<System::MESSAGE>("[BDHI::FIB] dt: %f", dt);
       if(scheme == Scheme::MIDPOINT)
@@ -126,35 +130,22 @@ namespace uammd{
       else if(scheme == Scheme::IMPROVED_MIDPOINT)
 	sys->log<System::MESSAGE>("[BDHI::FIB] Temporal integrator: Improved midpoint");
       int ncells = grid.getNumberCells();
-      try{
-	//Grid velocities, same array is used for real and Fourier space
-      
-	/*The layout of this array is
-	  fx000, fy000, fz000, fx001, fy001, fz001..., fxnnn, fynnn, fznnn. n=ncells-1
-	  When used in real space each f is a real number, whereas in wave space each f will be a complex number.
-	*/
-
-	gridVels.resize(3*ncells, cufftComplex());
-      
-	posOld.resize(numberParticles);
-	random.resize(6*ncells);
-      }
-      catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());	
-      }
+      CudaCheckError();
       //Init rng
       CurandSafeCall(curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT));
       //curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_MT19937);
     
       CurandSafeCall(curandSetPseudoRandomGeneratorSeed(curng, sys->rng().next()));
-      {
+      try{	
 	thrust::device_vector<real> noise(30000);
 	auto noise_ptr = thrust::raw_pointer_cast(noise.data());
 	//Warm cuRNG
 	CurandSafeCall(curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
 	CurandSafeCall(curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
       }
-
+      catch(thrust::system_error &e){
+	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());	
+      }
 
       CufftSafeCall(cufftCreate(&cufft_plan_forward));
       CufftSafeCall(cufftCreate(&cufft_plan_inverse));
@@ -166,7 +157,7 @@ namespace uammd{
       //Required storage for the plans
       size_t cufftWorkSizef = 0, cufftWorkSizei = 0;
       /*Set up cuFFT*/
-      int3 cdtmp = {grid.cellDim.x, grid.cellDim.y, grid.cellDim.z};
+      int3 cdtmp = {grid.cellDim.z, grid.cellDim.y, grid.cellDim.x};
       /*I want to make three 3D FFTs, each one using one of the three interleaved coordinates*/
       CufftSafeCall(cufftMakePlanMany(cufft_plan_forward,
 				      3, &cdtmp.x, /*Three dimensional FFT*/
@@ -206,7 +197,37 @@ namespace uammd{
 				   printUtils::prettySize(cufftWorkSize).c_str());
       }
 
-      cufftWorkArea.resize(cufftWorkSize+1);
+      try{	
+	cufftWorkArea.resize(cufftWorkSize);
+      }
+      catch(thrust::system_error &e){
+	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate cufft work area of size: %s (free memory: %s), with error: %s",
+				   printUtils::prettySize(cufftWorkSize).c_str(),
+				   printUtils::prettySize(free_mem).c_str(),
+				   e.what());
+      }
+
+      try{
+	if(temperature > real(0.0)){
+	  sys->log<System::DEBUG>("[BDHI::FIB] Allocating random");
+	  random.resize(6*ncells);
+	}
+	//Grid velocities, same array is used for real and Fourier space
+      
+	/*The layout of this array is
+	  fx000, fy000, fz000, fx001, fy001, fz001..., fxnnn, fynnn, fznnn. n=ncells-1
+	  When used in real space each f is a real number, whereas in wave space each f will be a complex number.
+	*/
+	sys->log<System::DEBUG>("[BDHI::FIB] Allocating gridVels");
+	gridVels.resize(3*ncells, cufftComplex());
+	sys->log<System::DEBUG>("[BDHI::FIB] Allocating posOld");
+	posOld.resize(numberParticles);
+      }
+      catch(thrust::system_error &e){
+	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());	
+      }
+
+      
       void * d_cufftWorkArea = thrust::raw_pointer_cast(cufftWorkArea.data());
       
       CufftSafeCall(cufftSetWorkArea(cufft_plan_forward, d_cufftWorkArea));

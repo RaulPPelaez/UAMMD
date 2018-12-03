@@ -158,7 +158,8 @@ namespace uammd{
 
       real getSelfMobility(){
 	double rh = 0.91*box.boxSize.x/grid.cellDim.x;
-	return 1.0/(6*M_PI*viscosity*rh)*(1-2.837297*rh/box.boxSize.x);
+	double l = rh/box.boxSize.x;
+	return 1.0/(6*M_PI*viscosity*rh)*(1-2.837297*l+(4.0/3.0)*M_PI*l*l*l-27.4*pow(l,6));
       }
       real getHydrodynamicRadius(){
 	return 0.91*box.boxSize.x/(real)grid.cellDim.x;
@@ -173,7 +174,7 @@ namespace uammd{
       Box box;
       
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
-      thrust::device_vector<real> cufftWorkArea; //Work space for cufft
+      thrust::device_vector<char> cufftWorkArea; //Work space for cufft
 
       //Grid forces/velocities in fourier/real space
       thrust::device_vector<cufftComplex> gridVels; 

@@ -131,8 +131,8 @@
        end if
 
        !Divided by the Stokes force
-       ! write(*,*) x2, 1.d0/(g0)
-       write(*,*) x2, 1.d0/(g0+g1+g2)*(1-2.837297d0*a/lx)
+       ! write(*,*) x2, 1.d0/(g0)  *(1-2.837297d0*a/lx)
+       write(*,*) x2, 1.d0/(g0+g1+g2)
     end do
 
 

@@ -50,10 +50,10 @@ map font 51 to "URWPalladioL-Bold", "URWPalladioL-Bold"
 map font 52 to "URWPalladioL-BoldItalic", "URWPalladioL-BoldItalic"
 map font 53 to "URWPalladioL-Italic", "URWPalladioL-Italic"
 map font 54 to "URWPalladioL-Roman", "URWPalladioL-Roman"
-map font 55 to "Utopia-Bold", "Utopia-Bold"
-map font 56 to "Utopia-BoldItalic", "Utopia-BoldItalic"
-map font 57 to "Utopia-Italic", "Utopia-Italic"
-map font 58 to "Utopia-Regular", "Utopia-Regular"
+map font 67 to "Utopia-Bold", "Utopia-Bold"
+map font 68 to "Utopia-BoldItalic", "Utopia-BoldItalic"
+map font 69 to "Utopia-Italic", "Utopia-Italic"
+map font 70 to "Utopia-Regular", "Utopia-Regular"
 map font 13 to "ZapfDingbats", "ZapfDingbats"
 map color 0 to (255, 255, 255), "white"
 map color 1 to (0, 0, 0), "black"
@@ -90,11 +90,11 @@ timestamp color 1
 timestamp rot 0
 timestamp font 0
 timestamp char size 1.000000
-timestamp def "Tue Nov  6 15:56:21 2018"
+timestamp def "Tue Nov 20 16:51:27 2018"
 with string
     string on
     string loctype view
-    string 0.4, 0.767156862745
+    string 0.3, 0.767156862745
     string color 1
     string rot 0
     string font 0
@@ -147,7 +147,7 @@ g0 fixedpoint xy 0.000000, 0.000000
 g0 fixedpoint format general general
 g0 fixedpoint prec 6, 6
 with g0
-    world 0.101873741969, 0.909792600863, 43.6615360528, 463.005041135
+    world 0.1, 0.9, 70, 1500
     stack world 0, 0, 0, 0
     znorm 1
     view 0.150000, 0.150000, 1.150000, 0.850000
@@ -221,7 +221,7 @@ with g0
     yaxis  bar color 1
     yaxis  bar linestyle 1
     yaxis  bar linewidth 2.0
-    yaxis  label "M\s0\N/v"
+    yaxis  label "M\s0\N/v[0]"
     yaxis  label layout para
     yaxis  label place auto
     yaxis  label char size 2.000000
@@ -269,7 +269,7 @@ with g0
     altyaxis  off
     legend on
     legend loctype view
-    legend 0.85, 0.8
+    legend 0.8, 0.8
     legend box color 1
     legend box pattern 1
     legend box linewidth 2.0
@@ -292,21 +292,21 @@ with g0
     frame background pattern 0
     s0 hidden false
     s0 type xy
-    s0 symbol 0
-    s0 symbol size 0.280000
-    s0 symbol color 1
+    s0 symbol 1
+    s0 symbol size 0.300000
+    s0 symbol color 3
     s0 symbol pattern 1
-    s0 symbol fill color 1
-    s0 symbol fill pattern 0
+    s0 symbol fill color 3
+    s0 symbol fill pattern 1
     s0 symbol linewidth 2.0
     s0 symbol linestyle 1
     s0 symbol char 65
     s0 symbol char font 0
     s0 symbol skip 0
-    s0 line type 1
+    s0 line type 0
     s0 line linestyle 1
-    s0 line linewidth 3.0
-    s0 line color 1
+    s0 line linewidth 2.0
+    s0 line color 3
     s0 line pattern 1
     s0 baseline type 0
     s0 baseline off
@@ -328,7 +328,7 @@ with g0
     s0 avalue offset 0.000000 , 0.000000
     s0 errorbar on
     s0 errorbar place both
-    s0 errorbar color 1
+    s0 errorbar color 3
     s0 errorbar pattern 1
     s0 errorbar size 0.280000
     s0 errorbar linewidth 2.0
@@ -337,23 +337,23 @@ with g0
     s0 errorbar riser linestyle 1
     s0 errorbar riser clip off
     s0 errorbar riser clip length 0.100000
-    s0 comment "theo"
-    s0 legend  "ewaldSumRPY.f90"
+    s0 comment "/tmp/grace-lWOMOZ"
+    s0 legend  "UAMMD"
     s1 hidden false
     s1 type xy
-    s1 symbol 1
-    s1 symbol size 0.200000
+    s1 symbol 0
+    s1 symbol size 0.280000
     s1 symbol color 2
     s1 symbol pattern 1
     s1 symbol fill color 2
-    s1 symbol fill pattern 1
+    s1 symbol fill pattern 0
     s1 symbol linewidth 2.0
     s1 symbol linestyle 1
     s1 symbol char 65
     s1 symbol char font 0
     s1 symbol skip 0
     s1 line type 1
-    s1 line linestyle 1
+    s1 line linestyle 3
     s1 line linewidth 2.0
     s1 line color 2
     s1 line pattern 1
@@ -386,5 +386,54 @@ with g0
     s1 errorbar riser linestyle 1
     s1 errorbar riser clip off
     s1 errorbar riser clip length 0.100000
-    s1 comment "0.100000.pvsvel"
-    s1 legend  "FIB"
+    s1 comment "theo"
+    s1 legend  "ewaldSumRPY.f90"
+    s2 hidden false
+    s2 type xy
+    s2 symbol 0
+    s2 symbol size 0.280000
+    s2 symbol color 1
+    s2 symbol pattern 1
+    s2 symbol fill color 1
+    s2 symbol fill pattern 0
+    s2 symbol linewidth 2.0
+    s2 symbol linestyle 1
+    s2 symbol char 65
+    s2 symbol char font 0
+    s2 symbol skip 0
+    s2 line type 1
+    s2 line linestyle 3
+    s2 line linewidth 2.0
+    s2 line color 1
+    s2 line pattern 1
+    s2 baseline type 0
+    s2 baseline off
+    s2 dropline off
+    s2 fill type 0
+    s2 fill rule 0
+    s2 fill color 1
+    s2 fill pattern 1
+    s2 avalue off
+    s2 avalue type 2
+    s2 avalue char size 1.000000
+    s2 avalue font 0
+    s2 avalue color 1
+    s2 avalue rot 0
+    s2 avalue format general
+    s2 avalue prec 3
+    s2 avalue prepend ""
+    s2 avalue append ""
+    s2 avalue offset 0.000000 , 0.000000
+    s2 errorbar on
+    s2 errorbar place both
+    s2 errorbar color 1
+    s2 errorbar pattern 1
+    s2 errorbar size 0.280000
+    s2 errorbar linewidth 2.0
+    s2 errorbar linestyle 1
+    s2 errorbar riser linewidth 2.0
+    s2 errorbar riser linestyle 1
+    s2 errorbar riser clip off
+    s2 errorbar riser clip length 0.100000
+    s2 comment "/tmp/grace-0eyJGV"
+    s2 legend  "UnboundedFCM"

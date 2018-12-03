@@ -90,27 +90,17 @@ timestamp color 1
 timestamp rot 0
 timestamp font 0
 timestamp char size 1.000000
-timestamp def "Wed Nov 28 13:17:01 2018"
+timestamp def "Wed Nov 28 12:27:35 2018"
 with string
     string on
     string loctype view
-    string 0.296568627451, 0.205882352941
+    string 0.189950980392, 0.881887254903
     string color 1
     string rot 0
     string font 0
     string just 0
     string char size 1.000000
-    string def "M0=1/(6\xp\0\xh\0R\sh\N)·(1-2.837R\sh\N/L+(4\xp\0/3)(R\sh\N/L)\S3\N-27.4(R\sh\N/L)\S6\N)\n\n"
-with string
-    string on
-    string loctype view
-    string 0.933823529411, 0.660539215687
-    string color 1
-    string rot 0
-    string font 0
-    string just 0
-    string char size 1.500000
-    string def "\xab\0"
+    string def "D\s0\N=kT/(6·\xph\0R\sh\N)·(1-2.837R\sh\N/L+(4/3)\xp\0(R\sh\N/L)\S3\N -27.4(R\sh\N/L)\S6\N)"
 r0 off
 link r0 to g0
 r0 type above
@@ -157,20 +147,20 @@ g0 fixedpoint xy 0.000000, 0.000000
 g0 fixedpoint format general general
 g0 fixedpoint prec 6, 6
 with g0
-    world 5.01187234, 1e-07, 150, 0.001
+    world 0.740752723429, 0.987350279508, 133.383593607, 1.01542391853
     stack world 0, 0, 0, 0
     znorm 1
-    view 0.261029, 0.150000, 1.150000, 0.852941
+    view 0.207108, 0.150000, 1.150000, 0.850490
     title ""
     title font 0
     title size 1.500000
     title color 1
-    subtitle "Only diagonal terms should be non zero"
+    subtitle ""
     subtitle font 0
     subtitle size 1.000000
     subtitle color 1
-    xaxes scale Logarithmic
-    yaxes scale Logarithmic
+    xaxes scale Normal
+    yaxes scale Normal
     xaxes invert off
     yaxes invert off
     xaxis  on
@@ -180,7 +170,7 @@ with g0
     xaxis  bar color 1
     xaxis  bar linestyle 1
     xaxis  bar linewidth 2.0
-    xaxis  label "Box size (R\sh\N)"
+    xaxis  label "Box Size [R\sh\N]"
     xaxis  label layout para
     xaxis  label place auto
     xaxis  label char size 1.750000
@@ -188,8 +178,8 @@ with g0
     xaxis  label color 1
     xaxis  label place normal
     xaxis  tick on
-    xaxis  tick major 2
-    xaxis  tick minor ticks 9
+    xaxis  tick major 20
+    xaxis  tick minor ticks 1
     xaxis  tick default 6
     xaxis  tick place rounded true
     xaxis  tick in
@@ -204,8 +194,8 @@ with g0
     xaxis  tick minor grid off
     xaxis  tick minor size 0.500000
     xaxis  ticklabel on
-    xaxis  ticklabel format decimal
-    xaxis  ticklabel prec 0
+    xaxis  ticklabel format general
+    xaxis  ticklabel prec 5
     xaxis  ticklabel formula ""
     xaxis  ticklabel append ""
     xaxis  ticklabel prepend ""
@@ -219,7 +209,7 @@ with g0
     xaxis  ticklabel start 0.000000
     xaxis  ticklabel stop type auto
     xaxis  ticklabel stop 0.000000
-    xaxis  ticklabel char size 1.500000
+    xaxis  ticklabel char size 1.750000
     xaxis  ticklabel font 0
     xaxis  ticklabel color 1
     xaxis  tick place both
@@ -231,7 +221,7 @@ with g0
     yaxis  bar color 1
     yaxis  bar linestyle 1
     yaxis  bar linewidth 2.0
-    yaxis  label "M\s\xab\0\N(r=0, L)/M\s0\N"
+    yaxis  label "D\smeasured\N/D\s0\N"
     yaxis  label layout para
     yaxis  label place auto
     yaxis  label char size 1.750000
@@ -239,8 +229,8 @@ with g0
     yaxis  label color 1
     yaxis  label place normal
     yaxis  tick on
-    yaxis  tick major 10
-    yaxis  tick minor ticks 9
+    yaxis  tick major 0.005
+    yaxis  tick minor ticks 1
     yaxis  tick default 6
     yaxis  tick place rounded true
     yaxis  tick in
@@ -255,8 +245,8 @@ with g0
     yaxis  tick minor grid off
     yaxis  tick minor size 0.500000
     yaxis  ticklabel on
-    yaxis  ticklabel format power
-    yaxis  ticklabel prec 0
+    yaxis  ticklabel format general
+    yaxis  ticklabel prec 5
     yaxis  ticklabel formula ""
     yaxis  ticklabel append ""
     yaxis  ticklabel prepend ""
@@ -270,7 +260,7 @@ with g0
     yaxis  ticklabel start 0.000000
     yaxis  ticklabel stop type auto
     yaxis  ticklabel stop 0.000000
-    yaxis  ticklabel char size 1.500000
+    yaxis  ticklabel char size 1.750000
     yaxis  ticklabel font 0
     yaxis  ticklabel color 1
     yaxis  tick place both
@@ -279,7 +269,7 @@ with g0
     altyaxis  off
     legend on
     legend loctype view
-    legend 1, 0.8
+    legend 0.85, 0.8
     legend box color 1
     legend box pattern 1
     legend box linewidth 2.0
@@ -287,7 +277,7 @@ with g0
     legend box fill color 0
     legend box fill pattern 1
     legend font 0
-    legend char size 1.250000
+    legend char size 1.500000
     legend color 1
     legend length 4
     legend vgap 1
@@ -302,8 +292,8 @@ with g0
     frame background pattern 0
     s0 hidden false
     s0 type xy
-    s0 symbol 8
-    s0 symbol size 1.280000
+    s0 symbol 1
+    s0 symbol size 1.030000
     s0 symbol color 1
     s0 symbol pattern 1
     s0 symbol fill color 1
@@ -347,15 +337,15 @@ with g0
     s0 errorbar riser linestyle 1
     s0 errorbar riser clip off
     s0 errorbar riser clip length 0.100000
-    s0 comment "0.1"
-    s0 legend  "xx"
+    s0 comment "kk"
+    s0 legend  "x"
     s1 hidden false
     s1 type xy
-    s1 symbol 6
-    s1 symbol size 0.780000
-    s1 symbol color 6
+    s1 symbol 2
+    s1 symbol size 1.030000
+    s1 symbol color 2
     s1 symbol pattern 1
-    s1 symbol fill color 6
+    s1 symbol fill color 2
     s1 symbol fill pattern 1
     s1 symbol linewidth 2.0
     s1 symbol linestyle 1
@@ -365,7 +355,7 @@ with g0
     s1 line type 0
     s1 line linestyle 1
     s1 line linewidth 2.0
-    s1 line color 6
+    s1 line color 2
     s1 line pattern 1
     s1 baseline type 0
     s1 baseline off
@@ -387,7 +377,7 @@ with g0
     s1 avalue offset 0.000000 , 0.000000
     s1 errorbar on
     s1 errorbar place both
-    s1 errorbar color 6
+    s1 errorbar color 2
     s1 errorbar pattern 1
     s1 errorbar size 0.280000
     s1 errorbar linewidth 2.0
@@ -396,15 +386,15 @@ with g0
     s1 errorbar riser linestyle 1
     s1 errorbar riser clip off
     s1 errorbar riser clip length 0.100000
-    s1 comment "results/selfMobilityCubicBox.test"
-    s1 legend  "xy"
+    s1 comment "kk"
+    s1 legend  "y"
     s2 hidden false
     s2 type xy
-    s2 symbol 5
-    s2 symbol size 0.780000
-    s2 symbol color 5
+    s2 symbol 3
+    s2 symbol size 1.030000
+    s2 symbol color 3
     s2 symbol pattern 1
-    s2 symbol fill color 5
+    s2 symbol fill color 3
     s2 symbol fill pattern 1
     s2 symbol linewidth 2.0
     s2 symbol linestyle 1
@@ -414,7 +404,7 @@ with g0
     s2 line type 0
     s2 line linestyle 1
     s2 line linewidth 2.0
-    s2 line color 5
+    s2 line color 3
     s2 line pattern 1
     s2 baseline type 0
     s2 baseline off
@@ -436,7 +426,7 @@ with g0
     s2 avalue offset 0.000000 , 0.000000
     s2 errorbar on
     s2 errorbar place both
-    s2 errorbar color 5
+    s2 errorbar color 3
     s2 errorbar pattern 1
     s2 errorbar size 0.280000
     s2 errorbar linewidth 2.0
@@ -445,299 +435,5 @@ with g0
     s2 errorbar riser linestyle 1
     s2 errorbar riser clip off
     s2 errorbar riser clip length 0.100000
-    s2 comment "results/selfMobilityCubicBox.test"
-    s2 legend  "xz"
-    s3 hidden false
-    s3 type xy
-    s3 symbol 4
-    s3 symbol size 0.780000
-    s3 symbol color 4
-    s3 symbol pattern 1
-    s3 symbol fill color 4
-    s3 symbol fill pattern 1
-    s3 symbol linewidth 2.0
-    s3 symbol linestyle 1
-    s3 symbol char 65
-    s3 symbol char font 0
-    s3 symbol skip 0
-    s3 line type 0
-    s3 line linestyle 1
-    s3 line linewidth 2.0
-    s3 line color 4
-    s3 line pattern 1
-    s3 baseline type 0
-    s3 baseline off
-    s3 dropline off
-    s3 fill type 0
-    s3 fill rule 0
-    s3 fill color 1
-    s3 fill pattern 1
-    s3 avalue off
-    s3 avalue type 2
-    s3 avalue char size 1.000000
-    s3 avalue font 0
-    s3 avalue color 1
-    s3 avalue rot 0
-    s3 avalue format general
-    s3 avalue prec 3
-    s3 avalue prepend ""
-    s3 avalue append ""
-    s3 avalue offset 0.000000 , 0.000000
-    s3 errorbar on
-    s3 errorbar place both
-    s3 errorbar color 4
-    s3 errorbar pattern 1
-    s3 errorbar size 0.280000
-    s3 errorbar linewidth 2.0
-    s3 errorbar linestyle 1
-    s3 errorbar riser linewidth 2.0
-    s3 errorbar riser linestyle 1
-    s3 errorbar riser clip off
-    s3 errorbar riser clip length 0.100000
-    s3 comment "results/selfMobilityCubicBox.test"
-    s3 legend  "yx"
-    s4 hidden false
-    s4 type xy
-    s4 symbol 9
-    s4 symbol size 1.110000
-    s4 symbol color 2
-    s4 symbol pattern 1
-    s4 symbol fill color 2
-    s4 symbol fill pattern 1
-    s4 symbol linewidth 2.0
-    s4 symbol linestyle 1
-    s4 symbol char 65
-    s4 symbol char font 0
-    s4 symbol skip 0
-    s4 line type 0
-    s4 line linestyle 1
-    s4 line linewidth 2.0
-    s4 line color 2
-    s4 line pattern 1
-    s4 baseline type 0
-    s4 baseline off
-    s4 dropline off
-    s4 fill type 0
-    s4 fill rule 0
-    s4 fill color 1
-    s4 fill pattern 1
-    s4 avalue off
-    s4 avalue type 2
-    s4 avalue char size 1.000000
-    s4 avalue font 0
-    s4 avalue color 1
-    s4 avalue rot 0
-    s4 avalue format general
-    s4 avalue prec 3
-    s4 avalue prepend ""
-    s4 avalue append ""
-    s4 avalue offset 0.000000 , 0.000000
-    s4 errorbar on
-    s4 errorbar place both
-    s4 errorbar color 2
-    s4 errorbar pattern 1
-    s4 errorbar size 0.280000
-    s4 errorbar linewidth 2.0
-    s4 errorbar linestyle 1
-    s4 errorbar riser linewidth 2.0
-    s4 errorbar riser linestyle 1
-    s4 errorbar riser clip off
-    s4 errorbar riser clip length 0.100000
-    s4 comment "results/selfMobilityCubicBox.test"
-    s4 legend  "yy"
-    s5 hidden false
-    s5 type xy
-    s5 symbol 7
-    s5 symbol size 0.780000
-    s5 symbol color 7
-    s5 symbol pattern 1
-    s5 symbol fill color 7
-    s5 symbol fill pattern 1
-    s5 symbol linewidth 2.0
-    s5 symbol linestyle 1
-    s5 symbol char 65
-    s5 symbol char font 0
-    s5 symbol skip 0
-    s5 line type 0
-    s5 line linestyle 1
-    s5 line linewidth 2.0
-    s5 line color 7
-    s5 line pattern 1
-    s5 baseline type 0
-    s5 baseline off
-    s5 dropline off
-    s5 fill type 0
-    s5 fill rule 0
-    s5 fill color 1
-    s5 fill pattern 1
-    s5 avalue off
-    s5 avalue type 2
-    s5 avalue char size 1.000000
-    s5 avalue font 0
-    s5 avalue color 1
-    s5 avalue rot 0
-    s5 avalue format general
-    s5 avalue prec 3
-    s5 avalue prepend ""
-    s5 avalue append ""
-    s5 avalue offset 0.000000 , 0.000000
-    s5 errorbar on
-    s5 errorbar place both
-    s5 errorbar color 7
-    s5 errorbar pattern 1
-    s5 errorbar size 0.280000
-    s5 errorbar linewidth 2.0
-    s5 errorbar linestyle 1
-    s5 errorbar riser linewidth 2.0
-    s5 errorbar riser linestyle 1
-    s5 errorbar riser clip off
-    s5 errorbar riser clip length 0.100000
-    s5 comment "results/selfMobilityCubicBox.test"
-    s5 legend  "yz"
-    s6 hidden false
-    s6 type xy
-    s6 symbol 8
-    s6 symbol size 0.780000
-    s6 symbol color 8
-    s6 symbol pattern 1
-    s6 symbol fill color 8
-    s6 symbol fill pattern 1
-    s6 symbol linewidth 2.0
-    s6 symbol linestyle 1
-    s6 symbol char 65
-    s6 symbol char font 0
-    s6 symbol skip 0
-    s6 line type 0
-    s6 line linestyle 1
-    s6 line linewidth 2.0
-    s6 line color 8
-    s6 line pattern 1
-    s6 baseline type 0
-    s6 baseline off
-    s6 dropline off
-    s6 fill type 0
-    s6 fill rule 0
-    s6 fill color 1
-    s6 fill pattern 1
-    s6 avalue off
-    s6 avalue type 2
-    s6 avalue char size 1.000000
-    s6 avalue font 0
-    s6 avalue color 1
-    s6 avalue rot 0
-    s6 avalue format general
-    s6 avalue prec 3
-    s6 avalue prepend ""
-    s6 avalue append ""
-    s6 avalue offset 0.000000 , 0.000000
-    s6 errorbar on
-    s6 errorbar place both
-    s6 errorbar color 8
-    s6 errorbar pattern 1
-    s6 errorbar size 0.280000
-    s6 errorbar linewidth 2.0
-    s6 errorbar linestyle 1
-    s6 errorbar riser linewidth 2.0
-    s6 errorbar riser linestyle 1
-    s6 errorbar riser clip off
-    s6 errorbar riser clip length 0.100000
-    s6 comment "results/selfMobilityCubicBox.test"
-    s6 legend  "zx"
-    s7 hidden false
-    s7 type xy
-    s7 symbol 9
-    s7 symbol size 0.780000
-    s7 symbol color 9
-    s7 symbol pattern 1
-    s7 symbol fill color 9
-    s7 symbol fill pattern 1
-    s7 symbol linewidth 2.0
-    s7 symbol linestyle 1
-    s7 symbol char 65
-    s7 symbol char font 0
-    s7 symbol skip 0
-    s7 line type 0
-    s7 line linestyle 1
-    s7 line linewidth 2.0
-    s7 line color 9
-    s7 line pattern 1
-    s7 baseline type 0
-    s7 baseline off
-    s7 dropline off
-    s7 fill type 0
-    s7 fill rule 0
-    s7 fill color 1
-    s7 fill pattern 1
-    s7 avalue off
-    s7 avalue type 2
-    s7 avalue char size 1.000000
-    s7 avalue font 0
-    s7 avalue color 1
-    s7 avalue rot 0
-    s7 avalue format general
-    s7 avalue prec 3
-    s7 avalue prepend ""
-    s7 avalue append ""
-    s7 avalue offset 0.000000 , 0.000000
-    s7 errorbar on
-    s7 errorbar place both
-    s7 errorbar color 9
-    s7 errorbar pattern 1
-    s7 errorbar size 0.280000
-    s7 errorbar linewidth 2.0
-    s7 errorbar linestyle 1
-    s7 errorbar riser linewidth 2.0
-    s7 errorbar riser linestyle 1
-    s7 errorbar riser clip off
-    s7 errorbar riser clip length 0.100000
-    s7 comment "results/selfMobilityCubicBox.test"
-    s7 legend  "zy"
-    s8 hidden false
-    s8 type xy
-    s8 symbol 1
-    s8 symbol size 0.510000
-    s8 symbol color 3
-    s8 symbol pattern 1
-    s8 symbol fill color 3
-    s8 symbol fill pattern 1
-    s8 symbol linewidth 2.0
-    s8 symbol linestyle 1
-    s8 symbol char 65
-    s8 symbol char font 0
-    s8 symbol skip 0
-    s8 line type 0
-    s8 line linestyle 1
-    s8 line linewidth 2.0
-    s8 line color 3
-    s8 line pattern 1
-    s8 baseline type 0
-    s8 baseline off
-    s8 dropline off
-    s8 fill type 0
-    s8 fill rule 0
-    s8 fill color 1
-    s8 fill pattern 1
-    s8 avalue off
-    s8 avalue type 2
-    s8 avalue char size 1.000000
-    s8 avalue font 0
-    s8 avalue color 1
-    s8 avalue rot 0
-    s8 avalue format general
-    s8 avalue prec 3
-    s8 avalue prepend ""
-    s8 avalue append ""
-    s8 avalue offset 0.000000 , 0.000000
-    s8 errorbar on
-    s8 errorbar place both
-    s8 errorbar color 3
-    s8 errorbar pattern 1
-    s8 errorbar size 0.280000
-    s8 errorbar linewidth 2.0
-    s8 errorbar linestyle 1
-    s8 errorbar riser linewidth 2.0
-    s8 errorbar riser linestyle 1
-    s8 errorbar riser clip off
-    s8 errorbar riser clip length 0.100000
-    s8 comment "results/selfMobilityCubicBox.test"
-    s8 legend  "zz"
+    s2 comment "kk"
+    s2 legend  "z"
