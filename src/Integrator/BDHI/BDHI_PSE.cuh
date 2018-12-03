@@ -145,7 +145,7 @@ namespace uammd{
       real3 m, eta; // kernel width and gaussian splitting in each direction
 
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
-      thrust::device_vector<real> cufftWorkArea; //Work space for cufft
+      thrust::device_vector<char> cufftWorkArea; //Work space for cufft
       
       thrust::device_vector<cufftComplex> gridVelsFourier; //Interpolated grid forces/velocities in fourier space
       thrust::device_vector<real3> fourierFactor;  // Fourier scaing factors to go from F to V in wave space

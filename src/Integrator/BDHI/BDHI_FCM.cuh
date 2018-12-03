@@ -87,7 +87,7 @@ namespace uammd{
       real sigma; //Gaussian kernel std
       
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
-      thrust::device_vector<real> cufftWorkArea; //Work space for cufft
+      thrust::device_vector<char> cufftWorkArea; //Work space for cufft
       
       thrust::device_vector<cufftComplex> gridVelsFourier; //Interpolated grid forces/velocities in fourier/real space
 
