@@ -206,7 +206,7 @@ namespace uammd{
 				   printUtils::prettySize(cufftWorkSize).c_str());
       }
 
-      cufftWorkArea.resize(cufftWorkSize/sizeof(real)+1);
+      cufftWorkArea.resize(cufftWorkSize+1);
       auto d_cufftWorkArea = thrust::raw_pointer_cast(cufftWorkArea.data());
       
       CufftSafeCall(cufftSetWorkArea(cufft_plan_forward, (void*)d_cufftWorkArea));
