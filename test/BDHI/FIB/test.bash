@@ -178,13 +178,33 @@ function noiseVariance {
     mv noiseVariance.test uammd.noiseVariance.log $resultsFolder/
 }
 
-#pairMobilityCubicBox
-#./fib pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1 
-#selfMobilityCubicBox
-#selfMobility_q2D
-#selfDiffusionCubicBox
-selfDiffusion_q2D
-#noiseVariance
+function radialDistributionFunction {
+    echo "Radial Distribution Function"
+    ./fib radialDistributionFunction $temperature $viscosity $hydrodynamicRadius $tolerance > uammd.radialDistributionFunction.log 2>&1
 
+    if ! ls tools/rdf >/dev/null 2>&1
+    then
+	cd tools
+	git clone https://github.com/RaulPPelaez/RadialDistributionFunction
+	cd RadialDistributionFunction
+	mkdir build; cd build; cmake ..; make; cd ..	
+	cp build/bin/rdf ../
+	cd ..
+	cd ..
+    fi
+
+    cat rdf.pos | tools/rdf -N 16384 -Nsnapshots 1000 -L 32 -nbins 100 -fixBIAS -rcut 1 > results/rdf.dat
+    mv rdf.pos uammd.*.log  results/
+}
+
+    
+pairMobilityCubicBox
+#./fib pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1 
+selfMobilityCubicBox
+selfMobility_q2D
+selfDiffusionCubicBox
+selfDiffusion_q2D
+noiseVariance
+radialDistributionFunction
 
 rm -f fit.log

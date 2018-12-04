@@ -479,6 +479,54 @@ void noiseVariance_test(){
 }
 
 
+void radialDistributionFunction_test(){
+  auto sys = make_shared<System>();
+  sys->rng().setSeed(0x33dbff9f235ab^time(NULL));
+  for(int i=0; i<10000; i++) sys->rng().next();
+  int N = 8192*2;
+  double L = 32;
+  
+  auto pd = make_shared<ParticleData>(N, sys);
+  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
+  Box box(L);
+  BDHI::FIB::Parameters par;
+  par.temperature = temperature;
+  par.viscosity = viscosity;
+  par.hydrodynamicRadius = rh;
+  par.dt = 0.01;
+  par.box = box;
+  
+  
+  auto bdhi = make_shared<BDHI::FIB>(pd, pg, sys, par);
+  
+  
+  std::ofstream out("rdf.pos");
+  {
+    auto pos = pd->getPos(access::location::cpu, access::mode::write);
+    fori(0, pd->getNumParticles()){
+      pos.raw()[i] = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5))*L, 0);
+    }
+  }
+
+  int nsteps = 1000000;
+  int printSteps = 1000;
+  fori(0,nsteps){
+    bdhi->forwardTime();
+    if(i%printSteps == 0){
+      auto pos = pd->getPos(access::location::cpu, access::mode::read);
+      real4 *p = pos.raw();
+      out<<"#"<<endl;
+      forj(0,pd->getNumParticles()){
+	out<<std::setprecision(15)<<make_real3(p[j])<<"\n";
+      }
+    }
+  }
+
+  sys->finish();
+  
+  
+}
 using namespace std;
 int main( int argc, char *argv[]){
 
@@ -503,5 +551,6 @@ int main( int argc, char *argv[]){
   if(strcmp(argv[1], "selfDiffusionCubicBox")==0) selfDiffusionCubicBox_test();
   if(strcmp(argv[1], "selfDiffusion_q2D")==0) selfDiffusion_q2D_test();
   if(strcmp(argv[1], "noiseVariance")==0) noiseVariance_test();
+  if(strcmp(argv[1], "radialDistributionFunction")==0) radialDistributionFunction_test();
   return 0;
 }
