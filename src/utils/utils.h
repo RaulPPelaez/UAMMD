@@ -85,10 +85,13 @@ public:
   double3 uniform3(double min, double max){
     return {uniform(min, max), uniform(min, max), uniform(min, max)};
   }
+  double2 uniform2(double min, double max){
+    return {uniform(min, max), uniform(min, max)};
+  }
   
   double gaussian(double mean, double std){
 
-    const double pi2 = 2.0*M_PI;
+    constexpr double pi2 = 2.0*M_PI;
 
     static double z0, z1;
     static bool generate = false;
@@ -113,6 +116,12 @@ public:
     return make_double3(gaussian(mean, std),
 			gaussian(mean, std),
 			gaussian(mean, std));		      
+  }
+
+  double2 gaussian2(double mean, double std){
+    return make_double2(gaussian(mean, std),
+			gaussian(mean, std));
+		
   }
 
   void setSeed(uint64_t s0, uint64_t s1){
