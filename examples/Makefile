@@ -1,14 +1,14 @@
 
 #The target CUDA compute capability(s), if not set it will be autodetected
 #ARCH ?= 30 35 50 52 60 61
-ARCH=52
+ARCH=
 
 #Uncomment to compile in double precision mode, single by default
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
-CXX=clang++-5.0
-#CXX=g++
+#CXX=clang++-5.0
+CXX=g++
 
 #Cuda version (assumed to be in /usr/local/cuda*) You can change this in CUDA_ROOT
 #If not set it will be autodetected
@@ -42,9 +42,9 @@ endif
 
 INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../src -I ../src/third_party
 OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
-BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets
+BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets -lineinfo -src-in-ptx
 
-all: test
+all: 
 	$(BASIC_LINE)  $(FILE)
 
 test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt fcm
@@ -69,6 +69,9 @@ bdhi:
 
 pse:
 	$(BASIC_LINE) PSE.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o pse
+
+logo:
+	$(BASIC_LINE) logo.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o logo
 
 fcm:
 	$(BASIC_LINE) FCM.cu  -lcufft  -o fcm
