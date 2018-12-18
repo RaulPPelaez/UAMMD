@@ -14,11 +14,11 @@ REFERENCES:
 #ifndef IBMKERNELS_CUH
 #define IBMKERNELS_CUH
 namespace uammd{
-  namespace IBM{
-      
-    namespace PeskinKernel{	
-      //Standard 3-point Peskin interpolator
+  namespace IBM{      
+    namespace PeskinKernel{
       //[1] Charles S. Peskin. The immersed boundary method (2002). DOI: 10.1017/S0962492902000077
+      
+      //Standard 3-point Peskin interpolator
       struct threePoint{
 	real3 invh;
 	static constexpr int support = 3;
@@ -41,9 +41,29 @@ namespace uammd{
 	}
 	  
       };
-    }
 
-      
+      //Standard 4-point Peskin interpolator
+      struct fourPoint{
+	real3 invh;
+	static constexpr int support = 4;
+	fourPoint(real3 h):invh(1.0/h){}
+	inline __device__ real phi(real r) const{
+	  constexpr real onediv8 = real(0.125);
+	  if(r<real(1.0)){
+	    return onediv8*(real(3.0) - real(2.0)*r + sqrt(real(1.0)+real(4.0)*r*(real(1.0)-r)));
+	  }
+	  else if(r<real(2.0)){
+	    return onediv8*(real(5.0) - real(2.0)*r - sqrt(real(-7.0) + real(12.0)*r-real(4.0)*r*r));
+	  }
+	  else return 0;
+	}
+	inline __device__ real delta(real3 rvec) const{	    
+	  return invh.x*invh.y*invh.z*phi(fabs(rvec.x*invh.x))*phi(fabs(rvec.y*invh.y))*phi(fabs(rvec.z*invh.z));
+	}
+	  
+      };
+    }
+    
     namespace GaussianFlexible{
       //[1] Yuanxun Bao, Jason Kaye and Charles S. Peskin. A Gaussian-like immersed-boundary kernel with three continuous derivatives and improved translational invariance. http://dx.doi.org/10.1016/j.jcp.2016.04.024
       //Adapted from https://github.com/stochasticHydroTools/IBMethod/
@@ -117,7 +137,6 @@ namespace uammd{
 	}
 
       };
-
     }
 
   }
