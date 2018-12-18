@@ -11,7 +11,7 @@ Given a certain box and a number of cells, subdivides the box in that number of 
 
 #include "Box.cuh"
 #include "vector.cuh"
-
+#include <algorithm>
 namespace uammd{
   
   struct Grid{
@@ -94,6 +94,60 @@ namespace uammd{
     inline __host__ __device__ int getNumberCells() const{ return cellDim.x*cellDim.y*cellDim.z;}
   };
 
+  //Looks for the closest (equal or greater) number of nodes of the form 2^a*3^b*5^c*7^d*11^e
+  int3 nextFFTWiseSize3D(int3 size){
+    int* cdim = &size.x;
+
+    int max_dim = std::max({size.x, size.y, size.z});
+	
+    int n= 14;
+    int n5 = 6; //number higher than this are not reasonable...
+    int n7 = 5;
+    int n11 = 4;
+    auto powint = [](uint64_t base, uint64_t exp){if(exp==0) return uint64_t(1); uint64_t res = base; fori(0,exp-1) res*=base; return res;};
+    
+    std::vector<uint64_t> tmp(n*n*n5*n7*n11, 0);
+    do{
+      tmp.resize(n*n*n5*n7*n11, 0);
+      fori(0,n)forj(0,n)
+	for(int k=0; k<n5;k++)for(int k7=0; k7<n7; k7++)for(int k11=0; k11<n11; k11++){
+	      if(k11>4 or k7>5 or k>6) continue;
+		
+	      uint64_t id = i+n*j+n*n*k+n*n*n5*k7+n*n*n5*n7*k11;
+	      tmp[id] = 0;
+	      //Current fft wise size
+	      uint64_t number = uint64_t(powint(2,i))*powint(3,j)*powint(5,k)*powint(7, k7);
+	      //This is to prevent overflow
+	      if(i==n-1 and j==n-1 and k==n5-1 and k7==n7-1 and k11<n11-1)
+		number *= powint(11, k11);
+	      else
+		continue;
+	      //The fastest FFTs always have at least a factor of 2
+	      if(i==0) continue;
+	      //I have seen empirically that factors 11 and 7 only works well with at least a factor 2 involved
+	      if((k11>0 && (i==0))) continue;
+	      tmp[id] = number;
+	    }
+      n++;
+      /*Sort this array in ascending order*/
+      std::sort(tmp.begin(), tmp.end());      
+    }while(tmp.back()<max_dim); /*if n is not enough, include more*/
+
+    //I have empirically seen that these sizes produce slower FFTs than they should in several platforms
+    constexpr uint64_t forbiddenSizes [] = {28, 98, 150, 154, 162, 196, 242};
+    /*Now look for the nearest value in tmp that is greater than each cell dimension and it is not forbidden*/
+    forj(0,3){
+      fori(0, tmp.size()){	    
+	if(tmp[i]<uint64_t(cdim[j])) continue;
+	for(int k =0;k<sizeof(forbiddenSizes)/sizeof(uint64_t); k++) if(tmp[i] == forbiddenSizes[k]) continue;
+	int set = int(tmp[i]);
+	if(tmp[i]>=powint(2,31)) set = -1;
+	cdim[j] = set;
+	break;
+      }	   	  
+    }
+    return size;
+  }
 }
 
 #endif
