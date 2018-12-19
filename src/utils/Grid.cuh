@@ -118,7 +118,7 @@ namespace uammd{
 	      //Current fft wise size
 	      uint64_t number = uint64_t(powint(2,i))*powint(3,j)*powint(5,k)*powint(7, k7);
 	      //This is to prevent overflow
-	      if(i==n-1 and j==n-1 and k==n5-1 and k7==n7-1 and k11<n11-1)
+	      if(!(i==n-1 and j==n-1 and k==n5-1 and k7==n7-1 and k11<n11-1))
 		number *= powint(11, k11);
 	      else
 		continue;
