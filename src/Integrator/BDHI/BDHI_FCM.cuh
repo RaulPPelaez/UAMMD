@@ -13,6 +13,7 @@
 #define BDHI_FCM_CUH
 
 #include "BDHI.cuh"
+#include "FIB/IBM_kernels.cuh"
 #include "utils/utils.h"
 #include "global/defines.h"
 #include<cufft.h>
@@ -43,11 +44,35 @@ namespace uammd{
       inline __device__ __host__ void operator+=(cufftComplex3 &a, const cufftComplex3 &b){
 	a.x += b.x; a.y += b.y; a.z += b.z;
       }
+     
+
+      struct GaussianKernel{
+        int support;
+	real prefactor;
+	real tau;	
+	GaussianKernel(real3 h){
+	  //eq. 8 in [1], \sigma_\Delta
+	  real sigma = 1/sqrt(M_PI); //hydrodynamic radius is sqrt(M_PI)*sigma;
+	  this->prefactor = pow(2*M_PI*sigma*sigma, -1.5);
+	  this->tau  = -0.5/(sigma*sigma);	  
+	  //According to [1] the Gaussian kernel can be considered 0 beyond 3*a, so P >= 3*a/h
+	  this->support = 2*int(3.0/h.x+0.5)+1;
+	}
+	
+	inline __device__ real delta(real3 rvec) const{	    
+	  return prefactor*exp(tau*dot(rvec, rvec));
+	}
+      };
+
     }
     
+
     class FCM{
     public:
+      using Kernel = FCM_ns::GaussianKernel;
+      //using Kernel = IBM::PeskinKernel::fourPoint;
       using cufftComplex3 = FCM_ns::cufftComplex3;
+      
       struct Parameters: BDHI::Parameters{
 	int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
       };
@@ -81,11 +106,7 @@ namespace uammd{
 
       /****Far (wave space) part) ******/
       Grid grid; /*Wave space Grid parameters*/
-      
-      /*Grid interpolation kernel parameters*/
-      int3 P; //Gaussian spreading/interpolation kernel support points in each direction (total support=2*P+1)*/
-      real sigma; //Gaussian kernel std
-      
+           
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
       

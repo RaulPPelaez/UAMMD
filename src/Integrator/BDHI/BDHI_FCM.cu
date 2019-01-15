@@ -14,54 +14,6 @@
 namespace uammd{
   namespace BDHI{
 
-    namespace FCM_ns{
-      //Looks for the closest (equal or greater) number of nodes of the form 2^a*3^b*5^c*7^d*11^e
-      int3 nextFFTWiseSize3D(int3 size){
-	int* cdim = &size.x;
-
-	int max_dim = std::max({size.x, size.y, size.z});
-	
-	int n= 14;
-	int n5 = 6; //number higher than this are not reasonable...
-	int n7 = 5;
-	int n11 = 4;
-	std::vector<int> tmp(n*n*n5*n7*n11, 0);
-	do{
-	  tmp.resize(n*n*n5*n7*n11, 0);
-	  fori(0,n)forj(0,n)
-	    for(int k=0; k<n5;k++)for(int k7=0; k7<n7; k7++)for(int k11=0; k11<n11; k11++){
-		  if(k11>4 or k7>5 or k>6) continue;
-		
-		  int id = i+n*j+n*n*k+n*n*n5*k7+n*n*n5*n7*k11;
-		  tmp[id] = 0;
-		  //Current fft wise size
-		  int number = pow(2,i)*pow(3,j)*pow(5,k)*pow(7, k7)*pow(11, k11);
-		  //The fastest FFTs always have at least a factor of 2
-		  if(i==0) continue;
-		  //I have seen empirically that factors 11 and 7 only works well with at least a factor 2 involved
-		  if((k11>0 && (i==0))) continue;
-		  tmp[id] = number;
-		}
-	  n++;
-	  /*Sort this array in ascending order*/
-	  std::sort(tmp.begin(), tmp.end());      
-	}while(tmp.back()<max_dim); /*if n is not enough, include more*/
-
-	//I have empirically seen that these sizes produce slower FFTs than they should in several platforms
-	constexpr int forbiddenSizes [] = {28, 98, 150, 154, 162, 196, 242};
-	/*Now look for the nearest value in tmp that is greater than each cell dimension and it is not forbidden*/
-	forj(0,3){
-	  fori(0, tmp.size()){	    
-	    if(tmp[i]<cdim[j]) continue;
-	    for(int k =0;k<sizeof(forbiddenSizes)/sizeof(int); k++) if(tmp[i] == forbiddenSizes[k]) continue;
-	    cdim[j] = tmp[i];
-	    break;
-	  }	   	  
-	}
-	return size;
-      }
-    }
-
     FCM::FCM(shared_ptr<ParticleData> pd,
 	     shared_ptr<ParticleGroup> pg,
 	     shared_ptr<System> sys,
@@ -95,36 +47,24 @@ namespace uammd{
       }
 	
       
-      this->sigma = par.hydrodynamicRadius/sqrt(M_PI); //eq. 8 in [1], \sigma_\Delta
+      real sigma = par.hydrodynamicRadius/sqrt(M_PI); //eq. 8 in [1], \sigma_\Delta
       int3 cellDim;
       if(par.cells.x<=0){
 	double minFactor = 1.5; //According to [1] \sigma_\Delta/H = 1.86 gives enough accuracy
 	real h = sigma/minFactor;
-	cellDim = FCM_ns::nextFFTWiseSize3D(make_int3(box.boxSize/h));
+	//real h = par.hydrodynamicRadius;
+	cellDim = nextFFTWiseSize3D(make_int3(box.boxSize/h));
       }
       else{      
         cellDim = par.cells;
       }
       grid = Grid(box, cellDim);
-      
-      //According to [1] the Gaussian kernel can be considered 0 beyond 3*a, so P >= 3*a/h
-      real supportDistance = 3*par.hydrodynamicRadius;
-      this->P = make_int3(supportDistance/grid.cellSize+0.5); 
-      if(this->P.x < 1 ) this->P = make_int3(1);
-
-      //Ensure the support is less than the grid dimensions, decrease support distance otherwise.
-      while(   2*this->P.x+1 > grid.cellDim.x
-	    or 2*this->P.y+1 > grid.cellDim.y
-	    or 2*this->P.z+1 > grid.cellDim.z){
-	sys->log<System::WARNING>("[BDHI::FCM] Default support of Gaussian kernels (%g) is greater than box size, reducing support to box size!", 2*supportDistance);
-	supportDistance *= 0.9;
-	this->P = make_int3(supportDistance/grid.cellSize+0.5);
-      }
-	
+      	
+      Kernel kernel(grid.cellSize);
       
       sys->log<System::MESSAGE>("[BDHI::FCM] Box Size: %g %g %g", grid.box.boxSize.x, grid.box.boxSize.y, grid.box.boxSize.z);
       sys->log<System::MESSAGE>("[BDHI::FCM] Grid dimensions: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
-      sys->log<System::MESSAGE>("[BDHI::FCM] Gaussian kernel support: %g rh, %d cells", 2*supportDistance, 2*this->P.x+1);      
+      sys->log<System::MESSAGE>("[BDHI::FCM] Interpolation kernel support: %g rh, %d cells", kernel.support*grid.cellSize.x, kernel.support);      
       sys->log<System::MESSAGE>("[BDHI::FCM] σ_Δ: %g", sigma);
       sys->log<System::MESSAGE>("[BDHI::FCM] h: %g %g %g", grid.cellSize.x, grid.cellSize.y, grid.cellSize.z);
       sys->log<System::MESSAGE>("[BDHI::FCM] σ_Δ/h: %g %g %g", sigma*grid.invCellSize.x, sigma*grid.invCellSize.y, sigma*grid.invCellSize.z);
@@ -307,48 +247,44 @@ namespace uammd{
 	i.e. Applies the operator S.
 	Launch a block per particle.
       */
-      template<typename vtype> /*Can take a real3 or a real4*/
+      template<class Kernel, typename vtype> /*Can take a real3 or a real4*/
       __global__ void particles2GridD(const real4 * __restrict__ pos, /*Particle positions*/
 				      const vtype * __restrict__ v,   /*Per particle quantity to spread*/
 				      real3 * __restrict__ gridVels, /*Interpolated values, size ncells*/
 				      int N, /*Number of particles*/
-				      int3 P, /*Gaussian kernel support in each dimension*/
 				      Grid grid, /*Grid information and methods*/
-				      real prefactor,
-				      real tau){
+				      Kernel kernel){
 	const int id = blockIdx.x;
 	const int tid = threadIdx.x;
 	if(id>=N) return;
 
 	/*Get pos and v (i.e force)*/
 	__shared__ real3 pi;
-	__shared__ real3 vi_pf;
+	__shared__ real3 vi;
 	__shared__ int3 celli;
 	if(tid==0){
 	  pi = make_real3(pos[id]);
-	  vi_pf = make_real3(v[id])*prefactor;
+	  vi = make_real3(v[id]);
 	  /*Get my cell*/
 	  celli = grid.getCell(pi);	  
 	}
 	/*Conversion between cell number and cell center position*/
 	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize);
-	const int3 supportCells = 2*P + 1;
-	const int numberNeighbourCells = supportCells.x*supportCells.y*supportCells.z;
-
+	const int supportCells = kernel.support;
+	const int numberNeighbourCells = supportCells*supportCells*supportCells;
+	const int P = supportCells/2;
 	__syncthreads();
 	for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
 	  /*Compute neighbouring cell*/
-	  int3 cellj = make_int3(celli.x + i%supportCells.x - P.x,
-				 celli.y + (i/supportCells.x)%supportCells.y - P.y,
-				 celli.z + i/(supportCells.x*supportCells.y) - P.z );
+	  int3 cellj = make_int3(celli.x + i%supportCells - P,
+				 celli.y + (i/supportCells)%supportCells - P,
+				 celli.z + i/(supportCells*supportCells) - P);
 	  cellj = grid.pbc_cell(cellj);
 	  
 	  /*Distance from particle i to center of cell j*/
-	  const real3 rij = grid.box.apply_pbc(pi-make_real3(cellj)*grid.cellSize-cellPosOffset);	  
-	  const real r2 = dot(rij, rij);
-
+	  const real3 rij = grid.box.apply_pbc(pi-make_real3(cellj)*grid.cellSize-cellPosOffset); 
 	  /*The weight of particle i on cell j*/
-	  const real3 weight = vi_pf*exp(-r2*tau);
+	  const real3 weight = vi*kernel.delta(rij);
 
 	  /*Get index of cell j*/
 	  const int jcell = grid.getCellIndex(cellj);
@@ -359,7 +295,6 @@ namespace uammd{
 	  atomicAdd(&gridVels[jcell].z, weight.z);	  
 	}
       }
-
       
       /*Scales fourier transformed forces in the regular grid to obtain velocities,
 	(Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F	
@@ -577,15 +512,13 @@ namespace uammd{
 	Output: Mv = σ·St·gridVels
 	The first term is computed in forceFourier2Vel and the second in fourierBrownianNoise
       */
-      template<typename vtype>
+      template<class Kernel, typename vtype>
       __global__ void grid2ParticlesD(const real4 * __restrict__ pos,
 				      vtype * __restrict__ Mv, /*Result (i.e Mw·F)*/
 				      const real3 * __restrict__ gridVels, /*Values in the grid*/
 				      int N, /*Number of particles*/
-				      int3 P, /*Gaussian kernel support in each dimension*/
 				      Grid grid, /*Grid information and methods*/				  
-				      real prefactor,
-				      real tau){
+				      Kernel kernel){
 	/*A thread per particle */
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>=N) return;
@@ -595,7 +528,7 @@ namespace uammd{
 	const int3 celli = grid.getCell(pi);
 
 	/*J = S^T = St = σ S*/    
-	prefactor *= (grid.cellSize.x*grid.cellSize.y*grid.cellSize.z);
+	real dV = (grid.cellSize.x*grid.cellSize.y*grid.cellSize.z);
 
 	real3  result = make_real3(0);
 
@@ -603,22 +536,22 @@ namespace uammd{
 	int x,y,z;
 	/*Transform cell number to cell center position*/
 	const real3 cellPosOffset = real(0.5)*(grid.cellSize-grid.box.boxSize);
+	const int P = kernel.support/2;
 	/*Transvers the Pth neighbour cells*/
-	for(z=-P.z; z<=P.z; z++){
+	for(z=-P; z<=P; z++){
 	  cellj.z = grid.pbc_cell_coord<2>(celli.z + z);
-	  for(y=-P.y; y<=P.y; y++){
+	  for(y=-P; y<=P; y++){
 	    cellj.y = grid.pbc_cell_coord<1>(celli.y + y);
-	    for(x=-P.x; x<=P.x; x++){
+	    for(x=-P; x<=P; x++){
 	      cellj.x = grid.pbc_cell_coord<0>(celli.x + x);
 	      /*Get neighbour cell*/	  
 	      const int jcell = grid.getCellIndex(cellj);
 
 	      /*Compute distance to center*/
 	      const real3 rij = grid.box.apply_pbc(pi-make_real3(cellj)*grid.cellSize - cellPosOffset);
-	      const real r2 = dot(rij, rij);
 	      /*Interpolate cell value and sum*/
 	      const real3 cellj_vel = make_real3(gridVels[jcell]);
-	      result += (prefactor*exp(-tau*r2))*cellj_vel;
+	      result += (dV*kernel.delta(rij))*cellj_vel;
 	    }
 	  }
 	}
@@ -635,20 +568,18 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
-      //Gaussian spreading/interpolation kernel parameters, s(r) = prefactor*exp(-tau*r2)           
-      real prefactorGaussian = pow(2*M_PI*sigma*sigma, -1.5);
-      real tau  = 0.5/(sigma*sigma);
       
       sys->log<System::DEBUG2>("[BDHI::FCM] Particles to grid");
-      //Launch a small block per particle
+      Kernel kernel(grid.cellSize);
+      //Launch a small block per particle      
       {
-	int3 support = 2*P+1;
+	int support = kernel.support;
 	int threadsPerParticle = 64;
-	int numberNeighbourCells = support.x*support.y*support.z;
+	int numberNeighbourCells = support*support*support;
 	if(numberNeighbourCells < 64) threadsPerParticle = 32;
 	
 	FCM_ns::particles2GridD<<<numberParticles, threadsPerParticle, 0, st>>>
-	  (pos.raw(), v, d_gridVels, numberParticles, P, grid, prefactorGaussian, tau);
+	  (pos.raw(), v, d_gridVels, numberParticles, grid, kernel);
       }
 
     }
@@ -738,10 +669,6 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
-
-      //Gaussian spreading/interpolation kernel parameters, s(r) = prefactor*exp(-tau*r2)           
-      real prefactorGaussian = pow(2*M_PI*sigma*sigma, -1.5);
-      real tau  = 0.5/(sigma*sigma);
       
       int BLOCKSIZE = 128;
       int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
@@ -751,9 +678,8 @@ namespace uammd{
 	Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
       FCM_ns::grid2ParticlesD<<<Nblocks, Nthreads, 0, st>>>
 	(pos.raw(), Mv, d_gridVels,
-	 numberParticles, P, grid, prefactorGaussian, tau);
+	 numberParticles, grid, Kernel(grid.cellSize));
     }
-
 
     /*Compute M·F and B·dW in Fourier space
       σ = dx*dy*dz; h^3 in [1]
