@@ -70,6 +70,11 @@
      }
   };
 
+  LIST OF SIGNALS:
+
+  numParticlesChangedSignal() -> int : Triggered when the total number of particles changes
+  reorderSignal() -> void : Triggered when the global sorting of particles changes
+  [PROPERTY]WrittenSignal() -> void: Triggered when PROPERTY has been requested with the write or readwrite flag (notice that the signal is emitted at requesting of the property, so the requester has writing rights
 
   TODO:
   100- Try libsigc++ if boost becomes a problem
@@ -161,8 +166,17 @@ namespace uammd{
     PROPERTY_LOOP(DECLARE_PROPERTIES)
 
     int numberParticles;
-    signal<void(void)> reorderSignal;
-    signal<void(int)> numParticlesChangedSignal;
+    shared_ptr<signal<void(void)>> reorderSignal = std::make_shared<signal<void(void)>>();
+    shared_ptr<signal<void(int)>> numParticlesChangedSignal = std::make_shared<signal<void(int)>>();
+
+//Declare write access signals for all properties
+#define DECLARE_SIGNAL_PROPERTIES_T(type, name) shared_ptr<signal<void(void)>> BOOST_PP_CAT(name,WriteRequestedSignal = std::make_shared<signal<void(void)>>();)
+#define DECLARE_SIGNAL_PROPERTIES(r,data, tuple) DECLARE_SIGNAL_PROPERTIES_T(PROPTYPE(tuple), PROPNAME(tuple))
+    //Declare all property write signals
+    PROPERTY_LOOP(DECLARE_SIGNAL_PROPERTIES)
+    
+    
+    
     ParticleSorter particle_sorter;
     thrust::host_vector<int> originalOrderIndexCPU;
     bool originalOrderIndexCPUNeedsUpdate;
@@ -178,8 +192,11 @@ namespace uammd{
     //Generate getters for all properties except ID
 #define GET_PROPERTY_T(Name,name)  GET_PROPERTY_R(Name,name)
 #define GET_PROPERTY_R(Name, name)					\
-    inline auto get ## Name(access::location dev, access::mode mode) -> decltype(name.data(dev,mode)){ \
-      if(!name.isAllocated()) name.resize(numberParticles);		\
+  inline auto get ## Name(access::location dev, access::mode mode) -> decltype(name.data(dev,mode)){ \
+    if(!name.isAllocated()) name.resize(numberParticles);		\
+    if(!name.isAllocated() or mode==access::mode::write or mode==access::mode::readwrite){ \
+    (*name ## WriteRequestedSignal)();				\
+    }									\
       return name.data(dev,mode);	                            	\
     }									\
     
@@ -260,25 +277,33 @@ namespace uammd{
       return particle_sorter.getSortedIndexArray(numberParticles);      
     }
   
-    signal<void(void)>* getReorderSignal(){
+
+    shared_ptr<signal<void(void)>> getReorderSignal(){
       sys->log<System::DEBUG>("[ParticleData] Reorder signal requested");  
-      return &this->reorderSignal;
+      return this->reorderSignal;
     }
 
+
+    //Generate getters for all properties except ID
+#define GET_PROPERTY_SIGNAL_T(Name,name)  GET_PROPERTY_SIGNAL_R(Name,name)
+#define GET_PROPERTY_SIGNAL_R(Name, name)				\
+  inline shared_ptr<signal<void(void)>> get ## Name ## WriteRequestedSignal(){ \
+    return this->name ## WriteRequestedSignal;				\
+    }									
+#define GET_PROPERTY_SIGNAL(r, data, tuple) GET_PROPERTY_SIGNAL_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))    
+    PROPERTY_LOOP(GET_PROPERTY_SIGNAL)
+
+          
     void emitReorder(){
       sys->log<System::DEBUG>("[ParticleData] Emitting reorder signal...");
-      this->reorderSignal();
+      (*this->reorderSignal)();
     }
 
-    signal<void(int)>* getNumParticlesChangedSignal(){
-      return &this->numParticlesChangedSignal;
+    shared_ptr<signal<void(int)>> getNumParticlesChangedSignal(){
+      return this->numParticlesChangedSignal;
     }
 
     void changeNumParticles(int Nnew);
-    void emitNumParticlesChanged(int Nnew){
-      numParticlesChangedSignal(Nnew);
-    }
-
     int getNumParticles(){ return this->numberParticles;}
 
 
@@ -289,6 +314,11 @@ namespace uammd{
     hints.hash_cutOff = hash_cutOff;
 
   }
+
+  private:
+    void emitNumParticlesChanged(int Nnew){
+      (*numParticlesChangedSignal)(Nnew);
+    }  
 
   };
 
@@ -372,9 +402,14 @@ namespace uammd{
 #undef PROPERTY_LOOP
 #undef DECLARE_PROPERTIES_T
 #undef DECLARE_PROPERTIES
+#undef DECLARE_SIGNAL_PROPERTIES_T
+#undef DECLARE_SIGNAL_PROPERTIES
 #undef GET_PROPERTY_T
 #undef GET_PROPERTY_R
 #undef GET_PROPERTY
+#undef GET_PROPERTY_SIGNAL_T
+#undef GET_PROPERTY_SIGNAL_R
+#undef GET_PROPERTY_SIGNAL
 #undef IS_ALLOCATED_T
 #undef IS_ALLOCATED_R
 #undef IS_ALLOCATED
