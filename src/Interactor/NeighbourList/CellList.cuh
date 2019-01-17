@@ -41,7 +41,6 @@ References:
 [1] http://developer.download.nvidia.com/assets/cuda/files/particles.pdf
 TODO:
 100- Make a better separation between neighbour list and transverse schemes in this file
-100- Improve needsRebuild (which says yes all the time)
 
  */
 #ifndef CELLLIST_CUH
@@ -324,7 +323,7 @@ namespace uammd{
     Box currentBox;
     real3 currentCutOff;
 
-    
+    connection numParticlesChangedConnection, posWriteConnection;
     cudaEvent_t event;
     
   public:
@@ -364,7 +363,8 @@ namespace uammd{
       maxNeighboursPerParticle = 32;
       
       //I want to know if the number of particles has changed
-      pd->getNumParticlesChangedSignal()->connect([this](int Nnew){this->handleNumParticlesChanged(Nnew);});      
+      pd->getNumParticlesChangedSignal()->connect([this](int Nnew){this->handleNumParticlesChanged(Nnew);});
+      pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});      
       
       //The flag has managed memory
       //cudaMallocHost(&tooManyNeighboursFlagGPU, sizeof(int), cudaHostAllocMapped);
@@ -377,6 +377,8 @@ namespace uammd{
       sys->log<System::DEBUG>("[CellList] Destroyed");
       //CudaSafeCall(cudaFreeHost(tooManyNeighboursFlagGPU));
       CudaSafeCall(cudaFree(tooManyNeighboursFlagGPU));
+      numParticlesChangedConnection.disconnect();
+      posWriteConnection.disconnect();
       CudaCheckError();
     }
 
@@ -543,7 +545,7 @@ namespace uammd{
     bool needsRebuild(Box box, real3 cutOff){
       pd->hintSortByHash(box, cutOff);
       if(force_next_update){
-	//force_next_update = false; //Currently returns true everytime
+	force_next_update = false;
 	currentCutOff = cutOff;
 	currentBox = box;
 	return true;
@@ -581,7 +583,7 @@ namespace uammd{
 	  sys->log<System::CRITICAL>("[CellList] The cell size cannot be smaller than the cut off.");
 	}
       }
-      if(this->needsRebuild(grid.box, cutOff) == false) return;      
+      if(this->needsRebuild(grid.box, cutOff) == false) return;
       
       sys->log<System::DEBUG1>("[CellList] Updating list");
 
@@ -690,6 +692,10 @@ namespace uammd{
 	neighbourList.resize(numberParticles*maxNeighboursPerParticle);
 	numberNeighbours.resize(numberParticles);
       }
+      force_next_update = true;
+    }
+    void handlePosWriteRequested(){
+      sys->log<System::DEBUG>("[CellList] Issuing a list update after positions were written to.");
       force_next_update = true;
     }
   };
