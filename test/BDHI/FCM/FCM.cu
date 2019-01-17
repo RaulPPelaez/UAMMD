@@ -16,14 +16,15 @@ All output is adimensional.
 #include<vector>
 #include<fstream>
 #include<iomanip>
+#include<cmath>
 using namespace uammd;
 
 real temperature, viscosity, rh, tolerance;
 
 //FCM kernel M(\vec{r}) = f(r)·I + g(r)·\vec{r}\otimes\vec{r}/r^2
 //M0 = f(0)
-long double f(long double r){return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1+2*rh*rh/(M_PIl*r*r))*std::erf(r*sqrt(M_PIl)/(2*rh)) - 2*rh/(M_PIl*r)*exp(-M_PIl*r*r/(4*rh*rh)) );}
-long double g(long double r){ return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1-6*rh*rh/(M_PIl*r*r))*std::erf(r*sqrt(M_PIl)/(2*rh)) + 6*rh/(M_PIl*r)*exp(-M_PIl*r*r/(4*rh*rh)) );}
+long double f(long double r){return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1+2*rh*rh/(M_PIl*r*r))*erfl(r*sqrt(M_PIl)/(2*rh)) - 2*rh/(M_PIl*r)*expl(-M_PIl*r*r/(4*rh*rh)) );}
+long double g(long double r){ return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1-6*rh*rh/(M_PIl*r*r))*erfl(r*sqrt(M_PIl)/(2*rh)) + 6*rh/(M_PIl*r)*expl(-M_PIl*r*r/(4*rh*rh)) );}
 
 
 //Self mobility with PBC corrections up to sixth order
@@ -52,7 +53,7 @@ using std::endl;
 void computeSelfMobilityMatrix(real3 L, double F, long double *M){
   int N = 1;
   auto sys = make_shared<System>();
-  sys->rng().setSeed(0xabefa129f9173^time(NULL));
+  sys->rng().setSeed(0xabefa129f9173);
   for(int i = 0; i<10000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
@@ -130,8 +131,8 @@ bool selfMobilityCubicBox_test(){
 void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
   int N = 2;
   auto sys = make_shared<System>();
-  sys->rng().setSeed(0xabefa129f9173^time(NULL));
-  for(int i = 0; i<10000; i++) sys->rng().next();
+  sys->rng().setSeed(0xabefa129f9173);
+  for(int i = 0; i<100000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
 
@@ -186,7 +187,7 @@ bool pairMobilityCubicBox_test(double dist){
   real L_max = 130*rh;
 
   Xorshift128plus rng;
-  rng.setSeed(0x12ffdbae328f01^time(NULL));
+  rng.setSeed(0x12ffdbae328f01);
   for(int i = 0; i<10000; i++) rng.next();
   real3 dir = make_real3(0);
   
@@ -238,7 +239,7 @@ bool pairMobility_q2D_test(double dist){
   real L_max = 200*rh;
 
   Xorshift128plus rng;
-  rng.setSeed(0x12ffdbae328f01^time(NULL));
+  rng.setSeed(0x12ffdbae328f01);
   for(int i = 0; i<10000; i++) rng.next();
   real3 dir = make_real3(0);
   
@@ -305,7 +306,7 @@ bool selfMobility_q2D_test(){
 
 bool idealParticlesDiffusion(int N, real3 L, std::string suffix = "test"){
   auto sys = make_shared<System>();
-  sys->rng().setSeed(0x33dbff9f235ab^time(NULL));
+  sys->rng().setSeed(0x33dbff9f235ab);
   for(int i=0; i<10000; i++) sys->rng().next();
   
   auto pd = make_shared<ParticleData>(N, sys);
