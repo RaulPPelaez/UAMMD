@@ -32,7 +32,7 @@ namespace uammd{
 	       stringUtils::removePattern(type_name<MyPotential>(), "uammd::")),
     box(par.box),
     pot(pot),
-    nl(nullptr),
+    nl(par.nl),
     nb(nullptr)
   {
     this->setDelegate(pot.get());

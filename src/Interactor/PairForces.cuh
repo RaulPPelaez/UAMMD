@@ -22,8 +22,9 @@ namespace uammd{
   class PairForces: public Interactor, public ParameterUpdatableDelegate<Potential>{
   public:
     struct Parameters{
-      real rcut;
-      Box box;      
+      Box box;
+      //You can provide a neighbour list from outside that will be used by PairForces
+      shared_ptr<NeighbourList> nl = nullptr;
     };
     PairForces(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
