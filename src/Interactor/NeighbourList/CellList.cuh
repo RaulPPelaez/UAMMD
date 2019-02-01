@@ -418,7 +418,7 @@ namespace uammd{
 	  auto neighbourList_ptr = thrust::raw_pointer_cast(neighbourList.data());
 	  auto numberNeighbours_ptr = thrust::raw_pointer_cast(numberNeighbours.data());
 	  sys->log<System::DEBUG3>("[CellList] fill Neighbour List");		
-	  //For each particle, transverse the 27 neighbour cells using the cell list
+	  //For each particle, transverse the neighbour cells using the cell list
 	  // and decide if they need to be included in the neighbour list.
 	  const bool is2D = grid.cellDim.z == 1;
 	  //Choose the kernel mode
@@ -485,8 +485,6 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
             
-      //Grid grid(currentBox, cellDim);
-
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       
@@ -564,7 +562,7 @@ namespace uammd{
 
     //Force the cell list to work with a certain grid
     void updateNeighbourList(Grid in_grid, real3 cutOff, cudaStream_t st = 0){
-      grid = in_grid;
+      this->grid = in_grid;
       //Two cells per dimension will cause strange behavior that is probably unexpected
       //If less than 3 cells are to be used it is better to use NBody instead of a cell list
       if(grid.cellDim.x < 3 or
@@ -579,7 +577,7 @@ namespace uammd{
        	 (grid.cellDim.z != 3 and grid.box.boxSize.z != real(0.0))){
 	if(grid.cellSize.x < cutOff.x or
 	   grid.cellSize.y < cutOff.y or
-	   grid.cellSize.z < cutOff.z){
+	   (grid.cellSize.z < cutOff.z and grid.cellSize.z>1)){
 	  sys->log<System::CRITICAL>("[CellList] The cell size cannot be smaller than the cut off.");
 	}
       }
@@ -694,8 +692,8 @@ namespace uammd{
       }
       force_next_update = true;
     }
-    void handlePosWriteRequested(){
-      sys->log<System::DEBUG>("[CellList] Issuing a list update after positions were written to.");
+    void handlePosWriteRequested()
+      sys->log<System::DEBUG1>("[CellList] Issuing a list update after positions were written to.");
       force_next_update = true;
     }
   };
