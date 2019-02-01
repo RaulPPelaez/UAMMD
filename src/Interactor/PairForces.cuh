@@ -24,7 +24,7 @@ namespace uammd{
     struct Parameters{
       Box box;
       //You can provide a neighbour list from outside that will be used by PairForces
-      shared_ptr<NeighbourList> nl = nullptr;
+      shared_ptr<NeighbourList> nl=shared_ptr<NeighbourList>(nullptr);
     };
     PairForces(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
