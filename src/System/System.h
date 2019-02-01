@@ -4,6 +4,7 @@
 
    Provides a logger and a CPU rng
 
+   Also provides a way to recover argc and argv from anywhere.
  */
 #ifndef SYSTEM_H
 #define SYSTEM_H
@@ -50,13 +51,17 @@ namespace uammd{
     SystemParameters sysPar;
     Timer tim;
     void printWellcome();
-    void printFarewell();    
+    void printFarewell();
+
+    int m_argc = 0;
+    char ** m_argv = nullptr;
+    
   public:
 
     System():System(0, nullptr){
       tim.tic();
     }
-    System(int argc, char *argv[]){
+    System(int argc, char *argv[]): m_argc(argc), m_argv(argv){
       tim.tic();
       this->printWellcome();
       CudaCheckError();
@@ -95,7 +100,7 @@ namespace uammd{
       CudaCheckError();
     }
     
-
+    
     void finish(){
       CudaCheckError();
       cudaDeviceSynchronize();
@@ -167,6 +172,10 @@ namespace uammd{
     }  
 
     Xorshift128plus& rng(){ return m_rng;}
+
+    int getargc(){ return this->m_argc;}
+    const char ** getargv(){return (const char **)this->m_argv;}
+    
   };
 
 
