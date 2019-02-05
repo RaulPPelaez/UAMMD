@@ -1,15 +1,14 @@
 /*Raul P. Pelaez 2016. Brownian Euler Maruyama with hydrodynamics Integrator derived class implementation
    
   Solves the following stochastich differential equation:
-  X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*kb*T*dt)·B·dW + T·divM·dt(in 2D)
+  X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*kb*T*dt)·B·dW
   Being:
   X - Positions
   M - Mobility matrix -> M = D/kT
   K - Shear matrix
   dW- Brownian noise vector
   B - B*B^T = M -> i.e Cholesky decomposition B=chol(M) or Square root B=sqrt(M)
-  divM - Divergence of the mobility matrix, zero in 3D.
-
+  divM - Divergence of the mobility matrix, zero in 3D and 2D, but non zero in q2D, which is turned off for the moment.
 
   The Mobility matrix is computed via the Rotne Prager Yamakawa tensor.
 
@@ -56,7 +55,8 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Temperature: %f", par.temperature);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Viscosity: %f", par.viscosity);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Time step: %f", par.dt);
-      sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Hydrodynamic Radius: %f", par.hydrodynamicRadius);
+      if(par.hydrodynamicRadius>0)
+	sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Hydrodynamic Radius: %f", par.hydrodynamicRadius);
       if(par.K.size()==3){
 	real3 Kx = par.K[0];
 	real3 Ky = par.K[1];
@@ -73,7 +73,7 @@ namespace uammd{
       /*Result of multiplyinf M·F*/
       MF.resize(numberParticles, real3());
       BdW.resize(numberParticles+1, real3());
-      if(par.is2D) divM.resize(numberParticles, real3());
+      //if(par.is2D) divM.resize(numberParticles, real3());
       
     }
     template<class Method>
@@ -85,7 +85,7 @@ namespace uammd{
 
     namespace EulerMaruyama_ns{
       /*
-	dR = dt(KR+MF) + sqrt(2*T*dt)·BdW +T·divM·dt
+	dR = dt(KR+MF) + sqrt(2*T*dt)·BdW +T·divM·dt -> divergence is commented out for the moment
       */
       /*With all the terms computed, update the positions*/
       /*T=0 case is templated*/
@@ -95,7 +95,8 @@ namespace uammd{
 				    const real3* __restrict__ MF,
 				    const real3* __restrict__ BdW,
 				    const real3* __restrict__ K,
-				    const real3* __restrict__ divM, int N,
+				    //const real3* __restrict__ divM,
+				    int N,
 				    real sqrt2Tdt, real T, real dt, bool is2D){
 	uint id = blockIdx.x*blockDim.x+threadIdx.x;    
 	if(id>=N) return;
@@ -124,13 +125,13 @@ namespace uammd{
 	    bdw.z = 0;
 	  p += sqrt2Tdt*bdw;
 	}
-	/*If we are in 2D and the divergence term exists*/
-	if(divM){
-	  real3 divm = divM[id];
-	  //divm.z = real(0.0);
-	  //p += params.T*divm*params.invDelta*params.invDelta*params.dt; //For RFD
-	  p += T*dt*divm;
-	}           
+	/*If we are in q2D and the divergence term exists*/
+	// if(divM){
+	//   real3 divm = divM[id];
+	//   //divm.z = real(0.0);
+	//   //p += params.T*divm*params.invDelta*params.invDelta*params.dt; //For RFD
+	//   p += T*dt*divm;
+	// }           
 	/*Write to global memory*/
 	pos[i] = make_real4(p,c);
       }
@@ -183,10 +184,10 @@ namespace uammd{
 	bdhi->computeBdW(d_BdW, stream);
       }
 
-      if(par.is2D){
-	auto d_divM = thrust::raw_pointer_cast(divM.data());
-	bdhi->computeDivM(d_divM, stream2);
-      }
+      // if(par.is2D){
+      // 	auto d_divM = thrust::raw_pointer_cast(divM.data());
+      // 	bdhi->computeDivM(d_divM, stream2);
+      // }
 
       real sqrt2Tdt = sqrt(2*par.dt*par.temperature);
 
@@ -201,8 +202,8 @@ namespace uammd{
       real3* d_K = nullptr;
       if(par.K.size() > 0) d_K = thrust::raw_pointer_cast(K.data());
 
-      real3* d_divM = nullptr;
-      if(par.is2D) d_divM = thrust::raw_pointer_cast(divM.data());
+      //real3* d_divM = nullptr;
+      //if(par.is2D) d_divM = thrust::raw_pointer_cast(divM.data());
       
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 
@@ -213,7 +214,7 @@ namespace uammd{
 									d_MF,
 									d_BdW,
 									d_K,
-									d_divM,
+									//d_divM,
 									numberParticles,
 									sqrt2Tdt,
 									par.temperature,
