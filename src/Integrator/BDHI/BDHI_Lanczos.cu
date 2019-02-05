@@ -30,7 +30,7 @@ namespace uammd{
       hydrodynamicRadius(par.hydrodynamicRadius),
       temperature(par.temperature),
       tolerance(par.tolerance),
-      rpy(par.hydrodynamicRadius){
+      rpy(par.viscosity){
       
       sys->log<System::MESSAGE>("[BDHI::Lanczos] Initialized");  
 
@@ -38,9 +38,16 @@ namespace uammd{
       //given an object that computes the product of a Matrix(M) and a vector(v), sqrt(M)·v
       lanczosAlgorithm = std::make_shared<LanczosAlgorithm>(sys, par.tolerance);
 
-      this->selfMobility = 1.0/(6*M_PI*par.viscosity*par.hydrodynamicRadius);
-      
-      sys->log<System::MESSAGE>("[BDHI::Lanczos] Self Mobility: %f", selfMobility);
+      if(par.hydrodynamicRadius>0)
+	sys->log<System::MESSAGE>("[BDHI::Lanczos] Self mobility: %g", rpy(0,par.hydrodynamicRadius, par.hydrodynamicRadius).x);
+      else{
+	sys->log<System::MESSAGE>("[BDHI::Lanczos] Self mobility dependent on particle radius as 1/(6πηa)");
+      }
+
+      if(par.hydrodynamicRadius<0 and ! pd->isRadiusAllocated())
+	sys->log<System::CRITICAL>("[BDHI::Lanczos] You need to provide Lanczos with either an hydrodynamic radius or via the individual particle radius.");
+      if(par.hydrodynamicRadius>0 and pd->isRadiusAllocated())
+	sys->log<System::MESSAGE>("[BDHI::Lanczos] Taking particle radius from parameter's hydrodynamicRadius");
 
       //Init rng
       curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
@@ -72,45 +79,42 @@ namespace uammd{
       template<class vtype>
       struct NbodyMatrixFreeMobilityDot{    
 	typedef real3 computeType;
-	typedef real3 infoType;
+	typedef real4 infoType; //v[i], radius[i]
 	NbodyMatrixFreeMobilityDot(vtype* v,
 				   real3 *Mv,
-				   BDHI::RotnePragerYamakawa rpy,
-				   real M0):
-	  v(v), Mv(Mv), rpy(rpy), M0(M0){}
+				   real rh, //Used only if radius is null
+				   real * radius,
+				   BDHI::RotnePragerYamakawa rpy):
+	  v(v), Mv(Mv), rpy(rpy), radius(radius), rh(rh){}
 	/*Start with 0*/
 	inline __device__ computeType zero(){ return make_real3(0);}
 
 	inline __device__ infoType getInfo(int pi){
-	  return make_real3(v[pi]);
+	  return make_real4(make_real3(v[pi]), radius?radius[pi]:rh);
 	}
 	/*Just count the interaction*/
 	inline __device__ computeType compute(const real4 &pi, const real4 &pj,
-					      const infoType &vi, const infoType &vj){
+					      const infoType &info_i, const infoType &info_j){
 	  /*Distance between the pair*/
 	  const real3 rij = make_real3(pi)-make_real3(pj);
-	  const real r = sqrtf(dot(rij, rij));
-	  /*Self mobility*/
-	  if(r==real(0.0))
-	    return vj;
+	  const real r = sqrt(dot(rij, rij));
+	  const real3 vj = make_real3(info_j);
 	  /*Compute RPY coefficients, see more info in BDHI::RPYutils::RPY*/
-	  real2 c12 = rpy.RPY(r);
+	  const real2 c12 = rpy(r, info_i.w, info_j.w);
 
 	  const real f = c12.x;
-	  const real g = c12.y;
+	  const real gdivr2 = c12.y;
 
-	  real3 Mv_t;
-	  /*Update the result with Dij·vj, the current box dot the current three elements of v*/
-	  /*This expression is a little obfuscated, Mij*vj*/
-	  /*
-	    M = f(r)*I+g(r)*r(diadic)r - > (M·v)_ß = f(r)·v_ß + g(r)·v·(r(diadic)r)
-	    Where f and g are the RPY coefficients
-	  */
-      
-	  const real gv = g*dot(rij, vj);
+	  /*Self mobility*/
+	  if(r==real(0.0))
+	    return f*vj;
+	  /*This expression is a little obfuscated, Mij*vj = f(rij)·I + g(rij)/rij^2 · \vec{rij}\diadic \vec{rij} ) · \vec{vij}
+	    Where f and g are the hydrodinamic kernel coefficients
+	  */      
+	  const real gv = gdivr2*dot(rij, vj);
 	  /*gv = g(r)·( vx·rx + vy·ry + vz·rz )*/
 	  /*(g(r)·v·(r(diadic)r) )_ß = gv·r_ß*/
-	  Mv_t = f*vj + gv*rij/(r*r);
+	  const real3 Mv_t = f*vj + gv*rij;
 	  return Mv_t;
 	}
 	/*Sum the result of each interaction*/
@@ -118,11 +122,12 @@ namespace uammd{
 
 	/*Write the final result to global memory*/
 	inline __device__ void set(int id, const computeType &total){
-	  Mv[id] = M0*total;
+	  Mv[id] = total;
 	}
 	vtype* v;
 	real3* Mv;
-	real M0;
+	real rh;
+	real *radius;
 	BDHI::RotnePragerYamakawa rpy;
       };
 
@@ -133,9 +138,9 @@ namespace uammd{
 	myTransverser Mv_tr;
     	shared_ptr<NBody> nbody;
 	cudaStream_t st;
-	Dotctor(BDHI::RotnePragerYamakawa rpy,
-		real M0, shared_ptr<NBody> nbody, cudaStream_t st):
-	  Mv_tr(nullptr, nullptr, rpy, M0),
+	Dotctor(BDHI::RotnePragerYamakawa rpy, real rh, real *radius,
+		shared_ptr<NBody> nbody, cudaStream_t st):
+	  Mv_tr(nullptr, nullptr, rh, radius, rpy),
 	  nbody(nbody),
 	  st(st)
 	  {}
@@ -161,7 +166,10 @@ namespace uammd{
       using myTransverser = Lanczos_ns::NbodyMatrixFreeMobilityDot<real4>;
 
       auto force = pd->getForce(access::location::gpu, access::mode::read);
-      myTransverser Mv_tr(force.raw(), MF, rpy, selfMobility);
+      auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
+
+      real * radius_ptr =  this->hydrodynamicRadius>0?nullptr:radius.raw();
+      myTransverser Mv_tr(force.raw(), MF, this->hydrodynamicRadius, radius_ptr, rpy);
  
       NBody nbody(pd, pg, sys);
   
@@ -176,63 +184,65 @@ namespace uammd{
 	int numberParticles = pg->getNumberParticles();
 	auto nbody = std::make_shared<NBody>(pd, pg, sys);
 	/*Lanczos Algorithm needs a functor that provides the dot product of M and a vector*/
-	Lanczos_ns::Dotctor<real3> Mdot(rpy, selfMobility, nbody, st);
+	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
+	real * radius_ptr =  this->hydrodynamicRadius>0?nullptr:radius.raw();
+	
+	Lanczos_ns::Dotctor<real3> Mdot(rpy, this->hydrodynamicRadius, radius_ptr, nbody, st);
 
 	//Filling V instead of an external array (for v in sqrt(M)·v) is faster 
 	real *noise = lanczosAlgorithm->getV(numberParticles);
 	curandGenerateNormal(curng, noise,
 			     3*numberParticles + (3*numberParticles)%2,
 			     real(0.0), real(1.0));
-	
 	lanczosAlgorithm->solve(Mdot, (real*) BdW, noise, numberParticles, tolerance, st);
       }
     }
 
-    namespace Lanczos_ns{
-      /*This Nbody Transverser computes the analytic divergence of the RPY tensor*/
-      struct divMTransverser{
-	divMTransverser(real3* divM, real M0, real rh): divM(divM), M0(M0), rh(rh){
-	  this->invrh = 1.0/rh;
-	}
+    // namespace Lanczos_ns{
+    //   /*This Nbody Transverser computes the analytic divergence of the RPY tensor*/
+    //   struct divMTransverser{
+    // 	divMTransverser(real3* divM, real M0, real rh): divM(divM), M0(M0), rh(rh){
+    // 	  this->invrh = 1.0/rh;
+    // 	}
     
-	inline __device__ real3 zero(){ return make_real3(real(0.0));}
-	inline __device__ real3 compute(const real4 &pi, const real4 &pj){
-	  /*Work in units of rh*/
-	  const real3 r12 = (make_real3(pi)-make_real3(pj))*invrh;
-	  const real r2 = dot(r12, r12);
-	  if(r2==real(0.0))
-	    return make_real3(real(0.0));
-	  real invr = rsqrtf(r2);
-	  /*Just the divergence of the RPY tensor in 2D, taken from A. Donev's notes*/
-	  /*The 1/6pia is in M0, the factor kT is in the integrator, and the factor 1/a is in set*/
-	  if(r2>real(4.0)){
-	    real invr2 = invr*invr;
-	    return real(0.75)*(r2-real(2.0))*invr2*invr2*r12*invr;
-	  }
-	  else{
-	    return real(0.09375)*r12*invr;
-	  }
-	}
-	inline __device__ void accumulate(real3 &total, const real3 &cur){total += cur;}
+    // 	inline __device__ real3 zero(){ return make_real3(real(0.0));}
+    // 	inline __device__ real3 compute(const real4 &pi, const real4 &pj){
+    // 	  /*Work in units of rh*/
+    // 	  const real3 r12 = (make_real3(pi)-make_real3(pj))*invrh;
+    // 	  const real r2 = dot(r12, r12);
+    // 	  if(r2==real(0.0))
+    // 	    return make_real3(real(0.0));
+    // 	  real invr = rsqrtf(r2);
+    // 	  /*Just the divergence of the RPY tensor in 2D, taken from A. Donev's notes*/
+    // 	  /*The 1/6pia is in M0, the factor kT is in the integrator, and the factor 1/a is in set*/
+    // 	  if(r2>real(4.0)){
+    // 	    real invr2 = invr*invr;
+    // 	    return real(0.75)*(r2-real(2.0))*invr2*invr2*r12*invr;
+    // 	  }
+    // 	  else{
+    // 	    return real(0.09375)*r12*invr;
+    // 	  }
+    // 	}
+    // 	inline __device__ void accumulate(real3 &total, const real3 &cur){total += cur;}
     
-	inline __device__ void set(int id, const real3 &total){
-	  divM[id] = M0*total*invrh;
-	}
-      private:
-	real3* divM;
-	real M0;
-	real rh, invrh;
-      };
+    // 	inline __device__ void set(int id, const real3 &total){
+    // 	  divM[id] = M0*total*invrh;
+    // 	}
+    //   private:
+    // 	real3* divM;
+    // 	real M0;
+    // 	real rh, invrh;
+    //   };
 
-    }
+    // }
 
-    void Lanczos::computeDivM(real3* divM, cudaStream_t st){
-      sys->log<System::DEBUG1>("[BDHI::Lanczos] divM");
-      Lanczos_ns::divMTransverser divMtr(divM, selfMobility, hydrodynamicRadius);
+    // void Lanczos::computeDivM(real3* divM, cudaStream_t st){
+    //   sys->log<System::DEBUG1>("[BDHI::Lanczos] divM");
+    //   Lanczos_ns::divMTransverser divMtr(divM, selfMobility, hydrodynamicRadius);
   
-      NBody nbody(pd, pg, sys);
+    //   NBody nbody(pd, pg, sys);
   
-      nbody.transverse(divMtr, st);
-    }
+    //   nbody.transverse(divMtr, st);
+    // }
   }
 }

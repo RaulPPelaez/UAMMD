@@ -34,39 +34,40 @@ namespace uammd{
 				       const  real4* __restrict__ R,
 				       IndexIter indexIter,
 				       uint N,
-				       real M0, BDHI::RotnePragerYamakawa rpy){
+				       real hydrodynamicRadius, //Used if radius is null
+				       real *radius,
+				       BDHI::RotnePragerYamakawa rpy){
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>=N) return;
 	int i = indexIter[id];
 	uint n = 3*N;
 
 	/*Self Diffusion*/
-    
 	for(int k = 0; k < 3; k++)
 	  for(int l = 0; l < 3; l++){
 	    M[3*id + k + n*(3*id + l)] =  real(0.0);
 	  }
+
+	const real radius_i = radius?radius[i]:hydrodynamicRadius;
+	real M0 = rpy(0, radius_i, radius_i).x;
 	M[3*id + 0 + n*(3*id + 0)] = M0;
 	M[3*id + 1 + n*(3*id + 1)] = M0;
 	M[3*id + 2 + n*(3*id + 2)] = M0;
   
 	real3 rij;
 	real* rijp = &(rij.x);    
-	real c1, c2;
 	real3 ri = make_real3(R[i]);
 	for(int j=id+1; j<N; j++){
-
-	  rij = make_real3(R[indexIter[j]]) - ri;
-#ifdef SINGLE_PRECISION
-	  const real r = sqrtf(dot(rij, rij));
-#else
-	  const real r = sqrt(dot(rij, rij));
-#endif
-	  const real invr2 = real(1.0)/(r*r);
-	  /*Rotne-Prager-Yamakawa tensor */
-	  const real2 c12 = rpy(r);      
-	  c1 = M0*c12.x;
-	  c2 = M0*c12.y*invr2;
+	  const int global_j = indexIter[j];
+	  const real radius_j = radius?radius[global_j]:hydrodynamicRadius;
+	  rij = make_real3(R[global_j]) - ri;
+	  
+	  const real r = sqrt(dot(rij, rij));	  
+	  /*Rotne-Prager-Yamakawa tensor: RPY = f(r)*I + g(r)*r\diadic r*/
+	  
+	  const real2 c12 = rpy(r, radius_i, radius_j);
+	  const real c1 = c12.x;
+	  const real c2 = c12.y;
 	  /*3x3 Matrix for each particle pair*/
 	  for(int k = 0; k < 3; k++)
 	    for(int l = 0; l < 3; l++)
@@ -83,7 +84,7 @@ namespace uammd{
 		       Parameters par):
       pd(pd), pg(pg), sys(sys),
       par(par),
-      rpy(par.hydrodynamicRadius){
+      rpy(par.viscosity){
 
       sys->log<System::MESSAGE>("[BDHI::Cholesky] Initialized");  
  
@@ -92,7 +93,19 @@ namespace uammd{
       force3.resize(numberParticles, real3());
       mobilityMatrix.resize(pow(3*numberParticles,2)+1, real());
 
-      this->selfMobility = 1.0/(6*M_PI*par.viscosity*par.hydrodynamicRadius);
+
+      
+      
+      if(par.hydrodynamicRadius>0)
+	sys->log<System::MESSAGE>("[BDHI::Cholesky] Self mobility: %g", rpy(0,par.hydrodynamicRadius, par.hydrodynamicRadius).x);
+      else{
+	sys->log<System::MESSAGE>("[BDHI::Cholesky] Self mobility dependent on particle radius as 1/(6πηa)");
+      }
+
+      if(par.hydrodynamicRadius<0 and ! pd->isRadiusAllocated())
+	sys->log<System::CRITICAL>("[BDHI::Cholesky] You need to provide Cholesky with either an hydrodynamic radius or via the individual particle radius.");
+      if(par.hydrodynamicRadius>0 and pd->isRadiusAllocated())
+	sys->log<System::MESSAGE>("[BDHI::Cholesky] Taking particle radius from parameter's hydrodynamicRadius");
       
       /*Init cuSolver for BdW*/
       CusolverSafeCall(cusolverDnCreate(&solver_handle));
@@ -108,8 +121,6 @@ namespace uammd{
       CudaSafeCall(cudaMalloc(&d_info, sizeof(int)));
       /*Init cuBLAS for MF*/ 
       CublasSafeCall(cublasCreate(&handle));
-
-
       
       /*Create noise*/
       curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
@@ -149,12 +160,16 @@ namespace uammd{
       int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       
+      auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
+      
       /*Fill the upper part of symmetric mobility matrix*/
       Cholesky_ns::fillMobilityRPYD<<<Nblocks, Nthreads, 0 ,st>>>(d_M,
        								  pos.raw(),
        								  groupIter,
        								  numberParticles,
-       								  selfMobility, rpy);
+								  par.hydrodynamicRadius,
+								  radius.raw(),
+       								  rpy);
       /*M contains the mobility tensor in this step*/
       isMup2date = true;
     }
@@ -187,7 +202,7 @@ namespace uammd{
 
       int numberParticles = pg->getNumberParticles();
       /*Morphs a real4 vector into a real3 one, needed by cublas*/
-      cublasSetStream(handle, st);
+      CublasSafeCall(cublasSetStream(handle, st));
       
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       auto indexIter = pg->getIndexIterator(access::location::gpu);
@@ -208,13 +223,13 @@ namespace uammd{
       real * d_M = thrust::raw_pointer_cast(mobilityMatrix.data());
       real * d_force3 = (real*)thrust::raw_pointer_cast(force3.data());
       
-      cublassymv(handle, CUBLAS_FILL_MODE_UPPER,
+      CublasSafeCall(cublassymv(handle, CUBLAS_FILL_MODE_UPPER,
 		 3*numberParticles, 
 		 &alpha,
 		 d_M, 3*numberParticles,
 		 d_force3, 1,
 		 &beta,
-		 (real *)MF, 1); 
+				(real *)MF, 1)); 
     }
 
 
@@ -234,6 +249,11 @@ namespace uammd{
 
       CusolverSafeCall(cusolverDnpotrf(solver_handle, CUBLAS_FILL_MODE_UPPER,
 				       3*numberParticles, d_M, 3*numberParticles, d_work, h_work_size, d_info));
+
+      // int h_info = 0;
+      // cudaMemcpy(&h_info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
+      // if(h_info)
+      // 	sys->log<System::ERROR>("[BDHI::Cholesky] Error at Cholesky factorization with code: %d", h_info);
 
       curandSetStream(curng, st);
 
@@ -256,59 +276,56 @@ namespace uammd{
     }
 
 
-    namespace Cholesky_ns{
-      /*Exactly the same as Lanczos_ns::divMTranverser.
-	It is placed here for convinience when performing tests that involve 
-	changing the input parameters to the class*/
-      /*This Nbody Transverser computes the analytic divergence of the RPY tensor*/
-      // https://github.com/RaulPPelaez/UAMMD/wiki/Nbody-Forces
-      // https://github.com/RaulPPelaez/UAMMD/wiki/Transverser
-      struct divMTransverser{
-	divMTransverser(real3* divM, real M0, real rh): divM(divM), M0(M0), rh(rh){
-	  this->invrh = 1.0/rh;
-	}
-    
-	inline __device__ real3 zero(){return make_real3(real(0.0));}
-	inline __device__ real3 compute(const real4 &pi, const real4 &pj){
-	  /*Work in units of rh*/
-	  const real3 r12 = (make_real3(pi)-make_real3(pj))*invrh;
-	  const real r2 = dot(r12, r12);
-	  if(r2==real(0.0))
-	    return make_real3(real(0.0));
-#ifdef SINGLE_PRECISION
-	  real invr = rsqrtf(r2);
-#else
-	  real invr = rsqrt(r2);
-#endif
-	  /*Just the divergence of the RPY tensor in 2D, taken from A. Donev's notes*/
-	  /*The 1/6pia is in M0, the factor kT is in the integrator, and the factor 1/a is in set*/
-	  if(r2>real(4.0)){
-	    real invr2 = invr*invr;
-	    return real(0.75)*(r2-real(2.0))*invr2*invr2*r12*invr;
-	  }
-	  else{
-	    return real(0.09375)*r12*invr;
-	  }
-	}
-	inline __device__ void accumulate(real3 &total, const real3 &cur){total += cur;}
-    
-	inline __device__ void set(int id, const real3 &total){
-	  divM[id] = M0*total*invrh;
-	}
-      private:
-	real3* divM;
-	real M0;
-	real rh, invrh;
-      };
+    // namespace Cholesky_ns{
+    //   /*Exactly the same as Lanczos_ns::divMTranverser.
+    // 	It is placed here for convinience when performing tests that involve 
+    // 	changing the input parameters to the class*/
+    //   /*This Nbody Transverser computes the analytic divergence of the RPY tensor*/
+    //   // https://github.com/RaulPPelaez/UAMMD/wiki/Nbody-Forces
+    //   // https://github.com/RaulPPelaez/UAMMD/wiki/Transverser
+    //   struct divMTransverser{
+    // 	divMTransverser(real3* divM, real rh, real* radius): divM(divM), rh(rh), radius(radius){}
 
-    }
+    // 	real getInfo(int i){
+    // 	  return radius?radius[i]:rh;
+    // 	}
+    // 	inline __device__ real3 zero(){return make_real3(real(0.0));}
+    // 	inline __device__ real3 compute(const real4 &pi, const real4 &pj, const real &a_i, const real &a_j){
+    // 	  /*Work in units of rh*/
+    // 	  const real3 r12 = (make_real3(pi)-make_real3(pj))*invrh;
+    // 	  const real r2 = dot(r12, r12);
+    // 	  if(r2==real(0.0))
+    // 	    return make_real3(real(0.0));
+    // 	  real invr = rsqrt(r2);
+    // 	  /*Just the divergence of the RPY tensor in 2D, taken from A. Donev's notes*/
+    // 	  /*The 1/6pia is in M0, the factor kT is in the integrator, and the factor 1/a is in set*/
+    // 	  if(r2>real(4.0)){
+    // 	    real invr2 = invr*invr;
+    // 	    return real(0.75)*(r2-real(2.0))*invr2*invr2*r12*invr;
+    // 	  }
+    // 	  else{
+    // 	    return real(0.09375)*r12*invr;
+    // 	  }
+    // 	}
+    // 	inline __device__ void accumulate(real3 &total, const real3 &cur){total += cur;}
+    
+    // 	inline __device__ void set(int id, const real3 &total){
+    // 	  divM[id] = M0*total*invrh;
+    // 	}
+    //   private:
+    // 	real3* divM;
+    // 	real M0;
+    // 	real rh, invrh;
+    //   };
 
-    void Cholesky::computeDivM(real3* divM, cudaStream_t st){
-      /*A simple NBody transverser, see https://github.com/RaulPPelaez/UAMMD/wiki/NBody-Forces */
-      Cholesky_ns::divMTransverser divMtr(divM, selfMobility, par.hydrodynamicRadius);
-      NBody nbody_divM(pd, pg, sys);
+    // }
+
+    // void Cholesky::computeDivM(real3* divM, cudaStream_t st){
+    //   /*A simple NBody transverser, see https://github.com/RaulPPelaez/UAMMD/wiki/NBody-Forces */
+    //   Cholesky_ns::divMTransverser divMtr(divM, selfMobility, par.hydrodynamicRadius);
+    //   NBody nbody_divM(pd, pg, sys);
   
-      nbody_divM.transverse(divMtr, st);
-    }
+    //   nbody_divM.transverse(divMtr, st);
+    // }
   }
 }

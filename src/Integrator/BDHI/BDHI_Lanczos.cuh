@@ -45,7 +45,6 @@ namespace uammd{
       shared_ptr<LanczosAlgorithm> lanczosAlgorithm;
 
       curandGenerator_t curng;
-      real selfMobility;
       real hydrodynamicRadius;
       real temperature;
       real tolerance;

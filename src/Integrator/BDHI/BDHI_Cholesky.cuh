@@ -67,7 +67,6 @@ namespace uammd{
       /*Rodne Prager Yamakawa device functions and parameters*/
       RotnePragerYamakawa rpy;
       Parameters par;
-      real selfMobility;
       
     };
   }
