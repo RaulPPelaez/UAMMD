@@ -169,18 +169,13 @@ namespace uammd{
       auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
       auto force = pd->getForce(access::location::gpu, access::mode::read);     
       //Mass is assumed 1 for all particles if it has not been set.
-      real * mass_ptr = nullptr;
-      if(pd->isMassAllocated()){
-	auto mass = pd->getMass(access::location::gpu, access::mode::read);
-	mass_ptr = mass.raw();
-      }
-      
+      auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
       //First step integration and reset forces
 
       VerletNVE_ns::integrateGPU<1><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
 									   vel.raw(),
 									   force.raw(),
-									   mass_ptr,
+								      mass.raw(),
 									   groupIterator,
 									   numberParticles, dt, is2D);
     }
@@ -194,16 +189,12 @@ namespace uammd{
       auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
             
-      real * mass_ptr = nullptr;
-      if(pd->isMassAllocated()){
-	auto mass = pd->getMass(access::location::gpu, access::mode::read);
-	mass_ptr = mass.raw();
-      }
+      auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
       //Wait untill all forces have been summed
       VerletNVE_ns::integrateGPU<2><<<Nblocks, Nthreads, 0 , stream>>>(pos.raw(),
 									    vel.raw(),
 									    force.raw(),
-									    mass_ptr,
+								       mass.raw(),
 									    groupIterator,
 									    numberParticles, dt, is2D);      
     }
