@@ -1,4 +1,6 @@
 /*Raul P. Pelaez 2016. Precision agnostic cublas/cusolver function defines*/
+#ifndef CUDA_LIB_DEFINES_H
+#define CUDA_LIB_DEFINES_H
 #include"global/defines.h"
 
 
@@ -36,3 +38,4 @@
 #endif
 
 
+#endif
