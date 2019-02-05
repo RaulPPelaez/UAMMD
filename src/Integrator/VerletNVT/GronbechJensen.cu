@@ -42,11 +42,6 @@ http://dx.doi.org/10.1080/00268976.2012.760055
  */
 
 #include"../VerletNVT.cuh"
-
-#ifndef SINGLE_PRECISION
-#define curandGenerateNormal curandGenerateNormalDouble
-#endif
-
 #include"third_party/saruprng.cuh"
 //See Basic.cu for initialization etc, this class is inherited from Basic
 namespace uammd{
