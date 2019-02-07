@@ -207,7 +207,7 @@ namespace uammd{
       
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 
-      cudaStreamSynchronize(stream2);
+      //cudaStreamSynchronize(stream2);
 
       EulerMaruyama_ns::integrateGPUD<<<nblocks, nthreads, 0, stream>>>(pos.raw(),
 									indexIter,
