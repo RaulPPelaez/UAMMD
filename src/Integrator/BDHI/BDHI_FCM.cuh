@@ -13,7 +13,8 @@
 #define BDHI_FCM_CUH
 
 #include "BDHI.cuh"
-#include "FIB/IBM_kernels.cuh"
+#include "misc/IBM_kernels.cuh"
+#include "misc/IBM.cuh"
 #include "utils/utils.h"
 #include "global/defines.h"
 #include<cufft.h>
@@ -44,38 +45,23 @@ namespace uammd{
       inline __device__ __host__ void operator+=(cufftComplex3 &a, const cufftComplex3 &b){
 	a.x += b.x; a.y += b.y; a.z += b.z;
       }
-     
-
-      struct GaussianKernel{
-        int support;
-	real prefactor;
-	real tau;	
-	GaussianKernel(real3 h){
-	  //eq. 8 in [1], \sigma_\Delta
-	  real sigma = 1/sqrt(M_PI); //hydrodynamic radius is sqrt(M_PI)*sigma;
-	  this->prefactor = pow(2*M_PI*sigma*sigma, -1.5);
-	  this->tau  = -0.5/(sigma*sigma);	  
-	  //According to [1] the Gaussian kernel can be considered 0 beyond 3*a, so P >= 3*a/h
-	  this->support = 2*int(3.0/h.x+0.5)+1;
-	}
-	
-	inline __device__ real delta(real3 rvec) const{	    
-	  return prefactor*exp(tau*dot(rvec, rvec));
-	}
-      };
-
     }
     
-
     class FCM{
     public:
-      using Kernel = FCM_ns::GaussianKernel;
-      //using Kernel = IBM::PeskinKernel::fourPoint;
+      using Kernel = IBM_kernels::GaussianKernel;
+      //using Kernel = IBM_kernels::BarnettMagland;
+      //using Kernel = IBM_kernels::PeskinKernel::fourPoint;
+      //using Kernel = IBM_kernels::PeskinKernel::threePoint;
+      //using Kernel = IBM_kernels::GaussianFlexible::sixPoint;
+      
       using cufftComplex3 = FCM_ns::cufftComplex3;
       
       struct Parameters: BDHI::Parameters{
 	int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
-      };
+	real fac = 1;
+      };     
+      real fac;
       FCM(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys,
@@ -84,14 +70,19 @@ namespace uammd{
       void setup_step(              cudaStream_t st = 0);
       void computeMF(real3* MF,     cudaStream_t st = 0);    
       void computeBdW(real3* BdW,   cudaStream_t st = 0);  
-      void computeDivM(real3* divM, cudaStream_t st = 0);
       void finish_step(             cudaStream_t st = 0);
 
-      template<typename vtype>
-      void Mdot_far(real3 *Mv, vtype *v, cudaStream_t st);
-      template<typename vtype>
-      void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
-
+      real getHydrodynamicRadius(){
+	//return 0.9867*grid.cellSize.x;
+	//return fac*grid.cellSize.x;	
+	return ibm->getKernel()->getHydrodynamicRadius(IBM_kernels::SpatialDiscretization::Spectral)*fac;
+      }
+      real getSelfMobility(){
+	long double rh = this->getHydrodynamicRadius();
+	long double L = box.boxSize.x;
+	return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-2.837297l*rh/L+(4.0l/3.0l)*M_PIl*pow(rh/L,3.0l)-27.4l*pow(rh/L,6.0l));
+      }
+      
     private:
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
@@ -101,7 +92,9 @@ namespace uammd{
       real temperature;
       real dt;
       real viscosity;
-    
+
+      shared_ptr<IBM<Kernel>> ibm;
+      
       Box box;
 
       /****Far (wave space) part) ******/
@@ -114,6 +107,13 @@ namespace uammd{
 
       cudaStream_t stream, stream2;
 
+      template<typename vtype>
+      void Mdot_far(real3 *Mv, vtype *v, cudaStream_t st);
+      template<typename vtype>
+      void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
+
+
+      
       void initCuFFT();
       template<typename vtype>
       void spreadParticles(vtype *v, cudaStream_t st);

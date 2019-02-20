@@ -23,9 +23,13 @@ then
 fi
 
 #Any number should produce equivalent results (except for the time step). The resulting plots will be adimensional.
-temperature=1.0
-viscosity=2
-hydrodynamicRadius=2
+#temperature=1.134141
+#viscosity=1.12312
+#hydrodynamicRadius=2.1343
+temperature=1
+viscosity=1
+hydrodynamicRadius=1
+
 tolerance=1e-7
 make fcm
 
@@ -35,12 +39,11 @@ figuresFolder=figures
 #rm -rf $resultsFolder $figuresFolder
 mkdir -p $resultsFolder $figuresFolder
 
-
+fac=$1
 
 function selfMobilityCubicBox {
     echo "self Mobility cubic box test"
-    ./fcm selfMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.selfMobility.log 2>&1 
-
+    ./fcm selfMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance  $fac> uammd.selfMobility.log 2>&1 
     gracebat -nxy selfMobilityCubicBox.test -par tools/selfMobility.par -hdevice EPS -printfile selfMobilityCubicBox.eps
 
     #Compute maximum deviation from theory, all points should be 0
@@ -58,6 +61,19 @@ function selfMobilityCubicBox {
     mv selfMobilityCubicBox.eps figures/
 }
 
+function hydrodynamicRadiusVariance {
+    echo "Hydrodynamic radius variance test"
+    ./fcm hydrodynamicRadiusVariance 0 $viscosity $hydrodynamicRadius $tolerance > uammd.hydrodynamicRadius.log 2>&1
+
+    echo "Maximum hydrodynamic radius variance across unit cell: $(cat hydrodynamicRadiusVariance.test | datamash -W min 3 max 3 | awk '{print ($2-$1)/2.0}') "
+
+    gnuplot -e "set term pngcairo color enhance; set output 'hydrodynamicRadiusVariance.png'; set dgrid 100, 100; set pm3d map; set size ratio -1; splot 'hydrodynamicRadiusVariance.test' u 1:2:3"
+
+    mv hydro*.png figures
+    mv hydrodynamicRadiusVariance.test *.log results
+    
+}
+
 
 function extrapolate {
     #Extrapolates the results of the mobility matrix to L=inf by fitting to a polynomy with gnuplot.
@@ -69,7 +85,7 @@ do for [i=2:10] {
      fit f(x) "'$file'" u 1:(column(i)) via a,b,c,d,e,f,g;
       print(a);
 }' 2>&1)
-    
+    rm -f fit.log
     echo $Minf
 }
 
@@ -78,7 +94,7 @@ function pairMobilityCubicBox {
     #Computes 1-M_{\alpha\beta}(\vec{r}, L)/M_{\alpha\beta}(\vec{r}, L=\inf) for two particles with opposing forces, which should converge to 0 for all terms.
     #It computes dist for several distances and uses a random distance between the two particles each time.
     
-    ./fcm pairMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility.log 2>&1 
+    ./fcm pairMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance $fac  > uammd.pairMobility.log 2>&1 
 
     maxDeviation=$(
     for i in $(ls  pairMobilityCubicBox.dist*.test)
@@ -116,9 +132,10 @@ function selfDiffusionCubicBox {
     do
 	echo "Doing $i" >/dev/stderr
 	L=$(echo $i | cut -d. -f3,4 | sed 's+boxSize++')
-	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .test '{print $1}')
+	D0=$(echo $i | awk -F Ds '{print $2}' | awk -F .rh '{print $1}')
+	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .Ds '{print $1}')
 	#PBC corrections up to sixth order in L
-	D0=$(echo 1 | awk '{l=1/'$L';print '$temperature'/(6*3.14159265358979*'$viscosity'*'$hydrodynamicRadius')*(1-2.837297*l+(4/3.0)*3.14159265358979*l**3-27.4*l**6);}')
+	#D0=$(echo 1 | awk '{l=1/'$L';print '$temperature'/(6*3.14159265358979*'$viscosity'*'$hydrodynamicRadius')*(1-2.837297*l+(4/3.0)*3.14159265358979*l**3-27.4*l**6);}')
 	
 	./msd -N $(grep -n "#" -m 2 $i | cut -d: -f1 | paste -sd" " | awk '{print $2-$1-1}') -Nsteps $(grep -c "#" $i)  $i 2>/dev/null | awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd 
 	
@@ -149,9 +166,9 @@ function selfDiffusion_q2D {
     for i in $(ls pos.noise*.*q2D*test)
     do
 	echo "Doing $i" >/dev/stderr
-	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .q2D '{print $1}')
-
-	D0=$(echo 1 | awk '{print '$temperature'/(6*3.14159265358979*'$viscosity'*'$hydrodynamicRadius');}')
+	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .Ds '{print $1}')
+	real_rh=$(echo $i | awk -F rh '{print $2}' | awk -F .q2D '{print $1}')
+	D0=$(echo 1 | awk '{print '$temperature'/(6*3.1415*'$viscosity'*'$real_rh');}')
 	N=$(grep -n "#" -m 2 $i | cut -d: -f1 | paste -sd" " | awk '{print $2-$1-1}')
 	Nsteps=$(grep -c "#" $i)	
 	./msd -N $N -Nsteps $Nsteps $i 2> /dev/null | awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd 
@@ -177,13 +194,13 @@ function noiseVariance {
     mv noiseVariance.test uammd.noiseVariance.log $resultsFolder/
 }
 
-pairMobilityCubicBox
+#pairMobilityCubicBox
 #./fcm pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1 
-selfMobilityCubicBox
-selfMobility_q2D
-selfDiffusionCubicBox
+#selfMobilityCubicBox
+#hydrodynamicRadiusVariance
+#selfMobility_q2D
+#selfDiffusionCubicBox
 selfDiffusion_q2D
-noiseVariance
-
+#noiseVariance
 
 rm -f fit.log
