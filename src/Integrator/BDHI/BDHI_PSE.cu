@@ -229,6 +229,7 @@ namespace uammd{
 	     shared_ptr<System> sys,
 	     Parameters par):
       pd(pd), pg(pg), sys(sys),
+      hydrodynamicRadius(par.hydrodynamicRadius),
       dt(par.dt),
       temperature(par.temperature),
       box(par.box), grid(box, int3()),

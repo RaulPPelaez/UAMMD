@@ -42,8 +42,8 @@ REFERENCES:
 #include"global/defines.h"
 
 #include"Integrator/Integrator.cuh"
-
-#include"BDHI.cuh"
+#include"utils/cxx_utils.h"
+#include"Integrator/BDHI/BDHI.cuh"
 #include<curand.h>
 
 namespace uammd{
@@ -67,7 +67,18 @@ namespace uammd{
 
     void forwardTime() override;
     real sumEnergy() override;
-  
+
+
+
+
+    real getHydrodynamicRadius(){
+      return bdhi->getHydrodynamicRadius();
+    }    
+
+    real getSelfMobility(){
+      return bdhi->getSelfMobility();
+    }    
+
   private:  
   
     thrust::device_vector<real3> MF;  /*Result of M·F*/

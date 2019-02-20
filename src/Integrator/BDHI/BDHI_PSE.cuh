@@ -110,7 +110,14 @@ namespace uammd{
       template<typename vtype>
       void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
 
-    
+
+      real getHydrodynamicRadius(){
+	return hydrodynamicRadius;
+      }
+      real getSelfMobility(){
+	return M0;
+      }
+
     private:
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
@@ -118,6 +125,8 @@ namespace uammd{
       //std::thread Mdot_nearThread, Mdot_farThread, NearNoise_Thread;
 
       ullint seed;
+
+      real hydrodynamicRadius;
       
       real temperature;
       real dt;
