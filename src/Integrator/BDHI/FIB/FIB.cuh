@@ -99,7 +99,7 @@ REFERENCES:
 #include<curand.h>
 
 
-#include"IBM_kernels.cuh"
+#include"misc/IBM_kernels.cuh"
 
 namespace uammd{
   namespace BDHI{
@@ -155,7 +155,7 @@ namespace uammd{
       using cufftComplex3 = FIB_ns::cufftComplex3;
       using cufftComplex = cufftComplex_t<real>;
       using cufftReal = cufftReal_t<real>;
-
+      
       real getSelfMobility(){
 	double rh = 0.91*box.boxSize.x/grid.cellDim.x;
 	double l = rh/box.boxSize.x;
@@ -165,7 +165,7 @@ namespace uammd{
 	return 0.91*box.boxSize.x/(real)grid.cellDim.x;
       }
     private:
-      using Kernel = IBM::PeskinKernel::threePoint;
+      using Kernel = IBM_kernels::PeskinKernel::threePoint;
       real temperature, viscosity;      
       
       shared_ptr<CellList> cl;
