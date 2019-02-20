@@ -30,7 +30,7 @@ temperature=1
 viscosity=1
 hydrodynamicRadius=1
 
-tolerance=1e-7
+tolerance=1e-12
 make fcm
 
 resultsFolder=results
@@ -194,13 +194,13 @@ function noiseVariance {
     mv noiseVariance.test uammd.noiseVariance.log $resultsFolder/
 }
 
-#pairMobilityCubicBox
+pairMobilityCubicBox
 #./fcm pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1 
-#selfMobilityCubicBox
-#hydrodynamicRadiusVariance
-#selfMobility_q2D
-#selfDiffusionCubicBox
+selfMobilityCubicBox
+hydrodynamicRadiusVariance
+selfMobility_q2D
+selfDiffusionCubicBox
 selfDiffusion_q2D
-#noiseVariance
+noiseVariance
 
 rm -f fit.log

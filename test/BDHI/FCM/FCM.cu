@@ -370,7 +370,7 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
   M0 = bdhi->getSelfMobility();
   real_rh = bdhi->getHydrodynamicRadius();
 
-  std::ofstream out("pos.noise.boxSize"+std::to_string(L.z/bdhi->getHydrodynamicRadius())+".dt"+std::to_string(par.dt)+".Ds"+std::to_string(temperature*M0)+".rh"+std::to_string(real_rh)+suffix);
+  std::ofstream out("pos.noise.boxSize"+std::to_string(L.z/bdhi->getHydrodynamicRadius())+".dt"+std::to_string(par.dt)+".Ds"+std::to_string(temperature*M0)+".rh"+std::to_string(real_rh)+"."+suffix);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     fori(0, pd->getNumParticles()){
@@ -423,7 +423,6 @@ void selfDiffusion_q2D_test(){
     double L = Lx;
     
     //From eq 21 and 23 in Vögele, M., & Hummer, G. (2016). Divergent Diffusion Coefficients in Simulations of Fluids and Lipid Membranes. The Journal of Physical Chemistry B, 120(33), 8722–8732. doi:10.1021/acs.jpcb.6b05102
-
     
     M0 = 1.0L/(6.0L*M_PIl*viscosity*real_rh);
     double Mplane_near = M0 + M0/L*(M_PI*0.5*Lz/L - 4.3878);
