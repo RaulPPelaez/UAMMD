@@ -16,7 +16,8 @@
 
     //After this you will be able to call tableFunction(r) as if it were foo(r) inside the interval rmin, rmax   
     //Below rmin, tableFunction(r) = tableFunction(rmin). Above rmax, tableFunction(r) = 0.
-    
+
+    //Alternatively you can omit the first argument to the constructor and TabulatedFunction will maintain an inner buffer.
     
 
  */
@@ -78,7 +79,17 @@ namespace uammd{
     real drNormalized;
     T *table;
     Interpolation interp;
+    bool freeTable = false;
+    bool isCopy;
+    TabulatedFunction(){}
 
+  private:
+    T* myCudaMalloc(int N){T* ptr; CudaSafeCall(cudaMalloc((void **)&ptr, N*sizeof(T))); return ptr;}
+  public:
+    template<class Functor>
+    TabulatedFunction(int N, real rmin, real rmax, Functor foo):     
+      TabulatedFunction(myCudaMalloc(N), N, rmin, rmax, foo)
+    {this->freeTable=true;}
     template<class Functor>
     TabulatedFunction(T* table, int N, real rmin, real rmax, Functor foo):
       Ntable(N-1),
@@ -87,9 +98,10 @@ namespace uammd{
       table(table),
       drNormalized(1.0/(real)Ntable),
       invInterval(1.0/(rmax-rmin)),
-      interp()    
-    {
-   
+      interp(),
+      freeTable(false),
+      isCopy(false)
+    {   
       std::vector<T> tableCPU(Ntable+1);
       for(int i = 0; i<=Ntable; i++){
 	double x = (i/(double)(Ntable))*(rmax-rmin) + rmin;
@@ -101,16 +113,21 @@ namespace uammd{
        			      cudaMemcpyHostToDevice));
       
     }
-    ~TabulatedFunction() = default;
+
+    //This copy constructor prevents cuda from calling the destructor after a kernel call
+    TabulatedFunction( const TabulatedFunction& _orig ) { *this = _orig; isCopy = true; }
+    ~TabulatedFunction(){
+      if(freeTable and ! isCopy)CudaSafeCall(cudaFree(table));
+    }
 
     template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
-    __device__ T get(real rs){
+    inline __device__ T get(real rs) const{
       return this->operator()<modifier>(rs);
     }
  
     
     template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
-    __device__ T operator()(real rs){
+    inline __device__ T operator()(real rs) const{     
       real r = (rs-rmin)*invInterval;
       if(rs >= rmax) return T();
       if(r <= real(0.0)) return table[0];
