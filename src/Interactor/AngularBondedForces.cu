@@ -10,22 +10,23 @@
 #include<iostream>
 #include<fstream>
 #include<vector>
+#include<set>
 
 namespace uammd{
 
-
-  AngularBondedForces::~AngularBondedForces(){}
-
-
-  AngularBondedForces::AngularBondedForces(shared_ptr<ParticleData> pd,
-					   shared_ptr<System> sys,
-					   Parameters par):
+ 
+  template<class BondType>
+  AngularBondedForces<BondType>::AngularBondedForces(shared_ptr<ParticleData> pd,
+						     shared_ptr<System> sys,
+						     Parameters par,
+						     BondType bondType_in):
     Interactor(pd,
 	       sys,
 	       "AngularBondedForces"),
-    TPP(64),
-    box(par.box){
-    
+    TPP(32),
+    bondType(bondType_in){
+
+    this->setDelegate(&bondType);
     int numberParticles = pg->getNumberParticles();
     sys->log<System::MESSAGE>("[AngularBondedForces] Initialized");
 
@@ -34,28 +35,32 @@ namespace uammd{
     std::ifstream in(par.readFile);
     //Has a list of the bonds each particle is in
     std::vector<std::vector<int>> isInBonds(numberParticles);
+    if(!in)
+      sys->log<System::CRITICAL>("[AngularBondedForces] File %s cannot be opened.", par.readFile.c_str());
     
     in>>nbonds;
-    std::vector<AngularBond> blst(nbonds); //Temporal storage for the bonds in the file
+    std::vector<Bond> blst(nbonds); //Temporal storage for the bonds in the file
 
   
     sys->log<System::MESSAGE>("[AngularBondedForces] Detected: %d particle-particle-particle bonds", nbonds);
     
     if(nbonds>0){
       std::set<int> pwb; //Particles with bonds
-      for(int b=0; b<nbonds; b++){
+      for(int b=0; b<nbonds; b++){	  
 	int i, j, k;
-	in>>i>>j>>k;
-	
+	if(!(in>>i>>j>>k))
+	  sys->log<System::CRITICAL>("[AngularBondedForces] ERROR! Bond file ended too soon! Expected %d lines, found %d", nbonds, b);
+	       
 	isInBonds[i].push_back(b);
 	isInBonds[j].push_back(b);
-	isInBonds[k].push_back(b);      
-      
+	isInBonds[k].push_back(b);
+	
 	blst[b].i = i;
 	blst[b].j = j;
 	blst[b].k = k;
-      
-	in>>blst[b].kspring>>blst[b].ang;
+	
+	blst[b].bond_info = BondType::readBond(in);
+	
 	pwb.insert(i);
 	pwb.insert(j);
 	pwb.insert(k);
@@ -64,33 +69,28 @@ namespace uammd{
     }
   
   
-    int NparticleswithBonds = particlesWithBonds.size();
-
+    const int NparticleswithBonds = particlesWithBonds.size();
+      
     bondStart.resize(NparticleswithBonds, 0xffFFffFF);
     bondEnd.resize(NparticleswithBonds, 0);
-
-
-    thrust::host_vector<AngularBond> bondListCPU(3*nbonds);   
+    
+    thrust::host_vector<Bond> bondListCPU(3*nbonds);   
 
     //Fill bondList, bondStart and bondEnd
     //BondList has the following format:
     //[all bonds involving particle 0, all bonds involving particle 1...]
     //So it has size 3*nbonds
     fori(0, NparticleswithBonds){
-      int index = particlesWithBonds[i];
-      int nbondsi;
-      nbondsi = isInBonds[index].size();      
+
+      const int index = particlesWithBonds[i];
+      const int nbondsi = isInBonds[index].size();      
       
       int offset;
-      if(i>0)
-	offset = bondEnd[i-1];
-      else
-	offset = 0;
-    
+      if(i>0) offset = bondEnd[i-1];
+      else    offset = 0;
       forj(0,nbondsi){
 	bondListCPU[offset+j] = blst[isInBonds[index][j]];
       }
-      
       bondEnd[i] = offset+nbondsi;
       bondStart[i] = offset;
     }
@@ -101,8 +101,25 @@ namespace uammd{
     //Upload bondList to GPU
     bondList = bondListCPU;
     sys->log<System::MESSAGE>("[AngularBondedForces] %d particles are involved in at least one bond.",particlesWithBonds.size());
-    sys->log<System::WARNING>("[AngularBondedForces] I do not check for duplicated bonds in the input, be sure there is none!");
+    
+    struct AngularBondCompareLessThan{
+      bool operator()(const Bond& lhs, const Bond &rhs) const{
+	if((lhs.i < rhs.i and lhs.j < rhs.j and lhs.k < rhs.k)
+	   or (lhs.i < rhs.k and lhs.j < rhs.j and lhs.k < rhs.i))
+	  return true;
+	else return false;
+      }
+    };
 
+
+    {
+      std::set<Bond, AngularBondCompareLessThan> checkDuplicates;
+      
+      fori(0, blst.size()){
+	if(!checkDuplicates.insert(blst[i]).second)
+	  sys->log<System::WARNING>("[AngularBondedForces] Bond %d %d %d with index %d is duplicated!", blst[i].i, blst[i].j, blst[i].k, i);
+      }
+    }
   }
 
 
@@ -114,60 +131,41 @@ namespace uammd{
       Computes the potential: V(theta) = 2.0 K(sin(theta/2)-sin(theta_0/2))^2
       F(\vec{ri}) = d(V(theta))/d(cos(theta))·d(cos(theta))/d(\vec{ri})
     */
+    template<class Bond, class BondType>
     __global__ void computeAngularBondedForce(real4* __restrict__ force,
-					    const real4* __restrict__ pos,
-					    const int* __restrict__ bondStart,
-					    const int* __restrict__ bondEnd,
-					    const int* __restrict__ particlesWithBonds,
-					    const AngularBondedForces::AngularBond* __restrict__ bondList,
-					    const int * __restrict__ id2index,
-					    Box box){
+					      const real4* __restrict__ pos,
+					      const int* __restrict__ bondStart,
+					      const int* __restrict__ bondEnd,
+					      const int* __restrict__ particlesWithBonds,
+					      const Bond* __restrict__ bondList,
+					      const int * __restrict__ id2index,
+					      BondType bondType){
       extern __shared__ real3 forceTotal[];
       //A block per particle
-      int tid = blockIdx.x;
+      const int tid = blockIdx.x;
 
       //Id of the first particle with bonds
-      int id_i = particlesWithBonds[tid];
+      const int id_i = particlesWithBonds[tid];
 
       //Current index of my particle in the global arrays
-      int index = id2index[id_i];
-      real3 posp = make_real3(pos[index]);
+      const int index = id2index[id_i];
+      const real3 posp = make_real3(pos[index]);
   
-      int first = bondStart[tid];
-      int last = bondEnd[tid];
+      const int first = bondStart[tid];
+      const int last = bondEnd[tid];
    
       real3 f = make_real3(real(0.0));
 
-      int i,j,k;             //The bond indices
+
       real3 posi,posj, posk; //The bond particles
-      real kspring, ang0; //The bond info
-
-      //         i -------- j -------- k
-      //             rij->     rjk ->   
-    
-      real3 rij, rjk; //rij = ji - ri
-  
-      real invsqrij, invsqrjk; //1/|rij|
-      real rij2, rjk2;  //|rij|^2
-
-    
-      real a2; 
-      real cijk;
-      real a11, a12, a22;
-      real ampli;
-
       //Go through my bonds
       for(int b = first+threadIdx.x; b<last; b+=blockDim.x){
 	//Recover bond info
 	auto bond = bondList[b];
-	i = id2index[bond.i];
-	j = id2index[bond.j];
-	k = id2index[bond.k];
+	const int i = id2index[bond.i];
+	const int j = id2index[bond.j];
+	const int k = id2index[bond.k];
 
-	kspring = bond.kspring;	
-	ang0 = bond.ang;
-
-      
 	//TODO Texture memory target
 	//Store the positions of the three particles
 	//We already got one of them, p
@@ -188,67 +186,10 @@ namespace uammd{
 	  posk = posp;
 	}
 
-	//Compute distances and vectors
-	//---rij---
-	rij =  box.apply_pbc(posj - posi);
-	rij2 = dot(rij, rij);
-	invsqrij = rsqrt(rij2);
-	//---rkj---
-	rjk =  box.apply_pbc(posk - posj);
-	rjk2 = dot(rjk, rjk);
-	invsqrjk = rsqrt(rjk2);
-
-      
-	a2 = invsqrij * invsqrjk;
-	cijk = dot(rij, rjk)*a2; //cijk = cos (theta) = rij*rkj / mod(rij)*mod(rkj)
-
-	//Cos must stay in range
-	if(cijk>real(1.0)) cijk = real(1.0);
-	else if (cijk<real(-1.0)) cijk = -real(1.0);
-
-
-	//Approximation for small angle displacements	
-	//const real sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
-	//sijk cant be zero to avoid division by zero
-	//if(sijk<real(0.000001)) sijk = real(0.000001);
-	//ampli = -kspring * (acosf(cijk) - ang0)/sijk; //The force amplitude -k·(theta-theta_0)
-
-	
-	if(ang0 == real(0.0)){
-	  //TODO replace rij for rji so ang0=0 means straight and this can apply
-	  //When ang0=pi means stragiht it is difficult to check if ang0 is pi
-	  ampli = -real(2.0)*kspring;
-	}
-	else{
-	  const real theta = acosf(cijk);
-	  if(theta==real(0.0)){
-	    continue;
-	  }
-	  const real sinthetao2 = sinf(real(0.5)*theta);
-	  ampli = -real(2.0)*kspring*(sinthetao2 - sinf(ang0*real(0.5)))/sinthetao2;
-	}
-	
-	//ampli = -kang*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0; //k(1-cos(ang-ang0))
-		
-	//Magical trigonometric relations to infere the direction of the force
-
-	a11 = ampli*cijk/rij2;
-	a12 = ampli*a2;
-	a22 = ampli*cijk/rjk2;
-      
-	//Sum according to my position in the bond
-	// i ----- j ------ k
-	if(index==i){
-	  f += make_real3(a12*rjk -a11*rij); //Angular spring	
-	}
-	else if(index==j){
-	  //Angular spring
-	  f -= make_real3((-a11 - a12)*rij + (a12 + a22)*rjk);
-	}
-	else if(index==k){
-	  //Angular spring
-	  f -= make_real3(a12*rij -a22*rjk);
-	}
+	f += bondType.force(i,j,k,
+			    index,
+			    posi, posj, posk,
+			    bond.bond_info);	
       }
 
       //The fisrt thread sums all the contributions
@@ -268,7 +209,8 @@ namespace uammd{
 
 
   }
-  void AngularBondedForces::sumForce(cudaStream_t st){
+  template<class BondType>
+  void AngularBondedForces<BondType>::sumForce(cudaStream_t st){
     if(nbonds>0){
       int Nparticles_with_bonds = particlesWithBonds.size();
       
@@ -289,14 +231,14 @@ namespace uammd{
 			     d_particlesWithBonds,
 			     d_bondList,
 			     id2index,
-			     box);
+			     bondType);
 
     }
 
   }
 
-
-  real AngularBondedForces::sumEnergy(){
+  template<class BondType>
+  real AngularBondedForces<BondType>::sumEnergy(){
     return 0;
   }
 
