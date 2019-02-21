@@ -12,6 +12,10 @@ TODO:
 #include<cub/cub.cuh>
 #include<thrust/sort.h>
 #include<thrust/reduce.h>
+#include<algorithm>
+#include<cstdint>
+#include<vector>
+#include<set>
 #include<fstream>
 namespace uammd{
   template<class BondType>
