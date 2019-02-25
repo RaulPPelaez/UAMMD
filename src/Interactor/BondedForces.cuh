@@ -107,13 +107,14 @@ namespace uammd{
 	real r2 = dot(r12, r12);
 	real r02 = bi.r0*bi.r0;
     
-	return -r02*bi.k/(r02-r2)*r12; 
+	return -r02*bi.k/(r02-r2)*r12;
       }    
       inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
 	real r2 = dot(r12, r12);
 	real r02 = bi.r0*bi.r0;
     
-	return -r02*bi.k/(r02-r2); 
+	//return -r02*bi.k/(r02-r2);
+	return -real(0.5)*r02*log(real(1.0)-r2/r02);
       }
 
     
@@ -123,7 +124,19 @@ namespace uammd{
 	return bi;
       }
 
-    };  
+    };
+    struct FENEPBC: public FENE{
+      Box box;
+      FENEPBC(Box box): box(box){}
+      inline __device__ real3 force(int i, int j, const real3 &r12, const BondInfo &bi){
+	return FENE::force(i, j, box.apply_pbc(r12), bi);
+      }
+      
+      inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
+	return FENE::energy(i, j, box.apply_pbc(r12), bi);
+      }
+    };
+
   }
 
 

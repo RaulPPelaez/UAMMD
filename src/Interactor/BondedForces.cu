@@ -53,18 +53,23 @@ namespace uammd{
 	  sys->log<System::CRITICAL>("[BondedForces] ERROR! Bond file ended too soon! Expected %d lines, found %d", nbonds, i);
 	}
 	in>>h_bondList[i].i>>h_bondList[i].j;
+	if(h_bondList[i].i >= numberParticles or h_bondList[i].j >= numberParticles)
+	  sys->log<System::WARNING>("[BondedForces] Bond %d involves particles with index beyond the total number of particles!. i: %d, j:%d, N: %d", i, h_bondList[i].i, h_bondList[i].j, numberParticles);
 	h_bondList[i].bond_info = BondType::readBond(in);
       }
       bondList = h_bondList;
     }
     sys->log<System::MESSAGE>("[BondedForces] %d particle-particle bonds detected.", bondList.size()/2);
     /*Fixed point bonds*/
-    in>>nbondsFP;
+    if(!in) nbondsFP = 0;
+    else in>>nbondsFP;
     if(nbondsFP>0){
       bondListFP.resize(nbondsFP);
       thrust::host_vector<BondFP> h_bondListFP = bondListFP;
       fori(0, nbondsFP){
 	in>>h_bondListFP[i].i;
+	if(h_bondListFP[i].i >= numberParticles)
+	  sys->log<System::WARNING>("[BondedForces] Bond %d involves a particle with index beyond the total number of particles!. i: %d, N: %d", i, h_bondListFP[i].i, numberParticles);
 	in>>h_bondListFP[i].pos.x>>h_bondListFP[i].pos.y>>h_bondListFP[i].pos.z;
 	h_bondListFP[i].bond_info = BondType::readBond(in);
       }
