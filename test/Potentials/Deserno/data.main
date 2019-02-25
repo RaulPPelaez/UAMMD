@@ -1,0 +1,18 @@
+
+boxSize         55 55 55
+outfile         pos.dat
+init_posfile    init.small.pos
+temperature 0.72 1.01 0.90 0.62 1.08 0.40 0.80 0.91 0.70 0.86 1.18 0.23 1.05 0.46 0.57 0.36 0.99 1.00 0.74 0.64 1.02 1.14 0.67 0.37 0.97 1.12 1.11 0.20 0.33 0.66 0.69     1.1
+viscosity       1
+dt              0.001
+tolerance       1e-6
+relaxSteps      10000
+nsteps          1000000
+printSteps      1000
+
+hydrodynamicRadius 1
+
+harmonicbonds   harmonic.small.bonds
+FENEbonds   FENE.small.bonds
+
+wc 1.0
