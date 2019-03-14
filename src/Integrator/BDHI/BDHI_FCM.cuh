@@ -49,11 +49,11 @@ namespace uammd{
     
     class FCM{
     public:
-      using Kernel = IBM_kernels::GaussianKernel;
+      //using Kernel = IBM_kernels::GaussianKernel;
       //using Kernel = IBM_kernels::BarnettMagland;
       //using Kernel = IBM_kernels::PeskinKernel::fourPoint;
       //using Kernel = IBM_kernels::PeskinKernel::threePoint;
-      //using Kernel = IBM_kernels::GaussianFlexible::sixPoint;
+      using Kernel = IBM_kernels::GaussianFlexible::sixPoint;
       
       using cufftComplex3 = FCM_ns::cufftComplex3;
       
@@ -67,20 +67,28 @@ namespace uammd{
 	  shared_ptr<System> sys,
 	  Parameters par);
       ~FCM();
-      void setup_step(              cudaStream_t st = 0);
+      void setup_step(              cudaStream_t st = 0){}
       void computeMF(real3* MF,     cudaStream_t st = 0);    
       void computeBdW(real3* BdW,   cudaStream_t st = 0);  
-      void finish_step(             cudaStream_t st = 0);
+      void finish_step(             cudaStream_t st = 0){}
+
 
       real getHydrodynamicRadius(){
-	//return 0.9867*grid.cellSize.x;
-	//return fac*grid.cellSize.x;	
-	return ibm->getKernel()->getHydrodynamicRadius(IBM_kernels::SpatialDiscretization::Spectral)*fac;
+	return ibm->getKernel()->getHydrodynamicRadius(IBM_kernels::SpatialDiscretization::Spectral);//*fac;
       }
       real getSelfMobility(){
+	//O(a^8) accuracy. See Hashimoto 1959.
+	//With a Gaussian this expression has a minimum deviation from measuraments of 7e-7*rh at L=64*rh.
+	//The translational invariance of the hydrodynamic radius however decreases arbitrarily with the tolerance.
+	//Seems that this deviation decreases with L, so probably is due to the correction below missing something.
 	long double rh = this->getHydrodynamicRadius();
 	long double L = box.boxSize.x;
-	return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-2.837297l*rh/L+(4.0l/3.0l)*M_PIl*pow(rh/L,3.0l)-27.4l*pow(rh/L,6.0l));
+	long double a = rh/L;
+	long double a2= a*a; long double a3 = a2*a;
+	long double c = 2.83729747948061947666591710460773907l;
+	long double b = 0.19457l;
+	long double a6pref = 16.0l*M_PIl*M_PIl/45.0l + 630.0L*b*b;
+	return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-c*a+(4.0l/3.0l)*M_PIl*a3-a6pref*a3*a3);
       }
       
     private:

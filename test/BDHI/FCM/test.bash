@@ -30,7 +30,7 @@ temperature=1
 viscosity=1
 hydrodynamicRadius=1
 
-tolerance=1e-12
+tolerance=1e-4
 make fcm
 
 resultsFolder=results
@@ -39,7 +39,7 @@ figuresFolder=figures
 #rm -rf $resultsFolder $figuresFolder
 mkdir -p $resultsFolder $figuresFolder
 
-fac=$1
+fac=0
 
 function selfMobilityCubicBox {
     echo "self Mobility cubic box test"
@@ -63,11 +63,18 @@ function selfMobilityCubicBox {
 
 function hydrodynamicRadiusVariance {
     echo "Hydrodynamic radius variance test"
-    ./fcm hydrodynamicRadiusVariance 0 $viscosity $hydrodynamicRadius $tolerance > uammd.hydrodynamicRadius.log 2>&1
+    ./fcm hydrodynamicRadiusVariance 0 $viscosity $hydrodynamicRadius $tolerance $fac > uammd.hydrodynamicRadius.log 2>&1
 
-    echo "Maximum hydrodynamic radius variance across unit cell: $(cat hydrodynamicRadiusVariance.test | datamash -W min 3 max 3 | awk '{print ($2-$1)/2.0}') "
-
-    gnuplot -e "set term pngcairo color enhance; set output 'hydrodynamicRadiusVariance.png'; set dgrid 100, 100; set pm3d map; set size ratio -1; splot 'hydrodynamicRadiusVariance.test' u 1:2:3"
+    mean=$(cat hydrodynamicRadiusVariance.test |
+	      datamash -W mean 3 min 3 max 3 |
+	      awk '{printf("%.17g", $1)}')
+    maxDev=$(cat hydrodynamicRadiusVariance.test |
+	       datamash -W mean 3 min 3 max 3 |
+	       awk '{printf("%.17g", ($3-$2)/2.0)}')
+		      
+    echo "Maximum hydrodynamic radius variance across unit cell: mean: $mean, max deviation: $maxDev"
+    
+    gnuplot -e "set term pngcairo color enhance; set output 'hydrodynamicRadiusVariance.png'; set dgrid 100, 100; set pm3d map; set size ratio -1; splot 'hydrodynamicRadiusVariance.test' u 1:2:(\$3-$mean)"
 
     mv hydro*.png figures
     mv hydrodynamicRadiusVariance.test *.log results
@@ -168,7 +175,7 @@ function selfDiffusion_q2D {
 	echo "Doing $i" >/dev/stderr
 	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .Ds '{print $1}')
 	real_rh=$(echo $i | awk -F rh '{print $2}' | awk -F .q2D '{print $1}')
-	D0=$(echo 1 | awk '{print '$temperature'/(6*3.1415*'$viscosity'*'$real_rh');}')
+	D0=$(echo 1 | awk '{print '$temperature'/(6*3.1415*'$viscosity'*'$real_rh');}')	
 	N=$(grep -n "#" -m 2 $i | cut -d: -f1 | paste -sd" " | awk '{print $2-$1-1}')
 	Nsteps=$(grep -c "#" $i)	
 	./msd -N $N -Nsteps $Nsteps $i 2> /dev/null | awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd 
@@ -194,10 +201,12 @@ function noiseVariance {
     mv noiseVariance.test uammd.noiseVariance.log $resultsFolder/
 }
 
-pairMobilityCubicBox
+
+
 #./fcm pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1 
 selfMobilityCubicBox
 hydrodynamicRadiusVariance
+pairMobilityCubicBox
 selfMobility_q2D
 selfDiffusionCubicBox
 selfDiffusion_q2D

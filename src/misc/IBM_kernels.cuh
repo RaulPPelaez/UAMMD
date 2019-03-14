@@ -37,27 +37,29 @@ namespace uammd{
     struct GaussianKernel{
       int support;
       GaussianKernel(real3 h, real tolerance){
-	this->support = int(-log10(tolerance)+0.5);
-	this->hydrodynamicRadius = (0.5*support)*h.x/3.0;
-	//this->hydrodynamicRadius = h.x*(1.0-log10(tolerance)/10.0);
-	//eq. 8 in [2], \sigma_\Delta
-	real sigma = hydrodynamicRadius/sqrt(M_PI); //hydrodynamic radius is sqrt(M_PI)*sigma;
+
+	real amin = 0.55;
+	real amax = 1.65;
+	real x = -log10(2*tolerance)/10.0;
+	real factor = std::min(amin + x*(amax-amin), amax);
+	
+	this->hydrodynamicRadius = h.x*factor*sqrt(M_PIl);
+	real sigma = hydrodynamicRadius/sqrt(M_PIl);
 	this->prefactor = pow(2*M_PI*sigma*sigma, -1.5);
-	this->tau  = -0.5/(sigma*sigma);	  
-	//According to [2] the Gaussian kernel can be considered 0 beyond 3*a, so P >= 3*a/h
-	//this->support = 2*int(3.0*hydrodynamicRadius/h.x+0.5)+1;
-	
-	
-	
-	
+	this->tau  = -0.5/(sigma*sigma);
+	this->support = int(2*(sqrt(1.0/tau*log(0.9*tolerance)/(h.x*h.x) + 0.5))+0.5);
+	if(support < 3 ) support = 3;
+
+	hydrodynamicRadius = hydrodynamicRadius;//-4.3145e-6*h.x;
       }
 
       inline __host__ __device__ real phi(real r) const{
 	return pow(prefactor,1/3.0)*exp(tau*r*r);
       }
       
-      inline __device__ real delta(real3 rvec) const{	    
-	return prefactor*exp(tau*dot(rvec, rvec));
+      inline __device__ real delta(real3 rvec) const{
+	const real r2 = dot(rvec, rvec);
+	return prefactor*exp(tau*r2);
       }
       inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
 	return hydrodynamicRadius;
@@ -230,42 +232,63 @@ namespace uammd{
     //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
     struct BarnettMagland{
     private:
+      template<class Foo>
+      real integrate(Foo foo, real rmin, real rmax, int Nr){
+	double integral = foo(rmin)*0.5;
+	for(int i = 1; i<Nr; i++){
+	  integral += foo(rmin+i*(rmax-rmin)/Nr);
+	}
+	integral += foo(rmax)*0.5;
+	integral *= (rmax-rmin)/(real)Nr;
+	return integral;
+      }
+      
       real3 invh;
-      real maxDist;
+      real w;
       real beta;
       real pref;
       real hydrodynamicRadius;
+      real norm;
     public:
       int support;
       BarnettMagland(real3 h, real tolerance = 1e-10):
-	invh(1.0/h){	
-	this->support = int(-log10(tolerance)+0.5);
-	this->maxDist = support*0.5;
-	this->pref = 1.0/support*invh.x*invh.y*invh.z;
-	beta=(sqrt(2*M_PI)*support);
+	invh(1.0/h){
+
+	w=h.x*(-log10(tolerance*0.25)+1)/1.6;
+	w = std::max(h.x,w);
+	beta=3.7*w;
+	
+	this->support = int(2*w/h.x+0.5);
+	
+	this->pref = invh.x*invh.y*invh.z;
+
+	norm = 1;
+	{
+	  auto foo = [&](real r){ return this->phi(r);};
+	  norm = integrate(foo, -w, w, 1000000);
+	}	
+	{//Totally empirical
+	  auto foo = [&](real r){ return pow(this->phi(r),2);}; //Inverse of the volume
+	  hydrodynamicRadius = h.x/(integrate(foo, -w, w, 1000000)*2);
+	  hydrodynamicRadius = hydrodynamicRadius*(0.99973532-0.0119735/w-0.0642921/w/w+0.150367/w/w/w-0.094169/w/w/w/w);
+	}
       }
       inline __host__  __device__ real phi(real r) const{
-	if(r>=maxDist) return 0;
-	const real z = r/maxDist;
-	return exp(beta*(sqrt(real(1.0)-z*z)-real(1.0)));
-
+	const real z = r/(w);
+	const real z2 = z*z;
+	if(z2>real(1.0)) return 0;
+	return exp(beta*(sqrt(real(1.0)-z*z)-real(1.0)))/norm;
       }
       inline __device__ real delta(real3 rvec) const{
 	return pref*phi(rvec.x*invh.x)*phi(rvec.y*invh.y)*phi(rvec.z*invh.z);
       }
-	
+      
       inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
-	real a,b,c,d;
 	switch(sd){
 	case SpatialDiscretization::Staggered: return -1;
 	case SpatialDiscretization::Spectral:
-	  //This is an empirical fit
-	  a = 0.292065997466564;
-	  b = 6.18161635236421;
-	  c = -13.5250825121145;
-	  d = 22.6266864452691;
-	  return (a+b/support+c/(support*support)+d/(support*support*support))/invh.x;	  
-	default: return -1; 	  
+	  return hydrodynamicRadius;
+	default: return -1;
 	}
       }
     };

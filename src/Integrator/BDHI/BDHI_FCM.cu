@@ -39,7 +39,7 @@ namespace uammd{
       if(par.cells.x<=0){
 	if(par.hydrodynamicRadius<=0)
 	  sys->log<System::CRITICAL>("[BDHI::FCM] I need an hydrodynamic radius if cell dimensions are not provided!");
-	real h = par.hydrodynamicRadius;///par.fac;
+	real h = par.hydrodynamicRadius;
 	cellDim = nextFFTWiseSize3D(make_int3(box.boxSize/h));
       }
       else{      
@@ -52,39 +52,41 @@ namespace uammd{
       
       double rh = this->getHydrodynamicRadius();
 
-       // {
-       // 	std::ofstream out("kern.dat");
+      // {
+      //  	std::ofstream out("kern.dat");
 
-       // 	int Nt = 10000;
-       // 	double rmax = 10;
+      //  	int Nt = 10000;
+      //  	double rmax = 6;
 
-       // 	double r = 0;
-       // 	double dr = rmax/Nt;
-       // 	fori(0,Nt){
-       // 	  out<<r<<" "<<kernel->phi(r)<<"\n";
-       // 	  r+=dr;
+      //  	double r = 0;
+      //  	double dr = rmax/Nt;
+      //  	fori(0,Nt){
+      //  	  out<<r<<" "<<kernel->phi(r)<<"\n";
+      //  	  r+=dr;
 
-       // 	}
-       // 	out<<std::endl;
-       // }
+      //  	}
+      //  	out<<std::endl;
+      //  }
 
-       // {
-       // 	 std::ofstream out("kern2.dat");
+      // {
+      //  	 std::ofstream out("kern2.dat");
 
-       // 	 int Nt = 10000;
-       // 	 double rmax = 10;
+      //  	 int Nt = 10000;
+      //  	 double rmax = 6;
 
-       // 	 double r = 0;
-       // 	 double dr = rmax/Nt;
-       // 	 auto k2 = std::make_shared<IBM_kernels::GaussianKernel>(grid.cellSize, par.tolerance);
-	 
-       // 	 fori(0,Nt){
-       // 	   out<<r<<" "<<k2->phi(r)<<"\n";
-       // 	   r+=dr;
+      //  	 double r = 0;
+      //  	 double dr = rmax/Nt;
+      //  	 auto k2 = std::make_shared<IBM_kernels::GaussianFlexible::sixPoint>(grid.cellSize, 1e-10);
+      // 	 //auto k2 = std::make_shared<IBM_kernels::PeskinKernel::threePoint>(grid.cellSize, 1e-10);
+      // 	 //auto k2 = std::make_shared<IBM_kernels::PeskinKernel::fourPoint>(grid.cellSize, 1e-10);
+      
+      //  	 fori(0,Nt){
+      //  	   out<<r<<" "<<k2->phi(r)<<"\n";
+      //  	   r+=dr;
 
-       // 	 }
-       // 	 out<<std::endl;
-       // }
+      //  	 }
+      //  	 out<<std::endl;
+      //  }
        // exit(1);
        
       
@@ -114,6 +116,12 @@ namespace uammd{
 
       sys->log<System::MESSAGE>("[BDHI::FCM] h: %g %g %g", grid.cellSize.x, grid.cellSize.y, grid.cellSize.z);
       sys->log<System::MESSAGE>("[BDHI::FCM] Cell volume: %e", grid.cellSize.x*grid.cellSize.y*grid.cellSize.z);
+      sys->log<System::MESSAGE>("[BDHI::FCM] Requested kernel tolerance: %g", par.tolerance);
+
+      if(kernel->support >= grid.cellDim.x or
+	 kernel->support >= grid.cellDim.y or
+	 kernel->support >= grid.cellDim.z)
+	sys->log<System::ERROR>("[BDHI::FCM] Kernel support is too big, try lowering the tolerance or increasing the box size!.");
       
       CudaSafeCall(cudaStreamCreate(&stream));
       CudaSafeCall(cudaStreamCreate(&stream2));
@@ -207,9 +215,6 @@ namespace uammd{
       CudaSafeCall(cudaStreamDestroy(stream2));
       CudaCheckError();
     }
-
-    //I dont need to do anything at the begining of a step
-    void FCM::setup_step(cudaStream_t st){}
 
     //Compute M·v = Mw·v
     template<typename vtype>
@@ -602,7 +607,10 @@ namespace uammd{
 
       spreadParticles(v, st);
       convolveFourier(st);
-      interpolateParticles(Mv, st);      
+      interpolateParticles(Mv, st);
+      // real3 mv;
+      // cudaMemcpy(&mv, Mv, sizeof(real3), cudaMemcpyDeviceToHost);
+      // sys->log<System::CRITICAL>("[BDHI::FCM] %g %g %g", mv.x, mv.y, mv.z);
     }
 
     void FCM::computeMF(real3* MF, cudaStream_t st){
@@ -616,9 +624,5 @@ namespace uammd{
     }
 
 
-    void FCM::finish_step(cudaStream_t st){
-      sys->log<System::DEBUG2>("[BDHI::FCM] Finishing step");
- 
-    }
   }
 }

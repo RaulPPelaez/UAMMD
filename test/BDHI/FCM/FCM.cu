@@ -49,7 +49,7 @@ public:
 using std::make_shared;
 using std::endl;
 //Self mobility deterministic test. Pull a particle with a force, measure its velocity.
-void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M0, long double &real_rh, int3 cells = {-1, -1, -1}, bool use_random_pos = true, real3 r0={0,0,0}){
+void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M0, long double &real_rh){
   int N = 1;
   auto sys = make_shared<System>();
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
@@ -61,12 +61,7 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   BDHI::FCM::Parameters par;
   par.temperature = 0.0;
   par.viscosity = viscosity;
-
-  if(cells.x > 0)
-    par.cells = cells;
-  else
-    par.hydrodynamicRadius = rh;
-  //par.cells=make_int3(64);
+  par.hydrodynamicRadius = rh;  
   par.dt = 1;
   par.box = box;
   par.tolerance = tolerance;
@@ -81,13 +76,13 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   real_rh = bdhi->getHydrodynamicRadius();
   
   for(int i = 0; i<9;i++){M[i] = 0;}
-  int Ntest = use_random_pos?100:1;
+  int Ntest = 100;
   for(int i = 0; i<Ntest;i++){
     for(int alpha = 0; alpha<3;alpha++){
       double3 posprev;
       {
 	auto pos = pd->getPos(access::location::cpu, access::mode::write);
-	pos.raw()[0] = make_real4(r0+use_random_pos*make_real3(sys->rng().uniform3(-0.5, 0.5))*box.boxSize,0);
+	pos.raw()[0] = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5))*box.boxSize,0);
 	posprev = make_double3(make_real3(pos.raw()[0]));
       }
 
@@ -106,10 +101,71 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   sys->finish();
 }
 
+
+
+void computeSelfMobilityMatrixRH(real3 L, double F, long double *M, long double &M0, long double &real_rh, real3 r0, shared_ptr<BDHI::EulerMaruyama<BDHI::FCM>> &bdhi, int3 cells = {-1, -1, -1}){
+  int N = 1;
+  static auto sys = make_shared<System>();
+  sys->rng().setSeed(0xabefa129f9173^time(NULL));
+  for(int i = 0; i<10000; i++) sys->rng().next();
+  static auto pd = make_shared<ParticleData>(N, sys);
+  static auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
+  Box box(L);
+  BDHI::FCM::Parameters par;
+  par.temperature = 0.0;
+  par.viscosity = viscosity;
+
+  if(cells.x<0){
+    par.hydrodynamicRadius = rh;
+  }
+  else
+    par.cells = cells;
+  par.dt = 1;
+  par.box = box;
+  par.tolerance = tolerance;
+  par.fac = fac;
+  static auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+  if(!bdhi){
+    bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
+    bdhi->addInteractor(inter);
+  }
+  M0 = bdhi->getSelfMobility();
+  real_rh = bdhi->getHydrodynamicRadius();
+  
+  for(int i = 0; i<9;i++){M[i] = 0;}
+  int Ntest = 1;
+  for(int i = 0; i<Ntest;i++){
+    for(int alpha = 0; alpha<1;alpha++){
+      double3 posprev;
+      {
+	auto pos = pd->getPos(access::location::cpu, access::mode::write);
+	pos.raw()[0] = make_real4(r0,0);
+	posprev = make_double3(make_real3(pos.raw()[0]));
+      }
+
+      inter->F = F*make_real3(alpha==0, alpha==1, alpha==2);
+      bdhi->forwardTime();
+      double3 vel;
+      {
+	auto pos = pd->getPos(access::location::cpu, access::mode::read);  
+	vel = (make_double3(make_real3(pos.raw()[0]))-posprev)/par.dt;
+      }
+      M[alpha+3*0] += vel.x/(F*double(Ntest));
+      M[alpha+3*1] += vel.y/(F*double(Ntest));
+      M[alpha+3*2] += vel.z/(F*double(Ntest));
+    }
+  }
+  //sys->finish();
+}
+
+
 bool hydrodynamicRadiusVariance_test(){
 
   real L = int(64*rh+0.5);
-
+  //real L = int(64*(-log10(0.5*tolerance)));
+  //real L = int(tolerance);
+  
   double F = 1;
   
   long double M[9];
@@ -117,25 +173,26 @@ bool hydrodynamicRadiusVariance_test(){
   std::ofstream Mout("hydrodynamicRadiusVariance.test");
   real3 r0 = make_real3(0);
   int Nt = 5000;
+  shared_ptr<BDHI::EulerMaruyama<BDHI::FCM>> bdhi;
+  std::random_device rd;  //Will be used to obtain a seed for the random number engine
+  std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+  long double M0;// = computeM0PBC(L);
+  long double real_rh = 0;
+
   fori(0, Nt){
-    long double M0;// = computeM0PBC(L);
-    long double real_rh;
-    std::random_device rd;  //Will be used to obtain a seed for the random number engine
-    std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
     std::uniform_real_distribution<> dis(-L*0.5, -L*0.5+1);
 
     r0.x = dis(gen);
     r0.y = dis(gen);
-    computeSelfMobilityMatrix(make_real3(L), F, M, M0, real_rh, make_int3(L,L,L), false, r0);
+    computeSelfMobilityMatrixRH(make_real3(L), F, M, M0, real_rh, r0, bdhi, make_int3(L));
     
-    CudaCheckError();
-   
-
+    CudaCheckError();   
     
-    Mout<<std::setprecision(15)<<r0.x<<" "<<r0.y<<" ";
+    Mout<<std::setprecision(15)<<r0.x+0.5*L<<" "<<r0.y+0.5*L<<" ";
     //Substract 1 to the diagonal terms, which should be one so a matrix of zeroes should be printed
     //abs to be able to plot log
-    for(int j=0; j<9; j++) Mout<<std::setprecision(15)<<((1.0L*(j%3==j/3)-M[j]/M0))<<" ";
+    //for(int j=0; j<3; j++) Mout<<std::setprecision(15)<<((1.0L*(j%3==j/3)-M[j]/M0))<<" ";
+    for(int j=0; j<3; j++) Mout<<std::setprecision(15)<<(M[j]/M0)<<" ";
     Mout<<endl;
   }
 
@@ -310,7 +367,7 @@ bool pairMobility_q2D_test(double dist){
 
 bool selfMobility_q2D_test(){
   
-  int NL = 40;
+  int NL = 20;
 
   real L_min = 8*rh;
   real L_max = 200*rh;
@@ -519,7 +576,7 @@ int main( int argc, char *argv[]){
   viscosity = std::stod(argv[3]);
   rh = std::stod(argv[4]);
   tolerance = std::stod(argv[5]);
-  fac = 1;//std::stod(argv[6]);
+  fac = 0;//std::stod(argv[6]);
   if(strcmp(argv[1], "selfMobilityCubicBox")==0) selfMobilityCubicBox_test();
   if(strcmp(argv[1], "hydrodynamicRadiusVariance")==0) hydrodynamicRadiusVariance_test();
   if(strcmp(argv[1], "pairMobilityCubicBox")==0){
