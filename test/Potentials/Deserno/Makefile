@@ -44,7 +44,7 @@ OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
 BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets -lineinfo -src-in-ptx
 
 all: 
-	$(BASIC_LINE) Deserno.cu -o deserno
+	$(BASIC_LINE) Deserno.cu -o deserno -lcufft
 clean:
 	rm -f deserno
 

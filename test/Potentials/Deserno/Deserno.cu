@@ -3,6 +3,8 @@
 */
 #include"uammd.cuh"
 #include"Integrator/BrownianDynamics.cuh"
+#include"Integrator/BDHI/BDHI_EulerMaruyama.cuh"
+#include"Integrator/BDHI/BDHI_FCM.cuh"
 #include"misc/Deserno.cuh"
 #include<fstream>
 #include"utils/InputFile.h"
@@ -25,6 +27,7 @@ int nsteps, relaxSteps;
 int printSteps;
 
 real wc;
+bool hydro;
 void readParameters(shared_ptr<System> sys);
 
 int main(int argc, char * argv[]){  
@@ -49,14 +52,33 @@ int main(int argc, char * argv[]){
   
 
   Box box(boxSize);
-  
-  BD::EulerMaruyama::Parameters par;
-  par.temperature = temperature;
-  par.viscosity = viscosity;
-  par.hydrodynamicRadius = hydrodynamicRadius;
-  par.dt = dt;
 
-  auto bd = make_shared<BD::EulerMaruyama>(pd, sys, par);
+  //using BD = BD::EulerMaruyama;
+  shared_ptr<Integrator> bd;
+
+  if(hydro){
+    using BD = BDHI::EulerMaruyama<BDHI::FCM>;
+    BD::Parameters par;
+    par.temperature = temperature;
+    par.viscosity = viscosity;
+    par.hydrodynamicRadius = hydrodynamicRadius;
+    par.tolerance=1e-6;
+    par.dt = dt;
+    par.box = Box(boxSize);
+    auto pg = make_shared<ParticleGroup>(pd, sys);
+    bd = make_shared<BD>(pd, pg, sys, par);
+  }
+  else{
+    using BD = BD::EulerMaruyama;
+    BD::Parameters par;
+    par.temperature = temperature;
+    par.viscosity = viscosity;
+    par.hydrodynamicRadius = hydrodynamicRadius;
+    par.dt = dt;
+    auto pg = make_shared<ParticleGroup>(pd, sys);
+    bd = make_shared<BD>(pd, pg, sys, par);
+
+  }
   {
     Deserno::Parameters params;
     params.box = box;
@@ -113,5 +135,6 @@ void readParameters(shared_ptr<System> sys){
   in.getOption("relaxSteps", InputFile::Required)>>relaxSteps;
   in.getOption("printSteps", InputFile::Required)>>printSteps;
   in.getOption("seed", InputFile::Optional)>>seed;
+  in.getOption("hydro", InputFile::Required)>>hydro;
   in.getOption("wc", InputFile::Required)>>wc;
 }

@@ -5,7 +5,7 @@ wc=1.0
 for T in $(seq 0.2 0.01 1.2 | shuf)
 do
     echo "Doing $T"
-    sed -i 's+^temperature+temperature '$T'+' data.main
+    sed -i '/^temperature/c\temperature '$T'+' data.main
     ./deserno 2> uammd.T$T.log
     echo "Simulation finished"
     S=$(cat pos.dat |

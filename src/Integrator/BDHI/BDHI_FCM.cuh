@@ -51,9 +51,9 @@ namespace uammd{
     public:
       //using Kernel = IBM_kernels::GaussianKernel;
       //using Kernel = IBM_kernels::BarnettMagland;
-      //using Kernel = IBM_kernels::PeskinKernel::fourPoint;
+      using Kernel = IBM_kernels::PeskinKernel::fourPoint;
       //using Kernel = IBM_kernels::PeskinKernel::threePoint;
-      using Kernel = IBM_kernels::GaussianFlexible::sixPoint;
+      //using Kernel = IBM_kernels::GaussianFlexible::sixPoint;
       
       using cufftComplex3 = FCM_ns::cufftComplex3;
       
