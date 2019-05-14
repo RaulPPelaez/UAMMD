@@ -158,7 +158,7 @@ namespace uammd{
     };
 
   private:
-    shared_ptr<const System> sys;
+    shared_ptr<System> sys;
 #define DECLARE_PROPERTIES_T(type, name) Property<type> name;
 #define DECLARE_PROPERTIES(r,data, tuple) DECLARE_PROPERTIES_T(PROPTYPE(tuple), PROPNAME(tuple))
 
@@ -182,7 +182,7 @@ namespace uammd{
     bool originalOrderIndexCPUNeedsUpdate;
     Hints hints;
   public:
-    ParticleData(int numberParticles, shared_ptr<const System> sys);
+    ParticleData(int numberParticles, shared_ptr<System> sys);
     ~ParticleData(){
       sys->log<System::DEBUG>("[ParticleData] Destroyed");
       CudaCheckError();
@@ -326,7 +326,7 @@ namespace uammd{
 #define INIT_PROPERTIES_T(NAME, name) ,  name(BOOST_PP_STRINGIZE(NAME), sys)
 #define INIT_PROPERTIES(r,data, tuple) INIT_PROPERTIES_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
 
-  ParticleData::ParticleData(int numberParticles, shared_ptr<const System> sys):
+  ParticleData::ParticleData(int numberParticles, shared_ptr<System> sys):
     numberParticles(numberParticles),
     originalOrderIndexCPUNeedsUpdate(true),
     sys(sys)
