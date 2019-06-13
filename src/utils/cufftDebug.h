@@ -5,7 +5,7 @@
 #ifdef CUDA_ERROR_CHECK
 #define CUFFT_ERROR_CHECK
 #endif
-
+#include<cufft.h>
 
 #define CufftSafeCall(err) __cufftSafeCall(err, __FILE__, __LINE__)
 
