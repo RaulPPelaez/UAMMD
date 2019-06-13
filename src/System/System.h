@@ -11,8 +11,9 @@
 
 #include"global/defines.h"
 #include"utils/utils.h"
+#include"utils/cxx_utils.h"
 #include"utils/debugTools.cuh"
-#include"sysutils.h"
+#include"utils/parseArguments.h"
 #include<cstring>
 #include<ostream>
 #include<iostream>
@@ -70,7 +71,15 @@ namespace uammd{
       m_rng.setSeed(seed);
       
       int dev = -1;
+      size_t cuda_printf_limit;
+
+      cudaDeviceGetLimit(&cuda_printf_limit,cudaLimitPrintfFifoSize);
       //If the device is set from cli
+      if(input_parse::parseArgument(argc, argv, "--increase_print_limit", &cuda_printf_limit)){
+	log<WARNING>("[System] Setting CUDA printf buffer size to %s",
+		     printUtils::prettySize(cuda_printf_limit).c_str());
+	cudaDeviceSetLimit(cudaLimitPrintfFifoSize, cuda_printf_limit);
+      }
       if(input_parse::parseArgument(argc, argv, "--device", &dev)){
 	cudaSetDevice(dev);
       }
