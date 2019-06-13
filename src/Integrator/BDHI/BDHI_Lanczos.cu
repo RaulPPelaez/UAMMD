@@ -30,7 +30,7 @@ namespace uammd{
       hydrodynamicRadius(par.hydrodynamicRadius),
       temperature(par.temperature),
       tolerance(par.tolerance),
-      rpy(par.viscosity){
+      rpy(par.viscosity),par(par){
       
       sys->log<System::MESSAGE>("[BDHI::Lanczos] Initialized");  
 

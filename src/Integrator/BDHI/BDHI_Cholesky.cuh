@@ -50,13 +50,7 @@ namespace uammd{
       real getSelfMobility(){
 	long double rh = par.hydrodynamicRadius;
 	if(rh<0) return -1.0;
-	else{
-	  long double L = box.boxSize.x;
-	  return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l
-						  -2.837297l*rh/L
-						  +(4.0l/3.0l)*M_PIl*pow(rh/L,3)
-						  -27.4l*pow(rh/L,6.0l));
-	}
+	else return  1.0l/(6.0l*M_PIl*par.viscosity*rh);	
       }
 
     private:
