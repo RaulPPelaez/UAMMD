@@ -71,6 +71,28 @@ namespace uammd{
       real hydrodynamicRadius;
     };
 
+    struct SimpleGaussian{
+      int support;
+      SimpleGaussian(int support, real width):support(support){
+	this-> prefactor = pow(1.0/sqrt(2*M_PI*width*width),3);
+	this-> tau = -1.0/(2.0*width*width);
+	sup = 0.5*support;
+      }
+      
+      inline __device__ real delta(real3 rvec, real3 h) const{
+	const real r2 = dot(rvec, rvec);
+	if(r2>sup*sup*h.x*h.x) return 0;
+	return prefactor*exp(tau*r2);
+      }
+    private:
+      real prefactor;
+      real tau;
+      real sup;
+    };
+
+
+
+    
     
     namespace PeskinKernel{
       //[1] Charles S. Peskin. The immersed boundary method (2002). DOI: 10.1017/S0962492902000077      
