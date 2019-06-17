@@ -434,10 +434,14 @@ VECATTR real2 make_real2(real x, real y){
   
 VECATTR real2 make_real2(real s){ return make_real2(s, s);}
 VECATTR real2 make_real2(real2 a){return make_real2(a.x, a.y);}
+VECATTR real2 make_real2(real3 a){return make_real2(a.x, a.y);}
 VECATTR real2 make_real2(real4 a){return make_real2(a.x, a.y);}
 VECATTR real2 make_real2(int3 a){ return make_real2(real(a.x), real(a.y));}
 VECATTR real2 make_real2(uint3 a){return make_real2(real(a.x), real(a.y));}
 
+  VECATTR real dot(real2 a, real2 b){ return a.x*b.x + a.y*b.y;}
+  
+  
 }
 ////////////////DOUBLE PRECISION//////////////////////
 #ifdef SINGLE_PRECISION
