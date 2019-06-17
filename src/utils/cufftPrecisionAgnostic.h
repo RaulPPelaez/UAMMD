@@ -10,15 +10,19 @@
 #include<cufft.h>
 namespace uammd{
   //Transforming cufft macros to templates...
-  template<class T> struct cufftTypeAgnostic;
-  template<> struct cufftTypeAgnostic<double>{using type=cufftDoubleReal;};
-  template<> struct cufftTypeAgnostic<float>{using type=cufftReal;};
-  template<class T> using cufftReal_t = typename cufftTypeAgnostic<T>::type;
+  namespace detail{
+    template<class T> struct cufftTypeAgnostic;
+    template<> struct cufftTypeAgnostic<double>{using type=cufftDoubleReal;};
+    template<> struct cufftTypeAgnostic<float>{using type=cufftReal;};
+  
+    template<class T> struct cufftComplexType;
+    template<> struct cufftComplexType<double>{using type=cufftDoubleComplex;};
+    template<> struct cufftComplexType<float>{using type=cufftComplex;};
+  }
+  
+  template<class T> using cufftReal_t = typename detail::cufftTypeAgnostic<T>::type;
 
-  template<class T> struct cufftComplexType;
-  template<> struct cufftComplexType<double>{using type=cufftDoubleComplex;};
-  template<> struct cufftComplexType<float>{using type=cufftComplex;};
-  template<class T> using cufftComplex_t = typename cufftComplexType<T>::type;
+  template<class T> using cufftComplex_t = typename detail::cufftComplexType<T>::type;
 
   template<class T> struct CUFFT_Real2Complex;
   template<> struct CUFFT_Real2Complex<double>{static constexpr cufftType value=CUFFT_D2Z;};
