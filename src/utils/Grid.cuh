@@ -23,6 +23,7 @@ namespace uammd{
     real3 cellSize;
     real3 invCellSize; /*The inverse of the cell size in each direction*/
     Box box;
+    real cellVolume;
     Grid(): Grid(Box(), make_int3(0,0,0)){}
 
     Grid(Box box, real3 minCellSize):
@@ -41,7 +42,8 @@ namespace uammd{
 	
       gridPos2CellIndex = make_int3( 1,
 				     cellDim.x,
-				     cellDim.x*cellDim.y);	
+				     cellDim.x*cellDim.y);
+      cellVolume = cellSize.x*cellSize.y*cellSize.z;
     }
     template<class VecType>
     inline __host__ __device__ int3 getCell(const VecType &r) const{
@@ -92,6 +94,15 @@ namespace uammd{
     }
 
     inline __host__ __device__ int getNumberCells() const{ return cellDim.x*cellDim.y*cellDim.z;}
+    inline __host__ __device__ real getCellVolume(int3 cell) const{ return getCellVolume();}
+    inline __host__ __device__ real getCellVolume() const{ return cellVolume;}   
+    inline __host__ __device__ real3 getCellSize(int3 cell) const{return getCellSize();}
+    inline __host__ __device__ real3 getCellSize() const{return cellSize;}
+    
+    inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell) const{
+      return box.apply_pbc(pos + box.boxSize*real(0.5) - cellSize*(make_real3(cell)+real(0.5)));
+      
+    }
   };
 
   //Looks for the closest (equal or greater) number of nodes of the form 2^a*3^b*5^c*7^d*11^e
