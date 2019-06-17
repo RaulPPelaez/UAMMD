@@ -23,6 +23,12 @@ namespace uammd{
       if(boxSize.y==real(0.0))	minusInvBoxSize.y = real(0.0);
       if(boxSize.z==real(0.0))	minusInvBoxSize.z = real(0.0);
     }
+    //Sets the periodicity of each dimension of the box.
+    inline void setPeriodicity(bool x, bool y, bool z){
+      if(!x) minusInvBoxSize.x = 0;
+      if(!y) minusInvBoxSize.y = 0;
+      if(!z) minusInvBoxSize.z = 0;      
+    }
     inline __host__ __device__ real3 apply_pbc(const real3 &r) const{
       //return  r - floorf(r/L+real(0.5))*L; //MIC Algorithm
       const real3 offset = floorf(r*minusInvBoxSize + real(0.5)); //MIC Algorithm
