@@ -18,7 +18,7 @@ if ! ls rdf
 then
    git clone https://github.com/raulppelaez/RadialDistributionFunction RDF
    cd RDF
-   make
+   cmake . && make
    cp bin/rdf ..
    cd ..
 fi
