@@ -79,11 +79,11 @@ namespace uammd{
 
     //Integrate the movement 0.5 dt and reset the forces in the first step
     template<int step>
-      __global__ void integrateGPU(real4 __restrict__  *pos,
-				   real3 __restrict__ *vel,
-				   real4 __restrict__  *force,
-				   const real __restrict__ *mass,
-				   ParticleGroup::IndexIterator indexIterator,
+      __global__ void integrateGPU(real4* __restrict__  pos,
+				   real3* __restrict__ vel,
+				   real4* __restrict__  force,
+				   const real* __restrict__ mass,
+				   ParticleGroup::IndexIterator __restrict__ indexIterator,
 				   int N,
 				   real dt, bool is2D){
 	int id = blockIdx.x*blockDim.x+threadIdx.x;

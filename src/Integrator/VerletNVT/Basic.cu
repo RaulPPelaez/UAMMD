@@ -135,11 +135,11 @@ namespace uammd{
 
       //Integrate the movement 1 dt and reset the forces in the first step
       template<int step>
-      __global__ void integrateGPU(real4 __restrict__  *pos,
-				   real3 __restrict__ *vel,
-				   real4 __restrict__  *force,
-				   const real __restrict__ *mass,
-				   const real __restrict__ *radius,
+      __global__ void integrateGPU(real4* __restrict__  pos,
+				   real3* __restrict__ vel,
+				   real4* __restrict__  force,
+				   const real* __restrict__ mass,
+				   const real* __restrict__ radius,
 				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
 				   real dt, real viscosity, bool is2D,

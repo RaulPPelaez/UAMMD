@@ -56,11 +56,11 @@ namespace uammd{
       // a = (1 - \gamma·dt/(2·m) ) ·b
       // \gamma = 6*pi*viscosity*radius
       template<int step>
-      __global__ void integrateGPU(real4 __restrict__  *pos,
-				   real3 __restrict__ *vel,
-				   real4 __restrict__  *force,
-				   const real __restrict__ *mass,
-				   const real __restrict__ *radius,				   
+      __global__ void integrateGPU(real4* __restrict__  pos,
+				   real3* __restrict__ vel,
+				   real4* __restrict__  force,
+				   const real* __restrict__ mass,
+				   const real* __restrict__ radius,				   
 				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
 				   real dt, real viscosity, bool is2D,

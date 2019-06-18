@@ -97,13 +97,12 @@ namespace uammd{
     
     namespace EulerMaruyama_ns{
       /*Integrate the movement*/
-      __global__ void integrateGPU(real4 __restrict__  *pos,
-				   ParticleGroup::IndexIterator indexIterator,
-				   const real4 __restrict__  *force,
-				   //const real3 __restrict__ *dW,
+      __global__ void integrateGPU(real4* __restrict__  pos,
+				   ParticleGroup::IndexIterator __restrict__ indexIterator,
+				   const real4* __restrict__  force,
 				   real3 Kx, real3 Ky, real3 Kz,
 				   real selfMobility,
-				   real * radius,
+				   real* __restrict__ radius,
 				   real dt,
 				   bool is2D,
 				   real sqrt2MTdt,
