@@ -7,6 +7,8 @@
   [option] [argument1] [argument2] ...
   
   You can have an option with no arguments
+  
+  Additionally you can use the special shell option, which will run the rest of the line as a bash command when encountered and wait for it to finish.
 
 USAGE:
 
@@ -52,12 +54,13 @@ USAGE:
 #include<vector>
 #include<sstream>
 #include"cxx_utils.h"
+#include <cstdlib>
 namespace uammd{
   class InputFile{
 
-    shared_ptr<System> sys;
     size_t maxFileSizeToStore = 1e7; //10 mb
     std::string fileName;
+    shared_ptr<System> sys;
     std::vector<std::pair<string,string>> options;
 
     //Process a line of the file and store option/arguments if necessary
@@ -98,7 +101,17 @@ namespace uammd{
 	  }
 	}
 	sys->log<System::DEBUG3>("[InputFile] option \"%s\" registered with args \"%s\"",  word.c_str(), line.c_str());
-	options.emplace_back(std::make_pair(word, line));	
+	if(word.compare("shell") == 0){
+	  sys->log<System::DEBUG3>("[InputFile] Executing shell command: %s", line.c_str());
+	  int rc = std::system(line.c_str());
+	  if(rc < 0){
+	    sys->log<System::ERROR>("[InputFile] Shell command execution failed with code %d: %s", rc, line.c_str());	    
+	  }
+	  return;
+	}
+					 
+	options.emplace_back(std::make_pair(word, line));
+
       }
     }
   public:
@@ -128,7 +141,7 @@ namespace uammd{
     std::istringstream& getOption(std::string op, OptionType type = OptionType::Optional){
       static std::istringstream ret;
       ret.str();
-      ret.clear();
+      ret.clear();      
       sys->log<System::DEBUG1>("[InputFile] Looking for option %s in file %s",  op.c_str(), fileName.c_str());
       for(auto s: options){
 	if(std::get<0>(s).compare(op)==0){
@@ -146,6 +159,10 @@ namespace uammd{
       //bad_ss.setstate(std::ios::failbit);      
       //return  bad_ss;
       ret.setstate(std::ios::failbit);
+      if(op.compare("shell") == 0){
+	sys->log<System::ERROR>("[InputFile] Ignoring use of the reserved \"shell\" option");
+      }
+
       return ret;
       
     }
