@@ -482,6 +482,13 @@ namespace uammd{
 	  gridVelsFourier[icell] += projectFourier(k, factor);
 	}
       }
+
+
+      struct toReal3{
+	template<class vtype>
+	inline __device__ real3 operator()(vtype q){ return make_real3(q);}
+      };
+
       
     }
     
@@ -491,8 +498,10 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
-
-      ibm->spread(pos.raw(), quantity, d_gridVels, grid, numberParticles, st);
+      
+      auto tr = thrust::make_transform_iterator(quantity, FCM_ns::toReal3());
+      
+      ibm->spread(pos.begin(), tr, d_gridVels, grid, numberParticles, st);
     }
 
     //Takes grid forcing and transforms it to grid velocity, also adds the fluctuations.

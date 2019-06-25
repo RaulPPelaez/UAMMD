@@ -49,9 +49,9 @@ namespace uammd{
     
     class FCM{
     public:
-      //using Kernel = IBM_kernels::GaussianKernel;
+      using Kernel = IBM_kernels::GaussianKernel;
       //using Kernel = IBM_kernels::BarnettMagland;
-      using Kernel = IBM_kernels::PeskinKernel::fourPoint;
+      //using Kernel = IBM_kernels::PeskinKernel::fourPoint;
       //using Kernel = IBM_kernels::PeskinKernel::threePoint;
       //using Kernel = IBM_kernels::GaussianFlexible::sixPoint;
       
