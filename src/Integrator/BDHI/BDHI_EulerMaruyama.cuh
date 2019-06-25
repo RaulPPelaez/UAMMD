@@ -22,15 +22,19 @@
 
   BDHI::PSE:
   -The Positively Split Edwald Method, which takes the computation to fourier space. [2]
-
+  
+  BDHI::FCM:
+  -Fluctuating Froce Coupling Method, also spectral but computing only long range [3]
+  
 REFERENCES:
 
 
-  1- Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations
-  J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
-  2- Rapid sampling of stochastic displacements in Brownian dynamics simulations 
-  The Journal of Chemical Physics 146, 124116 (2017); doi: http://dx.doi.org/10.1063/1.4978242
-
+  [1] Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations
+    J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
+  [2] Rapid sampling of stochastic displacements in Brownian dynamics simulations 
+    The Journal of Chemical Physics 146, 124116 (2017); doi: http://dx.doi.org/10.1063/1.4978242
+  [3] Fluctuating force-coupling method for simulations of colloidal suspensions; 
+    J. Comp. Phys. 269 (2014); doi: https://doi.org/10.1016/j.jcp.2014.03.013
 
 */
 
