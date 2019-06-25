@@ -50,21 +50,31 @@ namespace uammd{
 
     IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern);
 
-    template<class Grid, class PosIterator, class QuantityIterator>
+    template<class Grid, class PosIterator,
+      class QuantityIterator,
+      class GridDataIterator>
     void spread(const PosIterator &pos, const QuantityIterator &v,
-		real3 *gridData,
+		GridDataIterator &gridData,
 		Grid grid, int numberParticles, cudaStream_t st = 0);
 
-    template<class Grid, class PosIterator, class QuantityIterator>
-    void gather(const PosIterator &pos, const QuantityIterator &v,
-		real3 *gridData,
+    template<class Grid,
+      class PosIterator, class ResultIterator, class GridQuantityIterator>
+    void gather(const PosIterator &pos, const ResultIterator &Jq,
+		const GridQuantityIterator &gridData,
 		Grid & grid, int numberParticles, cudaStream_t st = 0);
 
-  template<class Grid,
-    class PosIterator, class ResultIterator, class GridQuantityIterator,
-    class QuadratureWeights>
+    template<class Grid,
+      class PosIterator, class ResultIterator, class GridQuantityIterator,
+      class QuadratureWeights>
     void gather(const PosIterator &pos, const ResultIterator &Jq,
-		GridQuantityIterator gridVels,
+		const GridQuantityIterator &gridData,
+		Grid & grid, const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0);
+
+    template<bool is2D, class Grid,
+      class PosIterator, class ResultIterator, class GridQuantityIterator,
+      class QuadratureWeights>
+    void gather(const PosIterator &pos, const ResultIterator &Jq,
+		const GridQuantityIterator &gridData,
 		Grid & grid, const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0);
 
     shared_ptr<Kernel> getKernel(){ return this->kernel;}

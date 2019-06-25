@@ -57,7 +57,7 @@ namespace uammd{
 	return pow(prefactor,1/3.0)*exp(tau*r*r);
       }
       
-      inline __device__ real delta(real3 rvec) const{
+      inline __device__ real delta(real3 rvec, real3 h) const{
 	const real r2 = dot(rvec, rvec);
 	return prefactor*exp(tau*r2);
       }
@@ -70,7 +70,6 @@ namespace uammd{
       real tau;
       real hydrodynamicRadius;
     };
-
     struct SimpleGaussian{
       int support;
       SimpleGaussian(int support, real width):support(support){
@@ -113,7 +112,7 @@ namespace uammd{
 	  }
 	  else return 0;
 	}
-	inline __device__ real delta(real3 rvec) const{
+	inline __device__ real delta(real3 rvec, real3 h) const{
 	    
 	  return invh.x*invh.y*invh.z*phi(fabs(rvec.x*invh.x))*phi(fabs(rvec.y*invh.y))*phi(fabs(rvec.z*invh.z));
 	}
@@ -143,7 +142,7 @@ namespace uammd{
 	  }
 	  else return 0;
 	}
-	inline __device__ real delta(real3 rvec) const{
+	inline __device__ real delta(real3 rvec, real3 h) const{
 	  return invh.x*invh.y*invh.z*phi(fabs(rvec.x*invh.x))*phi(fabs(rvec.y*invh.y))*phi(fabs(rvec.z*invh.z));
 	}
 	
@@ -232,7 +231,7 @@ namespace uammd{
 	  return real(0.0);
 	}
 
-	inline __device__ real delta(real3 rvec) const{
+	inline __device__ real delta(real3 rvec, real3 h) const{
 	  //Uncomment to evaluate instead of reading from a table
 	  //return invh.x*invh.y*invh.z*phi(fabs(rvec.x*invh.x))*phi(fabs(rvec.y*invh.y))*phi(fabs(rvec.z*invh.z));
 	  return invh.x*invh.y*invh.z*phi_tab(fabs(rvec.x*invh.x))*phi_tab(fabs(rvec.y*invh.y))*phi_tab(fabs(rvec.z*invh.z));
@@ -301,7 +300,7 @@ namespace uammd{
 	if(z2>real(1.0)) return 0;
 	return exp(beta*(sqrt(real(1.0)-z*z)-real(1.0)))/norm;
       }
-      inline __device__ real delta(real3 rvec) const{
+      inline __device__ real delta(real3 rvec, real3 h) const{
 	return pref*phi(rvec.x*invh.x)*phi(rvec.y*invh.y)*phi(rvec.z*invh.z);
       }
       
