@@ -16,8 +16,8 @@ INTERFACE:
 An IBM kernel must be a class with these characteristics:
 
    -A constructor that takes a cell size and a tolerance (which might be unused)
-   -A "delta" member device function that takes a real3 distance and returns a real weight, prototype:
-       	__device__ real delta(real3 rvec);
+   -A "delta" member device function that takes a real3 distance and a real3 cellsize and returns a real weight, prototype:
+       	__device__ real delta(real3 rvec, real3 h);
    -A function that returns the expected hydrodynamic radius for a given SpatialDiscretization (returns -1 if unknown):
       real getHydrodynamicRadius(SpatialDiscretization sd) const;
    -A public member called support with the necessary support cells (3 means first neighbours, 27 cells in total in 3D).
