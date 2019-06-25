@@ -15,7 +15,7 @@ CXX=g++
 CUDA_VER=
 
 ifeq ($(CUDA_VER),)
-CUDA_VER:=$(shell ls -d /usr/local/cuda*/ | grep -Eo '\-[0-9]\.[0-9]' | cut -d- -f2 | sort -grk1 | head -1)
+CUDA_VER:=$(shell ls -d /usr/local/cuda*/ | grep -Eo '\-[0-9]+\.[0-9]+' | cut -d- -f2 | sort -grk1 | head -1)
 endif
 CUDA_ROOT=/usr/local/cuda-$(CUDA_VER)
 
