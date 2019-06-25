@@ -1,0 +1,16 @@
+boxSize			64 64
+cells 			80 80
+numberSteps		1000
+printSteps		1
+dt			0.0001
+relaxSteps		0
+viscosity		1
+temperature		1
+hydrodynamicRadius	1
+#You can use the shell option to run arbitrary bash code at exactly this position during the datamain file read
+shell 			yes | awk 'BEGIN{L=64; N=2000; ix=int(sqrt(N)); if(L/ix<1.3) ix=int(L/1.5); iy=ix; print ix*iy}{for(i=0;i<ix; i++) for(j=0;j<iy; j++){print i*(L/ix)-L/2,j*(L/iy)-L/2,0;} exit;}' > q2D.init
+
+initcoords		q2D.init
+output			/dev/stdout
+tolerance		1e-3
+hydro 			1

@@ -4,7 +4,7 @@
 ARCH=52
 
 #Uncomment to compile in double precision mode, single by default
-#DOUBLE_PRECISION=-DDOUBLE_PRECISION
+DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
 #CXX=clang++-5.0
@@ -64,6 +64,9 @@ dpd:
 bdhi:
 	$(BASIC_LINE) BDHI.cu -llapacke -lcblas -lcurand -lcublas -lcusolver -lcufft  -lgomp -o bdhi
 
+quasi2D:
+	$(BASIC_LINE) q2D.cu -lcufft  -o q2D
+
 logo:
 	$(BASIC_LINE) logo.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o logo
 
@@ -95,7 +98,8 @@ dambreak:
 	$(BASIC_LINE) dambreak.cu  -o dambreak
 
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D
+
 
 
 
