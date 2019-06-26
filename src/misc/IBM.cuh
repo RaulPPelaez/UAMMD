@@ -14,7 +14,7 @@ auto ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
 
 ibm->spread(pos,      //An iterator with the position of the markers
             quantity, //An iterator with the quantity of each marker to spread
-	    gridQuantity, //A real3* with the grid data (ibm will sum to the existing data)
+	    gridQuantity, //An iterator with the grid data (ibm will sum to the existing data)
 	    grid,         //A Grid descriptor corresponding to gridQuantity
 	    numberMarkers,
 	    cudaStream);
@@ -23,11 +23,13 @@ ibm->spread(pos,      //An iterator with the position of the markers
 
 ibm->gather(pos,      //An iterator with the position of the markers
             quantity, //An iterator with the quantity of each marker to gather (ibm will sum to the existing values)
-	    gridQuantity, //A real3* with the grid data
+	    gridQuantity, //An iterator with the grid data
 	    grid,         //A Grid descriptor corresponding to gridQuantity
 	    //qw,  //Optional, a device functor that takes (cell, grid) and returns the quadrature weight of cell. cellVolume() is the default.
 	    numberMarkers,
 	    cudaStream);
+
+//The value types of the different iterators can be wildly different as long as they are compatible, in the sense that the type of quantity*delta() must be summable to the type of gridQuantity for spread, etc.
 
 
 //Get a reference to the kernel
@@ -78,7 +80,7 @@ namespace uammd{
 		Grid & grid, const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0);
 
     shared_ptr<Kernel> getKernel(){ return this->kernel;}
-    
+
   };
 
 }

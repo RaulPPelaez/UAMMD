@@ -54,8 +54,8 @@ namespace uammd{
     template<bool is2D, class Grid, class Kernel,
       class PosIterator,
       class ParticleQuantityIterator, class GridQuantityIterator>
-    __global__ void particles2GridD(const PosIterator __restrict__ pos, /*Particle positions*/
-				    const ParticleQuantityIterator __restrict__ v,   /*Per particle quantity to spread*/
+    __global__ void particles2GridD(const PosIterator pos, /*Particle positions*/
+				    const ParticleQuantityIterator  v,   /*Per particle quantity to spread*/
 				    GridQuantityIterator  __restrict__ gridQuantity, /*Spreaded values, size ncells*/
 				    int N, /*Number of particles*/
 				    Grid grid, /*Grid information and methods*/
@@ -89,22 +89,16 @@ namespace uammd{
       int numberNeighbourCells = supportCells*supportCells;
       if(!is2D)  numberNeighbourCells *= supportCells;
       __syncthreads();
-      for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
-	/*Compute neighbouring cell*/
+      for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){	
 	int3 cellj = make_int3(celli.x + i%supportCells - P.x,
 			       celli.y + (i/supportCells)%supportCells - P.y,
 			       is2D?0:(celli.z + i/(supportCells*supportCells) - P.z));
 	cellj = grid.pbc_cell(cellj);
-	  
-	/*Distance from particle i to center of cell j*/
+	
 	const real3 rij = grid.distanceToCellCenter(pi, cellj);
-	const real k = kernel.delta(rij, grid.getCellSize(cellj));
-	/*The weight of particle i on cell j*/
+	const auto k = kernel.delta(rij, grid.getCellSize(cellj));
+	
 	const auto weight = vi*kernel.delta(rij, grid.getCellSize(cellj));
-	// if(weight.x) printf("celli: %d %d , cellj: %d %d , weight: %g %g\n",
-	// 		    celli.x, celli.y,
-	// 		    cellj.x, cellj.y,
-	// 		    weight.x, weight.y);
 	/*Get index of cell j*/
 	const int jcell = grid.getCellIndex(cellj);
 	  
@@ -128,6 +122,7 @@ namespace uammd{
         Which in a regular grid is just the cell size, h. But can in general be something depending on the position.
     */
 
+    
     template<int TPP, bool is2D, class Grid,
       class Kernel,
       class PosIterator, class ResultIterator, class GridQuantityIterator,
@@ -135,15 +130,14 @@ namespace uammd{
     __global__ void grid2ParticlesDTPP(const PosIterator pos, /*Particle positions*/
 				       ResultIterator Jq, /*Result for each particle*/
 				       const GridQuantityIterator gridQuantity, /*Values in the grid*/
-				       int N, /*Number of particles*/
-				       Grid grid, /*Grid information and methods*/				  
+				       int N, /*Number of markers*/
+				       Grid grid, 
 				       Kernel kernel, 
 				       QuadratureWeights qw /*Quadrature weights*/
 				       ){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
-      
-      
+            
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using BlockReduce = cub::BlockReduce<GridQuantityType, TPP>;
 
@@ -182,20 +176,18 @@ namespace uammd{
 				 is2D?0:(celli.z + i/(supportCells*supportCells) - P.z));
 	  cellj = grid.pbc_cell(cellj);
 
-	  //Compute distance to cell center
 	  const real3 rij = grid.distanceToCellCenter(pi, cellj);
 	  
-	  const real weight = kernel.delta(rij, grid.getCellSize(cellj));
+	  const auto weight = kernel.delta(rij, grid.getCellSize(cellj));
 
-	  if(weight){
+	  //if(weight){
 	    //J = S^T = St = σ S 
 	    const int jcell = grid.getCellIndex(cellj);
 	    const auto cellj_vel = gridQuantity[jcell];
 	    const real dV = qw(cellj, grid);
-	    // printf("i: %d ; cellj: %d %d %d ; celli: %d %d %d; rij: %g %g %g; weight: %.17g ; dV: %g\n",
-	    //  	   id, cellj.x, cellj.y, cellj.z, celli.x, celli.y, celli.z, rij.x, rij.y, rij.z, weight, dV);
+
 	    result += (dV*weight)*cellj_vel;
-	  }
+	    //}
 	}
       }
 	  
