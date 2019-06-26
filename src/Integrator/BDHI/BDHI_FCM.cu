@@ -588,7 +588,7 @@ namespace uammd{
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
 
-      ibm->gather(pos.raw(), Mv, d_gridVels, grid, numberParticles, st);
+      ibm->gather(pos.begin(), Mv, d_gridVels, grid, numberParticles, st);
     }
 
     /*Compute M·F and B·dW in Fourier space
