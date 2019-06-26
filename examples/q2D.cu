@@ -23,8 +23,11 @@ std::string initFile, outFile("/dev/stdout");
 real viscosity, temperature, dt, tolerance=1e-3, hydrodynamicRadius;
 
 int numberSteps, printSteps, relaxSteps;
-bool hydro;
 
+std::string scheme;
+
+int in_numberParticles;
+bool loadParticles = true;
 
 void readParameters(shared_ptr<System> sys);
 int main(int argc, char *argv[]){    
@@ -37,27 +40,39 @@ int main(int argc, char *argv[]){
 
   
   Box box(boxSize);
-  
-  std::ifstream in(initFile);
-  if(!in) sys->log<System::CRITICAL>("Could not read from %s!", initFile.c_str());
-  in>>N;
-  
-  auto pd = make_shared<ParticleData>(N, sys);
+  std::shared_ptr<ParticleData> pd;
+  if(loadParticles){
+    std::ifstream in(initFile);
+    if(!in) sys->log<System::CRITICAL>("Could not read from %s!", initFile.c_str());
+    in>>N;
+    pd = make_shared<ParticleData>(N, sys);
+    
 
-  {  
-    auto pos = pd->getPos(access::location::cpu, access::mode::write); 
-    fori(0,N){
-      in>>pos[i].x>>pos[i].y>>pos[i].z;
-      pos[i].w = 0;
+    {  
+      auto pos = pd->getPos(access::location::cpu, access::mode::write); 
+      fori(0,N){
+	in>>pos[i].x>>pos[i].y>>pos[i].z;
+	pos[i].w = 0;
+      }
     }
   }
-  
+  else{
+    N = in_numberParticles;
+    if(!N) sys->log<System::CRITICAL>("I need numberParticles if loadParticles == 0 ");
+    pd = make_shared<ParticleData>(N, sys);
+    auto pos = pd->getPos(access::location::cpu, access::mode::write);
+    fori(0, N){
+      pos[i] = make_real4(make_real3(sys->rng().uniform3(-boxSize.x*0.5, boxSize.x*0.5)));
+      pos[i].z = 0;
+    }
+
+  }
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
   
   std::ofstream out(outFile);
 
   std::shared_ptr<Integrator> bdhi;
-  {
+  if(scheme.compare("quasi2D") == 0){
     using Scheme = BDHI::Quasi2D;
     Scheme::Parameters par;
     par.temperature = temperature;
@@ -69,9 +84,24 @@ int main(int argc, char *argv[]){
     
     bdhi = make_shared<Scheme>(pd, pg, sys, par);    
   }
-  sys->log<System::MESSAGE>("RUNNING!!!");
+  else if(scheme.compare("true2D") == 0){
+    using Scheme = BDHI::True2D;
+    Scheme::Parameters par;
+    par.temperature = temperature;
+    par.viscosity = viscosity;
+    par.dt = dt;
+    par.hydrodynamicRadius = hydrodynamicRadius;
+    par.cells = cells;
+    par.box = box;
+    
+    bdhi = make_shared<Scheme>(pd, pg, sys, par);    
 
-  //pd->sortParticles();
+  }
+  else{
+
+    sys->log<System::CRITICAL>("Unrecognized scheme!, use quasi2D or ture2D");
+  }
+  sys->log<System::MESSAGE>("RUNNING!!!");
         
   Timer tim;
   tim.tic();
@@ -97,9 +127,7 @@ int main(int argc, char *argv[]){
 	out<<p<<" "<<radius<<" "<<type<<"\n";
       }
       out<<std::flush;
-    }
-  
-    //if(j%500 == 0)   pd->sortParticles();
+    }    
     
   }
   
@@ -126,8 +154,12 @@ void readParameters(shared_ptr<System> sys){
   in.getOption("viscosity", InputFile::Required)>>viscosity;
   in.getOption("temperature", InputFile::Required)>>temperature;
   in.getOption("hydrodynamicRadius", InputFile::Required)>>hydrodynamicRadius;
-  in.getOption("initcoords", InputFile::Required)>>initFile;
+
   in.getOption("output", InputFile::Optional)>>outFile;  
   in.getOption("tolerance", InputFile::Optional)>>tolerance;
-  in.getOption("hydro", InputFile::Required)>>hydro;    
+  in.getOption("scheme", InputFile::Required)>>scheme;
+
+  in.getOption("initcoords", InputFile::Optional)>>initFile;
+  in.getOption("numberParticles", InputFile::Optional)>>in_numberParticles;
+  in.getOption("loadParticles", InputFile::Optional)>>loadParticles;    
 }

@@ -4,7 +4,7 @@
 ARCH=52
 
 #Uncomment to compile in double precision mode, single by default
-DOUBLE_PRECISION=-DDOUBLE_PRECISION
+#DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
 #CXX=clang++-5.0
@@ -47,7 +47,7 @@ BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OP
 all: 
 	$(BASIC_LINE)  $(FILE)
 
-test: benchmark lj ljMult dpd bdhi bd bonds sph mcnvt fcm dambreak
+test: benchmark lj ljMult dpd bdhi bd bonds sph mcnvt fcm dambreak quasi2D
 
 
 benchmark:
