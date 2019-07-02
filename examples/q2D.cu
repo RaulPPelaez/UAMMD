@@ -107,15 +107,14 @@ int main(int argc, char *argv[]){
   tim.tic();
   int nsteps = numberSteps;
 
+
   forj(0,relaxSteps){
     bdhi->forwardTime();
   }
   forj(0,nsteps){
-
     bdhi->forwardTime();
-
-    if(printSteps and j%printSteps==0){
-      sys->log<System::DEBUG1>("[System] Writing to disk...");
+    if(printSteps>0 and j%printSteps==0){
+      sys->log<System::DEBUG1>("[System] Writing to disk...");   
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       out<<"#"<<"\n";
