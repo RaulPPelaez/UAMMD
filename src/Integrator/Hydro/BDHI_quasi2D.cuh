@@ -21,7 +21,7 @@ struct True2D{
 // \hat{G}_\vec{k} = 1/\eta [ g_k(k*a)  \vec{k_perp}\dyadic\vec{k_perp} + f_k(k*a\vec{k}\dyadic\vec{k} ]
 //See eq.25 in [1].
 
-__device__ real2 operator()(real k2){
+__device__ real2 operator()(real k2, real a){
   //For True2D:
   real f_k = 0;
   real g_k = 1/(k2*k2)
@@ -91,7 +91,7 @@ namespace uammd{
 	  return pow(a*0.66556976637237890625, 2);
 	}
 	static constexpr inline bool hasThermalDrift(){ return false;}
-	inline __device__ real2 operator()(real k2){
+	inline __device__ real2 operator()(real k2, real a){
 	  const real fk = 0;
 	  const real gk = real(1.0)/(k2*k2);
 	  return {fk, gk};
@@ -103,15 +103,15 @@ namespace uammd{
 	static inline __host__ __device__ real getGaussianVariance(real a){
 	  return pow(a/sqrt(M_PI), 2);
 	}
-	inline __device__ real2 operator()(real k2){
+	inline __device__ real2 operator()(real k2, real a){
 	  const real k = sqrt(k2);
 	  const real invk3 = real(1.0)/(k*k*k);
 	  constexpr real inv_sqrtpi = 0.564189583547756; //1/sqrt(pi)
 	  constexpr real invpi = 1.0/M_PI;
-	  const real fk = real(0.5)*invpi*invk3*(-k +
-						 + exp(k2*invpi)*(k2 + real(M_PI)*real(0.5))*erfc(k*inv_sqrtpi)
+	  const real fk = real(0.5)*invpi*invk3*(-k*a +
+						 + exp(k2*invpi*a*a)*(k2*a*a + real(M_PI)*real(0.5))*erfc(k*a*inv_sqrtpi)
 						 );
-	  const real gk = real(0.5)*invk3*erfc(k*inv_sqrtpi)*exp(k2*invpi);
+	  const real gk = real(0.5)*invk3*erfc(k*a*inv_sqrtpi)*exp(k2*a*a*invpi);
 	  return {fk, gk};
 	}
 
@@ -190,11 +190,11 @@ namespace uammd{
 
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
-      thrust::device_vector<cufftComplex> gridVelsFourier;
-      thrust::device_vector<real2> particleVels;
+      // thrust::device_vector<cufftComplex> gridVelsFourier;
+      // thrust::device_vector<real2> particleVels;
 
-      //managed_vector<cufftComplex> gridVelsFourier;
-      //managed_vector<real2> particleVels;
+      managed_vector<cufftComplex> gridVelsFourier;
+      managed_vector<real2> particleVels;
 
       cudaStream_t st, st2;
 

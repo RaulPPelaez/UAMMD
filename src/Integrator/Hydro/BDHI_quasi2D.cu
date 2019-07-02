@@ -31,6 +31,11 @@ namespace uammd{
       if(!hydroKernel) hydroKernel = std::make_shared<HydroKernel>();
       seed = sys->rng().next();
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] Initialized");
+      sys->log<System::MESSAGE>("[BDHI::BDHI2D] Temperature: %g", temperature);
+      sys->log<System::MESSAGE>("[BDHI::BDHI2D] Viscosity: %g", viscosity);
+      sys->log<System::MESSAGE>("[BDHI::BDHI2D] dt: %g", dt);
+      sys->log<System::MESSAGE>("[BDHI::BDHI2D] hydrodynamic radius: %g", hydrodynamicRadius);
+      
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] Using interpolation kernel: %s",
 				type_name_without_namespace<Kernel>().c_str());
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] Using hydrodynamic kernel: %s",
@@ -54,7 +59,7 @@ namespace uammd{
       cellDim.z = 1;
       grid = Grid(box, cellDim);
 
-      int support  = (int(3.0 * par.hydrodynamicRadius * grid.cellDim.x / grid.box.boxSize.x) +1 )*2+1;
+      int support  = (int(2.5 * par.hydrodynamicRadius * grid.cellDim.x / grid.box.boxSize.x) +1 )*2+1;
 
       double width = hydroKernel->getGaussianVariance(par.hydrodynamicRadius);
       auto kernel = std::make_shared<Kernel>(support, width);
@@ -230,7 +235,8 @@ namespace uammd{
 				       cufftComplex2 * gridVels, /*Output array, can be the same as input*/
 				       real vis,
 				       Grid grid,/*Grid information and methods*/
-				       HydroKernel hydroKernel
+				       HydroKernel hydroKernel,
+				       real hydrodynamicRadius
 				       ){
 	/*Get my cell*/
 	int2 cell;
@@ -250,7 +256,8 @@ namespace uammd{
 	const real2 k = cellToWaveNumber(cell, make_int2(grid.cellDim), make_real2(grid.box.boxSize));
 	const real k2 = dot(k,k);
 
-	const real2 fg = hydroKernel(k2);
+	const real a = hydrodynamicRadius;
+	const real2 fg = hydroKernel(k2,a);
 	const real fk = fg.x/(vis*real(ncells));
 	const real gk = fg.y/(vis*real(ncells));
 	const cufftComplex2 factor = gridForces[icell];
@@ -266,7 +273,9 @@ namespace uammd{
 					   //Parameters to seed the RNG
 					   ullint seed,
 					   ullint step,
-					   HydroKernel hydroKernel
+					   HydroKernel hydroKernel,
+					   real hydrodynamicRadius
+					   
 					   ){
 	int2 cell;
 	cell.x= blockIdx.x*blockDim.x + threadIdx.x;
@@ -305,12 +314,13 @@ namespace uammd{
 	  {
 	    const real k2 = dot(k,k);
 
-	    const real2 fg = hydroKernel(k2);
+	    const real a = hydrodynamicRadius;
+	    const real2 fg = hydroKernel(k2, a);
 	    const real fk = fg.x;
 	    const real gk = fg.y;
 
-	    const real fk_sq = sqrt(fk/(vis*grid.getNumberCells()));
-	    const real gk_sq = sqrt(gk/(vis*grid.getNumberCells()));
+	    const real fk_sq = sqrt(fk);
+	    const real gk_sq = sqrt(gk);
 
 	    factor.x = (gk_sq*noise.x*k.y    + fk_sq*noise.y*k.x);
 	    factor.y = (gk_sq*noise.x*(-k.x) + fk_sq*noise.y*k.y);
@@ -396,14 +406,16 @@ namespace uammd{
 	   (cufftComplex2*) d_gridVelsFourier, //Output: B·FFT·S·F
 	   viscosity,
 	   grid,
-	   *hydroKernel);
+	   *hydroKernel,
+	   hydrodynamicRadius);
       }
       /*Add the stochastic term to the fourier velocities if T>0 -> 1/√σ·√B·dWw */
       if(temperature > 0){
 	static ullint counter = 0; //Seed the rng differently each call
 	counter++;
 	sys->log<System::DEBUG2>("[BDHI::BDHI2D] Wave space brownian noise");
-	real prefactor = sqrt(2.0*temperature/(dt*grid.getCellVolume()));
+	//real prefactor = sqrt(2.0*temperature/(dt*grid.getCellVolume()));
+	real prefactor = sqrt(2.0*temperature/(viscosity*dt*box.boxSize.x*box.boxSize.y));
 	BDHI2D_ns::fourierBrownianNoise<<<NblocksCells, NthreadsCells, 0, st>>>(
 										//In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
 										(cufftComplex2*)d_gridVelsFourier,
@@ -412,7 +424,8 @@ namespace uammd{
 										viscosity,
 										seed, //Saru needs two seeds apart from thread id
 										counter,
-										*hydroKernel);
+										*hydroKernel,
+										hydrodynamicRadius);
 
       }
 
@@ -437,7 +450,6 @@ namespace uammd{
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVelsFourier.data());
       real2* d_particleVels = thrust::raw_pointer_cast(particleVels.data());
-
       ibm->gather(pos,
 		  d_particleVels,
 		  d_gridVels,
@@ -465,14 +477,14 @@ namespace uammd{
       thrust::fill(gridVelsFourier.begin(), gridVelsFourier.end(),
 		   typename decltype(gridVelsFourier)::value_type());
 
-      spreadParticles();
-      convolveFourier();
+      spreadParticles();      
+      convolveFourier();      
       interpolateParticles();
-
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      const int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[BDHI::BDHI2D] Updating positions");
       try{
-	thrust::transform(thrust::device,
+	thrust::transform(thrust::cuda::par,
 			  particleVels.begin(), particleVels.end(),
 			  pos.begin(),
 			  pos.begin(),
@@ -482,6 +494,7 @@ namespace uammd{
 	sys->log<System::CRITICAL>("[BDHI::BDHI2D] Thrust transform failed with: %s", e.what());
       }
       sys->log<System::DEBUG2>("[BDHI::BDHI2D] Done");
+      cudaDeviceSynchronize();
       CudaCheckError();
     }
 
