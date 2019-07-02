@@ -11,6 +11,18 @@
 
 make
 
+if ! ls tools/fastmsd >/dev/null 2>&1
+then
+    cd tools
+    git clone https://github.com/raulppelaez/MeanSquareDisplacement    
+    cd MeanSquareDisplacement
+    mkdir build
+    cd build
+    cmake .. && make
+    cp bin/msd ../../fastmsd
+    cd ../../../
+    rm -rf tools/MeanSquareDisplacement
+fi
 
 
 T=1.23234
@@ -40,7 +52,7 @@ function checkSelfDiffusion {
 
 	msdtmp=$(mktemp)
 	
-	cat<<EOF | ./q2D /dev/stdin 2> /dev/null | fastmsd -N $N -Nsteps $Nsteps -precision float 2> /dev/null | awk '{print $1*'$dt', ($2+$3)/(4*'$D0')}' > $msdtmp
+	cat<<EOF | ./q2D /dev/stdin 2> /dev/null | tools/fastmsd -N $N -Nsteps $Nsteps -precision float 2> /dev/null | awk '{print $1*'$dt', ($2+$3)/(4*'$D0')}' > $msdtmp
 
 		scheme 	       	     	$scheme
 		boxSize			$L $L
