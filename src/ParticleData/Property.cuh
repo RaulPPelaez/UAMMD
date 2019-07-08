@@ -61,7 +61,7 @@ namespace uammd{
       if(mode==access::mode::write || mode==access::mode::readwrite){
 	*isBeingWritten = true;
       }
-      else{
+      else if(mode == access::mode::read){
 	*isBeingRead = true;
       }
     }

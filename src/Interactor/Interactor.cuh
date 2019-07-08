@@ -55,7 +55,7 @@ namespace uammd{
     }
     
     virtual void sumForce(cudaStream_t st) = 0;
-    virtual real sumEnergy() = 0;
+    virtual real sumEnergy(){ return 0;}
 
     std::string getName(){ return this->name;}
 
