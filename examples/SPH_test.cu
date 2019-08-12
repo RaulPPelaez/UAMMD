@@ -1,17 +1,12 @@
-/*Raul P. Pelaez 2017. A short range forces example.
+/*Raul P. Pelaez 2017. An SPH example.
 
-This file contains a good example of how UAMMD works and how to configure and launch a simulation.
-
-It describes a LJ liquid simulation in a periodic box.
-Two types of LJ particles exist, starting in a random configuration.
-Each type is attracted to a different z plane.
-This makes the particles form a kind of pillars going from one type to the other.
-
-Commented code is available to show other available features.
+Particles start in a cube configuration and are inside a prism box (longer in z). There is gravity and the bottom wall of the box is repulsive.
+The SPH particles will fall until hitting the bottom and then flow around until the energy from the fall is dissipated.
   
 Needs cli input arguments with a system size, etc, look for "argv"
 
-Or just run: ./a.out 14 45 0.05 0.9 2000 50 0
+Or just run: ./a.out 14 45 0.01 0.9 20000 500 -20
+
 for a quick test
 
 You can visualize the reuslts with superpunto
@@ -75,7 +70,7 @@ struct HarmonicWall{
 int main(int argc, char *argv[]){
 
   if(argc<8){
-    std::cerr<<"ERROR, I need some parameters!!\nTry to run me with:\n./a.out 14 45 0.05 0.9 2000 50 0"<<std::endl;
+    std::cerr<<"ERROR, I need some parameters!!\nTry to run me with:\n./"<<argv[0]<<" 14 45 0.01 0.9 20000 500 -20"<<std::endl;
     exit(1);
   }
   int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
