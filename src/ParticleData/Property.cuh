@@ -96,18 +96,8 @@ namespace uammd{
     
   };
 
-
-  struct Property_Base{
-    
-    virtual void resize(int Nnew) = 0;
-    virtual void swapInternalBuffers() = 0;
-    virtual std::string getName() = 0;
-    virtual int size() = 0;
-    virtual bool isAllocated() = 0;
-    virtual size_t typeSize() = 0;
-  };
   template<class T>
-  struct Property: public Property_Base{
+  struct Property{
     friend class ParticleData;
   private:  
     thrust::device_vector<T> deviceVector, deviceVector_alt;
@@ -249,10 +239,10 @@ namespace uammd{
 	
       }
     }
-    std::string getName() override { return this->name;}
-    int size() override{return this->N;}
-    bool isAllocated() override{ return this->N>0;}
-    size_t typeSize() override{ return sizeof(valueType);}
+    std::string getName() { return this->name;}
+    int size() {return this->N;}
+    bool isAllocated(){ return this->N>0;}
+    size_t typeSize() { return sizeof(valueType);}
   };
 
 }
