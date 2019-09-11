@@ -182,6 +182,7 @@ namespace uammd{
     bool originalOrderIndexCPUNeedsUpdate;
     Hints hints;
   public:
+    ParticleData() = delete;
     ParticleData(int numberParticles, shared_ptr<System> sys);
     ~ParticleData(){
       sys->log<System::DEBUG>("[ParticleData] Destroyed");
