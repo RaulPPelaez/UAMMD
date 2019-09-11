@@ -66,23 +66,20 @@ namespace uammd{
     char ** m_argv = nullptr;
     std::shared_ptr<device_temporary_memory_resource> m_memory_resource;
     
-  public:
-
-    System():System(0, nullptr){
-      tim.tic();
-    }
+  public:    
+    System():System(0, nullptr){}
     System(int argc, char *argv[]): m_argc(argc), m_argv(argv){
       tim.tic();
       this->printWellcome();
       CudaCheckError();
-      cudaDeviceSynchronize();
+      CudaSafeCall(cudaDeviceSynchronize());
       auto seed = 0xf31337Bada55D00dULL^time(NULL);
       m_rng.setSeed(seed);
       
       int dev = -1;
       size_t cuda_printf_limit;
 
-      cudaDeviceGetLimit(&cuda_printf_limit,cudaLimitPrintfFifoSize);
+      CudaSafeCall(cudaDeviceGetLimit(&cuda_printf_limit,cudaLimitPrintfFifoSize));
       //If the device is set from cli
       if(input_parse::parseArgument(argc, argv, "--increase_print_limit", &cuda_printf_limit)){
 	log<WARNING>("[System] Setting CUDA printf buffer size to %s",
@@ -93,14 +90,14 @@ namespace uammd{
 	cudaSetDevice(dev);
       }
       else{//Otherwise set the one CUDA Driver auto sets
-	cudaFree(0);
-	cudaGetDevice(&dev);
-	cudaFree(0);
-	cudaSetDevice(dev);
+	CudaSafeCall(cudaFree(0));
+	CudaSafeCall(cudaGetDevice(&dev));
+	CudaSafeCall(cudaFree(0));
+	CudaSafeCall(cudaSetDevice(dev));
       }
-      cudaFree(0);
+      CudaSafeCall(cudaFree(0));
       cudaDeviceProp deviceProp;
-      cudaGetDeviceProperties(&deviceProp, dev);
+      CudaSafeCall(cudaGetDeviceProperties(&deviceProp, dev));
       
       log<System::MESSAGE>("[System] Using device: %s with id: %d", deviceProp.name, dev);
       
