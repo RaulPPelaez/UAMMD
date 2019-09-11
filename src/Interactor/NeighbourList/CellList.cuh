@@ -357,7 +357,7 @@ namespace uammd{
 
     CellList(shared_ptr<ParticleData> pd,
 	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys){
+	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys), ps(sys){
       sys->log<System::MESSAGE>("[CellList] Created");
       
       maxNeighboursPerParticle = 32;

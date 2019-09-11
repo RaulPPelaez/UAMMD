@@ -102,13 +102,13 @@ namespace uammd{
     size_t temp_storage_bytes = 0; //Additional storage needed by cub
     thrust::device_vector<int>  original_index;
     thrust::device_vector<int>  index, index_alt;
-    thrust::device_vector<uint> hash, hash_alt; 
+    thrust::device_vector<uint> hash, hash_alt;
+    std::shared_ptr<System> sys;
     /*Radix sort by key using cub, puts sorted versions of index,hash in index_alt, hash_alt*/
-  public: 
-    ParticleSorter() = default;
-    ~ParticleSorter(){
-      CudaSafeCall(cudaFree(d_temp_storage));
-    }
+  public:
+    ParticleSorter() = delete;
+    ParticleSorter(std::shared_ptr<System> sys):sys(sys){};
+
     template<class hashType>
     void sortByKey(cub::DoubleBuffer<int> &index,
 		   cub::DoubleBuffer<hashType> &hash,
@@ -208,8 +208,7 @@ namespace uammd{
 	thrust::copy(ci, ci+N, original_index.begin());
       }
       catch(thrust::system_error &e){
-	fprintf(stderr,"[ParticleSorter] Thrust could not copy ID vector. Error: %s", e.what());
-	exit(1);
+	sys->log<System::CRITICAL>("[ParticleSorter] Thrust could not copy ID vector. Error: %s", e.what());
       }
 
 
@@ -257,8 +256,8 @@ namespace uammd{
 	  thrust::copy(ci, ci+(N-lastN), index.begin()+lastN);
 	}
 	catch(thrust::system_error &e){
-	  fprintf(stderr, "[ParticleSorter] Thrust failed in %s(%d). Error: %s", __FILE__, __LINE__, e.what());
-	  exit(1);
+	  sys->log<System::CRITICAL>("[ParticleSorter] Thrust failed in %s(%d). Error: %s",
+				     __FILE__, __LINE__, e.what());
 	}
 
       }
@@ -282,8 +281,9 @@ namespace uammd{
 	  thrust::copy(id, id+(N-lastN), original_index.begin()+lastN);
 	}
 	catch(thrust::system_error &e){
-	  fprintf(stderr, "[ParticleSorter] Thrust failed in %s(%d). Error: %s", __FILE__, __LINE__, e.what());
-	  exit(1);
+	  sys->log<System::CRITICAL>("[ParticleSorter] Thrust failed in %s(%d). Error: %s",
+				     __FILE__, __LINE__, e.what());
+
 	}
       }
       return thrust::raw_pointer_cast(original_index.data());

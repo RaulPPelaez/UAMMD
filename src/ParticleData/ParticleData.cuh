@@ -345,6 +345,8 @@ namespace uammd{
     catch(thrust::system_error &e){
       sys->log<System::CRITICAL>("[ParticleData] Thrust could not copy ID vector. Error: %s", e.what());
     }
+
+    particle_sorter = std::make_shared<ParticleSorter>(sys);
   }
 
   //Sort the particles to improve a certain kind of access pattern.
