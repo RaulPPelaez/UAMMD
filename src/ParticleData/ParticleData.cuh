@@ -177,7 +177,7 @@ namespace uammd{
     
     
     
-    ParticleSorter particle_sorter;
+    std::shared_ptr<ParticleSorter> particle_sorter;
     thrust::host_vector<int> originalOrderIndexCPU;
     bool originalOrderIndexCPUNeedsUpdate;
     Hints hints;
@@ -241,7 +241,7 @@ namespace uammd{
     const int * getIdOrderedIndices(access::location dev){
       sys->log<System::DEBUG5>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
       auto id = getId(access::location::gpu, access::mode::read);
-      int *sortedIndex = particle_sorter.getIndexArrayById(id.raw(), numberParticles);
+      int *sortedIndex = particle_sorter->getIndexArrayById(id.raw(), numberParticles);
       if(!sortedIndex) sortedIndex = id.raw();
       sys->log<System::DEBUG6>("[ParticleData] Id reorder completed.");  
       if(dev == access::location::gpu){	
@@ -270,11 +270,11 @@ namespace uammd{
     //Apply newest order to a certain iterator
     template<class InputIterator, class OutputIterator>
     void applyCurrentOrder(InputIterator in, OutputIterator out, int numElements){
-      particle_sorter.applyCurrentOrder(in, out, numElements);
+      particle_sorter->applyCurrentOrder(in, out, numElements);
     }
     
     const int * getCurrentOrderIndexArray(){
-      return particle_sorter.getSortedIndexArray(numberParticles);      
+      return particle_sorter->getSortedIndexArray(numberParticles);      
     }
   
 
@@ -325,14 +325,14 @@ namespace uammd{
 
 #define INIT_PROPERTIES_T(NAME, name) ,  name(BOOST_PP_STRINGIZE(NAME), sys)
 #define INIT_PROPERTIES(r,data, tuple) INIT_PROPERTIES_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
-
+  
   ParticleData::ParticleData(int numberParticles, shared_ptr<System> sys):
     numberParticles(numberParticles),
     originalOrderIndexCPUNeedsUpdate(true),
     sys(sys)
     PROPERTY_LOOP(INIT_PROPERTIES)
   {
-    sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);
+    sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);    
     id.resize(numberParticles);
     CudaCheckError();
     auto id_prop = id.data(access::location::gpu, access::mode::write);
@@ -355,7 +355,7 @@ namespace uammd{
       auto posPtr     = pos.data(access::gpu, access::write);
       if(hints.orderByHash || !hints.orderByType){
 	int3 cellDim = make_int3(hints.hash_box.boxSize/hints.hash_cutOff);
-	particle_sorter.updateOrderByCellHash(posPtr.raw(), numberParticles, hints.hash_box, cellDim);
+	particle_sorter->updateOrderByCellHash(posPtr.raw(), numberParticles, hints.hash_box, cellDim);
       }
       
     }
@@ -365,7 +365,7 @@ namespace uammd{
       if(name.isAllocated()){						\
 	auto devicePtr     = name.data(access::gpu, access::write);	\
 	auto device_altPtr = name.getAltGPUBuffer();			\
-	particle_sorter.applyCurrentOrder(devicePtr.raw(), device_altPtr, numberParticles); \
+	particle_sorter->applyCurrentOrder(devicePtr.raw(), device_altPtr, numberParticles); \
 	name.swapInternalBuffers();						\
       }									\
     }    
