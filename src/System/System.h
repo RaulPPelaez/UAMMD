@@ -18,7 +18,7 @@
 #include<ostream>
 #include<iostream>
 #include<cstdarg>
-
+#include"misc/allocator.h"
 #include<memory>
 #include<ctime>
 #include<chrono>
@@ -49,6 +49,13 @@ namespace uammd{
   #endif
   
   class System{
+  public:
+    
+    using device_temporary_memory_resource = uammd::device_pool_memory_resource;
+    template<class T>
+    using allocator = uammd::polymorphic_allocator<T, device_temporary_memory_resource>;
+
+  private:    
     Xorshift128plus m_rng;
     SystemParameters sysPar;
     Timer tim;
@@ -57,6 +64,7 @@ namespace uammd{
 
     int m_argc = 0;
     char ** m_argv = nullptr;
+    std::shared_ptr<device_temporary_memory_resource> m_memory_resource;
     
   public:
 
@@ -111,7 +119,9 @@ namespace uammd{
 
       if(sysPar.cuda_arch < sysPar.minimumCudaArch)
 	log<System::CRITICAL>("[System] Unsupported Configuration, the GPU must have at least compute capability %d (%d.%d found)", sysPar.minimumCudaArch, deviceProp.major, deviceProp.minor);
+      m_memory_resource = std::make_shared<device_temporary_memory_resource>();
       CudaCheckError();
+
     }
     
     
@@ -192,6 +202,11 @@ namespace uammd{
 
     const SystemParameters getSystemParameters(){
       return sysPar;
+    }
+
+    template<class T>
+    allocator<T> getTemporaryDeviceAllocator(){
+      return allocator<T>(m_memory_resource.get());
     }
     
   };
