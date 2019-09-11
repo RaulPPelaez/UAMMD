@@ -1,3 +1,5 @@
+#ifndef UAMMD_MANAGED_ALLOCATOR_H
+#define UAMMD_MANAGED_ALLOCATOR_H
 // Raul P. Pelaez 2019. Thrust Managed  memory allocator, adapted from devtalk nvidia:
 // https://devtalk.nvidia.com/default/topic/987577/-thrust-is-there-a-managed_vector-with-unified-memory-do-we-still-only-have-device_vector-cuda-thrust-managed-vectors-/
 #include <thrust/device_vector.h>
@@ -30,3 +32,5 @@ namespace uammd{
   template<class T>
   using managed_vector = thrust::device_vector<T, managed_allocator<T>>;
 }
+
+#endif
