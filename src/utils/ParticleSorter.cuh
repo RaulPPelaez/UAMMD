@@ -97,7 +97,7 @@ namespace uammd{
   class ParticleSorter{
     bool init = false;
     bool originalOrderNeedsUpdate = true;
-    void *d_temp_storage = nullptr;
+
     int temp_storage_num_elements = 0;
     size_t temp_storage_bytes = 0; //Additional storage needed by cub
     thrust::device_vector<int>  original_index;
@@ -117,35 +117,30 @@ namespace uammd{
 
       //This uses the CUB API to perform a radix sort
       //CUB orders by key an array pair and copies them onto another pair
-    
+      auto alloc = sys->getTemporaryDeviceAllocator<char>();
+      thrust::device_vector<char, System::allocator<char>> d_temp_storage(temp_storage_bytes, alloc);
       /**Initialize CUB if more temp storage is needed**/
       if(N > temp_storage_num_elements){
 	temp_storage_num_elements = N;
-	CudaSafeCall(cudaFree(d_temp_storage));
 	temp_storage_bytes = 0;
-	d_temp_storage = nullptr;
+
 	/*On first call, this function only computes the size of the required temporal storage*/
-	CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
+	CudaSafeCall(cub::DeviceRadixSort::SortPairs(nullptr, temp_storage_bytes,
 						     hash,
 						     index,
 						     N,
 						     0, end_bit,
 						     st));
-			
-	/*Allocate temporary storage*/
-	CudaSafeCall(cudaMalloc(&d_temp_storage, temp_storage_bytes));
+	d_temp_storage.resize(temp_storage_bytes);
       }
-
+      void* d_temp_storage_ptr = (void*) thrust::raw_pointer_cast(d_temp_storage.data());
       /**Perform the Radix sort on the index/hash pair**/
-      CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-						   hash, 
+      CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage_ptr, temp_storage_bytes,
+						   hash,
 						   index,
 						   N,
 						   0, end_bit,
 						   st));
-
-      
-
     }
     //Return the most significant bit of an unsigned integral type
     template <typename T> inline int msb(T n){
