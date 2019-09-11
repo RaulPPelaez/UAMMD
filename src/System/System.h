@@ -30,7 +30,7 @@ namespace uammd{
 
 
   struct access{
-    enum location{cpu, gpu, nodevice};
+    enum location{cpu, gpu, managed, nodevice};
     enum mode{read, write, readwrite, nomode};
   };
   
@@ -39,6 +39,7 @@ namespace uammd{
     int device = -1;
     int cuda_arch = 0;
     int minimumCudaArch = 200;
+    bool managedMemoryAvailable = false;
   };
 
   #ifdef MAXLOGLEVEL
@@ -97,6 +98,10 @@ namespace uammd{
       
       sysPar.device = dev;
       sysPar.cuda_arch = 100*deviceProp.major + 10*deviceProp.minor;
+      if(sysPar.cuda_arch >= 600){
+	sysPar.managedMemoryAvailable = true;
+	log<System::DEBUG>("[System] Managed memory enabled");
+      }
 
       log<System::MESSAGE>("[System] Compute capability of the device: %d.%d", deviceProp.major, deviceProp.minor);
 
@@ -184,6 +189,10 @@ namespace uammd{
 
     int getargc(){ return this->m_argc;}
     const char ** getargv(){return (const char **)this->m_argv;}
+
+    const SystemParameters getSystemParameters(){
+      return sysPar;
+    }
     
   };
 

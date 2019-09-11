@@ -15,6 +15,7 @@
 #include"utils/debugTools.cuh"
 #include<thrust/device_vector.h>
 #include <thrust/iterator/iterator_adaptor.h>
+#include"third_party/managed_allocator.h"
 
 namespace uammd{
   //Forward declaration for friend attribute
@@ -34,7 +35,6 @@ namespace uammd{
     size_t m_size;
     bool *isBeingRead, *isBeingWritten;
     access::mode mode;
-    access::location location;
     bool isCopy = false; //true if this instance was created when passed to a cuda kernel
     friend class thrust::iterator_core_access;
 
@@ -45,18 +45,17 @@ namespace uammd{
       ptr(nullptr),
       m_size(0),
       isBeingRead(nullptr), isBeingWritten(nullptr),      
-      mode(access::mode::nomode),
-      location(access::location::nodevice){}
+      mode(access::mode::nomode){}
     property_ptr(T* ptr,
 		 bool *isBeingWritten, bool *isBeingRead,
-		 access::mode mode, access::location loc,
+		 access::mode mode,
 		 size_t in_size):
       super_t(ptr),
       ptr(ptr),
       m_size(in_size),
       isBeingWritten(isBeingWritten),      
       isBeingRead(isBeingRead),
-      mode(mode), location(loc)
+      mode(mode)
     {
       if(mode==access::mode::write || mode==access::mode::readwrite){
 	*isBeingWritten = true;
@@ -102,15 +101,25 @@ namespace uammd{
   private:  
     thrust::device_vector<T> deviceVector, deviceVector_alt;
     std::vector<T> hostVector;
+    uammd::managed_vector<T> managedVector, managedVector_alt;
+    
     uint N = 0;
     bool deviceVectorNeedsUpdate = false, hostVectorNeedsUpdate= true;
     string name;
     bool isBeingWritten = false, isBeingRead= false;
+    bool isManaged = false;
     shared_ptr<System> sys;
 
     T* getAltGPUBuffer(){
-      if(deviceVector_alt.size() != N) deviceVector_alt.resize(N);
-      return thrust::raw_pointer_cast(deviceVector_alt.data()); 
+      if(isManaged){
+	managedVector_alt.resize(N);
+	CudaSafeCall(cudaDeviceSynchronize());
+	return thrust::raw_pointer_cast(managedVector_alt.data()); 
+      }
+      else{
+	deviceVector_alt.resize(N);
+	return thrust::raw_pointer_cast(deviceVector_alt.data());
+      }
     }
   public:
     using valueType = T;
@@ -121,39 +130,70 @@ namespace uammd{
     {
       sys->log<System::DEBUG>("[Property] Property %s created with size %d", name.c_str(), N);
       CudaCheckError();
-      if(N==0) return;
-      deviceVector.resize(N);    
+      //There is no benefit from using managed memory for Properties, at least for now (arch <=600)
+      //I would like to leave the possibility here though.      
+      if(false and sys->getSystemParameters().managedMemoryAvailable){
+	sys->log<System::DEBUG1>("[Property] Property %s is using managed memory");
+	this->isManaged = true;
+      }	
+      //if(N==0) return;
+      //deviceVector.resize(N);    
     }
     ~Property() = default;
     void resize(int Nnew){
-      //sys->log<System::DEBUG>("[Property] Resizing GPU version of %s to %d particles", name.c_str(), Nnew);
+      
       this->N = Nnew;
-      try{
-	deviceVector.resize(Nnew);
+      if(isManaged){
+	sys->log<System::DEBUG>("[Property] Resizing Managed version of %s to %d particles", name.c_str(), Nnew);
+	try{
+	  managedVector.resize(N);	
+	  if(managedVector_alt.size() > 0)managedVector_alt.resize(N);
+	}
+	catch(const thrust::system_error &e){
+	  sys->log<System::CRITICAL>("[Property] Thrust failed at managedVector.resize(%d) with address %p with the message: %s",
+				     Nnew, thrust::raw_pointer_cast(managedVector.data()), e.what());
+	}
       }
-      catch(const thrust::system_error &e){
-	sys->log<System::CRITICAL>("[Property] Thrust failed at deviceVector.resize(%d) with address %p with the message: %s",
-				   Nnew, thrust::raw_pointer_cast(deviceVector.data()), e.what());
-      }
-      if(deviceVector_alt.size()>0){
-	sys->log<System::DEBUG1>("[Property] Resizing alt GPU version of %s", name.c_str(), Nnew);
+      else{	
+	try{
+	  sys->log<System::DEBUG>("[Property] Resizing GPU version of %s to %d particles", name.c_str(), Nnew);
+	  deviceVector.resize(Nnew);
+	  if(deviceVector_alt.size()>0){
+	    sys->log<System::DEBUG1>("[Property] Resizing alt GPU version of %s", name.c_str());
 	
-	deviceVector_alt.resize(Nnew);
+	    deviceVector_alt.resize(Nnew);
+	  }
+	}
+	catch(const thrust::system_error &e){
+	  sys->log<System::CRITICAL>("[Property] Thrust failed at deviceVector.resize(%d) with address %p with the message: %s",
+				     Nnew, thrust::raw_pointer_cast(deviceVector.data()), e.what());
+}
+	//Only resize CPU memory if it has been created
+	if(hostVector.size() > 0){	  
+	  hostVector.resize(Nnew);
+	  sys->log<System::DEBUG>("[Property] Resizing CPU version of %s to %d particles", name.c_str(), Nnew);
+	}
       }
-      //Only resize CPU memory if it has been created
-      if(hostVector.size() > 0){
-	hostVector.resize(Nnew);
-	sys->log<System::DEBUG>("[Property] Resizing CPU version of %s", name.c_str());
-      }
-    }
-    void swapInternalBuffers(){
-      sys->log<System::DEBUG1>("[Property] Swapping GPU references of %s", name.c_str());
-      if(deviceVector_alt.size() != N) deviceVector_alt.resize(N);
-      deviceVector.swap(deviceVector_alt);
-      hostVectorNeedsUpdate = true;
     }
     
+    void swapInternalBuffers(){
+      if(isManaged){
+	sys->log<System::DEBUG1>("[Property] Swapping Managed references of %s", name.c_str());
+	if(managedVector_alt.size() != N) managedVector_alt.resize(N);
+	managedVector.swap(managedVector_alt);
+      }
+      else{
+	sys->log<System::DEBUG1>("[Property] Swapping GPU references of %s", name.c_str());
+	if(deviceVector_alt.size() != N) deviceVector_alt.resize(N);
+	deviceVector.swap(deviceVector_alt);
+	hostVectorNeedsUpdate = true;
+      }
+    }    
     void swapCPUContainer(std::vector<T> &outsideHostVector){
+      if(isManaged){
+	sys->log<System::ERROR>("[Property] Cannot swap the container of a Managed property (%s)", name.c_str());
+	return;
+      }
       sys->log<System::DEBUG1>("[Property] Swapping internal CPU container of property (%s)", name.c_str());      
       if(this->isBeingRead || this->isBeingWritten)
 	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
@@ -168,6 +208,11 @@ namespace uammd{
       hostVector.swap(outsideHostVector);
     }
     void swapGPUContainer(thrust::device_vector<T> &outsideDeviceVector){
+      if(isManaged){
+	sys->log<System::ERROR>("[Property] Cannot swap the container of a Managed property (%s)", name.c_str());
+	return;
+      }
+
       sys->log<System::DEBUG1>("[Property] Swapping internal GPU container of property (%s)", name.c_str());      
       if(this->isBeingRead || this->isBeingWritten)
 	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
@@ -186,43 +231,57 @@ namespace uammd{
       return data(dev, mode);
     }
     property_ptr<T> data(access::location dev, access::mode mode){
-      sys->log<System::DEBUG5>("[Property] %s requested from %d (0=cpu, 1=gpu) with access %d (0=r, 1=w, 2=rw)", name.c_str(), dev, mode);  
+      sys->log<System::DEBUG5>("[Property] %s requested from %d (0=cpu, 1=gpu, 2=managed) with access %d (0=r, 1=w, 2=rw)", name.c_str(), dev, mode);      
       if(this->isBeingWritten){
 	sys->log<System::CRITICAL>("[Property] You cant request %s property while its locked for writing!", name.c_str());
       }
-      if(mode==access::mode::write || mode==access::mode::readwrite){
-	if(dev==access::location::gpu) hostVectorNeedsUpdate=true;
-	else if(dev==access::location::cpu) deviceVectorNeedsUpdate=true;
-	else { sys->log<System::CRITICAL>("[Property] Invalid access location in %s", name.c_str());}
-	if(this->isBeingRead){
-	  sys->log<System::CRITICAL>("[Property] You cant write to %s property while its being read!", name.c_str()); 
-	}
-      }
 
-      T *devicePtr = thrust::raw_pointer_cast(deviceVector.data());
-      T *hostPtr = hostVector.data();    
-      switch(dev){
-      case access::location::cpu:
-	//Allocate CPU memory only if asked for it
-	if(this->hostVector.size() == 0){
-	  sys->log<System::DEBUG>("[Property] Resizing CPU version of %s to %d particles", name.c_str(), N);	  
-	  hostVector.resize(N);
-	  hostPtr = hostVector.data();
+      if(dev == access::location::managed and not isManaged){
+	sys->log<System::CRITICAL>("[Property] Current system does not accept Managed memory requests.");
+      }
+      
+      
+      if(isManaged){
+	if(sys->getSystemParameters().cuda_arch < 600)
+	  CudaSafeCall(cudaDeviceSynchronize());
+	auto ptr = thrust::raw_pointer_cast(managedVector.data());
+	return property_ptr<T>(ptr, &this->isBeingWritten, &this->isBeingRead, mode, size());	
+      }
+      else{
+	if(mode==access::mode::write || mode==access::mode::readwrite){
+	  if(dev==access::location::gpu) hostVectorNeedsUpdate=true;
+	  else if(dev==access::location::cpu) deviceVectorNeedsUpdate=true;
+	  else { sys->log<System::CRITICAL>("[Property] Invalid access location in %s", name.c_str());}
+	  if(this->isBeingRead){
+	    sys->log<System::CRITICAL>("[Property] You cant write to %s property while its being read!", name.c_str()); 
+	  }
 	}
-	if(hostVectorNeedsUpdate){
-	  CudaSafeCall(cudaMemcpy(hostPtr, devicePtr, N*sizeof(T), cudaMemcpyDeviceToHost));
-	  hostVectorNeedsUpdate=false;
+	
+	T *devicePtr = thrust::raw_pointer_cast(deviceVector.data());
+	T *hostPtr = hostVector.data();    
+	switch(dev){
+	case access::location::cpu:
+	  //Allocate CPU memory only if asked for it
+	  if(this->hostVector.size() == 0){
+	    sys->log<System::DEBUG>("[Property] Resizing CPU version of %s to %d particles", name.c_str(), N);	  
+	    hostVector.resize(N);
+	    hostPtr = hostVector.data();
+	  }
+	  if(hostVectorNeedsUpdate){
+	    CudaSafeCall(cudaMemcpy(hostPtr, devicePtr, N*sizeof(T), cudaMemcpyDeviceToHost));
+	    hostVectorNeedsUpdate=false;
+	  }
+	  return property_ptr<T>(hostPtr, &this->isBeingWritten, &this->isBeingRead, mode, size());
+	case access::location::gpu:
+	  if(deviceVectorNeedsUpdate){
+	    CudaSafeCall(cudaMemcpy(devicePtr, hostPtr, N*sizeof(T), cudaMemcpyHostToDevice));
+	    deviceVectorNeedsUpdate=false;
+	  }
+	  return property_ptr<T>(devicePtr, &this->isBeingWritten, &this->isBeingRead, mode, size());
+	case access::location::nodevice:
+	default:
+	  return property_ptr<T>(nullptr, &this->isBeingWritten, &this->isBeingRead, mode, size());
 	}
-	return property_ptr<T>(hostPtr, &this->isBeingWritten, &this->isBeingRead, mode, dev, size());
-      case access::location::gpu:
-	if(deviceVectorNeedsUpdate){
-	  CudaSafeCall(cudaMemcpy(devicePtr, hostPtr, N*sizeof(T), cudaMemcpyHostToDevice));
-	  deviceVectorNeedsUpdate=false;
-	}
-	return property_ptr<T>(devicePtr, &this->isBeingWritten, &this->isBeingRead, mode, dev, size());
-      case access::location::nodevice:
-      default:
-	return property_ptr<T>(nullptr, &this->isBeingWritten, &this->isBeingRead, mode, dev, size());
       }
     }
     void forceUpdate(access::location dev){
@@ -239,10 +298,10 @@ namespace uammd{
 	
       }
     }
-    std::string getName() { return this->name;}
-    int size() {return this->N;}
-    bool isAllocated(){ return this->N>0;}
-    size_t typeSize() { return sizeof(valueType);}
+    std::string getName() const{ return this->name;}
+    int size() const{ return this->N;}
+    bool isAllocated() const{ return this->N>0;}
+    size_t typeSize() const{ return sizeof(valueType);}
   };
 
 }
