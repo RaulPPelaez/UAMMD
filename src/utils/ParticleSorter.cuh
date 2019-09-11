@@ -36,9 +36,9 @@ REFERENCES:
 #include<third_party/cub/cub.cuh>
 
 namespace uammd{
-  
+
   namespace Sorter{
-    
+
     struct MortonHash{
       //Interleave a 10 bit number in 32 bits, fill one bit and leave the other 2 as zeros. See [1]
       static inline __host__ __device__ uint encodeMorton(const uint &i){
@@ -53,25 +53,25 @@ namespace uammd{
       /*Fuse three 10 bit numbers in 32 bits, producing a Z order Morton hash*/
       static inline __host__ __device__ uint hash(const int3 &cell, const Grid &grid){
 	return encodeMorton(cell.x) | (encodeMorton(cell.y) << 1) | (encodeMorton(cell.z) << 2);
-      }      
+      }
     };
     //The hash is the cell 1D index, this pattern is better than random for neighbour transverse, but worse than Morton
     struct CellHash{
       static inline __device__ __host__ uint hash(const int3 &cell, const Grid &grid){
 	return cell.x + cell.y*grid.cellDim.x + cell.z*grid.cellDim.x*grid.cellDim.z;
-      }      
+      }
     };
-  
+
     /*Assign a hash to each particle*/
     template<class HashComputer = MortonHash, class InputIterator>
     __global__ void computeHash(InputIterator pos,
 				int* __restrict__ index,
 				uint* __restrict__ hash , int N,
 				Grid grid){
-      const int i = blockIdx.x*blockDim.x + threadIdx.x;  
+      const int i = blockIdx.x*blockDim.x + threadIdx.x;
       if(i>=N) return;
       const real3 p = make_real3(pos[i]);
-    
+
       const int3 cell = grid.getCell(p);
       /*The particleIndex array will be sorted by the hashes, any order will work*/
       const uint ihash = HashComputer::hash(cell, grid);
@@ -81,13 +81,13 @@ namespace uammd{
     }
 
 
-    
+
     /*In case old position is a texture*/
     template<class InputIterator, class OutputIterator>
     __global__ void reorderArray(const InputIterator old,
 				 OutputIterator sorted,
 				 int* __restrict__ pindex, int N){
-      int i = blockIdx.x*blockDim.x + threadIdx.x;   
+      int i = blockIdx.x*blockDim.x + threadIdx.x;
       if(i>=N) return;
       sorted[i] = old[pindex[i]];
     }
@@ -159,14 +159,14 @@ namespace uammd{
 	}
       return 0;
     }
-    
+
     template<class HashType = Sorter::MortonHash, class InputIterator>
     void updateOrderByCellHash(InputIterator pos, uint N, Box box, int3 cellDim, cudaStream_t st = 0){
       init = true;
       if(hash.size() != N){hash.resize(N); hash_alt.resize(N);}
       if(index.size()!= N){index.resize(N); index_alt.resize(N);}
 
-      
+
       int Nthreads=128;
       int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
       Grid grid(box, cellDim);
@@ -175,11 +175,9 @@ namespace uammd{
 								  thrust::raw_pointer_cast(hash.data()),
 								  N,
 								  grid);
-      auto db_index = cub::DoubleBuffer<int>(
-					     thrust::raw_pointer_cast(index.data()),
+      auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(index.data()),
 					     thrust::raw_pointer_cast(index_alt.data()));
-      auto db_hash  = cub::DoubleBuffer<uint>(
-					      thrust::raw_pointer_cast(hash.data()),
+      auto db_hash  = cub::DoubleBuffer<uint>(thrust::raw_pointer_cast(hash.data()),
 					      thrust::raw_pointer_cast(hash_alt.data()));
 
       uint maxHash = HashType::hash(cellDim, grid);
@@ -187,17 +185,15 @@ namespace uammd{
       //Cub just needs this endbit at least
       int maxbit = int(std::log2(maxHash)+0.5)+1;
       maxbit = std::min(maxbit, 32);
-      
+
       this->sortByKey(db_index,
 		      db_hash,
 		      N,
 		      st, maxbit);
       //Sometimes CUB will not swap the references in the DoubleBuffer
-      if(db_index.selector)
-	index.swap(index_alt);
-      if(db_hash.selector)
-	hash.swap(hash_alt);
-      
+      if(db_index.selector) index.swap(index_alt);
+      if(db_hash.selector)  hash.swap(hash_alt);
+
       originalOrderNeedsUpdate = true;
     }
 
@@ -205,37 +201,36 @@ namespace uammd{
     void updateOrderById(int *id, int N, cudaStream_t st = 0){
       int lastN = original_index.size();
       if(lastN != N){
-	original_index.resize(N);	
+	original_index.resize(N);
       }
       cub::CountingInputIterator<int> ci(0);
       try{
-	thrust::copy(ci, ci+N, original_index.begin());       
+	thrust::copy(ci, ci+N, original_index.begin());
       }
       catch(thrust::system_error &e){
 	fprintf(stderr,"[ParticleSorter] Thrust could not copy ID vector. Error: %s", e.what());
 	exit(1);
       }
-	
-      
-      auto db_index = cub::DoubleBuffer<int>(
-					     thrust::raw_pointer_cast(original_index.data()),
+
+
+      auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(original_index.data()),
 					     thrust::raw_pointer_cast(index_alt.data()));
       //store current index in hash
 
       //thrust::copy will assume cpu copy if the first argument is a raw pointer
-      
+
       int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
       CudaSafeCall(cudaMemcpy(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice));
 
       auto db_hash  = cub::DoubleBuffer<int>(
 					     d_hash,
-					     (int*)thrust::raw_pointer_cast(hash_alt.data())); 
+					     (int*)thrust::raw_pointer_cast(hash_alt.data()));
       this->sortByKey(db_index,
 		      db_hash,
 		      N,
 		      st);
 
-      original_index.swap(index_alt);      
+      original_index.swap(index_alt);
     }
     //WARNING: _unsorted and _sorted cannot be aliased!
     template<class InputIterator, class OutputIterator>
@@ -254,7 +249,7 @@ namespace uammd{
     //Get current order keys
     int * getSortedIndexArray(int N){
       int lastN = index.size();
-      
+
       if(lastN != N){
 	cub::CountingInputIterator<int> ci(lastN);
         index.resize(N);
@@ -278,9 +273,9 @@ namespace uammd{
 	this->updateOrderById(id, N, st);
 	originalOrderNeedsUpdate = false;
       }
-      
+
       int lastN = original_index.size();
-      
+
       if(lastN != N){
 	original_index.resize(N);
 	try{
