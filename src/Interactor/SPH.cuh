@@ -48,6 +48,7 @@ namespace uammd{
       real viscosity = 50.0;
       real gasStiffness = 100.0;
       real restDensity = 0.4;
+      std::shared_ptr<CellList> nl = nullptr;
     };
     SPH(shared_ptr<ParticleData> pd,
 	shared_ptr<ParticleGroup> pg,

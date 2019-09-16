@@ -50,7 +50,7 @@ namespace uammd{
     box(par.box),
     support(par.support), viscosity(par.viscosity),
     gasStiffness(par.gasStiffness), restDensity(par.restDensity),
-    nl(nullptr)
+    nl(par.nl)
   {
     sys->log<System::MESSAGE>("[SPH] Initialized.");
     if(pg->getNumberParticles() != pd->getNumParticles()){
