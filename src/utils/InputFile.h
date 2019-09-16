@@ -11,7 +11,7 @@
 USAGE:
 
    //Creation:
-   InputFile inputFile("options.in");
+   InputFile inputFile("options.in", sys);
 
    //Read an option of type float
    float cutOff;
