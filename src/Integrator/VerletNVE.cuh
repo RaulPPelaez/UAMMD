@@ -56,6 +56,11 @@ namespace uammd{
       bool initVelocities = true;
     };
     VerletNVE(shared_ptr<ParticleData> pd,
+	      shared_ptr<System> sys,
+	      Parameters par):
+      VerletNVE(pd, std::make_shared<ParticleGroup>(pd, sys, "All"),sys, par){}
+
+    VerletNVE(shared_ptr<ParticleData> pd,
 	      shared_ptr<ParticleGroup> pg,
 	      shared_ptr<System> sys,
 	      Parameters par);
