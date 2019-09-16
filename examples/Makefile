@@ -47,7 +47,7 @@ BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OP
 all: 
 	$(BASIC_LINE)  $(FILE)
 
-test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt fcm
+test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt fcm dambreak
 
 
 benchmark:
@@ -97,8 +97,11 @@ sph:
 mcnvt:
 	$(BASIC_LINE) MCNVT.cu  -o mcnvt
 
+dambreak:
+	$(BASIC_LINE) dambreak.cu  -o dambreak
+
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak
 
 
 
