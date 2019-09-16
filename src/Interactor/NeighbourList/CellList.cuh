@@ -665,8 +665,10 @@ namespace uammd{
       const int * cellStart, *cellEnd;
       const real4 *sortPos;   //Particle positions in internal index
       const int* groupIndex; //Transformation between internal indexes and group indexes
+      Grid grid;
     };
     CellListData getCellList(){
+      this->updateNeighbourList(currentBox, currentCutOff);
       CellListData cl;
       try{
 	cl.cellStart   =  thrust::raw_pointer_cast(cellStart.data());
@@ -678,9 +680,9 @@ namespace uammd{
       }
       int numberParticles = pg->getNumberParticles();
       cl.groupIndex =  ps.getSortedIndexArray(numberParticles);
-      
+      cl.grid = grid;
       return cl;
-    }      
+    }
       
   protected:
     void handleNumParticlesChanged(int Nnew){
