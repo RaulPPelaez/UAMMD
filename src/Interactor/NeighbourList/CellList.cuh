@@ -327,7 +327,7 @@ namespace uammd{
     cudaEvent_t event;
     
   public:
-    
+    static constexpr auto EMPTY_CELL = CellList_ns::EMPTY_CELL;
     //Returns the index of the first neigbour of particle index
     struct NeighbourListOffsetFunctor{
       NeighbourListOffsetFunctor(int str, int* groupIndex):stride(str), groupIndex(groupIndex){}
