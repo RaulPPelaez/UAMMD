@@ -390,7 +390,7 @@ namespace uammd{
       //Computes thermal drift term using RFD
       //kbT/\delta [ S(q^n + \delta/2\hat{W}^n) - S(q^n - \delta/2\hat{W}^n) ] ·\hat{W}^n
       //See eq. 32 and 33 in [1]
-      template<class Kernel = IBM::PeskinKernel::threePoint>
+      template<class Kernel = IBM_kernels::PeskinKernel::threePoint>
       __global__ void addThermalDrift(real4 *pos,
 				      real3* gridVels,
 				      Grid grid,
@@ -490,7 +490,7 @@ namespace uammd{
       }
      
       //Computes S·F and adds it to gridVels
-      template<class Kernel = IBM::PeskinKernel::threePoint>
+      template<class Kernel = IBM_kernels::PeskinKernel::threePoint>
       __global__ void spreadParticleForces(real4 *pos,
 					   real4 *force,
 					   real3* gridVels,
@@ -681,7 +681,7 @@ namespace uammd{
       //  q^{n+1/2} = q^n + dt/2 J^n v in predictor mode
       //  q^{n+1} = q^n + dt J^{n+1/2} v in corrector mode
       //  q^{n+1} = q^n + dt J^n v in euler mode
-      template<Step mode = Step::PREDICTOR, class Kernel = IBM::PeskinKernel::threePoint>
+      template<Step mode = Step::PREDICTOR, class Kernel = IBM_kernels::PeskinKernel::threePoint>
       __global__ void midPointStep(real4* pos,    //q^n in predictor and euler, q^{n+1/2} in corrector
 				   real4* posOld, //empty in predictor and euler, q^n in corrector
 				   const real3* gridVels,
