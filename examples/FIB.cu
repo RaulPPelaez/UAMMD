@@ -3,105 +3,132 @@
 See BDHI/FIB.cuh for more info.
  */
 
-
 #include"uammd.cuh"
 #include"Integrator/BDHI/FIB.cuh"
 #include"utils/InitialConditions.cuh"
+#include"utils/InputFile.h"
 #include<fstream>
 
-using namespace std;
+
 using namespace uammd;
+using std::make_shared;
+using std::endl;
 
 
+real3 boxSize;
+real dt;
+std::string outputFile;
+int numberParticles;
+int numberSteps, printSteps;
+real temperature, viscosity;
+real hydrodynamicRadius;
+
+void readParameters(std::shared_ptr<System> sys, std::string file);
 
 int main(int argc, char *argv[]){
 
-  if(argc==1){
-    std::cerr<<"Run with: ./fib 14 32 0.01 50000 200 1 1"<<std::endl;
-    exit(1);
-  }
-
-  int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
-  
-  auto sys = make_shared<System>();
+  auto sys = make_shared<System>(argc, argv);
+  readParameters(sys, "data.main.fib");
 
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
 
-  auto pd = make_shared<ParticleData>(N, sys);
+  auto pd = make_shared<ParticleData>(numberParticles, sys);
 
-  Box box(std::stod(argv[2]));
+  Box box(boxSize);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
-    
-    auto initial =  initLattice(box.boxSize, N, sc);
-    fori(0,N){
-      pos.raw()[i] = initial[i];
-      pos.raw()[i].w = 0;//sys->rng().uniform(0,1)>std::stod(argv[6])?0:1;
-    }    
+
+    auto initial =  initLattice(box.boxSize, numberParticles, sc);
+    std::copy(initial.begin(), initial.end(), pos.begin());
   }
-  
+
 
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-  
-  ofstream out("kk");
-  
-  double hydrodynamicRadius =  std::stod(argv[7]);
-  
+
+
+
+
   BDHI::FIB::Parameters par;
-  par.temperature = std::stod(argv[6]);
-  par.viscosity = 1.0;
+  par.temperature = temperature;
+  par.viscosity = viscosity;
   par.hydrodynamicRadius =  hydrodynamicRadius;
-  par.dt = std::stod(argv[3]);
+  par.dt = dt;
   par.box = box;
   par.scheme=BDHI::FIB::MIDPOINT; //Use simple midpoint scheme
+
   auto bdhi = make_shared<BDHI::FIB>(pd, sys, par);
-   
+
   sys->log<System::MESSAGE>("RUNNING!!!");
 
   pd->sortParticles();
 
+  std::ofstream out(outputFile);
   bdhi->forwardTime();
   bdhi->forwardTime();
   Timer tim;
   tim.tic();
-  int nsteps = std::atoi(argv[4]);
-  int printSteps = std::atoi(argv[5]);
-  //Run the simulation
-  forj(0,nsteps){
-    //This will instruct the integrator to take the simulation to the next time step,
-    //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
+
+  forj(0, numberSteps){
+
     bdhi->forwardTime();
-    //Write results
-    if(j%printSteps==0)
+    if(printSteps>0 and j%printSteps==0)
     {
       sys->log<System::DEBUG1>("[System] Writing to disk...");
-      //continue;
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-      //This allows to access the particles with the starting order so the particles are written in the same order
-      // even after a sorting
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
-      
+
       out<<"#"<<endl;
       real3 p;
-      fori(0,N){
-	real4 pc = pos.raw()[sortedIndex[i]];
+      fori(0, numberParticles){
+	real4 pc = pos[sortedIndex[i]];
 	p = make_real3(pc);
 	int type = pc.w;
-	out<<p<<" "<<hydrodynamicRadius<<" "<<type<<endl;
+	out<<p<<" "<<hydrodynamicRadius<<" "<<type<<"\n";
       }
     }
-    //Sort the particles every few steps
-    //It is not an expensive thing to do really.
+
     if(j%500 == 0){
       pd->sortParticles();
     }
   }
-  
+
   auto totalTime = tim.toc();
-  sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
-  //sys->finish() will ensure a smooth termination of any UAMMD module.
+  sys->log<System::MESSAGE>("mean FPS: %.2f", numberSteps/totalTime);
+
   sys->finish();
 
   return 0;
+}
+
+
+void readParameters(std::shared_ptr<System> sys, std::string file){
+
+  {
+    if(!std::ifstream(file).good()){
+      real visco = 1/(6*M_PI);
+      std::ofstream default_options(file);
+      default_options<<"boxSize 25 25 25"<<std::endl;
+      default_options<<"numberParticles 16384"<<std::endl;
+      default_options<<"dt 0.005"<<std::endl;
+      default_options<<"numberSteps 20000"<<std::endl;
+      default_options<<"printSteps 100"<<std::endl;
+      default_options<<"outputFile /dev/stdout"<<std::endl;
+      default_options<<"temperature 1.0"<<std::endl;
+      default_options<<"viscosity "<<visco<<std::endl;
+      default_options<<"hydrodynamicRadius 1.0"<<std::endl;
+    }
+  }
+
+  InputFile in(file, sys);
+
+  in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
+  in.getOption("numberSteps", InputFile::Required)>>numberSteps;
+  in.getOption("printSteps", InputFile::Required)>>printSteps;
+  in.getOption("dt", InputFile::Required)>>dt;
+  in.getOption("numberParticles", InputFile::Required)>>numberParticles;
+  in.getOption("outputFile", InputFile::Required)>>outputFile;
+  in.getOption("temperature", InputFile::Required)>>temperature;
+  in.getOption("viscosity", InputFile::Required)>>viscosity;
+  in.getOption("hydrodynamicRadius", InputFile::Required)>>hydrodynamicRadius;
 }

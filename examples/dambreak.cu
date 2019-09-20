@@ -2,7 +2,7 @@
 
   A cube of fluid particles falling from the upper left corner of a closed box, a wave is formed when the fluid front reaches the right wall. the fluid is modelated with Smoothed Particle Hydrodynamics.
 
-  This executable looks for a "dam.options" file with parameters. 
+  This executable looks for a "dam.options" file with parameters.
   If not found the file will be auto generated with some default options.
 
 */
@@ -31,7 +31,7 @@ struct Gravity{
     if(pos.x<-L.x*0.5) f.x = m_Kwall;  if(pos.x>L.x*0.5) f.x = -m_Kwall;
     if(pos.y<-L.y*0.5) f.y = m_Kwall;  if(pos.y>L.y*0.5) f.y = -m_Kwall;
     if(pos.z<-L.z*0.5) f.z = m_Kwall;  if(pos.z>L.z*0.5) f.z = -m_Kwall;
-    
+
     f.z += m_g;
     return f;
   }
@@ -57,14 +57,14 @@ real viscosity, gasStiffness, support, restDensity;
 void readParameters(std::shared_ptr<System> sys, std::string file);
 int main(int argc, char *argv[]){
   auto sys = make_shared<System>(argc, argv);
-  readParameters(sys, "dam.options"); 
-  
+  readParameters(sys, "dam.options");
+
   ullint seed = 0xf31337Bada55D00dULL;
   sys->rng().setSeed(seed);
-  
+
   auto pd = make_shared<ParticleData>(numberParticles, sys);
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-  
+
   Box box(boxSize);
   {//Initial positions
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]){
     std::transform(initial.begin(), initial.end(),
 		   pos.begin(), [&](real4 p){p+=make_real4(L.x/8.0-L.x*0.49,0,0,0); p.w=0; return p;});
   }
-  
+
   std::ofstream out(outputFile);
   { //Particles start at rest
     auto vel = pd->getVel(access::location::cpu, access::mode::write);
@@ -86,9 +86,9 @@ int main(int argc, char *argv[]){
   VerletNVE::Parameters par;
   par.dt = dt;
   par.initVelocities = false; //Do not modify initial velocities
-  
+
   auto verlet = make_shared<VerletNVE>(pd, sys, par);
-  
+
   { //Add SPH interactor
     SPH::Parameters params;
     params.support = support;
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]){
     params.gasStiffness = gasStiffness;
     params.restDensity = restDensity;
     params.box = box;
-    auto sph = make_shared<SPH>(pd, pg, sys, params);  
+    auto sph = make_shared<SPH>(pd, pg, sys, params);
     verlet->addInteractor(sph);
   }
 
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]){
     auto gravity = make_shared<ExternalForces<Gravity>>(pd, pg, sys, make_shared<Gravity>(boxSize));
     verlet->addInteractor(gravity);
   }
-  
+
   sys->log<System::MESSAGE>("RUNNING!!!");
   pd->sortParticles();
   Timer tim;
@@ -141,7 +141,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
 
   {
     if(!std::ifstream(file).good()){
-      std::ofstream default_options(file);      
+      std::ofstream default_options(file);
       default_options<<"boxSize 150 32 50"<<std::endl;
       default_options<<"numberParticles 16000"<<std::endl;
       default_options<<"dt 0.007"<<std::endl;
@@ -156,9 +156,9 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
       default_options<<"g -1"<<std::endl;
     }
   }
-  
-  InputFile in(file, sys);  
-  
+
+  InputFile in(file, sys);
+
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("numberSteps", InputFile::Required)>>numberSteps;
   in.getOption("printSteps", InputFile::Required)>>printSteps;

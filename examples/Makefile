@@ -1,7 +1,7 @@
 
 #The target CUDA compute capability(s), if not set it will be autodetected
 #ARCH ?= 30 35 50 52 60 61
-ARCH=
+ARCH=52
 
 #Uncomment to compile in double precision mode, single by default
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
@@ -47,7 +47,7 @@ BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OP
 all: 
 	$(BASIC_LINE)  $(FILE)
 
-test: benchmark lj ljMult dpd nvt bdhi pse bd bonds sph mcnvt fcm dambreak
+test: benchmark lj ljMult dpd bdhi bd bonds sph mcnvt fcm dambreak
 
 
 benchmark:
@@ -61,20 +61,14 @@ ljMult:
 dpd:
 	$(BASIC_LINE) DPD.cu -o dpd
 
-nvt:
-	$(BASIC_LINE) nvt.cu -o nvt
-
 bdhi:
 	$(BASIC_LINE) BDHI.cu -llapacke -lcblas -lcurand -lcublas -lcusolver -lcufft  -lgomp -o bdhi
-
-pse:
-	$(BASIC_LINE) PSE.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o pse
 
 logo:
 	$(BASIC_LINE) logo.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o logo
 
 fcm:
-	$(BASIC_LINE) FCM.cu  -lcufft  -o fcm
+	$(BASIC_LINE) FCM.cu  -lcufft  -llapacke -lcblas -lcurand -lcublas -lcusolver -o fcm
 
 fib:
 	$(BASIC_LINE) FIB.cu -lcurand -lcufft  -o fib
@@ -101,7 +95,7 @@ dambreak:
 	$(BASIC_LINE) dambreak.cu  -o dambreak
 
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo
 
 
 

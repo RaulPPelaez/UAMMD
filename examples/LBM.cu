@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017.
+/*Raul P. Pelaez 2019. Lattice Boltzmann example, work in progress, not in a useful state atm
 */
 
 //This include contains the basic needs for an uammd project
@@ -27,8 +27,8 @@ void readParameters(shared_ptr<System> sys);
 
 int main(int argc, char *argv[]){
 
-  auto sys = make_shared<System>();
-  readParameters(sys);
+  auto sys = make_shared<System>(argc, argv);
+  readParameters(sys, "data.main.lbm");
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
 
@@ -48,10 +48,10 @@ int main(int argc, char *argv[]){
     //pos.raw()[0] = make_real4(-boxSize.x*0.5+20,0,0,0);
 
   }
-  
+
   ofstream out("kk");
   using LBM = Hydro::LBM::D3Q19;
-  
+
   LBM::Parameters par;
   par.dt = dt;
   par.box = box;
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]){
 
   auto lbm = make_shared<LBM>(pd, sys, par);
   sys->log<System::MESSAGE>("RUNNING!!!");
-  lbm->writePNG();      
+  lbm->writePNG();
   Timer tim;
   tim.tic();
   //Run the simulation
@@ -77,9 +77,9 @@ int main(int argc, char *argv[]){
     {
       sys->log<System::DEBUG>("[System] Writing to disk...");
       lbm->writePNG();
-    }    
+    }
   }
-  
+
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", numberSteps/totalTime);
   //sys->finish() will ensure a smooth termination of any UAMMD module.
@@ -89,9 +89,25 @@ int main(int argc, char *argv[]){
 }
 
 
-void readParameters(shared_ptr<System> sys){
+void readParameters(shared_ptr<System> sys, std::string file){
 
-  InputFile in("data.main.lbm", sys);
+  {
+    if(!std::ifstream(file).good()){
+      std::ofstream default_options(file);
+      default_options<<"boxSize   200 75 100"<<std::endl;
+      default_options<<"numberSteps  10000"<<std::endl;
+      default_options<<"printSteps   3"<<std::endl;
+      default_options<<"viscosity 9000"<<std::endl;
+      default_options<<"numberParticles 3"<<std::endl;
+      default_options<<"particleRadius 10"<<std::endl;
+      default_options<<"dt    1"<<std::endl;
+      default_options<<"cells      200 75 100"<<std::endl;
+      default_options<<"soundSpeed 10"<<std::endl;
+      default_options<<"relaxTime 1"<<std::endl;
+
+    }
+  }
+  InputFile in(file, sys);
 
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("numberSteps", InputFile::Required)>>numberSteps;
@@ -103,8 +119,8 @@ void readParameters(shared_ptr<System> sys){
   in.getOption("particleRadius", InputFile::Required)>>particleRadius;
   in.getOption("soundSpeed", InputFile::Required)>>soundSpeed;
   in.getOption("cells", InputFile::Required)>>cells.x>>cells.y>>cells.z;
-  
-  
+
+
 
 
 }

@@ -1,17 +1,13 @@
-/*Raul P. Pelaez 2017. An SPH example.
+/*Raul P. Pelaez 2019. An SPH example.
 
 Particles start in a cube configuration and are inside a prism box (longer in z). There is gravity and the bottom wall of the box is repulsive.
 The SPH particles will fall until hitting the bottom and then flow around until the energy from the fall is dissipated.
-  
-Needs cli input arguments with a system size, etc, look for "argv"
 
-Or just run: ./a.out 14 45 0.01 0.9 20000 500 -20
-
-for a quick test
+Needs a data.main.sph parameter file, if not present it will be auto generated with some default parameters.
 
 You can visualize the reuslts with superpunto
 
-  
+
  */
 
 //This include contains the basic needs for an uammd project
@@ -21,39 +17,35 @@ You can visualize the reuslts with superpunto
 #include"Interactor/SPH.cuh"
 #include"Interactor/ExternalForces.cuh"
 #include"utils/InitialConditions.cuh"
+#include"utils/InputFile.h"
 #include<fstream>
 
 
 using namespace uammd;
-using namespace std;
 
-//An HarmonicWall functor to be used in a ExternalForces module (See ExternalForces.cuh)
-struct HarmonicWall{
-  real zwall;
-  real k = 0.05;
-  HarmonicWall(real zwall):zwall(zwall){
+using std::endl;
+using std::make_shared;
+//An Wall+Gravity functor to be used in a ExternalForces module (See ExternalForces.cuh)
+struct Wall{
+  real k = 20;
+  real3 L;
+  Wall(real3 L):L(L){
   }
-  
+
   __device__ __forceinline__ real3 force(const real4 &pos){
 
-    real3 rij = make_real3(0,0, pos.z- zwall);
-    real r2 = dot(rij, rij);
-    
-    real invr2 = real(1.0)/(r2+0.001f);
-    real3 f = make_real3(0, 0, k);
-    if(r2 < 8.0f && r2> 0.1f && pos.z > 0.0f){
-      f.z -= 1.0f*invr2*invr2;
-    }
-    if(pos.z>zwall){
-      f.z -= k;
-    }
+    real3 f = real3();
+    if(pos.x<-L.x*0.5f) f.x = k;  if(pos.x>L.x*0.5f) f.x = -k;
+    if(pos.y<-L.y*0.5f) f.y = k;  if(pos.y>L.y*0.5f) f.y = -k;
+    if(pos.z<-L.z*0.5f) f.z = k;  if(pos.z>L.z*0.5f) f.z = -k;
 
+    f.z += k/30.0f;
     return f;
   }
 
   //If this function is not present, energy is assumed to be zero
   // __device__ __forceinline__ real energy(const real4 &pos){
-    
+
   //   return real(0.5)*k*pow(pos.z-zwall, 2);
   // }
 
@@ -66,98 +58,95 @@ struct HarmonicWall{
 };
 
 
+int N;
+real3 L;
+std::string outputFile;
+real dt;
+int nsteps, printSteps;
+real viscosity, gasStiffness, restDensity, support;
+
+void readParameters(std::shared_ptr<System> sys, std::string file);
 
 int main(int argc, char *argv[]){
 
-  if(argc<8){
-    std::cerr<<"ERROR, I need some parameters!!\nTry to run me with:\n./"<<argv[0]<<" 14 45 0.01 0.9 20000 500 -20"<<std::endl;
-    exit(1);
-  }
-  int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
 
+  std::cerr<<"ERROR, I need some parameters!!\nTry to run me with:\n./"<<argv[0]<<" 14 45 0.01 0.9 20000 500 -20"<<std::endl;
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
-  
-  auto sys = make_shared<System>();
+  auto sys = make_shared<System>(argc, argv);
+
+  readParameters(sys, "data.main.sph");
 
   //Modules will ask System when they need a random number (i.e for seeding the GPU RNG).
-  ullint seed = 0xf31337Bada55D00dULL;
+  ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
 
   //ParticleData stores all the needed properties the simulation will need.
   //Needs to start with a certain number of particles, which can be changed mid-simulation
-  //If UAMMD is to be used as a plugin for other enviroment or custom code, ParticleData should accept references to
-  // properties allocated and handled by the user, this is a non-implemented work in progress as of now though.
   auto pd = make_shared<ParticleData>(N, sys);
 
   //Some modules need a simulation box (i.e PairForces for the PBC)
-  real3 L =make_real3(std::stod(argv[2]));
-  L.z = 2*L.y;
-  Box box(L);//std::stod(argv[2]));
-  
+  Box box(L);
+
   //Initial positions
   {
-    //Ask pd for a property like so:
-    auto pos = pd->getPos(access::location::cpu, access::mode::write);    
+    //Ask pd for a property like so, do not store this handle, let it out of scope ASAP:
+    auto pos = pd->getPos(access::location::cpu, access::mode::write);
 
-    auto initial =  initLattice(make_real3(box.boxSize.x*std::stod(argv[4])), N, fcc);
-    
-    //Start in a cubic lattice, pos.w contains the particle type
-    //auto initial = cubicLattice(box.boxSize, N);
-    
-    fori(0,N){
-      pos.raw()[i] = initial[i]+make_real4(0,0, -std::stod(argv[7]), 0);
-      //Type of particle is stored in .w
-      //pos.raw()[i].w = sys->rng().uniform(0,1) > std::stod(argv[7])?0:1;
-      pos.raw()[i].w = 0;
-    }    
+    //returns an array with positions in an FCC lattice
+    auto initial =  initLattice(make_real3(box.boxSize.x*0.9), N, fcc);
+
+    //Copy to pos
+    std::transform(initial.begin(), initial.end(),
+		   pos.begin(), [&](real4 p){p+=make_real4(0, 0, -20, 0); p.w=0; return p;});
+
   }
-  
 
   //Modules can work on a certain subset of particles if needed, the particles can be grouped following any criteria
   //The builtin ones will generally work faster than a custom one. See ParticleGroup.cuh for a list
-  
-  //A group created with no criteria will contain all the particles  
+
+  //A group created with no criteria will contain all the particles
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-  
-  
-  ofstream out("kk");
-  
+
+
+  std::ofstream out(outputFile);
+
   //Some modules need additional parameters, in this case VerletNVT needs dt, temperature...
   //When additional parameters are needed, they need to be supplied in a form similar to this:
   {
-    auto vel = pd->getVel(access::location::cpu, access::mode::write);
-    fori(0, N) vel.raw()[i] = make_real3(0);
+    auto vel = pd->getVel(access::location::gpu, access::mode::write);
+    thrust::fill(thrust::device, vel.begin(), vel.end(), real3());
   }
-      
+
   VerletNVE::Parameters par;
-  par.dt = std::stod(argv[3]);
+  par.dt = dt;
   //If set to true (default), VerletNVE will compute Energy at step 0 and modify the velocities accordingly
   par.initVelocities = false;
   auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
 
-  //Harmonic walls acting on different particle groups
-  //This two interactors will cause particles in group pg2 to stick to a wall in -Lz/4
-  //And the ones in pg3 to +Lz/4
-  auto extForces = make_shared<ExternalForces<HarmonicWall>>(pd, pg, sys,
-							     make_shared<HarmonicWall>(box.boxSize.z*0.5));
-  
-  //Add interactors to integrator.
-  verlet->addInteractor(extForces);
+  {
+    //Harmonic walls acting on different particle groups
+    //This two interactors will cause particles in group pg2 to stick to a wall in -Lz/4
+    //And the ones in pg3 to +Lz/4
+    auto extForces = make_shared<ExternalForces<Wall>>(pd, pg, sys,
+							       make_shared<Wall>(box.boxSize));
 
-  
+    //Add interactors to integrator.
+    verlet->addInteractor(extForces);
+  }
+
   SPH::Parameters params;
   params.box = box;  //Box to work on
   //These are the default parameters,
   //if any parameter is not present, it will revert to the default in the .cuh
-  params.support = 1.0;
-  params.viscosity = 50.0;
-  params.gasStiffness = 100.0;
-  params.restDensity = 0.4;
+  params.support = support;
+  params.viscosity = viscosity;
+  params.gasStiffness = gasStiffness;
+  params.restDensity = restDensity;
 
   auto sph = make_shared<SPH>(pd, pg, sys, params);
 
 
-  
+
   //You can add as many modules as necessary
   verlet->addInteractor(sph);
 
@@ -171,13 +160,12 @@ int main(int argc, char *argv[]){
   //This can increase performance considerably as it improves coalescence.
   //Sorting the particles will cause the particle arrays to change in order and (possibly) address.
   //This changes will be informed with signals and any module that needs to be aware of such changes
-  //will acknowedge it through a callback (see ParticleData.cuh).
+  //will acknowledge it through a callback (see ParticleData.cuh).
+
   pd->sortParticles();
-        
+
   Timer tim;
   tim.tic();
-  int nsteps = std::atoi(argv[5]);
-  int printSteps = std::atoi(argv[6]);
   //Run the simulation
   forj(0,nsteps){
     //This will instruct the integrator to take the simulation to the next time step,
@@ -185,7 +173,7 @@ int main(int argc, char *argv[]){
     verlet->forwardTime();
 
     //Write results
-    if(j%printSteps==1)
+    if(printSteps and j%printSteps==0)
     {
       sys->log<System::DEBUG1>("[System] Writing to disk...");
       //continue;
@@ -197,21 +185,55 @@ int main(int argc, char *argv[]){
 	real4 pc = pos.raw()[sortedIndex[i]];
 	p = box.apply_pbc(make_real3(pc));
 	int type = pc.w;
-	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<endl;
+	out<<p<<" "<<0.5*(type==1?2:1)<<" "<<type<<"\n";
       }
 
-    }    
+    }
     //Sort the particles every few steps
     //It is not an expensive thing to do really.
     if(j%500 == 0){
       pd->sortParticles();
     }
   }
-  
+
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
   //sys->finish() will ensure a smooth termination of any UAMMD module.
   sys->finish();
 
   return 0;
+}
+
+
+void readParameters(std::shared_ptr<System> sys, std::string file){
+
+  {
+    if(!std::ifstream(file).good()){
+      std::ofstream default_options(file);
+      default_options<<"boxSize 45 45 90"<<std::endl;
+      default_options<<"numberParticles 16384"<<std::endl;
+      default_options<<"dt 0.01"<<std::endl;
+      default_options<<"numberSteps 100000"<<std::endl;
+      default_options<<"printSteps 100"<<std::endl;
+      default_options<<"outputFile /dev/stdout"<<std::endl;
+      default_options<<"viscosity 10"<<std::endl;
+      default_options<<"gasStiffness 60"<<std::endl;
+      default_options<<"support 2.4"<<std::endl; //1
+      default_options<<"restDensity 0.3"<<std::endl;
+    }
+  }
+
+  InputFile in(file, sys);
+
+  in.getOption("boxSize", InputFile::Required)>>L.x>>L.y>>L.z;
+  in.getOption("numberSteps", InputFile::Required)>>nsteps;
+  in.getOption("printSteps", InputFile::Required)>>printSteps;
+  in.getOption("dt", InputFile::Required)>>dt;
+  in.getOption("numberParticles", InputFile::Required)>>N;
+  in.getOption("outputFile", InputFile::Required)>>outputFile;
+  in.getOption("viscosity", InputFile::Required)>>viscosity;
+  in.getOption("gasStiffness", InputFile::Required)>>gasStiffness;
+  in.getOption("support", InputFile::Required)>>support;
+  in.getOption("restDensity", InputFile::Required)>>restDensity;
+
 }

@@ -6,7 +6,7 @@
   Look for argv[ to see what each parameter does.
 
 
-  Try running: 
+  Try running:
 
       ./mcnvt 14 32 100000 50 1 20 0.0525 300 0.9 2>&1
 
@@ -28,9 +28,9 @@ int main(int argc, char *argv[]) {
   if(argc<10){
     sys->log<System::CRITICAL>("[System] Not enough input arguments!. Look for argv[ in the source code");
   }
-  
+
     int N = pow(2,atoi(argv[1]));
-    
+
 
     ullint seed = 0xf31337Bada55D00dULL^time(NULL);
     sys->rng().setSeed(seed);
@@ -38,16 +38,16 @@ int main(int argc, char *argv[]) {
     auto pd = make_shared<ParticleData>(N, sys);
     auto pg = make_shared<ParticleGroup>(pd, sys, "All");
 
-    Box box(std::stod(argv[2]));        
-    {      
-        auto pos = pd->getPos(access::location::cpu, access::mode::write);   	
+    Box box(std::stod(argv[2]));
+    {
+        auto pos = pd->getPos(access::location::cpu, access::mode::write);
         fori(0,N) {
 	  pos.raw()[i] = make_real4(sys->rng().uniform3(-box.boxSize.x*0.5,box.boxSize.x*0.5), 0);
             pos.raw()[i].w = 0;
 	}
     }
-    
-    
+
+
     ofstream outPos("pos.dat"),outEnergy("energy.dat");
 
 
@@ -57,9 +57,9 @@ int main(int argc, char *argv[]) {
       LJ::InputPairParameters par;
       par.epsilon = 1.0;
       par.shift = false;
-      
+
       par.sigma = 1;
-      par.cutOff = 2.5*par.sigma;     
+      par.cutOff = 2.5*par.sigma;
       pot->setPotParameters(0, 0, par);
     }
     using MC = MC_NVT::Anderson<LJ>;
@@ -68,42 +68,42 @@ int main(int argc, char *argv[]) {
     par.kT = std::stod(argv[5]);
     par.attempsPerCell = std::atoi(argv[6]);
     par.initialJumpSize = std::stod(argv[7]); //0.05
-    
+
     par.thermalizationSteps = std::stod(argv[8]); //300
     par.desiredAcceptanceRatio = std::stod(argv[9]); //0.8
-    
+
     par.acceptanceRatioRate = 1.05;
-    par.tuneSteps = 50; 
-    
+    par.tuneSteps = 50;
+
     auto mc = make_shared<MC>(pd, pg, sys, pot, par);
-    
-    
+
+
     //Run the simulation
     sys->log<System::MESSAGE>("RUNNING!!!");
-    
+
     pd->sortParticles();
 
     Timer tim;
     tim.tic();
     int nsteps = std::atoi(argv[3]);
     int printSteps = std::atoi(argv[4]);
-    
+
     forj(0,nsteps) {
 
       mc->forwardTime();
-      
+
       //Write results
-	
-      if(j%printSteps==1 && j>par.thermalizationSteps) {	
-		
+
+      if(j%printSteps==1 && j>par.thermalizationSteps) {
+
             sys->log<System::DEBUG>("[System] Writing to disk...");
 
 	    real3 p;
 	    auto pos = pd->getPos(access::location::cpu, access::mode::read);
-	    
+
 	    outEnergy << mc->computeInternalEnergy() << endl;
-	    
-	    outPos<<"#"<<endl;            
+
+	    outPos<<"#"<<endl;
 	    fori(0,N) {
                 p = make_real3(pos.raw()[i]);
                 int type = pos.raw()[i].w;
@@ -111,11 +111,11 @@ int main(int argc, char *argv[]) {
             }
 	    outPos<<flush;
         }
-        
+
       if(j%500 == 1){pd->sortParticles();}
-	
+
     }
-    
+
     auto totalTime = tim.toc();
     sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
     sys->finish();

@@ -1,23 +1,18 @@
-/*Raul P. Pelaez 2017. A short Dissipative Particle Dynamics example.
-
-This file contains a good example of how UAMMD works and how to configure and launch a simulation.
-
+/*Raul P. Pelaez 2019. Dissipative Particle Dynamics example.
 
 Particles start in a random uniform configuration. They evolve following DPD integration.
-The parameters are set to reproduce the results in [1]. You can check the gdr and see that it perfectly reproduces Figure 3 in [1].
+The parameters are set to reproduce the results in [1]. You can check the RDF* and see that it perfectly reproduces Figure 3 in [1].
 
-
-
-  
-Needs cli input arguments with a system size, etc, look for "argv"
-
-Or just run: ./a.out 100000 5000 0.01
-for a quick test
+Reads some parameters from a file called "data.main.dpd", if not present it will be auto generated with some default parameters.
 
 You can visualize the reuslts with superpunto
+*You can use https://github.com/RaulPPelaez/RadialDistributionFunction to compute the RDF
+  With the default parameters you can do:
+  $ ./dpd | rdf -N 16384 -Nsnapshots 20 -L 16 -nbins 50 -rcut 2.5 > rdf.dat
+  To generate Fig 3. in [1]
 
 References:
-[1] On the numerical treatment of dissipative particle dynamics and related systems. Leimkuhler and Shang 2015. https://doi.org/10.1016/j.jcp.2014.09.008  
+[1] On the numerical treatment of dissipative particle dynamics and related systems. Leimkuhler and Shang 2015. https://doi.org/10.1016/j.jcp.2014.09.008
  */
 
 //This include contains the basic needs for an uammd project
@@ -28,87 +23,79 @@ References:
 #include"Interactor/PairForces.cuh"
 #include"Interactor/Potential/DPD.cuh"
 #include"utils/InitialConditions.cuh"
+#include"utils/InputFile.h"
 #include<fstream>
 
 
 using namespace uammd;
-using namespace std;
+
+using std::make_shared;
+using std::endl;
+
+real3 boxSize;
+real dt;
+std::string outputFile;
+int numberParticles;
+int numberSteps, printSteps;
+real temperature;
+real cutOff;
+real gamma_dpd;
+real A;
+
+
+void readParameters(std::shared_ptr<System> sys, std::string file);
 
 int main(int argc, char *argv[]){
+  auto sys = make_shared<System>(argc, argv);
+  readParameters(sys, "data.main.dpd");
 
-  if(argc<3){
-    std::cerr<<"ERROR, I need some parameters!!\nTry to run me with:\n./a.out 100000 5000 0.01"<<std::endl;
-    exit(1);
-  }
-  //Number of particles and box size set to match dens=4 as in [1]
-  int N = 16384;
-
-  //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
-  
-  auto sys = make_shared<System>();
-
-  //Modules will ask System when they need a random number (i.e for seeding the GPU RNG).
-  ullint seed = 0xf31337Bada55D00dULL;
+  ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
 
-  //ParticleData stores all the needed properties the simulation will need.
-  //Needs to start with a certain number of particles, which can be changed mid-simulation
-  //If UAMMD is to be used as a plugin for other enviroment or custom code, ParticleData should accept references to
-  // properties allocated and handled by the user, this is a non-implemented work in progress as of now though.
-  auto pd = make_shared<ParticleData>(N, sys);
+  auto pd = make_shared<ParticleData>(numberParticles, sys);
 
-  //Some modules need a simulation box (i.e PairForces for the PBC)
-  Box box(16);
-  //Initial positions
+  Box box(boxSize);
   {
-    //Ask pd for a property like so:
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
-    auto vel = pd->getVel(access::location::cpu, access::mode::write);    
-    
-    //Start in a random configuration    
-    fori(0,N){
-      pos.raw()[i] = make_real4(sys->rng().uniform3(-box.boxSize.x*0.5,box.boxSize.x*0.5), 0);//initial[i];
-      //Type of particle is stored in .w
-      pos.raw()[i].w = 0;
-      vel.raw()[i] = make_real3(sys->rng().gaussian(0, 1),sys->rng().gaussian(0, 1),sys->rng().gaussian(0, 1));
-    }    
+    auto vel = pd->getVel(access::location::cpu, access::mode::write);
+    std::generate(pos.begin(), pos.end(),
+		  [&](){
+		    return make_real4(sys->rng().uniform3(-box.boxSize.x*0.5,box.boxSize.x*0.5), 0);
+		  });
+    std::generate(vel.begin(), vel.end(),
+		  [&](){
+		    return make_real3(sys->rng().gaussian(0, 1),
+				      sys->rng().gaussian(0, 1),
+				      sys->rng().gaussian(0, 1));
+		  });
   }
-  
 
-  //Modules can work on a certain subset of particles if needed, the particles can be grouped following any criteria
-  //The builtin ones will generally work faster than a custom one. See ParticleGroup.cuh for a list
-  
-  //A group created with no criteria will contain all the particles  
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-  
-  ofstream out("kk");
-  
+
+  std::ofstream out(outputFile);
+
   using NVE = VerletNVE;
-  
   NVE::Parameters par;
 
-  par.dt = std::stod(argv[3]);
+  par.dt = dt;
   par.initVelocities = false;
 
   auto verlet = make_shared<NVE>(pd, pg, sys, par);
 
-
   {
     using PairForces = PairForces<Potential::DPD>;
-  
-    //This is the general interface for setting up a potential  
+
     Potential::DPD::Parameters dpd_params;
-    //Set too match parameters in [1]
-    dpd_params.cutOff = 1.0; 
-    dpd_params.temperature = 1.0;
-    dpd_params.gamma = 4.0;
-    dpd_params.A = 25.0;
+    dpd_params.cutOff = cutOff;
+    dpd_params.temperature = temperature;
+    dpd_params.gamma = gamma_dpd;
+    dpd_params.A = A;
     dpd_params.dt = par.dt;
-  
+
     auto pot = make_shared<Potential::DPD>(sys, dpd_params);
 
     PairForces::Parameters params;
-    params.box = box;  //Box to work on
+    params.box = box;
     auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
 
     verlet->addInteractor(pairforces);
@@ -117,51 +104,80 @@ int main(int argc, char *argv[]){
   sys->log<System::MESSAGE>("RUNNING!!!");
 
   pd->sortParticles();
-        
+
   Timer tim;
   tim.tic();
-  int nsteps = std::atoi(argv[1]);
-  int printSteps = std::atoi(argv[2]);
   //Thermalization
-  forj(0,1000){
-    //This will instruct the integrator to take the simulation to the next time step,
-    //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
+  forj(0, 1000){
     verlet->forwardTime();
   }
   //Run the simulation
-  forj(0,nsteps){
-    //This will instruct the integrator to take the simulation to the next time step,
-    //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
+  forj(0, numberSteps){
     verlet->forwardTime();
 
     //Write results
-    if(j%printSteps==1)
+    if(printSteps>0 and j%printSteps==0)
     {
       sys->log<System::DEBUG1>("[System] Writing to disk...");
-      //continue;
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       out<<"#Lx="<<0.5*box.boxSize.x<<";Ly="<<0.5*box.boxSize.y<<";Lz="<<0.5*box.boxSize.z<<";"<<endl;
       real3 p;
-      fori(0,N){
-	real4 pc = pos.raw()[sortedIndex[i]];
+      fori(0, numberParticles){
+	real4 pc = pos[sortedIndex[i]];
 	p = box.apply_pbc(make_real3(pc));
-	int type = pc.w;
-	out<<p<<" "<<0.5<<" "<<type<<endl;
+	out<<p<<" 0.5 0\n";
       }
 
-    }    
-    //Sort the particles every few steps
-    //It is not an expensive thing to do really.
+    }
+
     if(j%500 == 0){
       pd->sortParticles();
     }
   }
-  
+
   auto totalTime = tim.toc();
-  sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
-  //sys->finish() will ensure a smooth termination of any UAMMD module.
+  sys->log<System::MESSAGE>("mean FPS: %.2f", numberSteps/totalTime);
   sys->finish();
 
   return 0;
+}
+
+void readParameters(std::shared_ptr<System> sys, std::string file){
+
+  {
+    if(!std::ifstream(file).good()){
+      std::ofstream default_options(file);
+      default_options<<"boxSize 16 16 16"<<std::endl;
+      //Number of particles and box size set to match dens=4 as in [1]
+      default_options<<"numberParticles 16384"<<std::endl;
+      default_options<<"dt 0.01"<<std::endl;
+      default_options<<"numberSteps 100000"<<std::endl;
+      default_options<<"printSteps 5000"<<std::endl;
+      default_options<<"outputFile /dev/stdout"<<std::endl;
+      default_options<<"temperature 1.0"<<std::endl;
+      //Set too match parameters in [1]
+      default_options<<"cutOff  1.0"<<std::endl;
+      default_options<<"temperature  1.0"<<std::endl;
+      default_options<<"gamma  4.0"<<std::endl;
+      default_options<<"A  25.0"<<std::endl;
+
+    }
+  }
+
+  InputFile in(file, sys);
+
+  in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
+  in.getOption("numberSteps", InputFile::Required)>>numberSteps;
+  in.getOption("printSteps", InputFile::Required)>>printSteps;
+  in.getOption("dt", InputFile::Required)>>dt;
+  in.getOption("numberParticles", InputFile::Required)>>numberParticles;
+  in.getOption("outputFile", InputFile::Required)>>outputFile;
+  in.getOption("temperature", InputFile::Required)>>temperature;
+  in.getOption("cutOff", InputFile::Required)>>cutOff;
+  in.getOption("A", InputFile::Required)>>A;
+  in.getOption("gamma", InputFile::Required)>>gamma_dpd;
+
+
+
 }
