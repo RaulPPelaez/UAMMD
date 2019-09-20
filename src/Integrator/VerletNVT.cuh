@@ -74,12 +74,16 @@ namespace uammd{
 	    shared_ptr<System> sys,
 	    Parameters par,
 	    std::string name);
-
     public:
       Basic(shared_ptr<ParticleData> pd,
 	    shared_ptr<ParticleGroup> pg,
 	    shared_ptr<System> sys,
 	    Parameters par);
+      Basic(shared_ptr<ParticleData> pd,
+	    shared_ptr<System> sys,
+	    Parameters par):
+	Basic(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
+
       ~Basic();
 
       virtual void forwardTime() override;
@@ -94,7 +98,12 @@ namespace uammd{
 		     shared_ptr<System> sys,
 		     Basic::Parameters par):
 	Basic(pd, pg, sys, par, "VerletNVT::GronbechJensen"){}
-	
+
+      GronbechJensen(shared_ptr<ParticleData> pd,
+		     shared_ptr<System> sys,
+		     Basic::Parameters par):
+	Basic(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par, "VerletNVT::GronbechJensen"){}
+
       using Parameters = Basic::Parameters;
 
       virtual void forwardTime() override;

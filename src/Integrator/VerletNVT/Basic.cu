@@ -66,7 +66,7 @@ namespace uammd{
       }
     
     }
-  
+
     Basic::Basic(shared_ptr<ParticleData> pd,
 		 shared_ptr<ParticleGroup> pg,
 		 shared_ptr<System> sys,		       
@@ -77,7 +77,7 @@ namespace uammd{
 		   shared_ptr<ParticleGroup> pg,
 		   shared_ptr<System> sys,		       
 		   Basic::Parameters par,
-		   std::string name):	
+		   std::string name):
       Integrator(pd, pg, sys, name),
       dt(par.dt), temperature(par.temperature), viscosity(par.viscosity), is2D(par.is2D),
       steps(0){

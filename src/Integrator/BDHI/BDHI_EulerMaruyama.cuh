@@ -60,7 +60,7 @@ namespace uammd{
     EulerMaruyama(shared_ptr<ParticleData> pd,
 		  shared_ptr<System> sys,		       
 		  Parameters par):
-      EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), par){}
+      EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
       
 				     
     ~EulerMaruyama();
