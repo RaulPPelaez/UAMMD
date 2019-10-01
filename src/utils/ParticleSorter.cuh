@@ -117,8 +117,6 @@ namespace uammd{
 
       //This uses the CUB API to perform a radix sort
       //CUB orders by key an array pair and copies them onto another pair
-      auto alloc = sys->getTemporaryDeviceAllocator<char>();
-      thrust::device_vector<char, System::allocator<char>> d_temp_storage(temp_storage_bytes, alloc);
       /**Initialize CUB if more temp storage is needed**/
       if(N > temp_storage_num_elements){
 	temp_storage_num_elements = N;
@@ -131,9 +129,10 @@ namespace uammd{
 						     N,
 						     0, end_bit,
 						     st));
-	d_temp_storage.resize(temp_storage_bytes);
       }
-      void* d_temp_storage_ptr = (void*) thrust::raw_pointer_cast(d_temp_storage.data());
+      auto alloc = sys->getTemporaryDeviceAllocator<char>();
+      auto cuptr = alloc.allocate(temp_storage_bytes);
+      void* d_temp_storage_ptr = thrust::raw_pointer_cast(cuptr);
       /**Perform the Radix sort on the index/hash pair**/
       CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage_ptr, temp_storage_bytes,
 						   hash,
@@ -141,6 +140,7 @@ namespace uammd{
 						   N,
 						   0, end_bit,
 						   st));
+      alloc.deallocate(cuptr, temp_storage_bytes);
     }
     //Return the most significant bit of an unsigned integral type
     template <typename T> inline int msb(T n){
