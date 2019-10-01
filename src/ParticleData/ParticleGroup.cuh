@@ -235,11 +235,9 @@ namespace uammd{
     //Transform sequential indexing to indices of particle sin group
     using IndexIterator = cub::TransformInputIterator<int, IndexAccess, cub::CountingInputIterator<int>>;
     
-  private:
-    IndexIterator make_index_iterator(const int *indices){
+    static IndexIterator make_index_iterator(const int *indices){
       return IndexIterator(cub::CountingInputIterator<int>(0), IndexAccess(indices));
     }
-  public:
      
     //Get a raw memory pointer to the index list if it exists
     inline const int * getIndicesRawPtr(access::location loc){
