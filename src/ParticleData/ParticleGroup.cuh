@@ -383,7 +383,7 @@ namespace uammd{
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s contains %d particles.", name.c_str(), numberParticles);
     this->totalParticles = pd->getNumParticles();
   
-    if(numberParticles = totalParticles){
+    if(numberParticles == totalParticles){
       this->allParticlesInGroup = true;    
     }
     else{
