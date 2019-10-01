@@ -105,7 +105,7 @@ VECATTR  float2 operator /(const float &b, const float2 &a){
   return make_float2(b / a.x,
 		     b / a.y);
 }
-VECATTR  void operator /=(float2 &a, const float &b){  
+VECATTR  void operator /=(float2 &a, const float &b){
   a *= 1.0f/b;
 }
 
@@ -222,7 +222,7 @@ VECATTR  float3 operator /(const float &b, const float3 &a){
 		     b / a.z
 		     );
 }
-VECATTR  void operator /=(float3 &a, const float &b){  
+VECATTR  void operator /=(float3 &a, const float &b){
   a *= 1.0f/b;
 }
 
@@ -346,7 +346,7 @@ VECATTR  float4 operator /(const float &b, const float4 &a){
 		     b / a.z,
 		     b / a.w);
 }
-VECATTR  void operator /=(float4 &a, const float &b){  
+VECATTR  void operator /=(float4 &a, const float &b){
   a *= 1.0f/b;
 }
 
@@ -370,7 +370,7 @@ VECATTR real4 make_real4(real x, real y, real z, real w){
   #endif
 }
 
-VECATTR real4 make_real4(real s){return make_real4(s, s, s, s);}  
+VECATTR real4 make_real4(real s){return make_real4(s, s, s, s);}
   VECATTR real4 make_real4(real3 a){ return make_real4(a.x, a.y, a.z, real(0.0));}
 VECATTR real4 make_real4(real3 a, real w){ return make_real4(a.x, a.y, a.z, w);}
 
@@ -389,7 +389,7 @@ VECATTR real4 make_real4(uint4 a){return make_real4(real(a.x), real(a.y), real(a
 
 
 VECATTR real3 make_real3(real x, real y, real z){
-#ifdef SINGLE_PRECISION 
+#ifdef SINGLE_PRECISION
   return make_float3(x,y,z);
 #else
   return make_double3(x,y,z);
@@ -416,12 +416,12 @@ VECATTR real3 make_real3(int3 a){ return make_real3(real(a.x), real(a.y), real(a
 VECATTR real3 make_real3(uint3 a){return make_real3(real(a.x), real(a.y), real(a.z));}
 
 
-  
+
 //////////////////REAL2///////////////////////////
 
 
 VECATTR real2 make_real2(real x, real y){
-#ifdef SINGLE_PRECISION 
+#ifdef SINGLE_PRECISION
   return make_float2(x,y);
 #else
   return make_double2(x,y);
@@ -432,7 +432,7 @@ VECATTR real2 make_real2(real x, real y){
 #else
   VECATTR real2 make_real2(float2 a){return make_real2(a.x, a.y);}
 #endif
-  
+
 VECATTR real2 make_real2(real s){ return make_real2(s, s);}
 VECATTR real2 make_real2(real2 a){return make_real2(a.x, a.y);}
 VECATTR real2 make_real2(real3 a){return make_real2(a.x, a.y);}
@@ -441,8 +441,8 @@ VECATTR real2 make_real2(int3 a){ return make_real2(real(a.x), real(a.y));}
 VECATTR real2 make_real2(uint3 a){return make_real2(real(a.x), real(a.y));}
 
   VECATTR real dot(real2 a, real2 b){ return a.x*b.x + a.y*b.y;}
-  
-  
+
+
 }
 ////////////////DOUBLE PRECISION//////////////////////
 #ifdef SINGLE_PRECISION
@@ -579,7 +579,7 @@ VECATTR  double4 operator /(const double &b, const double4 &a){
 		      b / a.x,
 		      b / a.y,
 		      b / a.z,
-		      b / a.w 
+		      b / a.w
 		      );
 }
 VECATTR  void operator /=(double4 &a, const double &b){
@@ -745,7 +745,7 @@ VECATTR  double3 operator /(const double &b, const double3 &a){
 		      );
 }
 VECATTR  void operator /=(double3 &a, const double &b){
-  
+
   a *= 1.0/b;
 
 }
@@ -866,7 +866,7 @@ VECATTR double3 cross(double3 a, double3 b){
 
 VECATTR float3 sqrt(const float3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
 VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
-      
+
 
 //////////////////////////////////////////////////////////
 

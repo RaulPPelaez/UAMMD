@@ -2,15 +2,15 @@
 
   This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
   that conserves the energy, volume and number of particles.
- 
+
   Create the module as any other integrator with the following parameters:
-    
-    
+
+
   auto sys = make_shared<System>();
   auto pd = make_shared<ParticleData>(N,sys);
   auto pg = make_shared<ParticleGroup>(pd,sys, "All");
-  
-    
+
+
   VerletNVE::Parameters par;
      par.energy = 1.0; //Target energy per particle, can be ommited if initVelocities=false
      par.dt = 0.01;
@@ -18,15 +18,15 @@
      par.initVelocities=true; //Modify starting velocities to ensure the target energy
 
     auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
-      
+
     //Add any interactor
     verlet->addInteractor(...);
     ...
-    
+
     //forward simulation 1 dt:
-    
+
     verlet->forwardTime();
-    
+
  */
 #ifndef VERLETNVE_CUH
 #define VERLETNVE_CUH
@@ -40,7 +40,7 @@ namespace uammd{
     real energy;
     bool is2D;
     bool initVelocities;
-    
+
     cudaStream_t stream;
     int steps;
 
@@ -72,4 +72,4 @@ namespace uammd{
 
 #include"VerletNVE.cu"
 #endif
-  
+

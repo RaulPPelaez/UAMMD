@@ -3,7 +3,7 @@
    The requested memory blocks are kept in a cache instead of being cudaFree'd, which makes allocating/deallocating almost free when the same blocks are being constantly allocated/deallocated.
 
 System::allocator is a polymorphic allocator, which makes a thrust::device_vector using it compatible with vectors usig the default allocator.
- */ 
+ */
 #include"uammd.cuh"
 #include<thrust/device_vector.h>
 #include<thrust/host_vector.h>
@@ -23,7 +23,7 @@ int main(){
   {
     auto alloc = sys->getTemporaryDeviceAllocator<char>();
     thrust::device_vector<char, System::allocator<char>> vec(alloc);
-    vec.resize(10000);   
+    vec.resize(10000);
     thrust::host_vector<char> host_copy_with_default_allocator(vec);
     thrust::device_vector<char> device_copy_with_default_allocator(vec);
   }

@@ -8,7 +8,7 @@
 #include<fstream>
 namespace uammd{
   namespace Hydro{
-    namespace LBM{    
+    namespace LBM{
       class D3Q19: public Integrator{
 	int steps;
 	thrust::device_vector<real> sourceGrid, destGrid;
@@ -28,7 +28,7 @@ namespace uammd{
 	};
 	D3Q19(shared_ptr<ParticleData> pd,
 	      shared_ptr<System> sys,
-	      Parameters par);    
+	      Parameters par);
 	virtual void forwardTime() override;
 	void write();
 	void writePNG();

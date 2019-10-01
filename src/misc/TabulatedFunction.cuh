@@ -1,8 +1,8 @@
 /*Raul P. Pelaez 2018. Tabulated Function
-  
+
   A tabulated function allows to precompute a function on a certain range and access to it later on the GPU using
   interpolation.
-  
+
   The default interpolation mechanism is linear (like a cuda texture).
 
   USAGE:
@@ -14,11 +14,11 @@
     real rmax = 1;
     TabulatedFunction<real> tableFunction(d_table, ntablePoints, rmin, rmax, foo);
 
-    //After this you will be able to call tableFunction(r) as if it were foo(r) inside the interval rmin, rmax   
+    //After this you will be able to call tableFunction(r) as if it were foo(r) inside the interval rmin, rmax
     //Below rmin, tableFunction(r) = tableFunction(rmin). Above rmax, tableFunction(r) = 0.
 
     //Alternatively you can omit the first argument to the constructor and TabulatedFunction will maintain an inner buffer.
-    
+
 
  */
 #ifndef TABULATEDFUNCTION_CUH
@@ -40,7 +40,7 @@ namespace uammd{
 
   template <typename T2>
   __host__ __device__ inline real2 lerp(real2 v0, real2 v1, T2 t) {
-    return make_real2(lerp(v0.x, v1.x, t), lerp(v0.y, v1.y, t));		   
+    return make_real2(lerp(v0.x, v1.x, t), lerp(v0.y, v1.y, t));
   }
 
   template <typename T2>
@@ -61,17 +61,17 @@ namespace uammd{
     template<class iterator, class T = typename std::iterator_traits<iterator>::value_type>
     inline  __device__ T operator()(const iterator &table, int Ntable, real dr, real r) const{
       int i = r*Ntable;
-      real r0 = i*dr;      
+      real r0 = i*dr;
 
       T v0 = table[i];
       T v1 = table[i+1];
-    
+
       real t = (r - r0)*(real)Ntable;
 
-      return lerp(v0, v1, t);    
+      return lerp(v0, v1, t);
     }
   };
- 
+
   template<class T, class Interpolation = LinearInterpolation>
   struct TabulatedFunction{
     int Ntable;
@@ -87,7 +87,7 @@ namespace uammd{
     T* myCudaMalloc(int N){T* ptr; CudaSafeCall(cudaMalloc((void **)&ptr, N*sizeof(T))); return ptr;}
   public:
     template<class Functor>
-    TabulatedFunction(int N, real rmin, real rmax, Functor foo):     
+    TabulatedFunction(int N, real rmin, real rmax, Functor foo):
       TabulatedFunction(myCudaMalloc(N), N, rmin, rmax, foo)
     {this->freeTable=true;}
     template<class Functor>
@@ -101,7 +101,7 @@ namespace uammd{
       interp(),
       freeTable(false),
       isCopy(false)
-    {   
+    {
       std::vector<T> tableCPU(Ntable+1);
       for(int i = 0; i<=Ntable; i++){
 	double x = (i/(double)(Ntable))*(rmax-rmin) + rmin;
@@ -111,7 +111,7 @@ namespace uammd{
        			      tableCPU.data(),
        			      (Ntable+1)*sizeof(T),
        			      cudaMemcpyHostToDevice));
-      
+
     }
 
     //This copy constructor prevents cuda from calling the destructor after a kernel call
@@ -124,23 +124,23 @@ namespace uammd{
     inline __device__ T get(real rs) const{
       return this->operator()<modifier>(rs);
     }
- 
-    
+
+
     template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
-    inline __device__ T operator()(real rs) const{     
+    inline __device__ T operator()(real rs) const{
       real r = (rs-rmin)*invInterval;
       if(rs >= rmax) return T();
       if(r <= real(0.0)) return table[0];
       cub::CacheModifiedInputIterator<modifier, T> table_itr(table);
       return interp(table_itr, Ntable, drNormalized, r);
     }
- 
+
   };
 
   /*
     struct LJ{
     __device__ __host__ real2 operator()(real x){
-    
+
     return {(real)(pow(x, -13) - pow(x,-7)), real(1.0/(x*x))};
     }
     };
@@ -154,7 +154,7 @@ namespace uammd{
 
 
   }
-  
+
 
   int main(){
 
@@ -166,15 +166,15 @@ namespace uammd{
 
     cerr<<rmax/Ntable<<endl;
 
-  
+
 
     int N = 2*Ntable;
     cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1e8*sizeof(char));
 
     sample<<<N, 1>>>(table, lj, rmin, rmax, N);
-  
+
     cudaDeviceSynchronize();
-  
+
     return 0;
   }
   */

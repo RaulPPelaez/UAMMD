@@ -2,7 +2,7 @@
 
   See line 145 for HG setup.
 
-  This is a simulation of a 2D LJ liquid with Brownian Dynamics. 
+  This is a simulation of a 2D LJ liquid with Brownian Dynamics.
   HG is called every printSteps to update according to hydroGridOptions.nml (which must be present at the current folder) and write to disk.
 
   Some parameters are set in the command line:
@@ -13,7 +13,7 @@
 
   See utils/HydroGrid.cuh for more information:
 
-References: 
+References:
 [1] https://github.com/stochasticHydroTools/HydroGrid
 
 */
@@ -43,14 +43,14 @@ int main(int argc, char *argv[]){
     cerr<<"nsteps=argv[4]"<<endl;
     cerr<<"printSteps=argv[5]"<<endl;
     cerr<<"Temperature=argv[6]"<<endl;
-     
+
     exit(1);
   }
 
   int N = pow(2,atoi(argv[1]));//atoi(argv[1]));
 
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
-  
+
   auto sys = make_shared<System>();
 
   //Modules will ask System when they need a random number (i.e for seeding the GPU RNG).
@@ -71,10 +71,10 @@ int main(int argc, char *argv[]){
     //Ask pd for a property like so:
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     //auto radius = pd->getRadius(access::location::cpu, access::mode::write);
-    
+
     //Start in a square lattice, pos.w contains the particle type
     auto initial =  initLattice(box.boxSize, N, sq);
-    
+
     fori(0,N){
       pos.raw()[i] = initial[i];
       //Type of particle is stored in .w
@@ -82,14 +82,14 @@ int main(int argc, char *argv[]){
     }
 
   }
-  
+
   //Modules can work on a certain subset of particles if needed, the particles can be grouped following any criteria
   //The builtin ones will generally work faster than a custom one. See ParticleGroup.cuh for a list
-  
-  //A group created with no criteria will contain all the particles  
+
+  //A group created with no criteria will contain all the particles
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-  
-  
+
+
   BD::EulerMaruyama::Parameters par;
   par.temperature = std::stod(argv[6]);
   par.viscosity = 1.0/(6*M_PI);
@@ -98,7 +98,7 @@ int main(int argc, char *argv[]){
   par.is2D=true;
 
   auto bd = make_shared<BD::EulerMaruyama>(pd, pg, sys, par);
-  
+
    using PairForces = PairForces<Potential::LJ>;
 
    //This is the general interface for setting up a potential
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]){
      Potential::LJ::InputPairParameters par;
      par.epsilon = 1.0;
      par.shift = false;
-  
+
      par.sigma = 1.0;
      par.cutOff = 2.5*par.sigma;
      pot->setPotParameters(0, 0, par);
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]){
    auto pairforces = make_shared<PairForces>(pd, pg, sys, params, pot);
 
    bd->addInteractor(pairforces);
-  
+
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).
   //A maximum log level is set in System.cuh, every logging event with a level superior to the max will result in
   // absolutely no overhead, so dont be afraid to write System::DEBUGX log calls.
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]){
   //This changes will be informed with signals and any module that needs to be aware of such changes
   //will acknowedge it through a callback (see ParticleData.cuh).
   pd->sortParticles();
-  
+
   Timer tim;
   tim.tic();
   int nsteps = std::atoi(argv[4]);
@@ -150,9 +150,9 @@ int main(int argc, char *argv[]){
   hgpar.useColors = true;                    //Use pos.w as HydroGrid species
   HydroGrid hg(pd, sys, hgpar);
 
-  
+
   hg.init(); //Initialize
-  
+
   //Run the simulation
   forj(0,nsteps){
     //This will instruct the integrator to take the simulation to the next time step,
@@ -170,9 +170,9 @@ int main(int argc, char *argv[]){
 
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       //This allows to access the particles with the starting order so the particles are written in the same order
-      // even after a sorting      
+      // even after a sorting
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
-      
+
       out<<"#"<<endl;
       real3 p;
       fori(0,N){
@@ -182,14 +182,14 @@ int main(int argc, char *argv[]){
 	out<<p<<" "<<0.5<<" "<<type<<"\n";
       }
       out<<flush;
-    }    
+    }
     //Sort the particles every few steps
     //It is not an expensive thing to do really.
     if(j%500 == 0){
       pd->sortParticles();
     }
   }
-  
+
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
   //sys->finish() will ensure a smooth termination of any UAMMD module.

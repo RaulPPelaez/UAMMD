@@ -8,11 +8,11 @@
   Each one of the 8 subgrids is processed sequentially.
 
   The algorithm can be summarized as follows:
-  
-  
-  1- The checkerboard is placed with a random origin 
+
+
+  1- The checkerboard is placed with a random origin
   2- For each subgrid perform a certain prefixed number of trials on the particles inside each cell
-     
+
 Certain details must be taken into account to ensure detailed-balance:
   1- Any origin in the simulation box must be equally probable
   2- The different subgrids must be processed in a random order
@@ -49,48 +49,48 @@ namespace uammd {
       pd(pd), pg(pg), sys(sys),
       pot(pot),eP(eP),
       jumpSize(par.initialJumpSize),
-      steps(0),      
+      steps(0),
       par(in_par){
 
       if(par.kT<real(0.0))
 	sys->log<System::CRITICAL>("[MC_NVT::Anderson] Please specify a temperature!");
-      
+
       sys->log<System::MESSAGE>("[MC_NVT::Anderson] Created");
       cl = std::make_shared<CellList>(pd, pg, sys);
 
       sys->log<System::MESSAGE>("[MC_NVT::Anderson] Temperature: %e", par.kT);
-      
+
       if(par.box.boxSize.z == real(0.0)) this-> is2D = true;
       else is2D = false;
-      this->updateSimulationBox(par.box); 
+      this->updateSimulationBox(par.box);
       sys->log<System::MESSAGE>("[MC_NVT::Anderson] Box size: %e %e %e", grid.box.boxSize.x,
 				grid.box.boxSize.y,  grid.box.boxSize.z);
       sys->log<System::MESSAGE>("[MC_NVT::Anderson] Grid dimensions: %d %d %d", grid.cellDim.x,
 				grid.cellDim.y, grid.cellDim.z);
-      
+
       this->seed = par.seed;
       if(par.seed==0)
 	this->seed = sys->rng().next();
-      
+
       cudaStreamCreate(&st);
     }
-    
+
     template<class Pot,class ExternalPot>
     Anderson<Pot,ExternalPot>::~Anderson(){
       cudaStreamDestroy(st);
     }
-    
+
     //This function configures the simulation grid given a box and an interaction CutOff.
     //This process is done in such a way that an even number of cells in each dimension is ensured.
     template<class Pot,class ExternalPot>
     void Anderson<Pot,ExternalPot>::updateSimulationBox(Box box){
-	
-      this->currentCutOff = make_real3(pot->getCutOff());       
+
+      this->currentCutOff = make_real3(pot->getCutOff());
 
       int3 cellDim = make_int3(box.boxSize/currentCutOff);
       //I need an even number of cells
       if(cellDim.x%2!=0) cellDim.x -= 1;
-      if(cellDim.y%2!=0) cellDim.y -= 1; 
+      if(cellDim.y%2!=0) cellDim.y -= 1;
       if(cellDim.z%2!=0) cellDim.z -= 1;
       if(is2D){
 	cellDim.z = 1;
@@ -100,28 +100,28 @@ namespace uammd {
 	 cellDim.y < 3 or
 	 cellDim.z == 2)
 	sys->log<System::CRITICAL>("[MC_NVT::Anderson] I cannot work with such a large cut off (%e) in this box (%e)!", currentCutOff.x, box.boxSize.x);
-      
+
 
       this->grid = Grid(box, cellDim);
 
       //maxOriginDisplacement = sqrt(2)*grid.cellSize.x;
       maxOriginDisplacement = 0.5*grid.box.boxSize.x;
-      
-      int ncells = grid.getNumberCells();      
-     
+
+      int ncells = grid.getNumberCells();
+
       triedChanges.resize(ncells);
       acceptedChanges.resize(ncells);
-	
+
       uint* triedChanges_ptr = thrust::raw_pointer_cast(triedChanges.data());
       uint* acceptedChanges_ptr = thrust::raw_pointer_cast(acceptedChanges.data());
-	
+
       int Nthreads=128;
-      int Nblocks=ncells/Nthreads + ((ncells%Nthreads)?1:0);      
+      int Nblocks=ncells/Nthreads + ((ncells%Nthreads)?1:0);
 
       fillWithGPU<<<Nblocks, Nthreads>>>(triedChanges_ptr,0, ncells);
       fillWithGPU<<<Nblocks, Nthreads>>>(acceptedChanges_ptr,0, ncells);
     }
-    
+
     //This function computes the systems internal energy (per particle)
     template<class Pot,class ExternalPot>
     real Anderson<Pot,ExternalPot>::computeInternalEnergy(bool resetEnergy){
@@ -154,10 +154,10 @@ namespace uammd {
 			       it,
 			       totalEnergyGPU,
 			       numberParticles);
-      
+
 	//this check is important because the same storage space is used for several cub calls
 	if(newSize > cubTempStorage.size()){
-	  cubTempStorage.resize(newSize);	
+	  cubTempStorage.resize(newSize);
 	}
       }
       size_t size = cubTempStorage.size();
@@ -194,9 +194,9 @@ namespace uammd {
 	  return E;
 	}
       };
-      
+
     }
-    
+
     //This function computes the system external energy (per particle)
     template<class Pot,class ExternalPot>
     real Anderson<Pot,ExternalPot>::computeExternalEnergy(bool resetEnergy){
@@ -205,24 +205,24 @@ namespace uammd {
       if(SFINAE::has_energy<ExternalPot>::value == false){
 	return 0;
       }
-      
+
       int numberParticles = pg->getNumberParticles();
-      
+
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
-      
+
       auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
-      
+
       // If resetEnergy is true energy is set to 0 for particles in the group
       if(resetEnergy){
 	int Nthreads=128;
 	int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
 	fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(energy.raw(), globalIndex, 0, numberParticles);
       }
-	    
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);		
+
+      auto pos = pd->getPos(access::location::gpu, access::mode::read);
 
       cudaStreamSynchronize(st);
-      
+
       real *totalEnergyGPU; cudaMalloc(&totalEnergyGPU, sizeof(real));
       using EnergyTrans = Anderson_ns::ExternalEnergyTransform<ExternalPot>;
       using EnergyComputer = cub::TransformInputIterator<real,
@@ -232,17 +232,17 @@ namespace uammd {
       EnergyComputer energyComputer(globalIndex,
 				    EnergyTrans(*eP,
 						pos.raw(),
-						energy.raw()));      
-      
+						energy.raw()));
+
       size_t newSize = 0;
-      cub::DeviceReduce::Sum(nullptr, newSize, 
+      cub::DeviceReduce::Sum(nullptr, newSize,
 			     energyComputer,
 			     totalEnergyGPU,
 			     numberParticles);
-      
+
       //this check is important because the same storage space is used for several cub calls
       if(newSize > cubTempStorage.size()){
-	cubTempStorage.resize(newSize);	
+	cubTempStorage.resize(newSize);
       }
       //Compute energy and sum it, store each particle's energy as well
       size_t size = cubTempStorage.size();
@@ -255,20 +255,20 @@ namespace uammd {
       real totalEnergy = 0;
       CudaSafeCall(cudaMemcpy(&totalEnergy, totalEnergyGPU, sizeof(real), cudaMemcpyDeviceToHost));
       CudaSafeCall(cudaFree(totalEnergyGPU));
-      
-      return totalEnergy/numberParticles;      
+
+      return totalEnergy/numberParticles;
     }
-    
+
     //This functions computes de current acceptance ratio and fits jumpSize in order to obtain the desired one.
     template<class Pot,class ExternalPot>
     void Anderson<Pot,ExternalPot>::updateAccRatio(){
-	
+
       auto tmp = this->getNumberTriesAndNumberAccepted();
 
       this->resetAcceptanceCounters();
       uint numberTries = tmp.x;
       uint numberAccepted = tmp.y;
-      
+
       //posVar fitting
       const real currentAcceptanceRatio = real(numberAccepted)/numberTries;
 
@@ -281,14 +281,14 @@ namespace uammd {
       else if(currentAcceptanceRatio > par.desiredAcceptanceRatio){
 	jumpSize *= par.acceptanceRatioRate;
 	jumpSize = std::min({jumpSize, maxJump.x, maxJump.y});
-	if(!is2D){	
+	if(!is2D){
 	  jumpSize = std::min(jumpSize, maxJump.z);
-	}	
-      }	
-      
+	}
+      }
+
       sys->log<System::DEBUG>("[MC_NVT::Anderson] Current acceptance ratio: %e", currentAcceptanceRatio);
       sys->log<System::DEBUG>("[MC_NVT::Anderson] Current step size: %e, %e·cellSize", jumpSize, jumpSize/grid.cellSize.x);
-	
+
     }
 
 
@@ -304,51 +304,51 @@ namespace uammd {
 					    real3 shift){
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
 	if(i>=N) return;
-	
-	pos[globalIndex[groupIndex[i]]] = sortPos[i] + make_real4(shift,0); 
+
+	pos[globalIndex[groupIndex[i]]] = sortPos[i] + make_real4(shift,0);
 
       }
-    
+
 
       //Shifts the positions in the global position array
       __global__ void shiftKernel(real4* pos,
 				  int N,
 				  real3 shift){
 	int i = blockIdx.x*blockDim.x + threadIdx.x;
-	if(i>=N) return;       
+	if(i>=N) return;
 	pos[i] += make_real4(shift, 0);
       }
-    
+
 
 
     }
-    
+
     //Main Monte Carlo Step
     template<class Pot,class ExternalPot>
     void Anderson<Pot,ExternalPot>::forwardTime(){
-      
+
       sys->log<System::DEBUG>("[MC_NVT::Anderson] Performing Monte Carlo Parallel step: %d",steps);
       steps++;
-	
+
       int numberParticles = pg->getNumberParticles();
-      
+
       currentOrigin = make_real3(0);
 
       //int dir = sys->rng().next()%3;
       //((real*)(&currentOrigin.x))[dir] = sys->rng().uniform(-grid.cellSize.x*0.5, grid.cellSize.x*0.5);
-      
+
       currentOrigin = make_real3(sys->rng().uniform3(-maxOriginDisplacement, maxOriginDisplacement));
       if(is2D) currentOrigin.z = 0;
-      
+
       sys->log<System::DEBUG1>("[MC_NVT::Anderson] Current origin: %e %e %e",currentOrigin.x, currentOrigin.y, currentOrigin.z);
-      
-      //Displace the origin of all the particles in the group 
+
+      //Displace the origin of all the particles in the group
       {
 	int Nthreads = 128;
 	int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-	    
+
 	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
-	    
+
 	Anderson_ns::shiftKernel<<<Nblocks, Nthreads, 0, st>>>(pos.raw(),
 							       numberParticles,
 							       currentOrigin);
@@ -367,25 +367,25 @@ namespace uammd {
 				   st));
       //Update all subgrids
       if(steps < par.thermalizationSteps){
-	step<true>(); //Keep the count of the accepted/rejected movements 
+	step<true>(); //Keep the count of the accepted/rejected movements
 	if(steps%par.tuneSteps == 0)
 	  this->updateAccRatio();
       }
       else
 	//Just perform the step, without counting accepted/rejected moves
 	step<false>();
-	
+
       //Undo shift and copy results to global position array
       {
 	int Nthreads = 128;
 	int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-	    
+
 	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 	auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
-	
+
 	auto groupIndex = cl->getCellList().groupIndex;
 	auto globalIndex = pg->getIndexIterator(access::location::gpu);
-	    
+
 	Anderson_ns::upgradeAndShiftKernel<<<Nblocks, Nthreads, 0, st>>>(pos.raw(),
 									 sortPos_ptr,
 									 groupIndex,
@@ -394,9 +394,9 @@ namespace uammd {
 									 (-1.0)*currentOrigin);
 	currentOrigin = make_real3(0);
       }
-      
 
-	
+
+
     }
 
     namespace Anderson_ns{
@@ -426,7 +426,7 @@ namespace uammd {
 	//Get any additional info on particle i if needed
 	SFINAE::Delegator<PotentialTransverser> del;
 	del.getInfo(tr, globalIndex[groupIndex[selected_i]]);
-	
+
 	//Sum energy for particles in all neighbouring cells using the new and the old position
 	constexpr int numberNeighbourCells = is2D?9:27;
 	for(int i = 0; i<numberNeighbourCells; i++){
@@ -437,16 +437,16 @@ namespace uammd {
 	    cellj.z = 0;
 	  else
 	    cellj.z += i/9-1;
-	
+
 	  cellj = grid.pbc_cell(cellj);
-		
+
 	  const int icellj = grid.getCellIndex(cellj);
-    
+
 	  const int firstParticle = cellStart[icellj];
 	  if(firstParticle == CellList_ns::EMPTY_CELL) continue;
 	  //Continue only if there are particles in this cell
 	  //Index of the last particle in the cell's list
-	  const int lastParticle = cellEnd[icellj];	  
+	  const int lastParticle = cellEnd[icellj];
 	  const int nincell = lastParticle-firstParticle;
 	  for(int j=0; j<nincell; j++) {
 	    const int cur_j = j + firstParticle;
@@ -457,14 +457,14 @@ namespace uammd {
 	    //Do not exclude self interactions
 	    if(cur_j == selected_i) posj = newPos;
 	    tr.accumulate(newEnergy, del.compute(tr, global_cur_j, newPos, posj));
-	  
-					
+
+
 	  }
 	}
 	return newEnergy - oldEnergy;
-      }       
-	  
-      
+      }
+
+
       //A thread per cell in a 1D thread grid of size ncells/2 for a certain offset in the range [+-1, +-1, +-1]
       //A kernel invocation updates all cells in the subgrid given by offset
       //Each thread will attempt attemptsPerCell movements of particles inside its assigned cell
@@ -495,13 +495,13 @@ namespace uammd {
 	  celli.y = 2*((tid/cd.x)%cd.y) + offset.y;
 	  celli.z = 2*(tid/(cd.x*cd.y)) + offset.z;
 	}
-	
+
 	if(is2D)
 	  celli.z = 0;
 	else if(celli.z>=grid.cellDim.z) return;
 	if(celli.x>=grid.cellDim.x or
 	   celli.y>=grid.cellDim.y) return;
-	
+
 	const int icell = grid.getCellIndex(celli);
 
 	const int firstParticle = cellStart[icell];
@@ -519,14 +519,14 @@ namespace uammd {
 	  const int i = firstParticle + int(rng.f()*nincell);
 	  //const int i = firstParticle + rng.u32()%nincell;
 
-	  
+
 	  const real4 oldPos = sortPos[i];
 	  //Displace with a random vector
 	  real4 newPos = oldPos;
 	  newPos.x += jumpSize*(real(2.0)*rng.f()-real(1.0));
 	  newPos.y += jumpSize*(real(2.0)*rng.f()-real(1.0));
 	  if(!is2D)
-	    newPos.z += jumpSize*(real(2.0)*rng.f()-real(1.0));	  
+	    newPos.z += jumpSize*(real(2.0)*rng.f()-real(1.0));
 	  newPos.w = oldPos.w;
 
 	  //If the attempt takes the particle out of its cell reject it immediately
@@ -546,18 +546,18 @@ namespace uammd {
 						  sortPos,
 						  origin,
 						  tr, eP);
-	  //Metropolis acceptance rule	  
+	  //Metropolis acceptance rule
 	  const real Z = rng.f();
-	  const real acceptanceProbabilty = thrust::min(real(1.0), exp(-beta*dH));	  
+	  const real acceptanceProbabilty = thrust::min(real(1.0), exp(-beta*dH));
 	  if(Z <= acceptanceProbabilty) {
 	    //Move accepted
 	    sortPos[i] = newPos;
 	    if(countTries) accepted[icell]++;
 	  }
-    
+
 	} //End attempt loop
       } //End kernel
-    
+
 
     }
 
@@ -568,32 +568,32 @@ namespace uammd {
     void Anderson<Pot,ExternalPot>::step(){
       sys->log<System::DEBUG1>("[MC_NVT::Anderson] Launching step kernel with countTries=%d", countTries);
       int numberParticles = pg->getNumberParticles();
-		
+
       auto et = pot->getEnergyTransverser(grid.box, pd);
-	
+
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<decltype(et)>().getSharedMemorySize(et);
-      
+
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
-	
+
       uint* triedChanges_ptr = thrust::raw_pointer_cast(triedChanges.data());
       uint* acceptedChanges_ptr = thrust::raw_pointer_cast(acceptedChanges.data());
-      	
+
       real beta = 1.0/par.kT;
 
-      const int numberSubGrids = is2D?4:8;      
+      const int numberSubGrids = is2D?4:8;
       //The different subsets are sorted randomly with Fisher-Yates shuffle
       int shuffled_indexes[] = {0,1,2,3,4,5,6,7};
-      fori(0, numberSubGrids-1){	
+      fori(0, numberSubGrids-1){
 	int j = i + (sys->rng().next()%(numberSubGrids-i));
 	std::swap(shuffled_indexes[i], shuffled_indexes[j]);
       }
 
       int Nthreads = 128;
       int Nblocks = (grid.getNumberCells()/8)/Nthreads + (((grid.getNumberCells()/8)%Nthreads)?1:0);
-      
+
       auto clData = cl->getCellList();
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
-      
+
 
       //Choose kernel mode
       auto MCStepKernel = &Anderson_ns::MCStepKernel<countTries, false, decltype(et), ExternalPot>;
@@ -621,16 +621,16 @@ namespace uammd {
       }
 
     }
-    
-    //This function returns the number of Monte Carlo steps 
+
+    //This function returns the number of Monte Carlo steps
     //that have been performed since the last call.
     template<class Pot,class ExternalPot>
     uint2 Anderson<Pot,ExternalPot>::getNumberTriesAndNumberAccepted(){
       int ncells = grid.getNumberCells();
-	
+
       uint* triedChanges_ptr = thrust::raw_pointer_cast(triedChanges.data());
       uint* acceptedChanges_ptr = thrust::raw_pointer_cast(acceptedChanges.data());
-	
+
       tmpStorage.resize(sizeof(uint)*2);
 
       uint* tmpStorage_ptr = (uint*)thrust::raw_pointer_cast(tmpStorage.data());
@@ -643,10 +643,10 @@ namespace uammd {
 	cub::DeviceReduce::Sum(nullptr, newSize, triedChanges_ptr, totalTriesGPU, ncells, st);
 	//this check is important because the same storage space is used for several cub calls
 	if(newSize > cubTempStorage.size()){
-	  cubTempStorage.resize(newSize);	
+	  cubTempStorage.resize(newSize);
 	}
       }
-      
+
       void* cubTempStorage_ptr = (void*)thrust::raw_pointer_cast(cubTempStorage.data());
       size_t cubTempStorageSize = cubTempStorage.size();
 
@@ -659,7 +659,7 @@ namespace uammd {
 
       CudaSafeCall(cudaMemcpy(&totalTries, totalTriesGPU, sizeof(int), cudaMemcpyDeviceToHost));
       CudaSafeCall(cudaMemcpy(&totalChanges, totalChangesGPU, sizeof(int), cudaMemcpyDeviceToHost));
-      
+
       return {totalTries, totalChanges};
     }
 
@@ -667,18 +667,18 @@ namespace uammd {
     void  Anderson<Pot,ExternalPot>::resetAcceptanceCounters(){
 
       int ncells = grid.getNumberCells();
-	
+
       uint* triedChanges_ptr = thrust::raw_pointer_cast(triedChanges.data());
       uint* acceptedChanges_ptr = thrust::raw_pointer_cast(acceptedChanges.data());
 
       int Nthreads=128;
       int Nblocks=ncells/Nthreads + ((ncells%Nthreads)?1:0);
-      
+
       //Reset
       fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(triedChanges_ptr, 0, ncells);
       fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(acceptedChanges_ptr, 0, ncells);
 
     }
-    
+
   }
 }

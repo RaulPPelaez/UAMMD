@@ -7,21 +7,21 @@
 
 #include"utils/cxx_utils.h"
 namespace uammd{
-  //Defines the most simple and general posible transverser that does nothing. 
-  //This allows to fall back to nothing when a transverser is required.  
+  //Defines the most simple and general posible transverser that does nothing.
+  //This allows to fall back to nothing when a transverser is required.
   //Just does nothing, every function has an unspecified number of arguments. Very general.
   struct BasicNullTransverser{
     template<class ...T> static constexpr inline __host__ __device__ int zero(T...){ return 0;}
     template<class ...T> static constexpr inline __host__ __device__ int compute(T...){ return 0;}
     template<class ...T> static inline __host__ __device__ void accumulate(T...){}
-    template<class ...T> static inline __host__ __device__ void set(T...){}       
+    template<class ...T> static inline __host__ __device__ void set(T...){}
   };
 
 
   namespace SFINAE{
     // For Transversers, detects if a Transverser has getSharedMemorySize, therefore needing to allocate extra shared memory when launching a kernel that involves it.
     SFINAE_DEFINE_HAS_MEMBER(getSharedMemorySize)
-        
+
     //This delegator allows to ask a Transverser for the shared memory it needs even when getSharedMemorySize() is not present (it will return 0 by default)
     template<class T, bool general = has_getSharedMemorySize<T>::value>
     class SharedMemorySizeDelegator;
@@ -57,14 +57,14 @@ namespace uammd{
     };
 
     template<class T>
-    struct EnergyDelegator<T, false>{      
+    struct EnergyDelegator<T, false>{
       template<class ...Types>
       static inline __device__ __host__ real energy(T &t, Types... args){return real(0.0); }
     };
 
     SFINAE_DEFINE_HAS_MEMBER(force)
-    
-  
+
+
     //For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser
     //This macro defines a tempalted struct has_getInfo<T> that contains a static value=0 if T has not a getInfo method, and 1 otherwise
     SFINAE_DEFINE_HAS_MEMBER(getInfo);
@@ -78,11 +78,11 @@ namespace uammd{
     class Delegator;
 
     //Specialization for general transversers,
-    //    In this case, delegator holds the value of infoi, 
+    //    In this case, delegator holds the value of infoi,
     //    so it can be stored only when we have a general Transverser
-    //    Additionally, it supports shared memory reads, so you can use a delegator 
+    //    Additionally, it supports shared memory reads, so you can use a delegator
     //    even if the kernel writes/reads infoj to/from shared memory, see an example in NBodyForces.cuh
-  
+
     template<class T>
     class Delegator<T, true>{
     public:
@@ -108,7 +108,7 @@ namespace uammd{
       inline __device__ auto computeSharedMem(T &t,
 					      const real4& posi, const real4 &posj,
 					      void* shMem, int counter)-> decltype(t.zero()){
-      
+
 	return t.compute(posi, posj, infoi, ((myType*)shMem)[counter]);
       }
 
@@ -119,7 +119,7 @@ namespace uammd{
     template<class T>
     class Delegator<T, false>{
     public:
-    
+
       static inline __device__  void getInfo(T &t, const int &id){}
       //I dont have any additional info
       static constexpr inline __host__ __device__ size_t sizeofInfo(){return 0;}

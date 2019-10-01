@@ -33,12 +33,12 @@ namespace uammd{
 
 
   namespace DesernoPotential{
-    
+
     struct NonBonded_Functor{
       struct InputPairParameters{
 	real cutOff, sigma, epsilon, wc, rc;
       };
-      
+
       struct __align__(16) PairParameters{
 	real rc, wc;
 	real b2, epsilon;
@@ -51,7 +51,7 @@ namespace uammd{
 	if(r2 < params.rc*params.rc){
 	  const real invr2 = params.b2/r2;
 	  const real invr6 = invr2*invr2*invr2;
-	  const real invr8 = invr6*invr2;      
+	  const real invr8 = invr6*invr2;
 	  fmod += params.epsilon*(real(-48.0)*invr6 + real(24.0))*invr8/params.b2;
 	}
 	else if(r2 < rcpluswc2){
@@ -61,24 +61,24 @@ namespace uammd{
 	  fmod = params.epsilon*real(M_PI)*s*c/(params.wc*r);
 	}
 
-	return fmod;      
+	return fmod;
       }
-      
+
       static inline __host__ __device__ real energy(const real &r2, const PairParameters &params){
 	const real rcpluswc2 = (params.rc+params.wc)*(params.rc+params.wc);
-	if(r2 > rcpluswc2) return 0;	
+	if(r2 > rcpluswc2) return 0;
 	real E = 0;
 	if(r2 < params.rc*params.rc){
 	  const real invr2 = params.b2/r2;
-	  const real invr6 = invr2*invr2*invr2;	
+	  const real invr6 = invr2*invr2*invr2;
 	  E += params.epsilon*real(4.0)*invr6*(invr6-real(1.0))+params.epsilon*(params.wc>0?real(1.0):real(0.0));
 	}
 	else if(r2 < rcpluswc2){
 	  const real c = cospi((sqrt(r2)-params.rc)/(real(2.0)*params.wc));
 	  E -= params.epsilon*c*c;
 	}
-		
-	return E;      
+
+	return E;
       }
       static inline __host__ PairParameters processPairParameters(InputPairParameters in_par){
 	PairParameters params;
@@ -86,15 +86,15 @@ namespace uammd{
 	params.b2 = in_par.sigma*in_par.sigma;
 	params.epsilon = in_par.epsilon;
 	params.wc = in_par.wc;
-	return params;	
+	return params;
       }
-    
+
     };
     using NonBonded = Potential::Radial<NonBonded_Functor>;
 
 
   }
-  
+
   class Deserno: public Interactor{
     using PairForces =  PairForces<DesernoPotential::NonBonded, CellList>;
     shared_ptr<PairForces> nonBonded;
@@ -102,7 +102,7 @@ namespace uammd{
     shared_ptr<BondedHarmonic> bondedHarmonic;
     using BondedFENE = BondedForces<BondedType::FENEPBC>;
     shared_ptr<BondedFENE> bondedFENE;
-    
+
     cudaStream_t stream;
   public:
 
@@ -117,7 +117,7 @@ namespace uammd{
 	    shared_ptr<ParticleGroup> pg,
 	    shared_ptr<System> sys,
 	    Parameters par);
-    
+
     //If no group is provided, a group with all particles is assumed
     Deserno(shared_ptr<ParticleData> pd,
 	    shared_ptr<System> sys,
@@ -125,12 +125,12 @@ namespace uammd{
       Deserno(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
 
     ~Deserno() = default;
-  
-    void sumForce(cudaStream_t st) override; 
-    real sumEnergy() override;   
+
+    void sumForce(cudaStream_t st) override;
+    real sumEnergy() override;
 
   };
-  
+
 
 }
 #include"Deserno.cu"

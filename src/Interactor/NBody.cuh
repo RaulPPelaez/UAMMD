@@ -1,5 +1,5 @@
 /*Raul P. Pelaez 2017. NBody submodule.
-  
+
   An NBody is a very lightweight object than can be used to process Transversers with an all-with-all nbody interaction O(N^2).
 
 USAGE:
@@ -12,7 +12,7 @@ Use it to process a transverser:
 nbody.transverse(myTransverser, cudaStream);
 
 
-It has a very low memory footprint and a very fast initialization, 
+It has a very low memory footprint and a very fast initialization,
   so do not bother storing it, just create it when needed.
 
 See more about transversers and how to implement them at the end of this file.
@@ -39,8 +39,8 @@ namespace uammd{
     template<class Transverser, class Iterator>
     __global__ void transverseGPU(const real4* __restrict__ pos,
 				  Iterator groupIterator,
-				  int numTiles, /*Thread paralellism level, 
-						  controls how many elements are stored in 
+				  int numTiles, /*Thread paralellism level,
+						  controls how many elements are stored in
 						  shared memory and
 						  computed in parallel between synchronizations*/
 				  Transverser tr, uint N,
@@ -61,23 +61,23 @@ namespace uammd{
     template<class Transverser>
     inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[NBody] Transversing with %s", type_name<Transverser>().c_str());
-      int N = pg->getNumberParticles();      
+      int N = pg->getNumberParticles();
       int Nthreads = 128<N?128:N;
       int Nblocks  = (N+Nthreads-1)/Nthreads;
-      int numtiles = (N + Nthreads-1)/Nthreads;        
-  
+      int numtiles = (N + Nthreads-1)/Nthreads;
+
       auto groupIterator = pg->getIndexIterator(access::location::gpu);
-      
+
       //NBody will store the transverser's info in shared memory
       size_t info_size = SFINAE::Delegator<Transverser>::sizeofInfo()+sizeof(real4);
-      
-  
+
+
       //Get the transverser's shared memory needs (if any)
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(a_tr);
 
       sys->log<System::DEBUG4>("[NBody] %d particles", N);
       sys->log<System::DEBUG4>("[NBody] %d sh mem", shMemorySize);
-      
+
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       NBody_ns::transverseGPU<<<Nblocks, Nthreads, Nthreads*info_size+shMemorySize, st>>>(pos.raw(),
 											  groupIterator,
@@ -95,43 +95,43 @@ namespace uammd{
     template<class Transverser, class Iterator>
     __global__ void transverseGPU(const real4* __restrict__ pos,
 				  Iterator groupIterator,
-				  int numTiles, /*Thread paralellism level, 
-						  controls how many elements are stored in 
+				  int numTiles, /*Thread paralellism level,
+						  controls how many elements are stored in
 						  shared memory and
 						  computed in parallel between synchronizations*/
 				  Transverser tr, uint N,
 				  //Requested shared memory of Transverser in bytes
 				  size_t transverserShMemSize){
       int tid = blockIdx.x*blockDim.x+threadIdx.x;
-      /*All threads must pass through __syncthreads, 
+      /*All threads must pass through __syncthreads,
 	but when N is not a multiple of 32 some threads are assigned a particle i>N.
 	This threads cant return, so they are masked to not do any work*/
       bool active = true;
       if(tid>=N) active = false;
 
       int id = groupIterator[tid];
-    
+
       /*Each thread handles the interaction between particle id and all the others*/
       /*Storing blockDim.x positions in shared memory and processing all of them in parallel*/
       extern __shared__ char shMem[];
 
-      real4 *shPos = (real4*) (shMem + transverserShMemSize);    
+      real4 *shPos = (real4*) (shMem + transverserShMemSize);
       void *shInfo = (void*) (shMem+blockDim.x*sizeof(real4) + transverserShMemSize);
-    
+
       /*Delegator makes it possible to invoke this template even with a simple Transverser
 	(one that doesnt have a getInfo method) by using a little SFINAE trick*/
       /*Note that in any case there is no overhead for calling Delegator, as the compiler
 	is smart enough to just trash it all in any case*/
       SFINAE::Delegator<Transverser> del;
-      real4 pi;    
+      real4 pi;
       if(active) {
 	pi = pos[id]; /*My position*/
 	/*Get additional info if needed.
 	  Note that this code is just trashed if Transverser is simple*/
 	del.getInfo(tr, id);
       }
-      /*Get the initial value of the quantity to compute, i.e force*/    
-      auto quantity = tr.zero(); 
+      /*Get the initial value of the quantity to compute, i.e force*/
+      auto quantity = tr.zero();
       /*Distribute the N particles in numTiles tiles.
 	Storing in each tile blockDim.x positions in shared memory*/
       /*This way all threads are accesing the same memory addresses at the same time*/
@@ -150,7 +150,7 @@ namespace uammd{
 #pragma unroll 8
 	for(uint counter = 0; counter<blockDim.x; counter++){
 	  if(!active) break; /*An out of bounds thread must be masked*/
-	  int cur_j = tile*blockDim.x+counter; 
+	  int cur_j = tile*blockDim.x+counter;
 	  if(cur_j<N){/*If the current particle exists, compute and accumulate*/
 	    /*Compute and accumulate the current pair using:
 	      -positions
@@ -166,18 +166,18 @@ namespace uammd{
       if(active)
 	tr.set(id, quantity);
     }
-  
-    
+
+
     //Reference: Fast N-Body Simulation with CUDA. Chapter 31 of GPU Gems 3
 //     template<class Transverser, class Iterator>
-//     __global__ void transverseGPUold(Iterator groupIterator, 
-// 				     int numTiles, /*Thread paralellism level, 
-// 						     controls how many elements are stored in 
+//     __global__ void transverseGPUold(Iterator groupIterator,
+// 				     int numTiles, /*Thread paralellism level,
+// 						     controls how many elements are stored in
 // 						     shared memory and
 // 						     computed in parallel between synchronizations*/
 // 				     Transverser tr, uint N){
 //       int tid = blockIdx.x*blockDim.x+threadIdx.x;
-//       /*All threads must pass through __syncthreads, 
+//       /*All threads must pass through __syncthreads,
 // 	but when N is not a multiple of 32 some threads are assigned a particle i>N.
 // 	This threads cant return, so they are masked to not do any work*/
 //       bool active = true;
@@ -187,10 +187,10 @@ namespace uammd{
 //       /*Each thread handles the interaction between particle id and all the others*/
 //       /*Storing blockDim.x positions in shared memory and processing all of them in parallel*/
 //       using InfoType = decltype(tr.getInfo(id));
-//       extern __shared__ char shMem[];    
+//       extern __shared__ char shMem[];
 //       InfoType *shInfo = (InfoType*) (shMem);
-    
-    
+
+
 //       /*Delegator makes it possible to invoke this template even with a simple Transverser
 // 	(one that doesnt have a getInfo method) by using a little SFINAE trick*/
 //       /*Note that in any case there is no overhead for calling Delegator, as the compiler
@@ -201,8 +201,8 @@ namespace uammd{
 // 	  Note that this code is just trashed if Transverser is simple*/
 // 	infoi = tr.getInfo(id);
 //       }
-//       /*Get the initial value of the quantity to compute, i.e force*/    
-//       auto quantity = tr.zero(id); 
+//       /*Get the initial value of the quantity to compute, i.e force*/
+//       auto quantity = tr.zero(id);
 //       /*Distribute the N particles in numTiles tiles.
 // 	Storing in each tile blockDim.x positions in shared memory*/
 //       /*This way all threads are accesing the same memory addresses at the same time*/
@@ -219,7 +219,7 @@ namespace uammd{
 // #pragma unroll 8
 // 	for(uint counter = 0; counter<blockDim.x; counter++){
 // 	  if(!active) break; /*An out of bounds thread must be masked*/
-// 	  int cur_j = tile*blockDim.x+counter; 
+// 	  int cur_j = tile*blockDim.x+counter;
 // 	  if(cur_j<N){/*If the current particle exists, compute and accumulate*/
 // 	    /*Compute and accumulate the current pair using:
 // 	      -positions
@@ -284,9 +284,9 @@ namespace uammd{
       /*In this case, only a device array is needed to store the results*/
       computeType* tmp;
     };
-    
+
   }
-  
+
 }
 
 

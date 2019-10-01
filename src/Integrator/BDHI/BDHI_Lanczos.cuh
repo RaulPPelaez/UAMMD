@@ -1,5 +1,5 @@
 /*Raul P. Pelaez 2017. BDHI Lanczos submodule. Intended to be used with BDHI::EulerMaruyama
-  
+
   Computes the mobility matrix on the fly when needed, so it is a mtrix free method.
 
   M·F is computed as an NBody interaction (a dense Matrix vector product).
@@ -28,8 +28,8 @@ namespace uammd{
 	      Parameters par);
       ~Lanczos();
       void setup_step(              cudaStream_t st = 0){};
-      void computeMF(real3* MF,     cudaStream_t st = 0);    
-      void computeBdW(real3* BdW,   cudaStream_t st = 0);  
+      void computeMF(real3* MF,     cudaStream_t st = 0);
+      void computeBdW(real3* BdW,   cudaStream_t st = 0);
       void computeDivM(real3* divM, cudaStream_t st = 0);
       void finish_step(cudaStream_t st = 0){};
 
@@ -39,18 +39,18 @@ namespace uammd{
       real getSelfMobility(){
 	long double rh = par.hydrodynamicRadius;
 	if(rh<0) return -1.0;
-	else return  1.0l/(6.0l*M_PIl*par.viscosity*rh);	
+	else return  1.0l/(6.0l*M_PIl*par.viscosity*rh);
       }
 
-    
+
     private:
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
       shared_ptr<System> sys;
-       
+
       /*Rodne Prager Yamakawa device functions and parameters*/
       BDHI::RotnePragerYamakawa rpy;
-      
+
       shared_ptr<LanczosAlgorithm> lanczosAlgorithm;
 
       curandGenerator_t curng;

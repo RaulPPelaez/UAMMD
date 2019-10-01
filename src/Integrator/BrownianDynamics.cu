@@ -32,7 +32,7 @@ namespace uammd{
       sys->rng().next32();
       seed = sys->rng().next32();
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] Initialized");
-      
+
       int numberParticles = pg->getNumberParticles();
 
       this->selfMobility = 1.0/(6.0*M_PI*par.viscosity);
@@ -40,7 +40,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] Temperature: %f", temperature);
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] dt: %f", dt);
 
-      
+
       if(par.hydrodynamicRadius != real(-1.0)){
 	this->selfMobility /= par.hydrodynamicRadius;
 	this->hydrodynamicRadius = par.hydrodynamicRadius;
@@ -56,14 +56,14 @@ namespace uammd{
       else if(pd->isRadiusAllocated()){
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: particleRadius");
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Mobility: %f/particleRadius",
-				    selfMobility);      
+				    selfMobility);
       }
       else{
 	//Default hydrodynamic radius when none is provided is 1
 	this->hydrodynamicRadius = real(1.0);
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Hydrodynamic radius: %f", hydrodynamicRadius);
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Self Mobility: %f", selfMobility);
-      }      
+      }
 
 
       this->sqrt2MTdt = sqrt(2.0*selfMobility*temperature*dt);
@@ -79,7 +79,7 @@ namespace uammd{
 				  Ky.x, Ky.y, Ky.z,
 				  Kz.x, Kz.y, Kz.z);
       }
-      
+
       if(is2D){
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Starting in 2D mode");
       }
@@ -87,14 +87,14 @@ namespace uammd{
       cudaStreamCreate(&forceStream);
 
     }
-    
+
 
     EulerMaruyama::~EulerMaruyama(){
       sys->log<System::MESSAGE>("[BD::EulerMaruyama] Destroyed");
-      cudaStreamDestroy(forceStream);		     
+      cudaStreamDestroy(forceStream);
     }
 
-    
+
     namespace EulerMaruyama_ns{
       /*Integrate the movement*/
       __global__ void integrateGPU(real4* __restrict__  pos,
@@ -112,8 +112,8 @@ namespace uammd{
 	if(id>=N) return;
 
 	int i = indexIterator[id];
-	
-	/*Half step velocity*/	
+
+	/*Half step velocity*/
 	real3 p = make_real3(pos[i]);
 	real3 f = make_real3(force[i]);
 
@@ -131,9 +131,9 @@ namespace uammd{
 	  if(radius) sqrtInvRadius = sqrtf(invRadius);
 	  const real noiseAmplitude = sqrt2MTdt*sqrtInvRadius;
 	  real3 dW = make_real3(rng.gf(0, noiseAmplitude), 0);
-	  
+
 	  if(!is2D)   dW.z = rng.gf(0, noiseAmplitude).x;
-	  
+
 	  p += dW;
 	}
 
@@ -155,11 +155,11 @@ namespace uammd{
       if(steps==1){
 	for(auto forceComp: interactors){
 	  forceComp->updateTimeStep(dt);
-	  forceComp->updateTemperature(temperature);	 
+	  forceComp->updateTemperature(temperature);
 	}
       }
 
-      
+
       int BLOCKSIZE = 128;
       uint Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
       uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
@@ -169,20 +169,20 @@ namespace uammd{
 
 
       {
-	auto force = pd->getForce(access::location::gpu, access::mode::write);      
+	auto force = pd->getForce(access::location::gpu, access::mode::write);
 	fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
       }
       for(auto forceComp: interactors) forceComp->sumForce(forceStream);
 
-      
+
       real * d_radius = nullptr;
       if(hydrodynamicRadius == real(-1.0) && pd->isRadiusAllocated()){
 	auto radius = pd->getRadius(access::location::gpu, access::mode::read);
 	d_radius = radius.raw();
 	sys->log<System::DEBUG3>("[BD::EulerMaruyama] Using particle radius.");
       }
-          
-      
+
+
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       EulerMaruyama_ns::integrateGPU<<<Nblocks, Nthreads>>>(pos.raw(),
@@ -198,7 +198,7 @@ namespace uammd{
 							    steps, seed);
 
     }
-    
+
 
   }
 }

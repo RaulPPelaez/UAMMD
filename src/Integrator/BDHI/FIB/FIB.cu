@@ -23,7 +23,7 @@ namespace uammd{
 	int* cdim = &size.x;
 
 	int max_dim = std::max({size.x, size.y, size.z});
-	
+
 	int n= 10;
 	int n5 = 6; //number higher than this are not reasonable...
 	int n7 = 5;
@@ -34,7 +34,7 @@ namespace uammd{
 	  fori(0,n)forj(0,n)
 	    for(int k=0; k<n5;k++)for(int k7=0; k7<n7; k7++)for(int k11=0; k11<n11; k11++){
 		if(k11>4 or k7>5 or k>6) continue;
-		
+
 		int id = i+n*j+n*n*k+n*n*n5*k7+n*n*n5*n7*k11;
 		tmp[id] = 0;
 		//Current fft wise size
@@ -47,38 +47,38 @@ namespace uammd{
 	      }
 	  n++;
 	  /*Sort this array in ascending order*/
-	  std::sort(tmp.begin(), tmp.end());      
+	  std::sort(tmp.begin(), tmp.end());
 	}while(tmp.back()<max_dim); /*if n is not enough, include more*/
 
 	//I have empirically seen that these sizes produce slower FFTs than they should in several platforms
 	constexpr int forbiddenSizes [] = {28, 98, 150, 154, 162, 196, 242};
 	/*Now look for the nearest value in tmp that is greater than each cell dimension and it is not forbidden*/
 	forj(0,3){
-	  fori(0, tmp.size()){	    
+	  fori(0, tmp.size()){
 	    if(tmp[i]<cdim[j]) continue;
 	    for(int k =0;k<sizeof(forbiddenSizes)/sizeof(int); k++) if(tmp[i] == forbiddenSizes[k]) continue;
 	    cdim[j] = tmp[i];
 	    break;
-	  }	   	  
+	  }
 	}
 	return size;
       }
     }
-    
+
     FIB::FIB(shared_ptr<ParticleData> pd,
 	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys,		       
+	     shared_ptr<System> sys,
 	     Parameters par):
       Integrator(pd, pg, sys, "BDHI::FIB"),
       dt(par.dt),
       temperature(par.temperature), viscosity(par.viscosity),
       box(par.box), scheme(par.scheme){
-      
+
       CudaCheckError();
       sys->log<System::MESSAGE>("[BDHI::FIB] Initialized");
 
       seed = sys->rng().next();
-      
+
       int numberParticles = pg->getNumberParticles();
 
       if(par.hydrodynamicRadius>0 and par.cells.x > 0)
@@ -93,19 +93,19 @@ namespace uammd{
 	/*FFT likes a number of cells as cellDim.i = 2^n·3^l·5^m */
 	cellDim = FIB_ns::nextFFTWiseSize3D(cellDim);
       }
-            
-      
+
+
       if(par.cells.x>0) cellDim = par.cells;
       if(par.hydrodynamicRadius>0)
 	sys->log<System::MESSAGE>("[BDHI::FIB] Target hydrodynamic radius: %f", par.hydrodynamicRadius);
-      
+
       if(cellDim.x <3)cellDim.x = 3;
       if(cellDim.y <3)cellDim.y = 3;
-      if(cellDim.z==2)cellDim.z = 3; 
+      if(cellDim.z==2)cellDim.z = 3;
 
       double rh = 0.91*box.boxSize.x/cellDim.x;
-      
-#ifndef SINGLE_PRECISION      
+
+#ifndef SINGLE_PRECISION
       this->deltaRFD = 1e-6*rh;
 #else
       this->deltaRFD = 1e-4*rh;
@@ -134,9 +134,9 @@ namespace uammd{
       //Init rng
       CurandSafeCall(curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT));
       //curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_MT19937);
-    
+
       CurandSafeCall(curandSetPseudoRandomGeneratorSeed(curng, sys->rng().next()));
-      try{	
+      try{
 	thrust::device_vector<real> noise(30000);
 	auto noise_ptr = thrust::raw_pointer_cast(noise.data());
 	//Warm cuRNG
@@ -144,12 +144,12 @@ namespace uammd{
 	CurandSafeCall(curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
       }
       catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());	
+	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());
       }
 
       CufftSafeCall(cufftCreate(&cufft_plan_forward));
       CufftSafeCall(cufftCreate(&cufft_plan_inverse));
-      
+
       /*I will be handling workspace memory*/
       CufftSafeCall(cufftSetAutoAllocation(cufft_plan_forward, 0));
       CufftSafeCall(cufftSetAutoAllocation(cufft_plan_inverse, 0));
@@ -190,14 +190,14 @@ namespace uammd{
       sys->log<System::DEBUG>("[BDHI::FIB] Necessary work space for cuFFT: %s", printUtils::prettySize(cufftWorkSize).c_str());
       size_t free_mem, total_mem;
       CudaSafeCall(cudaMemGetInfo(&free_mem, &total_mem));
-      
+
       if(free_mem<cufftWorkSize){
 	sys->log<System::CRITICAL>("[BDHI::FIB] Not enough memory in device to allocate cuFFT free %s, needed: %s!!!",
 				   printUtils::prettySize(free_mem).c_str(),
 				   printUtils::prettySize(cufftWorkSize).c_str());
       }
 
-      try{	
+      try{
 	cufftWorkArea.resize(cufftWorkSize);
       }
       catch(thrust::system_error &e){
@@ -213,7 +213,7 @@ namespace uammd{
 	  random.resize(6*ncells);
 	}
 	//Grid velocities, same array is used for real and Fourier space
-      
+
 	/*The layout of this array is
 	  fx000, fy000, fz000, fx001, fy001, fz001..., fxnnn, fynnn, fznnn. n=ncells-1
 	  When used in real space each f is a real number, whereas in wave space each f will be a complex number.
@@ -224,19 +224,19 @@ namespace uammd{
 	posOld.resize(numberParticles);
       }
       catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());	
+	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());
       }
 
-      
+
       void * d_cufftWorkArea = thrust::raw_pointer_cast(cufftWorkArea.data());
-      
+
       CufftSafeCall(cufftSetWorkArea(cufft_plan_forward, d_cufftWorkArea));
       CufftSafeCall(cufftSetWorkArea(cufft_plan_inverse, d_cufftWorkArea));
-  
+
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
     }
-      				     
+
     FIB::~FIB(){
       CudaCheckError();
       CudaSafeCall(cudaDeviceSynchronize());
@@ -251,7 +251,7 @@ namespace uammd{
       struct Direction{
 	static constexpr int XX = 0, YY=1, ZZ=2, XY=3, XZ=4, YZ=5;
       };
-      
+
       //Adds the stochastic term to the current velocity: v_i += noisePrefactor*\hat{D}·W^n
       //noisePrefactor will be proportional to sqrt(\eta·kT/(dt·Vcell)) depending on the temporal integrator.
       //W is a symmetric tensor with 3 white gaussian numbers per direction
@@ -273,62 +273,62 @@ namespace uammd{
 	if(cell.x>=grid.cellDim.x) return;
 	if(cell.y>=grid.cellDim.y) return;
 	if(cell.z>=grid.cellDim.z) return;
-	
+
 	/*Get my cell index (position in the array) */
 	const int icell = grid.getCellIndex(cell);
 	const int ncells = grid.getNumberCells();
-	
-	//I will draw 6 random numbers for each cell	
+
+	//I will draw 6 random numbers for each cell
 	real3 DW = make_real3(0);
 	//(\nabla·W)_\alpha^i = \nabla^i·(W_{\alpha x}, W_{\alpha y}, W_{\alpha z}) ->
 	// -> \partial_\alpha^i W_{\alpha\beta} = 1/d\alpha (W^{\alpha\beta}_{i+\alpha/2} - W^{\alpha\beta}_{i-\alpha/2})
 	constexpr real sqrt2 = real(1.41421356237310);
 	//Diagonal terms
 	//See eq. 10 in [1] to understand the sqrt2
-	//m -> \alpha - 1/2, p -> \alpha + 1/2	
+	//m -> \alpha - 1/2, p -> \alpha + 1/2
 	{
-	  const int n_mx = icell; //n_[m/p]\alpha -> cell index of neighbour in a certain direction	  
+	  const int n_mx = icell; //n_[m/p]\alpha -> cell index of neighbour in a certain direction
 	  real wxx_mx = random[n_mx+ncells*Direction::XX];
-	  
-	  const int n_px = grid.getCellIndex(grid.pbc_cell({cell.x + 1, cell.y, cell.z}));	  
+
+	  const int n_px = grid.getCellIndex(grid.pbc_cell({cell.x + 1, cell.y, cell.z}));
 	  real wxx_px = random[n_px+ncells*Direction::XX];
-	  
+
 	  DW.x += sqrt2*grid.invCellSize.x*(wxx_px - wxx_mx);
 	}
 	{
-	  const int n_my = icell;  
+	  const int n_my = icell;
 	  real wyy_my = random[n_my+ncells*Direction::YY];
-	  
+
 	  const int n_py = grid.getCellIndex(grid.pbc_cell({cell.x, cell.y + 1, cell.z}));
 	  real wyy_py = random[n_py+ncells*Direction::YY];
-	  
+
 	  DW.y += sqrt2*grid.invCellSize.y*(wyy_py - wyy_my);
 	}
 	{
-	  const int n_mz = icell;  
+	  const int n_mz = icell;
 	  real wzz_mz = random[n_mz+ncells*Direction::ZZ];
-	  
+
 	  const int n_pz = grid.getCellIndex(grid.pbc_cell({cell.x, cell.y, cell.z + 1}));
 	  real wzz_pz = random[n_pz+ncells*Direction::ZZ];
-	  
+
 	  DW.z += sqrt2*grid.invCellSize.z*(wzz_pz - wzz_mz);
 	}
 	//Cross terms
 	//W is simmetric so wxy_mx = wyx_my, etc
 	{
-	  const int n_m = icell;  
+	  const int n_m = icell;
 	  real wxy_m = random[n_m + ncells*Direction::XY];
 	  {
 	    const int n_my = grid.getCellIndex(grid.pbc_cell({cell.x, cell.y - 1, cell.z}));
 	    real wxy_my = random[n_my + ncells*Direction::XY];
-	    
+
 	    const real dwxy_dy = (wxy_m - wxy_my);
 	    DW.x += grid.invCellSize.y*dwxy_dy;
 	  }
 	  {
 	    const int n_mx = grid.getCellIndex(grid.pbc_cell({cell.x - 1, cell.y, cell.z}));
 	    real wxy_mx = random[n_mx + ncells*Direction::XY];
-	    
+
 	    const real dwxy_dx = (wxy_m - wxy_mx);
 	    DW.y += grid.invCellSize.x*dwxy_dx;
 	  }
@@ -350,7 +350,7 @@ namespace uammd{
 	    const real dwxz_dx = (wxz_m - wxz_mx);
 	    DW.z += grid.invCellSize.x*dwxz_dx;
 	  }
-	}	
+	}
 	{
 	  const int n_m = icell;
 	  real wyz_m = random[n_m+ncells*Direction::YZ];
@@ -362,15 +362,15 @@ namespace uammd{
 	  }
 	  {
 	    const int n_my = grid.getCellIndex(grid.pbc_cell({cell.x, cell.y - 1, cell.z}));
-	    real wyz_my = random[n_my+ncells*Direction::YZ];	    
+	    real wyz_my = random[n_my+ncells*Direction::YZ];
 	    const real dwyz_dy = (wyz_m - wyz_my);
 	    DW.z += grid.invCellSize.y*dwyz_dy;
 	  }
 	}
 	//const real dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
 	//gridVels[icell] += (DW/dV)*noisePrefactor;
-	gridVels[icell] += DW*noisePrefactor;	
-	
+	gridVels[icell] += DW*noisePrefactor;
+
       }
 
 #ifndef SINGLE_PRECISION
@@ -406,12 +406,12 @@ namespace uammd{
 	const int3 cellix = grid.getCell(make_real3(pi.x - real(0.5)*grid.cellSize.x, pi.y, pi.z));
 	const int3 celliy = grid.getCell(make_real3(pi.x, pi.y - real(0.5)*grid.cellSize.y, pi.z));
 	const int3 celliz = grid.getCell(make_real3(pi.x, pi.y, pi.z - real(0.5)*grid.cellSize.z));
-	
+
 	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize); //Cell index to cell center position
 	constexpr int P = Kernel::support/2;
 	constexpr int supportCells = Kernel::support;
 	constexpr int numberNeighbourCells = supportCells*supportCells*supportCells;
-	
+
 	real3 W;
 	{
 	  Saru rng(id, seed, step);
@@ -429,20 +429,20 @@ namespace uammd{
 				    cellix.y + (i/supportCells)%supportCells - P,
 				    cellix.z + i/(supportCells*supportCells) - P );
 	    celljx = grid.pbc_cell(celljx);
-	    
+
 	    const int jcellx = grid.getCellIndex(celljx);
 	    real SmSdWx;
 	    {
-	      /*Staggered distance from q + noise to center of cell j*/	  
+	      /*Staggered distance from q + noise to center of cell j*/
 	      const real3 rijx = q_p_noise-make_real3(celljx)*grid.cellSize-cellPosOffset;
 	      //Spread Wx, delta with the distance of the point where vx is defined, which is 0.5dx to the left of the center
 	      SmSdWx = kernel.delta(grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.x, rijx.y, rijx.z}))*W.x;
 	    }
 	    {
-	      /*Staggered distance from q - noise to center of cell j*/	  
+	      /*Staggered distance from q - noise to center of cell j*/
 	      const real3 rijx = q_m_noise-make_real3(celljx)*grid.cellSize-cellPosOffset;
 	      //Spread Wx
-	      SmSdWx -= kernel.delta(grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.x, rijx.y, rijx.z}))*W.x;	      
+	      SmSdWx -= kernel.delta(grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.x, rijx.y, rijx.z}))*W.x;
 	    }
 	    atomicAdd(&gridVels[jcellx].x, SmSdWx*driftPrefactor);
 	  }
@@ -460,7 +460,7 @@ namespace uammd{
 	    }
 	    {
 	      const real3 rijy = q_m_noise-make_real3(celljy)*grid.cellSize-cellPosOffset;
-	      SmSdWy -= kernel.delta(grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z}))*W.y;	   
+	      SmSdWy -= kernel.delta(grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z}))*W.y;
 	    }
 	    atomicAdd(&gridVels[jcelly].y, SmSdWy*driftPrefactor);
 	  }
@@ -471,16 +471,16 @@ namespace uammd{
 				    celliz.z + i/(supportCells*supportCells) - P );
 	    celljz = grid.pbc_cell(celljz);
 
-	  
 
-	    const int jcellz = grid.getCellIndex(celljz);	  
-	    real SmSdWz;	    
+
+	    const int jcellz = grid.getCellIndex(celljz);
+	    real SmSdWz;
 	    {
 	      const real3 rijz = q_p_noise-make_real3(celljz)*grid.cellSize-cellPosOffset;
 	      SmSdWz = kernel.delta(grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z}))*W.z;
 	    }
-	    {	    
-	      const real3 rijz = q_m_noise-make_real3(celljz)*grid.cellSize-cellPosOffset;	 	    
+	    {
+	      const real3 rijz = q_m_noise-make_real3(celljz)*grid.cellSize-cellPosOffset;
 	      SmSdWz -= kernel.delta(grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z}))*W.z;
 	    }
 	    atomicAdd(&gridVels[jcellz].z, SmSdWz*driftPrefactor);
@@ -488,7 +488,7 @@ namespace uammd{
 	}
 
       }
-     
+
       //Computes S·F and adds it to gridVels
       template<class Kernel = IBM_kernels::PeskinKernel::threePoint>
       __global__ void spreadParticleForces(real4 *pos,
@@ -505,12 +505,12 @@ namespace uammd{
 	const int3 cellix = grid.getCell(make_real3(pi.x - real(0.5)*grid.cellSize.x, pi.y, pi.z));
 	const int3 celliy = grid.getCell(make_real3(pi.x, pi.y - real(0.5)*grid.cellSize.y, pi.z));
 	const int3 celliz = grid.getCell(make_real3(pi.x, pi.y, pi.z - real(0.5)*grid.cellSize.z));
-	
+
 	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize); //Cell index to cell center position
 	constexpr int P = Kernel::support/2;
 	constexpr int supportCells = Kernel::support;
 	constexpr int numberNeighbourCells = supportCells*supportCells*supportCells;
-        
+
 	for(int i = 0; i<numberNeighbourCells; i++){
 	  //Contribution to vx
 	  {
@@ -519,9 +519,9 @@ namespace uammd{
 				    cellix.y + (i/supportCells)%supportCells - P,
 				    cellix.z + i/(supportCells*supportCells) - P );
 	    celljx = grid.pbc_cell(celljx);
-	    
+
 	    const int jcellx = grid.getCellIndex(celljx);
-	    /*Staggered distance from q - noise to center of cell j*/	  
+	    /*Staggered distance from q - noise to center of cell j*/
 	    const real3 rijx = pi-make_real3(celljx)*grid.cellSize-cellPosOffset;
 	    //Spread Wx
 	    real fx = kernel.delta(grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.x, rijx.y, rijx.z}))*forcei.x;
@@ -535,7 +535,7 @@ namespace uammd{
 	    celljy = grid.pbc_cell(celljy);
 	    const int jcelly = grid.getCellIndex(celljy);
 	    const real3 rijy = pi - make_real3(celljy)*grid.cellSize-cellPosOffset;
-	    real fy = kernel.delta(grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z}))*forcei.y;	   
+	    real fy = kernel.delta(grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z}))*forcei.y;
 	    atomicAdd(&gridVels[jcelly].y, fy);
 	  }
 	  //Contribution to vz
@@ -543,16 +543,16 @@ namespace uammd{
 	    int3 celljz = make_int3(celliz.x + i%supportCells - P,
 				    celliz.y + (i/supportCells)%supportCells - P,
 				    celliz.z + i/(supportCells*supportCells) - P );
-	    celljz = grid.pbc_cell(celljz);	 
-	    const int jcellz = grid.getCellIndex(celljz);	  
-	    const real3 rijz = pi-make_real3(celljz)*grid.cellSize-cellPosOffset;	 	    
+	    celljz = grid.pbc_cell(celljz);
+	    const int jcellz = grid.getCellIndex(celljz);
+	    const real3 rijz = pi-make_real3(celljz)*grid.cellSize-cellPosOffset;
 	    real fz = kernel.delta(grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z}))*forcei.z;
 	    atomicAdd(&gridVels[jcellz].z, fz);
 	  }
 	}
 
       }
-      
+
       using cufftComplex3 = FIB::cufftComplex3;
 
       /*This function takes a node index and returns the corresponding wave number*/
@@ -570,13 +570,13 @@ namespace uammd{
 	if(cell.z >= (cellDim.z+1)/2) k.z -= real(cellDim.z)*pi2invL.z;
 	return k;
       }
-      
+
       /*Apply the divergence free projection operator, P, to a wave number with a certain complex factor.
 	res = (I-k^k)·factor -> k is unitary
 	See i.e below eq. 45 [2]. P = I-G(DG)^-1 D = I-D*(DD*)^-1 D = I-D*L^-1 D = I-k·k^T/|k|^2
       */
       inline __device__ cufftComplex3 projectFourier(const real3 &k, const cufftComplex3 &factor){
-	
+
 	const real invk2 = real(1.0)/dot(k,k);
 
 	cufftComplex3 res;
@@ -594,11 +594,11 @@ namespace uammd{
 	  const real3 vi = (fi-k*kfi);
 	  res.x.y = vi.x;
 	  res.y.y = vi.y;
-	  res.z.y = vi.z;	  
+	  res.z.y = vi.z;
 	}
 	return res;
       }
-      
+
       //Apply a phase shift in Fourier space to a certain v(k), given cos(phase*k) and sin(phase*k)
       inline __device__ cufftComplex3 shiftVelocity(cufftComplex3 vk, const real3 &cosk, const real3 &sink){
 	FIB::cufftComplex tmp;
@@ -616,9 +616,9 @@ namespace uammd{
 	vk.z.y = tmp.y*cosk.z + tmp.x*sink.z;
 	return vk;
       }
-      
+
       //See eq. 28 in [1].
-      //Apply 1/\eta\mathcal{L}^-1 operator to SF + noise in Fourier space. PBC makes \mathcal{L}^-1 = -P·L^-1 where P = I-G(DG)^-1 D 
+      //Apply 1/\eta\mathcal{L}^-1 operator to SF + noise in Fourier space. PBC makes \mathcal{L}^-1 = -P·L^-1 where P = I-G(DG)^-1 D
       __global__ void solveStokesFourier(const cufftComplex3* fluidForcing, //g
 					 cufftComplex3* gridVels, //on exit this is: 1/\eta·\mathcal{L}^-1·g
 					 real viscosity,
@@ -636,9 +636,9 @@ namespace uammd{
 
 	/*Get my cell index (position in the array) */
 	const int icell =grid.getCellIndex(cell);
-	
+
 	const int ncells = grid.getNumberCells();
-	
+
 	//k=0 cannot contribute, v_cm = 0
 	if(icell==0){
 	  gridVels[0] = {0,0 ,0,0 ,0,0};
@@ -653,14 +653,14 @@ namespace uammd{
 	real3 sink, cosk;
 	{
 	  const real3 k = cellToWaveNumber(cell, grid.cellDim, grid.box.boxSize);
-	  
+
 	  sincos(k.x*grid.cellSize.x*real(0.5), &sink.x, &cosk.x);
 	  sincos(k.y*grid.cellSize.y*real(0.5), &sink.y, &cosk.y);
-	  sincos(k.z*grid.cellSize.z*real(0.5), &sink.z, &cosk.z);	  
-	 
+	  sincos(k.z*grid.cellSize.z*real(0.5), &sink.z, &cosk.z);
+
 	  keff = real(2.0)*grid.invCellSize*sink;
 	}
-	
+
 	//Shift fluid forcing to cell centers
 	cufftComplex3 vk = shiftVelocity(fluidForcing[icell], cosk, real(-1.0)*sink);
 
@@ -673,9 +673,9 @@ namespace uammd{
 	}
 	//Store new velocity shifted back to cell faces, normalize FFT
 	gridVels[icell] = (real(1.0)/real(ncells))*shiftVelocity(vk, cosk, sink);
-	
+
       }
-      
+
       enum class Step{PREDICTOR, CORRECTOR, EULER};
       //Computes
       //  q^{n+1/2} = q^n + dt/2 J^n v in predictor mode
@@ -694,20 +694,20 @@ namespace uammd{
 
 	//Pos prediction
 	real3 pnew = make_real3(0);
-	
+
 	real3 posCurrent = make_real3(pos[id]);
 	//Store q^n
-	if(mode==Step::PREDICTOR) posOld[id] = pos[id];	
+	if(mode==Step::PREDICTOR) posOld[id] = pos[id];
 
 	//Staggered grid cells for interpolating each velocity coordinate
 	const int3 cellix = grid.getCell(make_real3(posCurrent.x - real(0.5)*grid.cellSize.x, posCurrent.y, posCurrent.z));
 	const int3 celliy = grid.getCell(make_real3(posCurrent.x, posCurrent.y - real(0.5)*grid.cellSize.y, posCurrent.z));
 	const int3 celliz = grid.getCell(make_real3(posCurrent.x, posCurrent.y, posCurrent.z - real(0.5)*grid.cellSize.z));
-	
+
 	real prefactor = dt;
 	//Half step in predictor mode
 	if(mode==Step::PREDICTOR) prefactor *= real(0.5);
-	
+
 	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize);
 	constexpr int P = Kernel::support/2;
 	constexpr int supportCells = Kernel::support;
@@ -718,7 +718,7 @@ namespace uammd{
 
 	//Sum contribution of neighbouring cells
 	for(int i = 0; i<numberNeighbourCells; i++){
-	  	  
+
 	  //Apply J to the velocity of the current cell.
 	  {
 	    //Neighbour cell in the x direction
@@ -755,7 +755,7 @@ namespace uammd{
 	    const int jcellz = grid.getCellIndex(celljz);
 	    const real3 rijz = posCurrent-make_real3(celljz)*grid.cellSize-cellPosOffset;
 	    const real v_jz = gridVels[jcellz].z;
-	    pnew.z += kernel.delta(grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z}))*v_jz*dV;	    
+	    pnew.z += kernel.delta(grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z}))*v_jz*dV;
 	  }
 	}
 	//Update position
@@ -766,8 +766,8 @@ namespace uammd{
 	else if(mode==Step::CORRECTOR || mode==Step::EULER){
 	  // p^{n+1} = p^n + dt J^{n+1/2} v in corrector
 	  // p^{n+1} = p^n + dt J^n v in euler
-	  pnew = make_real3(posOld[id]) + prefactor*pnew; 
-	  //Write to global memory 
+	  pnew = make_real3(posOld[id]) + prefactor*pnew;
+	  //Write to global memory
 	  pos[id] = make_real4(pnew, posOld[id].w);
 	}
       }
@@ -789,11 +789,11 @@ namespace uammd{
       }
       /*Compute new force*/
       for(auto forceComp: interactors) forceComp->sumForce(0);
-      
+
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       auto d_gridVels = thrust::raw_pointer_cast(gridVels.data());
-      
+
       FIB_ns::spreadParticleForces<<<nblocks, nthreads>>>(pos.raw(),
 							  force.raw(),
 							  (real3*)d_gridVels,
@@ -807,18 +807,18 @@ namespace uammd{
     void FIB::randomAdvection(real noisePrefactor){
       if(temperature==real(0.0)) return;
       auto d_gridVels = thrust::raw_pointer_cast(gridVels.data());
-      
-      //double dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;	
+
+      //double dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
       // real noisePrefactor = sqrt(4*viscosity*temperature/(dt*dV));
       // if(mode==1) noisePrefactor = sqrt(viscosity*temperature/(dt*dV));;
-      
+
       //Compute and sum the stochastic advection
       dim3 NthreadsCells = dim3(8,8,8);
-      dim3 NblocksCells;		  
+      dim3 NblocksCells;
       NblocksCells.x = grid.cellDim.x/NthreadsCells.x + ((grid.cellDim.x%NthreadsCells.x)?1:0);
       NblocksCells.y = grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
       NblocksCells.z = grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
-	
+
       FIB_ns::addRandomAdvection<<<NblocksCells, NthreadsCells>>>((real3*)d_gridVels,
 								  grid,
 								  noisePrefactor,
@@ -826,7 +826,7 @@ namespace uammd{
     }
 
     // v +=  kbT/\delta [ S(q^n + \delta/2\hat{W}^n) - S(q^n - \delta/2\hat{W}^n) ] ·\hat{W}^n
-    //See eq. 32 and 33 in [1]    
+    //See eq. 32 and 33 in [1]
     void FIB::thermalDrift(){
       if(temperature==real(0.0)) return;
       int numberParticles = pg->getNumberParticles();
@@ -857,7 +857,7 @@ namespace uammd{
       cufftComplex* d_gridVels = (cufftComplex*)thrust::raw_pointer_cast(gridVels.data());
 
       //Go to fourier space
-      sys->log<System::DEBUG3>("[BDHI::FIB] Taking grid to wave space");      
+      sys->log<System::DEBUG3>("[BDHI::FIB] Taking grid to wave space");
       auto cufftStatus =
 	cufftExecReal2Complex<real>(cufft_plan_forward,
 				    d_gridForcing,
@@ -867,7 +867,7 @@ namespace uammd{
       }
 
       dim3 NthreadsCells = dim3(8,8,8);
-      dim3 NblocksCells;		  
+      dim3 NblocksCells;
       NblocksCells.x = grid.cellDim.x/NthreadsCells.x + ((grid.cellDim.x%NthreadsCells.x)?1:0);
       NblocksCells.y = grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
       NblocksCells.z = grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
@@ -877,7 +877,7 @@ namespace uammd{
       solveStokesFourier<<<NblocksCells, NthreadsCells>>>((cufftComplex3*)d_gridForcing,
 							  (cufftComplex3*)d_gridVels,
 							  viscosity,
-							  grid);							       
+							  grid);
       sys->log<System::DEBUG3>("[BDHI::FIB] Going back to real space");
       //Go back to real space
       cufftStatus =
@@ -890,7 +890,7 @@ namespace uammd{
   }
 
 
-    //Updates positions to half step according to the current fluid velocities 
+    //Updates positions to half step according to the current fluid velocities
     //q^{n+1/2} = q^n + dt/2 J^n v
     void FIB::predictorStep(){
       int numberParticles = pg->getNumberParticles();
@@ -908,7 +908,7 @@ namespace uammd{
 									   dt,
 									   numberParticles);
     }
-    //Updates positions to the next step according to the current fluid velocities 
+    //Updates positions to the next step according to the current fluid velocities
     //q^{n+1} = q^n + dt J^{n+1/2} v
     void FIB::correctorStep(){
       int numberParticles = pg->getNumberParticles();
@@ -921,12 +921,12 @@ namespace uammd{
       FIB_ns::midPointStep<FIB_ns::Step::CORRECTOR><<<Nblocks, Nthreads>>>(pos.raw(),
 									   d_posOld,
 									   (real3*) d_gridVels,
-									   grid,					   
+									   grid,
 									   Kernel(grid.cellSize),
 									   dt,
 									   numberParticles);
     }
-    //Updates positions to the next step according to the current fluid velocities 
+    //Updates positions to the next step according to the current fluid velocities
     //q^{n+1} = q^n + dt J^n v
     void FIB::eulerStep(){
       int numberParticles = pg->getNumberParticles();
@@ -944,7 +944,7 @@ namespace uammd{
 								       dt,
 								       numberParticles);
     }
-    
+
     //forwards the simulation to the next time step with the simple midpoint scheme in [1]
     void FIB::forwardMidpoint(){
      sys->log<System::DEBUG2>("[BDHI::FIB] Reset fluid velocity");
@@ -956,11 +956,11 @@ namespace uammd{
 	int Nblocks  =  ncells/Nthreads +  ((ncells%Nthreads!=0)?1:0);
 	fillWithGPU<<<Nblocks, Nthreads>>>((cufftComplex3*)d_gridVels, cufftComplex3(), ncells);
       }
-      
-      
+
+
       sys->log<System::DEBUG2>("[BDHI::FIB] Random advection");
       if(temperature!=real(0.0)){
-	sys->log<System::DEBUG2>("[BDHI::FIB] Generate random numbers");      
+	sys->log<System::DEBUG2>("[BDHI::FIB] Generate random numbers");
 	CurandSafeCall(curandGenerateNormal(curng,
 					    thrust::raw_pointer_cast(random.data()),
 					    random.size(),
@@ -971,7 +971,7 @@ namespace uammd{
 	double dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
 	real noisePrefactor = sqrt(2*viscosity*temperature/(dt*dV));
 	randomAdvection(noisePrefactor);
-      }      
+      }
 
       sys->log<System::DEBUG2>("[BDHI::FIB] Thermal drift");
       //kT/\delta [ S(q^{n+1/2} + \delta/2\hat{\bf{W}}^{n+1/2}) - S(q^{n+1/2} - \delta/2\hat{\bf{W}}^{n+1/2})]\hat{\bf{W}}^{n+1/2}
@@ -979,7 +979,7 @@ namespace uammd{
       thermalDrift();
 
       sys->log<System::DEBUG2>("[BDHI::FIB] Spread particle forces");
-      //S^n·F^n      
+      //S^n·F^n
       spreadParticleForces();
 
       sys->log<System::DEBUG2>("[BDHI::FIB] Solve fluid");
@@ -989,7 +989,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::FIB] Predictor step");
       //q^{n+1/2} = q^n + dt/2·J^n·v
       predictorStep();
-      
+
       sys->log<System::DEBUG2>("[BDHI::FIB] Corrector");
       //q^n+1 = q^n + dt·J^{n+1/2}·v
       correctorStep();
@@ -1006,12 +1006,12 @@ namespace uammd{
 	int Nblocks  =  ncells/Nthreads +  ((ncells%Nthreads!=0)?1:0);
 	fillWithGPU<<<Nblocks, Nthreads>>>((cufftComplex3*)d_gridVels, cufftComplex3(), ncells);
       }
-      
-      
+
+
       sys->log<System::DEBUG2>("[BDHI::FIB] Random advection");
 
       if(temperature!=real(0.0)){
-	sys->log<System::DEBUG2>("[BDHI::FIB] Generate random numbers");      
+	sys->log<System::DEBUG2>("[BDHI::FIB] Generate random numbers");
 	CurandSafeCall(curandGenerateNormal(curng,
 					    thrust::raw_pointer_cast(random.data()),
 					    random.size(),
@@ -1024,8 +1024,8 @@ namespace uammd{
 	randomAdvection(noisePrefactor);
       }
       sys->log<System::DEBUG2>("[BDHI::FIB] Spread particle forces");
-      
-      //S^n·F^n      
+
+      //S^n·F^n
       spreadParticleForces();
 
       sys->log<System::DEBUG2>("[BDHI::FIB] Solve fluid");
@@ -1036,7 +1036,7 @@ namespace uammd{
       //q^{n+1/2} = q^n + dt/2·J^n·v
       predictorStep();
       for(auto forceComp: interactors) forceComp->updateSimulationTime((step+0.5)*dt);
-      
+
       //Clean velocity for next half step
       {
 	auto d_gridVels = thrust::raw_pointer_cast(gridVels.data());
@@ -1047,7 +1047,7 @@ namespace uammd{
 	fillWithGPU<<<Nblocks, Nthreads>>>((cufftComplex3*)d_gridVels, cufftComplex3(), ncells);
       }
 
-      
+
       //sqrt(vis·kT/(dt·dV))·\hat{D}(\bf{W}^{n,1}+\bf{W}^{n,2})
       {
 	double dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
@@ -1072,7 +1072,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::FIB] Solve fluid");
       //v = vis^-1\mathcal{\bf{L}}^-1·g
       applyStokesSolutionOperator();
-      
+
       sys->log<System::DEBUG2>("[BDHI::FIB] Corrector");
       //q^n+1 = q^n + dt·J^{n+1/2}·v
       correctorStep();
@@ -1083,26 +1083,26 @@ namespace uammd{
 
     //Takes the simulation to the nxt time step
     void FIB::forwardTime(){
-      CudaCheckError();      
+      CudaCheckError();
       step++;
       if(step==1){
 	for(auto forceComp: interactors){
 	  forceComp->updateSimulationTime(0);
 	  forceComp->updateTimeStep(dt);
 	  forceComp->updateTemperature(temperature);
-	  forceComp->updateBox(box);	 
+	  forceComp->updateBox(box);
 	}
       }
-      
-      sys->log<System::DEBUG1>("[BDHI::FIB] Performing step");      
+
+      sys->log<System::DEBUG1>("[BDHI::FIB] Performing step");
       switch(scheme){
       case Scheme::MIDPOINT:
 	this->forwardMidpoint();break;
       case Scheme::IMPROVED_MIDPOINT:
-	this->forwardMidpoint();break;	  
+	this->forwardMidpoint();break;
       }
     }
     real FIB::sumEnergy(){ return 0;}
-  
+
   }
 }

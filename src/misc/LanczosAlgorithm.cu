@@ -5,7 +5,7 @@ References:
   -http://dx.doi.org/10.1063/1.4742347
 
 */
-#include"LanczosAlgorithm.cuh" 
+#include"LanczosAlgorithm.cuh"
 
 
 
@@ -27,14 +27,14 @@ namespace uammd{
   void LanczosAlgorithm::init(){
     //Init cuBLAS for Lanczos process
     CublasSafeCall(cublasCreate_v2(&cublas_handle));
-    sys->log<System::DEBUG1>("[LanczosAlgorithm] Success!");  
+    sys->log<System::DEBUG1>("[LanczosAlgorithm] Success!");
   }
 
   LanczosAlgorithm::LanczosAlgorithm(shared_ptr<System> sys, real tolerance):
     sys(sys),
     N(0),
     max_iter(3), check_convergence_steps(3)
-  {    
+  {
     sys->log<System::DEBUG1>("[LanczosAlgorithm] Initializing");
 #ifdef SINGLE_PRECISION
     if(tolerance < 1e-6){
@@ -48,7 +48,7 @@ namespace uammd{
   }
 
   void LanczosAlgorithm::numElementsChanged(int newN){
-    sys->log<System::DEBUG3>("[LanczosAlgorithm] Number of elements changed.");  
+    sys->log<System::DEBUG3>("[LanczosAlgorithm] Number of elements changed.");
     this-> N = newN;
     try{
       w.resize(N+1, real3());
@@ -56,22 +56,22 @@ namespace uammd{
       oldBz.resize(N+1, real3());
     }
     catch(thrust::system_error &e){
-      sys->log<System::CRITICAL>("[LanczosAlgorithm] Thrust could not resize temporal storage with error: %s.", e.what());  
+      sys->log<System::CRITICAL>("[LanczosAlgorithm] Thrust could not resize temporal storage with error: %s.", e.what());
     }
   }
   //Increase maximum dimension of Krylov subspace, reserve necessary memory
   void LanczosAlgorithm::increment_max_iter(int inc){
-    sys->log<System::DEBUG3>("[LanczosAlgorithm] Increasing subspace dimension.");  
-    
+    sys->log<System::DEBUG3>("[LanczosAlgorithm] Increasing subspace dimension.");
+
     V.resize(3*N*(max_iter+inc),0);
     P.resize((max_iter+inc)*(max_iter+inc),0);
-    
+
     hdiag.resize((max_iter+inc)+1,0);
     hsup.resize((max_iter+inc)+1,0);
     htemp.resize(2*(max_iter+inc),0);
     htempGPU.resize(2*(max_iter+inc),0);
-    
-    
+
+
     this->max_iter += inc;
   }
 
@@ -83,7 +83,7 @@ namespace uammd{
     real beta = 0.0;
     /**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
     /**** H^1/2·e1 = Pt· first_column_of(sqrt(Hdiag)·P) ******/
-  
+
     /**************LAPACKE********************/
 
     /*The tridiagonal matrix is stored only with its diagonal and subdiagonal*/
@@ -95,13 +95,13 @@ namespace uammd{
     /*P = eigenvectors must be filled with zeros, I do not know why*/
     real* h_P = thrust::raw_pointer_cast(P.data());
     memset(h_P, 0, iter*iter*sizeof(real));
-  
+
     /*Compute eigenvalues and eigenvectors of a triangular symmetric matrix*/
     auto info = LAPACKE_steqr(LAPACK_COL_MAJOR, 'I',
 			      iter, &htemp[0], &htemp[0]+iter,
 			      h_P, iter);
     if(info!=0){
-      sys->log<System::CRITICAL>("[LanczosAlgorithm] Could not diagonalize tridiagonal krylov matrix, steqr failed with code %d", info);      
+      sys->log<System::CRITICAL>("[LanczosAlgorithm] Could not diagonalize tridiagonal krylov matrix, steqr failed with code %d", info);
     }
 
     /***Hdiag_temp = Hdiag·P·e1****/
@@ -122,10 +122,10 @@ namespace uammd{
 
     auto d_htempGPU = thrust::raw_pointer_cast(htempGPU.data());
     CudaSafeCall(cudaMemcpy(d_htempGPU, &htemp[0] + iter, iter*sizeof(real), cudaMemcpyHostToDevice));
-    
+
     CublasSafeCall(cublasSetStream(cublas_handle, st));
     real * d_V = thrust::raw_pointer_cast(V.data());
-    
+
     // thrust::host_vector<real> h_V = V;
     // fori(0, iter){
     //   std::cerr<<h_V[3*N*i]*z2<<" ";
@@ -142,7 +142,7 @@ namespace uammd{
     // 	}
     //   if(htemp[iter+i] != real(0.0)) 	  std::cerr<<i<<" "<<htemp[iter+i]<<std::endl;
     // }
-    
+
     /*y = ||z||_2 * Vm · H^1/2 · e1 = Vm · (z2·hdiag_temp)*/
     beta = 0.0;
     CublasSafeCall(cublasgemv(cublas_handle, CUBLAS_OP_N,

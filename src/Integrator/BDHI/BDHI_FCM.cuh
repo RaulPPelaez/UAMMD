@@ -25,7 +25,7 @@
 #define cufftComplex cufftDoubleComplex
 #define cufftReal cufftDoubleReal
 #define cufftExecR2C cufftExecD2Z
-#define cufftExecC2R cufftExecZ2D 
+#define cufftExecC2R cufftExecZ2D
 #define CUFFT_C2R CUFFT_Z2D
 #define CUFFT_R2C CUFFT_D2Z
 
@@ -33,7 +33,7 @@
 
 namespace uammd{
   namespace BDHI{
-    namespace FCM_ns{      
+    namespace FCM_ns{
       /*A convenient struct to pack 3 complex numbers, that is 6 real numbers*/
       struct cufftComplex3{
 	cufftComplex x,y,z;
@@ -46,7 +46,7 @@ namespace uammd{
 	a.x += b.x; a.y += b.y; a.z += b.z;
       }
     }
-    
+
     class FCM{
     public:
       using Kernel = IBM_kernels::GaussianKernel;
@@ -54,13 +54,13 @@ namespace uammd{
       //using Kernel = IBM_kernels::PeskinKernel::fourPoint;
       //using Kernel = IBM_kernels::PeskinKernel::threePoint;
       //using Kernel = IBM_kernels::GaussianFlexible::sixPoint;
-      
+
       using cufftComplex3 = FCM_ns::cufftComplex3;
-      
+
       struct Parameters: BDHI::Parameters{
 	int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
 	real fac = 1;
-      };     
+      };
       real fac;
       FCM(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
@@ -68,8 +68,8 @@ namespace uammd{
 	  Parameters par);
       ~FCM();
       void setup_step(              cudaStream_t st = 0){}
-      void computeMF(real3* MF,     cudaStream_t st = 0);    
-      void computeBdW(real3* BdW,   cudaStream_t st = 0);  
+      void computeMF(real3* MF,     cudaStream_t st = 0);
+      void computeBdW(real3* BdW,   cudaStream_t st = 0);
       void finish_step(             cudaStream_t st = 0){}
 
 
@@ -90,27 +90,27 @@ namespace uammd{
 	long double a6pref = 16.0l*M_PIl*M_PIl/45.0l + 630.0L*b*b;
 	return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-c*a+(4.0l/3.0l)*M_PIl*a3-a6pref*a3*a3);
       }
-      
+
     private:
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
       shared_ptr<System> sys;
       ullint seed;
-      
+
       real temperature;
       real dt;
       real viscosity;
 
       shared_ptr<IBM<Kernel>> ibm;
-      
+
       Box box;
 
       /****Far (wave space) part) ******/
       Grid grid; /*Wave space Grid parameters*/
-           
+
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
-      
+
       thrust::device_vector<cufftComplex> gridVelsFourier; //Interpolated grid forces/velocities in fourier/real space
 
       cudaStream_t stream, stream2;
@@ -121,7 +121,7 @@ namespace uammd{
       void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
 
 
-      
+
       void initCuFFT();
       template<typename vtype>
       void spreadParticles(vtype *v, cudaStream_t st);

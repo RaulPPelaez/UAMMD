@@ -1,4 +1,4 @@
-/* Raul P. Pelaez 2018, HydroGrid [1] analyzer UAMMD wrapper 
+/* Raul P. Pelaez 2018, HydroGrid [1] analyzer UAMMD wrapper
 
 
    HydroGrid computes static and dynamic structure factors of a 3D particle simulation (2D if cellDim.z = 1).
@@ -35,7 +35,7 @@ USAGE:
   //End of the simulation
 
   //HydroGrid will free memory once the object is destroyed
- 
+
 
 COMPILATION:
 
@@ -92,7 +92,7 @@ namespace uammd{
       std::string outputName;       //Name prefix of HG output files
       double dt;                    //Simulation time between calls to HG
       bool useColors = false;       //Use pos.w as HydroGrid species
-    } par;  
+    } par;
     HydroGrid(shared_ptr<ParticleData> pd,
 
 	      shared_ptr<System> sys,
@@ -144,41 +144,41 @@ namespace uammd{
 			    1 /*structFactMultiplier*/,
 			    1 /*project2D*/);
 
-      
+
     }
     void update(int step){
       sys->log<System::DEBUG>("[HydroGrid] Update.");
       int ncells = par.cellDim.x*par.cellDim.y*par.cellDim.z;
-      
+
       density.resize(ncells);
       velocity.resize(velDimension*ncells);
       concentration.resize(nSpecies*ncells); //An array for each species
 
-      //Compute concentration      
+      //Compute concentration
       int numberParticles = pd->getNumParticles();
 
 
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
 
-      
+
       particlesToGrid();
-      
+
       bool firstUpdate = posOld.size() == 0;
       if(firstUpdate) posOld.resize(numberParticles, make_double3(0));
-      
+
       fori(0, numberParticles){
 	posOld[i] = make_double3(pos.raw()[sortedIndex[i]]);
       }
 
 
       updateHydroAnalysisMixture_C(velocity.data(), density.data(), concentration.data());
-      
+
       //This fixes the first step not having the velocity
       if(firstUpdate){
 	resetHydroAnalysis_C(); // Write to files
       }
-      
+
     }
     void write(int step){
       sys->log<System::DEBUG>("[HydroGrid] Writing.");
@@ -187,13 +187,13 @@ namespace uammd{
     ~HydroGrid(){
       sys->log<System::DEBUG>("[HydroGrid] Destroying.");
       writeToFiles_C(-1);
-      destroyHydroAnalysis_C();      
+      destroyHydroAnalysis_C();
     }
 
     //Spread particle properties to the grid
     void particlesToGrid(){
       int N = pd->getNumParticles();
-      
+
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       Grid grid(par.box, par.cellDim);
@@ -206,7 +206,7 @@ namespace uammd{
       double invCellVolume = grid.invCellSize.x*grid.invCellSize.y;
       if(grid.cellDim.z > 1)
 	invCellVolume *= grid.invCellSize.z;
-      
+
       fori(0,N){
 	double3 vi;
 	real4 pci =pos.raw()[sortedIndex[i]];

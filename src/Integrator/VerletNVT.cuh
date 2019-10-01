@@ -10,14 +10,14 @@
     - BBK ( TODO)
     - SPV( TODO)
  Usage:
- 
+
     Create the module as any other integrator with the following parameters:
-    
-    
+
+
     auto sys = make_shared<System>();
     auto pd = make_shared<ParticleData>(N,sys);
     auto pg = make_shared<ParticleGroup>(pd,sys, "All");
-    
+
     using NVT = VerletNVT::GronbechJensen;
     NVT::Parameters par;
      par.temperature = 1.0;
@@ -26,21 +26,21 @@
      par.is2D = false;
 
     auto verlet = make_shared<NVT>(pd, pg, sys, par);
-      
+
     //Add any interactor
     verlet->addInteractor(...);
     ...
-    
+
     //forward simulation 1 dt:
-    
+
     verlet->forwardTime();
-    
+
 -----
 References:
 
 [1] N. Gronbech-Jensen, and O. Farago: "A simple and effective Verlet-type
 algorithm for simulating Langevin dynamics", Molecular Physics (2013).
-http://dx.doi.org/10.1080/00268976.2012.760055 
+http://dx.doi.org/10.1080/00268976.2012.760055
 
 
  */
@@ -58,11 +58,11 @@ namespace uammd{
 	real dt = 0;
 	real viscosity = 1.0;
 	bool is2D = false;
-      };      
+      };
     protected:
       real noiseAmplitude;
       uint seed;
-      real dt, temperature, viscosity;    
+      real dt, temperature, viscosity;
       bool is2D;
 
       cudaStream_t stream;
@@ -90,7 +90,7 @@ namespace uammd{
       virtual real sumEnergy() override{ return 0;};
     };
 
-    
+
     class GronbechJensen: public Basic{
     public:
       GronbechJensen(shared_ptr<ParticleData> pd,
@@ -107,7 +107,7 @@ namespace uammd{
       using Parameters = Basic::Parameters;
 
       virtual void forwardTime() override;
-      
+
     };
 
 
@@ -117,4 +117,3 @@ namespace uammd{
 #include"VerletNVT/Basic.cu"
 #include"VerletNVT/GronbechJensen.cu"
 #endif
-  

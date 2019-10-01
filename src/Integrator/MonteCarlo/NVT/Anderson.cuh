@@ -8,11 +8,11 @@
   Each one of the 8 subgrids is processed sequentially.
 
   The algorithm can be summarized as follows:
-  
-  
-  1- The checkerboard is placed with a random origin 
+
+
+  1- The checkerboard is placed with a random origin
   2- For each subgrid perform a certain prefixed number of trials on the particles inside each cell
-     
+
 Certain details must be taken into account to ensure detailed-balance:
   1- Any origin in the simulation box must be equally probable
   2- The different subgrids must be processed in a random order
@@ -54,7 +54,7 @@ namespace uammd {
       };
     protected:
 
-      
+
       shared_ptr<Pot> pot;
       shared_ptr<ExternalPot> eP;
       shared_ptr<CellList> cl;
@@ -63,9 +63,9 @@ namespace uammd {
 
       bool is2D;  //True if box.z = 0
       int steps; //Number of steps performed since start
-      
+
       ullint seed;
-      
+
       Grid grid;
       real3 currentCutOff;
 
@@ -73,16 +73,16 @@ namespace uammd {
       real maxOriginDisplacement; //Range of the checkerboard origin
 
       real jumpSize;
-      
+
       thrust::device_vector<uint> triedChanges;    //Number of attempts per cell
       thrust::device_vector<uint> acceptedChanges; //Number of accepted steps per cell
 
       //Temporal storage for GPU/CPU communication
       thrust::device_vector<char> tmpStorage;
-      
+
       //Current measure of total number of tries and accepted moves
       uint totalTries, totalChanges;
-      
+
       thrust::device_vector<char> cubTempStorage;
 
       //Positions sorted in the internal CellList order, allow for a faster traversal
@@ -102,35 +102,35 @@ namespace uammd {
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
     public:
-    
+
       Anderson(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
 	       shared_ptr<Pot> pot,
 	       shared_ptr<ExternalPot> eP,
 	       Parameters par);
-    
+
       Anderson(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
 	       shared_ptr<Pot> pot,
 	       Parameters par): Anderson(pd, pg, sys, pot, shared_ptr<ExternalPot>(), par){}
-    
-      ~Anderson();    
-    
+
+      ~Anderson();
+
       void updateSimulationBox(Box box);
       void updateAccRatio();
-    
+
       real computeInternalEnergy(bool resetEnergy = true);
       real computeExternalEnergy(bool resetEnergy = true);
-      
+
       virtual void forwardTime();
-    
+
       template<bool countTries> void step();
-    
+
       uint2 getNumberTriesAndNumberAccepted();
       void resetAcceptanceCounters();
-          
+
     };
 
   }

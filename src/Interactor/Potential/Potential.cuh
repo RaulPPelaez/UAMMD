@@ -1,7 +1,7 @@
 /*Raul P. Pelaez 2017. Implemented Potentials
 
   In this file there are functors and objects describing different potentials.
-  
+
   A potential must provide:
    -transversers to compute force, energy and virial through get*Transverser(Box box, shared_ptr<ParticleData> pd)
    -A maximum interaction distance (can be infty)
@@ -9,11 +9,11 @@
 
 
 
-  A single Potential might be written to handle a variety of similar potentials. 
+  A single Potential might be written to handle a variety of similar potentials.
   For example, all radial potentials need only the distance between particles,
     so RadialPotential is defined, and the particular potential is a functor passed to it (See LJFunctor).
     See RadialPotential on how to implement a RadialPotential.
-    
+
 
 
  */
@@ -42,7 +42,7 @@ namespace uammd{
 	real cutOff, sigma, epsilon;
 	bool shift = false; //Shift the potential so lj(rc) = 0?
       };
-      
+
       struct __align__(16) PairParameters{
 	real cutOff2;
 	real sigma2, epsilonDivSigma2;
@@ -54,24 +54,24 @@ namespace uammd{
 	const real invr2 = params.sigma2/r2;
 	const real invr6 = invr2*invr2*invr2;
 	const real invr8 = invr6*invr2;
-      
+
 	real fmod = params.epsilonDivSigma2*(real(-48.0)*invr6 + real(24.0))*invr8;
 
 
 	if(params.shift != real(0.0)){
 	  fmod += params.shift*sqrtf(invr2);
 	}
-	return fmod;      
+	return fmod;
       }
-      
-      static inline __host__ __device__ real energy(const real &r2, const PairParameters &params){	
-	
+
+      static inline __host__ __device__ real energy(const real &r2, const PairParameters &params){
+
 	if(r2 >= params.cutOff2) return 0;
 	real invr2 = params.sigma2/r2;
 	real invr6 = invr2*invr2*invr2;
 	//This must be multiplied by 2 instead of 4 because sum_i(sum_j(E(rij))) = 2*E_total
 	real E = params.epsilonDivSigma2*params.sigma2*real(4.0)*invr6*(invr6-real(1.0));
-	
+
 	if(params.shift != real(0.0)){
 	  //With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
 	  real rc = sqrt(params.cutOff2);
@@ -79,7 +79,7 @@ namespace uammd{
 	  real invrc6 = invrc2*invrc2*invrc2;
 	  E += -(sqrt(r2)-rc)*params.shift - real(4.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
 	}
-	return E;      
+	return E;
       }
 
 
@@ -97,17 +97,17 @@ namespace uammd{
 	  real invrc6 = invCutOff2*invCutOff2*invCutOff2;
 	  real invrc7 = invrc6*sqrtf(invCutOff2);
 	  real invrc13 = invrc7*invrc6;
-      
+
 	  params.shift = params.epsilonDivSigma2*(real(48.0)*invrc13 - real(24.0)*invrc7);
 	}
 	else params.shift = real(0.0);
 	return params;
-	
+
       }
-    
+
     };
 
-    
+
     using LJ = Radial<LJFunctor>;
   }
 }

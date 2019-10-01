@@ -1,10 +1,10 @@
 /* Raul P. Pelaez 2017. Integrator Base class
 
    An integrator has the ability to move the simulation one step forward in time.
-   
+
    For that, it can use any number of interactors.
 
-Integrator is an UAMMD base module, 
+Integrator is an UAMMD base module,
 to create an Integrator module inherit from Integrator and overload the virtual methods.
 
 
@@ -25,15 +25,15 @@ namespace uammd{
     shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
     shared_ptr<System> sys;
-  
+
     std::vector<shared_ptr<Interactor>> interactors;
   public:
 
-    Integrator(shared_ptr<ParticleData> pd,	       
+    Integrator(shared_ptr<ParticleData> pd,
 	       shared_ptr<System> sys,
 	       std::string name="noName"):
       Integrator(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, name){}
-	  
+
     Integrator(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
@@ -46,7 +46,7 @@ namespace uammd{
     ~Integrator(){
       sys->log<System::DEBUG>("[Integrator] %s Destroyed", name.c_str());
     }
-    
+
     virtual void forwardTime() = 0;
     virtual real sumEnergy(){ return 0.0;}
 
@@ -54,13 +54,13 @@ namespace uammd{
     //The interactors can be called at any time from the integrator to compute the forces when needed.
     void addInteractor(shared_ptr<Interactor> an_interactor){
       sys->log<System::MESSAGE>("[%s] Adding Interactor %s...", name.c_str(), an_interactor->getName().c_str());
-      interactors.emplace_back(an_interactor);      
+      interactors.emplace_back(an_interactor);
     }
-    
+
     std::vector<std::shared_ptr<Interactor>> getInteractors(){
       return interactors;
-    }            
-        
+    }
+
 };
 
 }

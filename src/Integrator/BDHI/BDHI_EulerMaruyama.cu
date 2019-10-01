@@ -1,5 +1,5 @@
 /*Raul P. Pelaez 2016. Brownian Euler Maruyama with hydrodynamics Integrator derived class implementation
-   
+
   Solves the following stochastich differential equation:
   X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*kb*T*dt)·B·dW
   Being:
@@ -13,7 +13,7 @@
   The Mobility matrix is computed via the Rotne Prager Yamakawa tensor.
 
   The module offers several ways to compute and solve the different terms.
-  
+
   BDHI::Cholesky:
   -Computing M·F and B·dW  explicitly storing M and performing a Cholesky decomposition on M.
 
@@ -27,7 +27,7 @@
 
   1- Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations
   J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
-  2- Rapid sampling of stochastic displacements in Brownian dynamics simulations 
+  2- Rapid sampling of stochastic displacements in Brownian dynamics simulations
   The Journal of Chemical Physics 146, 124116 (2017); doi: http://dx.doi.org/10.1063/1.4978242
 
   TODO:
@@ -40,7 +40,7 @@ namespace uammd{
     template<class Method>
     EulerMaruyama<Method>::EulerMaruyama(shared_ptr<ParticleData> pd,
 					 shared_ptr<ParticleGroup> pg,
-					 shared_ptr<System> sys,		       
+					 shared_ptr<System> sys,
 					 Parameters par):
       Integrator(pd, pg, sys, "BDHI::EulerMaruyama/"+type_name<Method>()),
       K(par.K),
@@ -51,7 +51,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Initialized");
 
       int numberParticles = pg->getNumberParticles();
-      
+
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Temperature: %f", par.temperature);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Viscosity: %f", par.viscosity);
       sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Time step: %f", par.dt);
@@ -66,15 +66,15 @@ namespace uammd{
 				  Ky.x, Ky.y, Ky.z,
 				  Kz.x, Kz.y, Kz.z);
       }
-  
+
       cudaStreamCreate(&stream);
-      cudaStreamCreate(&stream2);     
-  
+      cudaStreamCreate(&stream2);
+
       /*Result of multiplyinf M·F*/
       MF.resize(numberParticles, real3());
       BdW.resize(numberParticles+1, real3());
       //if(par.is2D) divM.resize(numberParticles, real3());
-      
+
     }
     template<class Method>
     EulerMaruyama<Method>::~EulerMaruyama(){
@@ -98,7 +98,7 @@ namespace uammd{
 				    //const real3* __restrict__ divM,
 				    int N,
 				    real sqrt2Tdt, real T, real dt, bool is2D){
-	uint id = blockIdx.x*blockDim.x+threadIdx.x;    
+	uint id = blockIdx.x*blockDim.x+threadIdx.x;
 	if(id>=N) return;
 	int i = indexIterator[id];
 	/*Position and color*/
@@ -131,7 +131,7 @@ namespace uammd{
 	//   //divm.z = real(0.0);
 	//   //p += params.T*divm*params.invDelta*params.invDelta*params.dt; //For RFD
 	//   p += T*dt*divm;
-	// }           
+	// }
 	/*Write to global memory*/
 	pos[i] = make_real4(p,c);
       }
@@ -141,7 +141,7 @@ namespace uammd{
     /*Advance the simulation one time step*/
     template<class Method>
     void EulerMaruyama<Method>::forwardTime(){
-      sys->log<System::DEBUG1>("[BDHI::EulerMaruyama] Performing integration step %d", steps);  
+      sys->log<System::DEBUG1>("[BDHI::EulerMaruyama] Performing integration step %d", steps);
       /*
 	dR = dt(KR+MF) + sqrt(2*T*dt)·BdW +T·divM·dt
       */
@@ -153,7 +153,7 @@ namespace uammd{
 	for(auto forceComp: interactors){
 	  forceComp->updateTimeStep(par.dt);
 	  forceComp->updateTemperature(par.temperature);
-	  forceComp->updateBox(par.box);	 
+	  forceComp->updateBox(par.box);
 	}
       }
 
@@ -172,7 +172,7 @@ namespace uammd{
       }
       /*Compute new force*/
       for(auto forceComp: interactors) forceComp->sumForce(stream);
-      
+
       bdhi->setup_step(stream);
 
       auto d_MF = thrust::raw_pointer_cast(MF.data());
@@ -195,16 +195,16 @@ namespace uammd{
 
       /*Update the positions*/
       /* R += KR + MF + sqrt(2dtT)BdW + kTdivM*/
-      
+
       real3* d_BdW = nullptr;
       if(par.temperature > 0) d_BdW = thrust::raw_pointer_cast(BdW.data());
-      
+
       real3* d_K = nullptr;
       if(par.K.size() > 0) d_K = thrust::raw_pointer_cast(K.data());
 
       //real3* d_divM = nullptr;
       //if(par.is2D) d_divM = thrust::raw_pointer_cast(divM.data());
-      
+
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 
       //cudaStreamSynchronize(stream2);
@@ -218,8 +218,8 @@ namespace uammd{
 									numberParticles,
 									sqrt2Tdt,
 									par.temperature,
-									par.dt, par.is2D);  
-  
+									par.dt, par.is2D);
+
 
     }
     template<class Method>

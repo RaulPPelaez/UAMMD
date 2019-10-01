@@ -44,7 +44,7 @@ public:
 
 
 void readParameters(shared_ptr<System> sys);
-int main(int argc, char *argv[]){   
+int main(int argc, char *argv[]){
   auto sys = make_shared<System>(argc, argv);
 
   readParameters(sys);
@@ -55,7 +55,7 @@ int main(int argc, char *argv[]){
   Box box(boxSize);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
-    auto radius = pd->getRadius(access::location::cpu, access::mode::write);    
+    auto radius = pd->getRadius(access::location::cpu, access::mode::write);
     fori(0,N){
       pos.raw()[i] = make_real4(sys->rng().uniform3(-boxSize.x*0.5, boxSize.x*0.5),0);
       radius.raw()[i] = radius_min;
@@ -63,8 +63,8 @@ int main(int argc, char *argv[]){
     pos.raw()[0] = make_real4(0);
     radius.raw()[0] = radius_max;
   }
-  
-  std::ofstream out(outfile);  
+
+  std::ofstream out(outfile);
   BDHI::Parameters par;
   par.temperature = temperature;
   par.viscosity = viscosity;
@@ -83,9 +83,9 @@ int main(int argc, char *argv[]){
   auto inter = make_shared<miniInteractor>(pd, sys, "puller");
   inter->F.x = 1;
   bdhi->addInteractor(inter);
-  
+
   //pd->sortParticles();
-  
+
   Timer tim;
   tim.tic();
   forj(0,nsteps){
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]){
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       auto radius = pd->getRadius(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
-      
+
       out<<"#"<<endl;
       real3 p;
       fori(0,N){
@@ -105,9 +105,9 @@ int main(int argc, char *argv[]){
       }
     }
     bdhi->forwardTime();
-    //if(j%500 == 0) pd->sortParticles();    
+    //if(j%500 == 0) pd->sortParticles();
   }
-  
+
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
   sys->finish();

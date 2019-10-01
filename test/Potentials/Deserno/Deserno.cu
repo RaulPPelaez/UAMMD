@@ -30,7 +30,7 @@ real wc;
 bool hydro;
 void readParameters(shared_ptr<System> sys);
 
-int main(int argc, char * argv[]){  
+int main(int argc, char * argv[]){
   auto sys = make_shared<System>(argc, argv);
   sys->rng().setSeed(seed);
   readParameters(sys);
@@ -49,7 +49,7 @@ int main(int argc, char * argv[]){
       types[i] = pos[i].w;
     }
   }
-  
+
 
   Box box(boxSize);
 
@@ -92,7 +92,7 @@ int main(int argc, char * argv[]){
   ofstream out(outfile);
 
   forj(0,relaxSteps)  bd->forwardTime();
-  
+
   forj(0,nsteps){
 
     bd->forwardTime();
@@ -108,9 +108,9 @@ int main(int argc, char * argv[]){
     }
     }
   }
-  
-  
-  
+
+
+
   return 0;
 }
 
@@ -120,7 +120,7 @@ int main(int argc, char * argv[]){
 
 
 void readParameters(shared_ptr<System> sys){
-  InputFile in("data.main", sys); 
+  InputFile in("data.main", sys);
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("outfile", InputFile::Required)>>outfile;
   in.getOption("init_posfile", InputFile::Required)>>init_posfile;

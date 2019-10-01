@@ -23,7 +23,7 @@ private:
 int main(){
   cout<<"Starting"<<endl;
   int N = 100;
-  
+
   auto sys = std::make_shared<System>();
   auto pd = std::make_shared<ParticleData>(N, sys);
 
@@ -34,7 +34,7 @@ int main(){
     auto poscpuf = pd->getPos(access::cpu, access::write);
     //std::generate((float*)poscpuf.raw(), (float*)poscpuf.raw()+4*N,  [&](){return dist(gen)*100;});
     for(int i=0; i<N; i++) poscpuf.raw()[i] = make_real4(N-i, N-i, N-i, rand()%2);
-    
+
     cerr<<"DONE!"<<endl;
   }
   cerr<<"Printing initial pos..."<<endl;
@@ -50,7 +50,7 @@ int main(){
   }
 
   auto selector = particle_selector::IDRange(4, 8);
-   
+
   auto pg = make_shared<ParticleGroup>(selector, pd, sys, "Group0");
 
   cerr<<"Printing particle Group:"<<endl;
@@ -72,8 +72,8 @@ int main(){
     cout<<endl;
 
   }
-  
-  
+
+
   User user(pd);
   cout<<"Emitting sort signal.."<<endl;
   pd->sortParticles();
@@ -90,7 +90,7 @@ int main(){
     cout<<endl;
    }
    cudaDeviceSynchronize();
-   
+
   cerr<<"Printing particle Group:"<<endl;
 
   {
@@ -111,9 +111,9 @@ int main(){
     cout<<endl;
   }
 
-   
-   
-   
+
+
+
    /*
    cerr<<"Adding particles"<<endl;
 
@@ -127,7 +127,7 @@ int main(){
      for(int i=0; i<10; i++){
        idcpu.raw()[N+i] = N+i;
      }
-    
+
    }
    N = pd->getNumParticles();
    {
@@ -145,7 +145,7 @@ int main(){
    {
      auto   poscpu= pd->getPos(access::cpu, access::read);
      auto   idcpu= pd->getId(access::cpu, access::read);
-     for(int i=0; i<N; i++) cout<<poscpu.raw()[i].x<<" ";   
+     for(int i=0; i<N; i++) cout<<poscpu.raw()[i].x<<" ";
      cout<<endl;
      for(int i=0; i<N; i++) cout<<idcpu.raw()[i]<<" ";
      cout<<endl;
@@ -163,7 +163,7 @@ int main(){
      for(int i=0; i<10; i++){
        idcpu.raw()[N+i] = N+i;
      }
-    
+
    }
    N = pd->getNumParticles();
    {
@@ -181,7 +181,7 @@ int main(){
    {
      auto   poscpu= pd->getPos(access::cpu, access::read);
      auto   idcpu= pd->getId(access::cpu, access::read);
-     for(int i=0; i<N; i++) cout<<poscpu.raw()[i].x<<" ";   
+     for(int i=0; i<N; i++) cout<<poscpu.raw()[i].x<<" ";
      cout<<endl;
      for(int i=0; i<N; i++) cout<<idcpu.raw()[i]<<" ";
      cout<<endl;
@@ -193,7 +193,7 @@ int main(){
 
 
 
-   cudaDeviceSynchronize();   
+   cudaDeviceSynchronize();
    pd.reset();
 
   // float4 *d_m, *d_out;
@@ -203,15 +203,15 @@ int main(){
   // cudaMalloc(&d_m, n*sizeof(float4));
   // cudaMalloc(&d_out, n*sizeof(float4));
   // cudaMemset(d_m, 0, n*sizeof(float4));
- 
+
   // cub::TexObjInputIterator<float4> tex;
   // tex.BindTexture(d_m, n*sizeof(float4));
   // tex.UnbindTexture();
   // cudaDeviceSynchronize();
   // cerr<<"Binding test"<<endl;
   // auto t_start = std::chrono::high_resolution_clock::now();
-  // for(int i=0; i<ntest;i++){   
-  //   tex.BindTexture(d_m, n*sizeof(float4));    
+  // for(int i=0; i<ntest;i++){
+  //   tex.BindTexture(d_m, n*sizeof(float4));
   //   transverse<<<n/128, 128>>>(tex, n, d_out);
   //   tex.UnbindTexture();
   // }
@@ -221,7 +221,7 @@ int main(){
 
   // cerr<<"No binding test"<<endl;
   // t_start = std::chrono::high_resolution_clock::now();
-  // tex.BindTexture(d_m, n*sizeof(float4));    
+  // tex.BindTexture(d_m, n*sizeof(float4));
   // for(int i=0; i<ntest;i++)
   //   transverse<<<n/128, 128>>>(tex, n, d_out);
 
@@ -229,7 +229,7 @@ int main(){
   // cerr<< std::chrono::duration<double, std::milli>(t_end-t_start).count()/ntest<<"ms"<<endl;
 
   // print<<<5,1>>>((float*)d_out,5);
-  
+
   cudaDeviceSynchronize();
   return 0;
 }

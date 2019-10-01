@@ -15,7 +15,7 @@ namespace uammd{
   //typedef enum {sc, bcc, fcc, dia, hcp, sq, tri} lattice;
 
   std::vector<real4> initLattice(real3 L, uint N, BRAVAISLAT lat){
-  
+
     // cerr<<"Starting in a ";
 
     // switch(lat){
@@ -27,7 +27,7 @@ namespace uammd{
     // case sq:   cerr<<"square";    break;
     // case dia:  cerr<<"zincblende";break;
     // }
-  
+
     // cerr<<" Lattice...";
     std::vector<float4> pos(N, make_float4(0));
 

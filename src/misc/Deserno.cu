@@ -28,15 +28,15 @@ namespace uammd{
       //Heads and head+tail
       param.sigma = 0.95*par.sigma;
       wc = par.wc*param.sigma;
-      rc = pow(2, 1/6.0)*param.sigma;      
+      rc = pow(2, 1/6.0)*param.sigma;
       param.cutOff = rc;
       param.rc = rc;
       param.wc = 0;
       pot->setPotParameters(0, 0, param);
-      pot->setPotParameters(0, 1, param);      
-            
+      pot->setPotParameters(0, 1, param);
+
     }
-    
+
     {
       PairForces::Parameters params;
       params.box = par.box;
@@ -55,7 +55,7 @@ namespace uammd{
 
 
   }
-  
+
 
   void Deserno::sumForce(cudaStream_t st){
     nonBonded->sumForce(st);

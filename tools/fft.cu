@@ -50,14 +50,14 @@ int main(int argc, char *argv[]){
     std::cerr<<""<<std::endl;
     std::cerr<<"w=$(grep $( datamash -W max 2 <kk) kk | awk '{print 2*3.1415*$1}')"<<std::endl;
     std::cerr<<std::endl;
-    std::cerr<<"w will be 1"<<std::endl;    
+    std::cerr<<"w will be 1"<<std::endl;
     exit(1);
   }
-  
-  
+
+
   int numberElements = std::atoi(argv[1]);
   double Fs = std::stod(argv[2]);
-  
+
   cufftHandle plan;
   thrust::device_vector<cufftComplex> data(numberElements/2+1);
 
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]){
   cufftPlan1d(&plan, numberElements, CUFFT_R2C, 1);
 
   cufftComplex *d_m = thrust::raw_pointer_cast(data.data());
-  
+
   cufftExecR2C(plan, (cufftReal*) d_m, d_m);
 
   cudaDeviceSynchronize();
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]){
 
 
   thrust::device_vector<double> devAmplitudes(numberElements/2+1);
-  
+
   //Print
   thrust::transform(data.begin(),
 		    data.begin()+numberElements/2+1,
@@ -94,18 +94,18 @@ int main(int argc, char *argv[]){
 
   double maxAmplitude = *thrust::max_element(devAmplitudes.begin(),
 					     devAmplitudes.end());
-  
+
   thrust::device_vector<double> hostAmplitudes = devAmplitudes;
 
-  
+
   for(int i = 0; i<numberElements/2+1; i++){
 
-    double Aw = hostAmplitudes[i];    
+    double Aw = hostAmplitudes[i];
     double phase = 0.0;
     if(Aw >= maxAmplitude/1000.0)
       phase = std::atan2(h_data[i].y, h_data[i].x);
-    
-    
+
+
     std::cout<<i*Fs/(numberElements)<<" "<<Aw<<" "<<phase<<"\n";
   }
   std::cout<<std::flush;

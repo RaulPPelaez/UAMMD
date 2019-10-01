@@ -28,7 +28,7 @@ public:
     auto force = pd->getForce(access::location::cpu, access::mode::write);
     force.raw()[0] = make_real4(F,0,0,0);
     if(pg->getNumberParticles()>1)
-      force.raw()[1] = make_real4(-F,0,0,0);    
+      force.raw()[1] = make_real4(-F,0,0,0);
   }
   real sumEnergy() override{return 0;}
 };
@@ -56,7 +56,7 @@ real pullForce_measureVelocity(real L, real psi, real F){
   par.box = box;
   par.tolerance = tolerance;
   par.psi = psi;
-  
+
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
   {
     auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
@@ -67,7 +67,7 @@ real pullForce_measureVelocity(real L, real psi, real F){
   real vel;
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::read);
-  
+
     vel = pos.raw()[0].x/par.dt;
 
     if(pos.raw()[0].y > 0 || pos.raw()[0].z > 0){
@@ -98,13 +98,13 @@ bool selfMobility_pullForce_test(){
     velout<<"#L  v/(F·M0)"<<endl;
     fori(0, NL){
       real L = L_min + i*((L_max-L_min)/(real)(NL-1));
-      velocities[i+NL*j] = make_real3(L, psi, pullForce_measureVelocity(L, psi, F));      
+      velocities[i+NL*j] = make_real3(L, psi, pullForce_measureVelocity(L, psi, F));
       CudaCheckError();
       real M0 = 1/(6*M_PI*viscosity*rh)*(1-2.837297*rh/L);
       velout<<L/rh<<" "<<(velocities[i+NL*j].z/(F*M0))<<endl;
     }
 
-  } 
+  }
   return true;
 }
 
@@ -125,7 +125,7 @@ real pullForce_pairMobility_measureVelocity(real L, real psi, real F){
   par.box = box;
   par.tolerance = tolerance;
   par.psi = psi;
-  
+
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
   {
     auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
@@ -149,7 +149,7 @@ real pullForce_pairMobility_measureVelocity(real L, real psi, real F){
     bdhi->forwardTime();
     {
       auto pos = pd->getPos(access::location::cpu, access::mode::readwrite);
-  
+
       vel = (double(pos.raw()[1].x)-double(prevp))/par.dt;
       real p = prevp;
       real r = minr + i*((maxr-minr)/(real)(nPoints-1));
@@ -188,7 +188,7 @@ bool deterministicPairMobility_test(){
   fori(0, velocities.size()){
     velout<<" "<<velocities[i].x*rh<<" "<<(velocities[i].y/(F*M0*(1-2.837297*rh/L)))<<endl;
   }
-  
+
   return true;
 }
 
@@ -208,7 +208,7 @@ bool idealParticlesDiffusion(int N, real L, real psi){
   par.box = box;
   par.tolerance = tolerance;
   par.psi = psi;
-  
+
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
   std::ofstream out("pos.noise.psi"+std::to_string(psi*rh)+".dt"+std::to_string(par.dt)+".test");
   {
@@ -237,7 +237,7 @@ void selfDiffusion_test(){
   real psi_min = 0.1/rh;
   real psi_max = 1.0/rh;
   int N=4096;
-  real L = 64*rh;  
+  real L = 64*rh;
   forj(0, Npsi){
 
     real psi = psi_min + j*((psi_max-psi_min)/(real)(Npsi-1));
@@ -270,7 +270,7 @@ real3 singleParticleNoise(real T, real L, real psi){
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     pos.raw()[0] = make_real4(sys->rng().uniform3(-L*0.5, L*0.5), 0);
-    prevp = make_real3(pos.raw()[0]);    
+    prevp = make_real3(pos.raw()[0]);
   }
   real3 variance = make_real3(0);
   real3 mean = make_real3(0);
@@ -279,11 +279,11 @@ real3 singleParticleNoise(real T, real L, real psi){
     bdhi->forwardTime();
     auto pos = pd->getPos(access::location::cpu, access::mode::read);
     real4 *p = pos.raw();
-    real3 noise = make_real3(p[0]) - prevp;   
+    real3 noise = make_real3(p[0]) - prevp;
     real3 delta = noise - mean;
     mean += delta/real(i+1);
     real3 delta2 = noise - mean;
-    variance += delta*delta2;    
+    variance += delta*delta2;
     prevp = make_real3(p[0]);
   }
   variance /= real(nsteps);
@@ -305,9 +305,9 @@ void noiseVariance_test(){
   real psi_min = 0.1/rh;
   real psi_max = 1.0/rh;
   real L = 64*rh;
-  real T = temperature;  
+  real T = temperature;
   std::ofstream out("noiseVariance.test");
-  
+
   real selfDiffusion = T/(6*M_PI*viscosity*rh)*(1.0-2.3872979*rh/L);
   forj(0, Npsi){
     real psi = psi_min + j*((psi_max-psi_min)/(real)(Npsi-1));
@@ -331,6 +331,6 @@ int main( int argc, char *argv[]){
   if(strcmp(argv[1], "pairMobility")==0) deterministicPairMobility_test();
   if(strcmp(argv[1], "selfDiffusion")==0) selfDiffusion_test();
   if(strcmp(argv[1], "noiseVariance")==0) noiseVariance_test();
-  
+
   return 0;
 }

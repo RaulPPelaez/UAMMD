@@ -1,6 +1,6 @@
-/*Raul P. Pelaez 2017. Lanczos Algotihm,   
+/*Raul P. Pelaez 2017. Lanczos Algotihm,
   Computes the matrix-vector product sqrt(M)·v recursively. In the case of solveNoise, v is a random gaussian vector.
-  
+
   For that, it requires a functor in which the () operator takes an output real3* array and an input real3* (both device memory) as:
   inline __device__ operator()(real3* out, real3 * a_v);
 
@@ -18,7 +18,7 @@
 
 Some notes:
 
-  From what I have seen, this algorithm converges to an error of ~1e-3 in a few steps (<5) and from that point a lot of iterations are needed to lower the error. 
+  From what I have seen, this algorithm converges to an error of ~1e-3 in a few steps (<5) and from that point a lot of iterations are needed to lower the error.
   It usually achieves machine precision in under 50 iterations.
 
   If the matrix does not have a sqrt (not positive definite, not symmetric...) it will usually be reflected as a nan in the current error estimation and leave the algorithm in an UNKNOWN_ERROR state.
@@ -50,7 +50,7 @@ namespace uammd{
       UNKNOWN_ERROR
       };
 
-  struct LanczosAlgorithm{  
+  struct LanczosAlgorithm{
     LanczosAlgorithm(shared_ptr<System> sys, real tolerance = 1e-3);
     void init();
     ~LanczosAlgorithm(){
@@ -81,7 +81,7 @@ namespace uammd{
     cublasHandle_t cublas_handle;
     /*Maximum number of Lanczos iterations*/
     int max_iter; //<100 in general, increases as needed
-    int iterationHardLimit = 100; //Do not perform more than this iterations 
+    int iterationHardLimit = 100; //Do not perform more than this iterations
     /*Lanczos algorithm auxiliar memory*/
     thrust::device_vector<real3> w; //size N, v in each iteration
     thrust::device_vector<real> V; //size 3Nxmax_iter; Krylov subspace base transformation matrix
@@ -93,14 +93,14 @@ namespace uammd{
     thrust::device_vector<real3> oldBz;
 
     int check_convergence_steps;
-  
+
     LanczosStatus errorStatus = LanczosStatus::SUCCESS;
-    
+
     shared_ptr<System> sys;
   };
 
-  
-  
+
+
   template<class Dotctor>
   LanczosStatus LanczosAlgorithm::solve(Dotctor &dot, real *Bz, real*z, int N, real tolerance, cudaStream_t st){
     st = 0;
@@ -116,20 +116,20 @@ namespace uammd{
       if(z == d_V){
 	errorStatus = LanczosStatus::SIZE_MISMATCH;
 	return errorStatus;
-      }      
+      }
       numElementsChanged(N);
     }
 
     real * d_V = thrust::raw_pointer_cast(V.data());
     int steps_needed = 0;
     CublasSafeCall(cublasSetStream(cublas_handle, st));
-  
+
     sys->log<System::DEBUG2>("[LanczosAlgorithm] Starting");
     real normNoise_prev = 1.0; //For error estimation, see eq 27 in [1]
 
     /*See algorithm I in [1]*/
     /************v[0] = z/||z||_2*****/
-  
+
     /*If v doesnt come from solveNoise*/
     if(z != d_V){
       sys->log<System::DEBUG2>("[LanczosAlgorithm] Copying input to subspace  proyection matrix");
@@ -140,9 +140,9 @@ namespace uammd{
     CublasSafeCall(cublasnrm2(cublas_handle, 3*N, d_V, 1, &invz2));
     invz2 = 1.0/invz2;
 
-    /*v[0] = v[0]*1/norm(z)*/ 
+    /*v[0] = v[0]*1/norm(z)*/
     CublasSafeCall(cublasscal(cublas_handle, 3*N, &invz2,  d_V, 1));
-  
+
     real alpha=1.0;
     /*Lanczos iterations for Krylov decomposition*/
     /*Will perform iterations until Error<=tolerance*/
@@ -154,7 +154,7 @@ namespace uammd{
       /*w = D·vi ---> See i.e BDHI::Lanczos_ns::NbodyFreeMatrixMobilityDot and BDHI::Lanczos_ns::Dotctor on how this works*/
       sys->log<System::DEBUG3>("[LanczosAlgorithm] Computing M·v");
       dot(d_w, (real3 *)(d_V+3*N*i));
-      
+
       if(i>0){
 	/*w = w-h[i-1][i]·vi*/
 	alpha = -hsup[i-1];
@@ -208,7 +208,7 @@ namespace uammd{
 	sys->log<System::DEBUG4>("[LanczosAlgorithm] norm(w) = %e in iteration %d! z2 = %e, threshold= %e", hsup[i], i,1.0/invz2, tol);
 	CudaSafeCall(cudaMemcpyAsync(d_V+3*N*(i+1), (real *)d_w, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
       }
-      
+
       /*Check convergence if needed*/
       steps_needed++;
       if(i >= check_convergence_steps){ //Miminum of 3 iterations
@@ -229,7 +229,7 @@ namespace uammd{
 				    &a,
 				    Bz, 1,
 				    d_oldBz, 1));
-	  
+
 	  /*yy = ||Bz_i - Bz_{i-1}||_2*/
 	  real yy;
 	  CublasSafeCall(cublasnrm2(cublas_handle, 3*N,  d_oldBz, 1, &yy));
@@ -248,7 +248,7 @@ namespace uammd{
 	    //Or check more often if I performed too many iterations
 	    else{
 	      check_convergence_steps = std::max(1, check_convergence_steps - 2);
-	      
+
 	    }
 	    sys->log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %e",i, Error);
 	    return errorStatus;

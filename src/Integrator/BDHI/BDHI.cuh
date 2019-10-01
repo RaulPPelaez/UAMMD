@@ -8,7 +8,7 @@
 #include<vector>
 namespace uammd{
   namespace BDHI{
-    
+
     //Parameters that BDHI modules may need
     struct Parameters{
       //The 3x3 shear matrix is encoded as an array of 3 real3
@@ -31,7 +31,7 @@ namespace uammd{
 
       //Version for particles of equal size
       /*M(r) = 0.75*M0*( f(r)*I + g(r)*r(diadic)r )
-	c12.x = f(r) * 0.75*M0 
+	c12.x = f(r) * 0.75*M0
 	c12.y = g(r) * 0.75*M0/r^2  -> r^2 to normalize the diadic
       Where M0 is the self mobility: 1/(6*pi*eta*rh)*/
       inline __host__  __device__  real2  RPY(real r, real rh) const{
@@ -65,7 +65,7 @@ namespace uammd{
 	  const real pref = M0*real(3.0)*real(0.25)*invr;
 	  const real denom = (ai*ai+aj*aj)/(real(3.0)*r*r);
 	  c12.x = pref*(real(1.0) + denom);
-	  c12.y = pref*(real(1.0) - real(3.0)*denom)*invr*invr;	  
+	  c12.y = pref*(real(1.0) - real(3.0)*denom)*invr*invr;
 	}
 	else if(r>asub){
 	  const real pref = M0/(ai*aj*real(32.0)*r*r*r);
@@ -79,7 +79,7 @@ namespace uammd{
 	  c12.x = M0/(ai>aj?ai:aj);
 	  c12.y = real(0.0);
 	}
-	
+
 	return c12;
       }
 
@@ -90,7 +90,7 @@ namespace uammd{
 	else
 	  return RPY_differentSizes(r, a_i, a_j);
       }
-      
+
     };
 
   }

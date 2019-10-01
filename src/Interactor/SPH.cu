@@ -1,26 +1,26 @@
 /*Raul P.Pelaez 2017. Smoothed Particle Hydrodynamics
-  
+
   SPH is an Interactor module, any simplectic integrator can be used with it (i.e VerletNVE).
-  
+
   Computes a force on each particle as:
   Fi = sum_j[  mj·(Pj/rhoj^2 + Pi/rhoi^2 + visij)·grad_i(Wij) ]
 
   Where:
     j: The neighbours of i (within a distance given by the support of Wij)
-    
+
     m: mass
     P: Pressure
     rho: Density
     vis: Artificial viscosity
 
     W: Interpolation kernel, a smooth decaying function with a close support. See SPH_ns::Kernel
-    
+
   The density on a given particle i is interpolated from its neighbours as:
    rho_i = sum_j[ mj·Wij ]
 
   The Pressure is given by an equation-of-state depending on interpolated properties of the particles. Currently:
     Pi = K·(rho_i-rho0)
-    
+
   An artificial viscosity is introduced to allow shock phenomena ans stabilize the algorithm.
    visij = -nu( vij·rij)/(rij^2+epsilon)
     epsilon ~ 0.001
@@ -44,7 +44,7 @@ References:
 namespace uammd{
   SPH::SPH(shared_ptr<ParticleData> pd,
 	   shared_ptr<ParticleGroup> pg,
-	   shared_ptr<System> sys,		       
+	   shared_ptr<System> sys,
 	   Parameters par):
     Interactor(pd, pg, sys, "SPH/"),
     box(par.box),
@@ -75,23 +75,23 @@ namespace uammd{
       real *mass;
       DensityTransverser(Box box, real *density, real *mass, real support):
 	box(box),density(density),mass(mass),support(support){ }
-      
+
       inline __device__ real  getInfo(int i){
-	if(mass) return mass[i];	
+	if(mass) return mass[i];
 	else return real(1.0);
       }
       //Starting density of each particle
       inline __device__ real zero(){ return real(0);}
-      
+
       //rho_i = sum_j( mj · Wij)
       inline __device__ real compute(real4 ri, real4 rj, real massi, real massj){
-	real3 rij = box.apply_pbc(make_real3(rj) - make_real3(ri));	
-	return massj*kernel(rij, support);	
+	real3 rij = box.apply_pbc(make_real3(rj) - make_real3(ri));
+	return massj*kernel(rij, support);
       }
       //Sum for each particle
       inline __device__ void accumulate(real &total, real current){ total += current; }
       //Write the result
-      inline __device__ void set(int i, const real &total){ density[i] = total; }      
+      inline __device__ void set(int i, const real &total){ density[i] = total; }
     };
 
     //Compute Pressure, this simple functor codes the ideal gas state eq. Pi = K·(rho_i - rho0)
@@ -102,7 +102,7 @@ namespace uammd{
 	restDensity(restDensity){}
 
       inline __device__ real operator()(real density_i) const{
-	return gasStiffness*(density_i - restDensity);	
+	return gasStiffness*(density_i - restDensity);
       }
     };
 
@@ -115,14 +115,14 @@ namespace uammd{
 	return viscosityPrefactor*(dot(vij, rij)/(dot(rij, rij)+epsilon*support*support));
       }
     };
-    
+
     //Compute and sum the force on each particle:
     // Fi = sum_j( mi·mj·(Pi/rho_i^2 + Pj/rho_j^2)· rij · W(rij)
     template<class Kernel>
     struct ForceTransverser{
       Kernel kernel; //Interpolation kernel
       real support; //Support distance of the kernel
-      Box box; 
+      Box box;
       real4 *force;
       real3 * vel;
       real *density, *pressure, *mass;
@@ -134,7 +134,7 @@ namespace uammd{
 	real mass;
 	real3 vel;
       };
-      
+
       ForceTransverser(Box box,
 		       real4 *force,
 		       real3* vel,
@@ -165,49 +165,49 @@ namespace uammd{
 	real3 rij = box.apply_pbc(make_real3(rj) - make_real3(ri));
 
         real3 vij = infoj.vel - infoi.vel;
-	
+
 	const real mi = infoi.mass;
 	const real mj = infoj.mass;
 
 	const real vis = viscosity(vij, rij, support);
-	
-	return mi*mj*(infoi.Pdivrhosq + infoj.Pdivrhosq + vis)*kernel.gradient(rij, support);	
+
+	return mi*mj*(infoi.Pdivrhosq + infoj.Pdivrhosq + vis)*kernel.gradient(rij, support);
       }
-      
+
       inline __device__ void accumulate(real3 &total, real3 current){ total += current; }
       //Write result
       inline __device__ void set(int i, const real3 &total){ force[i] += make_real4(total); }
-      
+
     };
 
 
 
   }
-     
+
   void SPH::sumForce(cudaStream_t st){
     sys->log<System::DEBUG1>("[SPH] Summing forces");
     int numberParticles = pg->getNumberParticles();
 
     using Kernel = SPH_ns::Kernel::M4CubicSpline;
-    
+
     if(!nl){
       sys->log<System::MESSAGE>("[SPH] Initializing NeighbourList");
       //A neighbour list must know just my system information at construction
       nl = std::make_shared<CellList>(pd, pg, sys);
-    } 
-    
-    
+    }
+
+
     real rcut = Kernel::getCutOff(support);
     sys->log<System::DEBUG3>("[SPH] Using cutOff: %f", rcut);
-    
+
     //Update neighbour list. It is smart enough to do it only when it is necessary,
     // so do not fear calling it several times.
-    nl->updateNeighbourList(box, rcut, st);   
-    
+    nl->updateNeighbourList(box, rcut, st);
+
     sys->log<System::DEBUG3>("[SPH] Computing density");
 
     density.resize(numberParticles);
-    
+
     auto d_density = thrust::raw_pointer_cast(density.data());
     //If mass is not allocated assume all masses are 1
     real *d_mass = nullptr;
@@ -220,7 +220,7 @@ namespace uammd{
 
     //Compute Density
     nl->transverseList(densityTrans, st);
-    
+
     sys->log<System::DEBUG3>("[SPH] Computing Pressure");
     pressure.resize(numberParticles);
 
@@ -230,12 +230,12 @@ namespace uammd{
 
     int BLOCKSIZE = 128;
     int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-    int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0); 
+    int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 
     copyGPU<<<Nblocks, Nthreads, 0 , st>>>(d2p, pressure.begin(), numberParticles);
 
 
-    sys->log<System::DEBUG3>("[SPH] Computing Force");    
+    sys->log<System::DEBUG3>("[SPH] Computing Force");
 
     auto d_pressure = thrust::raw_pointer_cast(pressure.data());
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
@@ -249,10 +249,10 @@ namespace uammd{
     //Compute Force
     nl->transverseList(forceTrans, st);
   }
-    
+
 
   real SPH::sumEnergy(){
     return 0;
   }
-    
+
 }

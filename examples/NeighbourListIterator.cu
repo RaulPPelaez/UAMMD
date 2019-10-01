@@ -1,11 +1,11 @@
 /*Raul P. Pelaez 2019. NeighbourContainer interface example.
-  
-  This file computes a LJ liquid simulation, similar to benchmark.cu. 
 
-  The difference is that instead of using PairForces, this code gets a NeighbourContainer from CellList and processes the neighbours manually (see processNeighbours kernel). 
+  This file computes a LJ liquid simulation, similar to benchmark.cu.
+
+  The difference is that instead of using PairForces, this code gets a NeighbourContainer from CellList and processes the neighbours manually (see processNeighbours kernel).
   This code has an even better performance than benchmark.cu (as many Potential parameters are not present)
 
-  It is an example on how to interface with a NeighbourList without writing a Transverser and without necesarily constructing an explicit neighbour list. 
+  It is an example on how to interface with a NeighbourList without writing a Transverser and without necesarily constructing an explicit neighbour list.
 
  */
 #include"uammd.cuh"
@@ -32,7 +32,7 @@ real temperature, viscosity, rcut;
 
 __device__ real lj(real r2){
   const real invr2 = real(1.0)/r2;
-  const real invr6 = invr2*invr2*invr2;      
+  const real invr6 = invr2*invr2*invr2;
   const real fmod = (real(-48.0)*invr6 + real(24.0))*invr6*invr2;
   return fmod;
 }
@@ -41,7 +41,7 @@ __device__ real lj(real r2){
 //A new way of using a neighbour list
 template<class NeighbourContainer>
 __global__ void processNeighbours(NeighbourContainer ni,// Provides iterator with neighbours of a particle
-			const real4* sortPos, //Positions sorted by the neighbour list 
+			const real4* sortPos, //Positions sorted by the neighbour list
 			const int* groupIndex,//Transformation between NL internal index and particle group index
 			int numberParticles,
 			Box box,
@@ -52,26 +52,26 @@ __global__ void processNeighbours(NeighbourContainer ni,// Provides iterator wit
 
   //Set ni to provide iterators for particle i
   ni.set(i);
-  
+
   const real3 pi = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(sortPos + i));
   real3 f = real3();
-  
+
   //for(auto neigh: ni){ //This is equivalent to the while loop, although a tad slower
   auto it = ni.begin(); //Iterator to the first neighbour of particle i
   //Note that ni.end() is not a pointer to the last neighbour, it just represents "no more neighbours" and
   // should not be dereferenced
   while(it){ //it will cast to false when there are no more neighbours
     auto neigh = *it++; //The iterator can only be advanced and dereferenced
-    
+
     const real3 pj = make_real3(neigh.getPos());
-    
+
     const real3 rij = box.apply_pbc(pj-pi);
     const real r2 = dot(rij, rij);
-    
+
     if(r2>0) f += lj(r2)*rij;
   }
-  
-  force[groupIndex[i]] += make_real4(f);  
+
+  force[groupIndex[i]] += make_real4(f);
 }
 
 
@@ -91,11 +91,11 @@ public:
     //once you have asked for the next neighbour there is no going back without starting from the first.
     //With it=ni.begin() you can only do it++, etc, there is no operator[] nor it--
     auto ni = cl->getNeighbourContainer();
-    
+
     auto sortPos = cl->getPositionIterator();
     auto groupIndex = cl->getGroupIndexIterator();
     auto force = pd->getForce(access::location::gpu, access::mode::write);
-    
+
     processNeighbours<<<numberParticles/128+1, 128, 0, st>>>(ni, sortPos, groupIndex,
 							     numberParticles, box,
 							     force.raw());
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]){
   auto sys = std::make_shared<System>(argc, argv);
   readParameters(sys, "data.main.neighbourIterator");
   auto pd = std::make_shared<ParticleData>(numberParticles, sys);
-  
+
   Box box(boxSize);
   { //Initialize positions
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
@@ -123,13 +123,13 @@ int main(int argc, char *argv[]){
 		     return p;
 		   });
   }
-      
+
   using NVT = VerletNVT::GronbechJensen;
   NVT::Parameters par;
   par.temperature = temperature;
   par.dt = dt;
   par.viscosity = viscosity;
-  auto verlet = make_shared<NVT>(pd, sys, par);  
+  auto verlet = make_shared<NVT>(pd, sys, par);
 
   {
     auto inter = std::make_shared<myInteractor>(pd, sys);
@@ -138,7 +138,7 @@ int main(int argc, char *argv[]){
 
 
 
-  
+
   std::ofstream out(outputFile);
   Timer tim;
   tim.tic();
@@ -162,7 +162,7 @@ int main(int argc, char *argv[]){
       }
 
     }
-    if(j%500 == 0)  pd->sortParticles();    
+    if(j%500 == 0)  pd->sortParticles();
   }
 
   auto totalTime = tim.toc();

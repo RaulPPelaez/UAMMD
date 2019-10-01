@@ -39,7 +39,7 @@ The incompressible fluctuating Navier-Stokes equation in the creeping flow regim
   \vec{v_fluid} = 1/\eta\mathcal{L}^-1\vec{g} -> fluid velocity
 
   Where \mathcal{L} is an operator coming from a proyection method that allows to solve the velocity without computing or storing the pressure and can be written as:
-  \mathcal{L}^-1 = -L^{-1}P 
+  \mathcal{L}^-1 = -L^{-1}P
   Where L is the Laplacian operator and P aa projector onto the divergence-free space.
   P = I-L^{-1}·G -> \hat{P} = I-k·k^T/|k|^2 with PBC, G is gradient, \hat represents Fourier space
 
@@ -71,7 +71,7 @@ S_cellj = sum_i=0^N{\delta(ri-r_cellj)} ->particles to fluid
 J_i = dV·sum_j=0^ncells{\delta(ri-r_cellj)}->fluid to particles
 
 Where \delta is an spreading kernel (smeared delta).
-The default kernel used is the 3-point Peskin kernel, see IBM_kernels.cuh. 
+The default kernel used is the 3-point Peskin kernel, see IBM_kernels.cuh.
 But others can be selected with arbitrary support to better describe or satisfy certain conditions.
 
 
@@ -135,18 +135,18 @@ namespace uammd{
 	real dt;
 	Box box;
 	int3 cells={-1, -1, -1}; //Default is compute the closest number of cells that is a FFT friendly number
-	Scheme scheme = Scheme::IMPROVED_MIDPOINT;       
+	Scheme scheme = Scheme::IMPROVED_MIDPOINT;
       };
 
       FIB(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys,		       
+	  shared_ptr<System> sys,
 	  Parameters par);
       FIB(shared_ptr<ParticleData> pd,
-	  shared_ptr<System> sys,		       
+	  shared_ptr<System> sys,
 	  Parameters par):
 	FIB(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
-      				     
+
       ~FIB();
 
       void forwardTime() override;
@@ -155,7 +155,7 @@ namespace uammd{
       using cufftComplex3 = FIB_ns::cufftComplex3;
       using cufftComplex = cufftComplex_t<real>;
       using cufftReal = cufftReal_t<real>;
-      
+
       real getSelfMobility(){
 	double rh = 0.91*box.boxSize.x/grid.cellDim.x;
 	double l = rh/box.boxSize.x;
@@ -166,30 +166,30 @@ namespace uammd{
       }
     private:
       using Kernel = IBM_kernels::PeskinKernel::threePoint;
-      real temperature, viscosity;      
-      
+      real temperature, viscosity;
+
       shared_ptr<CellList> cl;
-      
+
       Grid grid;
       Box box;
-      
+
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
 
       //Grid forces/velocities in fourier/real space
-      thrust::device_vector<cufftComplex> gridVels; 
+      thrust::device_vector<cufftComplex> gridVels;
 
       curandGenerator_t curng;
       thrust::device_vector<real> random;
-      
+
       //Temporal integration variables
       real dt;
       Scheme scheme; //Temporal integration mode
-      
+
       thrust::device_vector<real4> posOld; //q^n
-      real deltaRFD; //Random finite diference step      
+      real deltaRFD; //Random finite diference step
       ullint step = 0;
-      
+
       ullint seed = 1234;
 
 
@@ -198,14 +198,14 @@ namespace uammd{
       void thermalDrift();
 
       void applyStokesSolutionOperator();
-    
+
       void predictorStep();
       void correctorStep();
       void eulerStep();
 
       void forwardMidpoint();
       void forwardImprovedMidpoint();
-      
+
     };
 
   }

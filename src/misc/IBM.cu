@@ -9,7 +9,7 @@ namespace uammd{
     inline __device__ T atomicAdd(T* address, T val){ return ::atomicAdd(address, val);}
 
 #ifndef SINGLE_PRECISION
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ < 600 
+#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ < 600
       inline __device__ double atomicAdd(double* address, double val){
       unsigned long long int* address_as_ull =
 	(unsigned long long int*)address;
@@ -42,7 +42,7 @@ namespace uammd{
     }
 
     /*Spreads the 3D quantity v (defined on the particle positions) to a grid
-      
+
       S v(z) = v(x) = \sum_{z}{ v(z)*\delta(||z-x||^2) }
       Where:
       - S is the spreading operator
@@ -64,7 +64,7 @@ namespace uammd{
       const int tid = threadIdx.x;
       using QuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityIterator>::value_type;
-      
+
       if(id>=N) return;
 
       __shared__ real3 pi;
@@ -76,7 +76,7 @@ namespace uammd{
 	vi = v[id];
 	celli = grid.getCell(pi);
 	const auto invCellSize = real(1.0)/grid.getCellSize(celli);
-	  
+
 	P = make_int3(kernel.support/2);
 	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
 	if(kernel.support%2==0){
@@ -89,19 +89,19 @@ namespace uammd{
       int numberNeighbourCells = supportCells*supportCells;
       if(!is2D)  numberNeighbourCells *= supportCells;
       __syncthreads();
-      for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){	
+      for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
 	int3 cellj = make_int3(celli.x + i%supportCells - P.x,
 			       celli.y + (i/supportCells)%supportCells - P.y,
 			       is2D?0:(celli.z + i/(supportCells*supportCells) - P.z));
 	cellj = grid.pbc_cell(cellj);
-	
+
 	const real3 rij = grid.distanceToCellCenter(pi, cellj);
 	const auto k = kernel.delta(rij, grid.getCellSize(cellj));
-	
+
 	const auto weight = vi*kernel.delta(rij, grid.getCellSize(cellj));
 	/*Get index of cell j*/
 	const int jcell = grid.getCellIndex(cellj);
-	  
+
 	/*Atomically sum my contribution to cell j*/
 	atomicAdd(&gridQuantity[jcell], weight);
       }
@@ -114,15 +114,15 @@ namespace uammd{
          - J is the interpolation operator
 	 - "q" a certain quantity
 	 - "x" a cell of the grid
-	 - "z" the position of a particle 
+	 - "z" the position of a particle
 	 - \delta() is the window function given by Kernel
 	 - weight() is the quadrature weight of a cell. (cellsize^d in a regular grid) given by QuadratureWeights
 
-      This is the discretization of an integral and thus requires quadrature weigths for each element. 
+      This is the discretization of an integral and thus requires quadrature weigths for each element.
         Which in a regular grid is just the cell size, h. But can in general be something depending on the position.
     */
 
-    
+
     template<int TPP, bool is2D, class Grid,
       class Kernel,
       class PosIterator, class ResultIterator, class GridQuantityIterator,
@@ -131,18 +131,18 @@ namespace uammd{
 				       ResultIterator Jq, /*Result for each particle*/
 				       const GridQuantityIterator gridQuantity, /*Values in the grid*/
 				       int N, /*Number of markers*/
-				       Grid grid, 
-				       Kernel kernel, 
+				       Grid grid,
+				       Kernel kernel,
 				       QuadratureWeights qw /*Quadrature weights*/
 				       ){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
-            
+
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using BlockReduce = cub::BlockReduce<GridQuantityType, TPP>;
 
       GridQuantityType result = GridQuantityType();
-      
+
       __shared__ real3 pi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
@@ -152,7 +152,7 @@ namespace uammd{
 	if(tid==0){
 	  pi = make_real3(pos[id]);
 	  celli = grid.getCell(pi);
-	    
+
 	  P = make_int3(kernel.support/2);
 	  //Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
 	  if(kernel.support%2==0){
@@ -168,7 +168,7 @@ namespace uammd{
 	const int supportCells = kernel.support;
 	int numberNeighbourCells = supportCells*supportCells;
 	if(!is2D)  numberNeighbourCells *= supportCells;
-	
+
 	for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
 	  //current neighbour cell
 	  int3 cellj = make_int3(celli.x + i%supportCells - P.x,
@@ -177,11 +177,11 @@ namespace uammd{
 	  cellj = grid.pbc_cell(cellj);
 
 	  const real3 rij = grid.distanceToCellCenter(pi, cellj);
-	  
+
 	  const auto weight = kernel.delta(rij, grid.getCellSize(cellj));
 
 	  //if(weight){
-	    //J = S^T = St = σ S 
+	    //J = S^T = St = σ S
 	    const int jcell = grid.getCellIndex(cellj);
 	    const auto cellj_vel = gridQuantity[jcell];
 	    const real dV = qw(cellj, grid);
@@ -190,7 +190,7 @@ namespace uammd{
 	    //}
 	}
       }
-	  
+
       //Write total to global memory
       GridQuantityType total = BlockReduce(temp_storage).Sum(result);
       __syncthreads();
@@ -201,7 +201,7 @@ namespace uammd{
     }
 
   }
-  
+
   template<class Kernel>
   IBM<Kernel>::IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern):
     sys(sys), kernel(kern){
@@ -255,10 +255,10 @@ namespace uammd{
 			   const GridQuantityIterator &gridData,
 			   Grid & grid, const QuadratureWeights &qw, int numberParticles, cudaStream_t st){
     if(grid.cellDim.z == 1)
-      gather<true>(pos, Jq, gridData, grid, qw, numberParticles, st);    
+      gather<true>(pos, Jq, gridData, grid, qw, numberParticles, st);
     else
       gather<false>(pos, Jq, gridData, grid, qw, numberParticles, st);
-    
+
 
   }
 
@@ -270,7 +270,7 @@ namespace uammd{
 			   const GridQuantityIterator &gridData,
 			   Grid & grid, const QuadratureWeights &qw, int numberParticles, cudaStream_t st){
     sys->log<System::DEBUG2>("[IBM] Gathering");
-    
+
     int support = kernel->support;
     int numberNeighbourCells = support*support*support;
     int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 512);
@@ -285,14 +285,14 @@ namespace uammd{
       KERNEL(256)
       KERNEL(512)
 #undef KERNEL
-	
+
       grid2Particles<<<numberParticles, threadsPerParticle, 0, st>>>(pos, Jq, gridData,
 								     numberParticles, grid, *kernel, qw);
 
 
 
   }
-  
+
 }
 
 

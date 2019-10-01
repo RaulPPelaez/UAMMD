@@ -1,11 +1,11 @@
 /*Raul P. Pelaez 2017. ParticleData.
-  Handles and stores all properties a particle can have. 
+  Handles and stores all properties a particle can have.
   However they are only initialized when they are asked for the first time.
   Offers a way to access this properties.
 
   Can change in size and periodically sorts the particles to increase spatial locality.
-  
-  All changes in the particle data are announced using boost signals. 
+
+  All changes in the particle data are announced using boost signals.
   You can suscribe to this signals by asking for them with get*Signal()
 
 
@@ -19,12 +19,12 @@
   USAGE:
 
   To get a certain property:
-  
+
   You can get a property both in GPU or CPU memory
   and must specify the kind of access (read, write, readwrite)
- 
-  If the mode is set to write, the handle will gain exclusivity and no one else will be able to 
-  access it until it is realeased (the handle is deleted). 
+
+  If the mode is set to write, the handle will gain exclusivity and no one else will be able to
+  access it until it is realeased (the handle is deleted).
   You cannot write to an array that is currently being read.
   For this it is important to control the scope of the property handles.
 
@@ -39,9 +39,9 @@
 
   //To get a property only if it has been asked for before (i.e if the mass has been set)
   auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
-  //mass.raw() will be nullptr if mass has not been asked for before. 
+  //mass.raw() will be nullptr if mass has not been asked for before.
   //Note that this call will never allocate the property
-    
+
   CONNECT TO A SIGNAL:
 
   When the particles are reordered, or the number of them changes a signal will be thrown.
@@ -64,7 +64,7 @@
      }
      void handle_reorder(){
        std::cout<<"A reorder occured!!"<std::endl;
-     }  
+     }
      void handle_numChanged(int Nnew){
        std::cout<<"Particle number changed, now it is: "<<Nnew<<std::endl;
      }
@@ -78,7 +78,7 @@
 
   TODO:
   100- Try libsigc++ if boost becomes a problem
-  
+
 */
 #ifndef PARTICLEDATA_CUH
 #define PARTICLEDATA_CUH
@@ -114,7 +114,7 @@
 			    ((Torque, torque, real4))  \
   			    ((AngVel, angVel, real4))  \
   			    ((Dir, dir, real4))        \
-    			    ((Charge, charge, real))        
+    			    ((Charge, charge, real))
 */
 
 namespace uammd{
@@ -132,8 +132,8 @@ namespace uammd{
   //     >::type;
 
   // using connection = boost::signals2::connection;
-  
-  
+
+
   //Get the Name (first letter capital) from a tuple in the property list
 #define PROPNAME_CAPS(tuple) BOOST_PP_TUPLE_ELEM(3, 0 ,tuple)
   //Get the name (no capital) from a tuple in the property list
@@ -145,7 +145,7 @@ namespace uammd{
 #define PROPERTY_LOOP(macro)  BOOST_PP_SEQ_FOR_EACH(macro, _, ALL_PROPERTIES_LIST)
 
 
-  
+
   class ParticleData{
   public:
     //Hints to ParticleData about how to perform different task. Mainly how to sort the particles.
@@ -153,7 +153,7 @@ namespace uammd{
       bool orderByHash = false;
       Box hash_box = Box(make_real3(128));
       real3 hash_cutOff = make_real3(10.0);
-      bool orderByType = false;      
+      bool orderByType = false;
 
     };
 
@@ -174,9 +174,9 @@ namespace uammd{
 #define DECLARE_SIGNAL_PROPERTIES(r,data, tuple) DECLARE_SIGNAL_PROPERTIES_T(PROPTYPE(tuple), PROPNAME(tuple))
     //Declare all property write signals
     PROPERTY_LOOP(DECLARE_SIGNAL_PROPERTIES)
-    
-    
-    
+
+
+
     std::shared_ptr<ParticleSorter> particle_sorter;
     thrust::host_vector<int> originalOrderIndexCPU;
     bool originalOrderIndexCPUNeedsUpdate;
@@ -189,7 +189,7 @@ namespace uammd{
       CudaCheckError();
     }
 
-    
+
     //Generate getters for all properties except ID
 #define GET_PROPERTY_T(Name,name)  GET_PROPERTY_R(Name,name)
 #define GET_PROPERTY_R(Name, name)					\
@@ -200,12 +200,12 @@ namespace uammd{
     }									\
       return name.data(dev,mode);	                            	\
     }									\
-    
+
 #define GET_PROPERTY(r, data, tuple) GET_PROPERTY_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
 
     //Define getProperty() functions for all properties in list
     PROPERTY_LOOP(GET_PROPERTY)
-    
+
 
         //Generate getters for all properties except ID
 #define GET_PROPERTY_IF_ALLOC_T(Name,name)  GET_PROPERTY_IF_ALLOC_R(Name,name)
@@ -217,22 +217,22 @@ namespace uammd{
       }						  \
       return this->get ## Name(dev,mode);	  \
     }						  \
-    
+
 #define GET_PROPERTY_IF_ALLOC(r, data, tuple) GET_PROPERTY_IF_ALLOC_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
 
     //Define getProperty() functions for all properties in list
     PROPERTY_LOOP(GET_PROPERTY_IF_ALLOC)
-    
 
 
-    
+
+
     //Generate isPropAllocated for all properties
-#define IS_ALLOCATED_T(Name, name) IS_ALLOCATED_R(Name, name)    
+#define IS_ALLOCATED_T(Name, name) IS_ALLOCATED_R(Name, name)
 #define IS_ALLOCATED_R(Name, name)					\
     inline bool is##Name##Allocated(){return name.isAllocated();}	\
-    
+
 #define IS_ALLOCATED(r, data, tuple) IS_ALLOCATED_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
-    
+
     PROPERTY_LOOP(IS_ALLOCATED)
 
     //Sort the particles to improve a certain kind of access pattern.
@@ -244,13 +244,13 @@ namespace uammd{
       auto id = getId(access::location::gpu, access::mode::read);
       int *sortedIndex = particle_sorter->getIndexArrayById(id.raw(), numberParticles);
       if(!sortedIndex) sortedIndex = id.raw();
-      sys->log<System::DEBUG6>("[ParticleData] Id reorder completed.");  
-      if(dev == access::location::gpu){	
+      sys->log<System::DEBUG6>("[ParticleData] Id reorder completed.");
+      if(dev == access::location::gpu){
 	return sortedIndex;
       }
       else{
 	if(originalOrderIndexCPUNeedsUpdate){
-	  sys->log<System::DEBUG1>("[ParticleData] Updating CPU original order array");  
+	  sys->log<System::DEBUG1>("[ParticleData] Updating CPU original order array");
 	  originalOrderIndexCPU.resize(numberParticles);
 	  int * sortedIndexCPU = thrust::raw_pointer_cast(originalOrderIndexCPU.data());
 	  CudaSafeCall(cudaMemcpy(sortedIndexCPU,
@@ -263,9 +263,9 @@ namespace uammd{
 	else{
 	  return thrust::raw_pointer_cast(originalOrderIndexCPU.data());
 	}
-	  
+
       }
-      
+
 
     }
     //Apply newest order to a certain iterator
@@ -273,14 +273,14 @@ namespace uammd{
     void applyCurrentOrder(InputIterator in, OutputIterator out, int numElements){
       particle_sorter->applyCurrentOrder(in, out, numElements);
     }
-    
+
     const int * getCurrentOrderIndexArray(){
-      return particle_sorter->getSortedIndexArray(numberParticles);      
+      return particle_sorter->getSortedIndexArray(numberParticles);
     }
-  
+
 
     shared_ptr<signal<void(void)>> getReorderSignal(){
-      sys->log<System::DEBUG>("[ParticleData] Reorder signal requested");  
+      sys->log<System::DEBUG>("[ParticleData] Reorder signal requested");
       return this->reorderSignal;
     }
 
@@ -290,11 +290,11 @@ namespace uammd{
 #define GET_PROPERTY_SIGNAL_R(Name, name)				\
   inline shared_ptr<signal<void(void)>> get ## Name ## WriteRequestedSignal(){ \
     return this->name ## WriteRequestedSignal;				\
-    }									
-#define GET_PROPERTY_SIGNAL(r, data, tuple) GET_PROPERTY_SIGNAL_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))    
+    }
+#define GET_PROPERTY_SIGNAL(r, data, tuple) GET_PROPERTY_SIGNAL_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
     PROPERTY_LOOP(GET_PROPERTY_SIGNAL)
 
-          
+
     void emitReorder(){
       sys->log<System::DEBUG>("[ParticleData] Emitting reorder signal...");
       (*this->reorderSignal)();
@@ -308,7 +308,7 @@ namespace uammd{
     int getNumParticles(){ return this->numberParticles;}
 
 
-    
+
   void hintSortByHash(Box hash_box, real3 hash_cutOff){
     hints.orderByHash = true;
     hints.hash_box = hash_box;
@@ -319,21 +319,21 @@ namespace uammd{
   private:
     void emitNumParticlesChanged(int Nnew){
       (*numParticlesChangedSignal)(Nnew);
-    }  
+    }
 
   };
 
 
 #define INIT_PROPERTIES_T(NAME, name) ,  name(BOOST_PP_STRINGIZE(NAME), sys)
 #define INIT_PROPERTIES(r,data, tuple) INIT_PROPERTIES_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
-  
+
   ParticleData::ParticleData(int numberParticles, shared_ptr<System> sys):
     numberParticles(numberParticles),
     originalOrderIndexCPUNeedsUpdate(true),
     sys(sys)
     PROPERTY_LOOP(INIT_PROPERTIES)
   {
-    sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);    
+    sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);
     id.resize(numberParticles);
     CudaCheckError();
     auto id_prop = id.data(access::location::gpu, access::mode::write);
@@ -354,15 +354,15 @@ namespace uammd{
   void ParticleData::sortParticles(){
     sys->log<System::DEBUG>("[ParticleData] Sorting particles...");
     //Orders according to positions
-    {      
+    {
       auto posPtr     = pos.data(access::gpu, access::write);
       if(hints.orderByHash || !hints.orderByType){
 	int3 cellDim = make_int3(hints.hash_box.boxSize/hints.hash_cutOff);
 	particle_sorter->updateOrderByCellHash(posPtr.raw(), numberParticles, hints.hash_box, cellDim);
       }
-      
+
     }
-  //This macro reorders to the newest order a property given its name 
+  //This macro reorders to the newest order a property given its name
 #define APPLY_CURRENT_ORDER(r, data, tuple) APPLY_CURRENT_ORDER_R(PROPNAME(tuple))
 #define APPLY_CURRENT_ORDER_R(name) {					\
       if(name.isAllocated()){						\
@@ -371,14 +371,14 @@ namespace uammd{
 	particle_sorter->applyCurrentOrder(devicePtr.raw(), device_altPtr, numberParticles); \
 	name.swapInternalBuffers();						\
       }									\
-    }    
+    }
     //Apply current order to all allocated properties. See APPLY_CURRENT_ORDER macro
     PROPERTY_LOOP(APPLY_CURRENT_ORDER)
 
     originalOrderIndexCPUNeedsUpdate = true;
     //Notify all connected entities of the reordering
     this->emitReorder();
-    
+
   }
 
 
@@ -390,7 +390,7 @@ namespace uammd{
     pos.resize(Nnew);
 #define RESIZE_PROPERTY_R(name) {if(this->name.isAllocated()){this->name.resize(this->numberParticles);}}
 #define RESIZE_PROPERTY(r, data, tuple) RESIZE_PROPERTY_R(PROPNAME(tuple))
-    
+
     PROPERTY_LOOP(RESIZE_PROPERTY)
 
     originalOrderIndexCPUNeedsUpdate = true;

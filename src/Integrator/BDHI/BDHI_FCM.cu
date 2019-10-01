@@ -22,7 +22,7 @@ namespace uammd{
       pd(pd), pg(pg), sys(sys),
       dt(par.dt),
       temperature(par.temperature),
-      viscosity(par.viscosity),      
+      viscosity(par.viscosity),
       box(par.box), grid(par.box, int3()){
 
       seed = sys->rng().next();
@@ -33,7 +33,7 @@ namespace uammd{
       }
 
       int numberParticles = pg->getNumberParticles();
-	
+
       fac = par.fac;
       int3 cellDim;
       if(par.cells.x<=0){
@@ -42,14 +42,14 @@ namespace uammd{
 	real h = par.hydrodynamicRadius;
 	cellDim = nextFFTWiseSize3D(make_int3(box.boxSize/h));
       }
-      else{      
+      else{
         cellDim = par.cells;
       }
       grid = Grid(box, cellDim);
-      
-      auto kernel = std::make_shared<Kernel>(grid.cellSize, par.tolerance);      
+
+      auto kernel = std::make_shared<Kernel>(grid.cellSize, par.tolerance);
       ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
-      
+
       double rh = this->getHydrodynamicRadius();
 
       // {
@@ -79,7 +79,7 @@ namespace uammd{
       //  	 auto k2 = std::make_shared<IBM_kernels::GaussianFlexible::sixPoint>(grid.cellSize, 1e-10);
       // 	 //auto k2 = std::make_shared<IBM_kernels::PeskinKernel::threePoint>(grid.cellSize, 1e-10);
       // 	 //auto k2 = std::make_shared<IBM_kernels::PeskinKernel::fourPoint>(grid.cellSize, 1e-10);
-      
+
       //  	 fori(0,Nt){
       //  	   out<<r<<" "<<k2->phi(r)<<"\n";
       //  	   r+=dr;
@@ -88,8 +88,8 @@ namespace uammd{
       //  	 out<<std::endl;
       //  }
        // exit(1);
-       
-      
+
+
       //Try to set the closest rh possible
       if(par.cells.x<=0){
        	double fac = rh/par.hydrodynamicRadius;
@@ -98,13 +98,13 @@ namespace uammd{
        	grid = Grid(box, cellDim);
        	kernel = std::make_shared<Kernel>(grid.cellSize, par.tolerance);
 	ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
-       	rh = this->getHydrodynamicRadius();	
+       	rh = this->getHydrodynamicRadius();
       }
       long double M0 = this->getSelfMobility();
-            
+
       sys->log<System::MESSAGE>("[BDHI::FCM] Closest possible hydrodynamic radius: %g (%g requested)", rh, par.hydrodynamicRadius);
       sys->log<System::MESSAGE>("[BDHI::FCM] Self mobility: %g", (double)M0);
-      
+
       if(box.boxSize.x != box.boxSize.y || box.boxSize.y != box.boxSize.z || box.boxSize.x != box.boxSize.z){
 	sys->log<System::WARNING>("[BDHI::FCM] Self mobility will be different for non cubic boxes!");
       }
@@ -112,7 +112,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::FCM] Box Size: %g %g %g", grid.box.boxSize.x, grid.box.boxSize.y, grid.box.boxSize.z);
 
       sys->log<System::MESSAGE>("[BDHI::FCM] Grid dimensions: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
-      sys->log<System::MESSAGE>("[BDHI::FCM] Interpolation kernel support: %g rh max distance, %d cells total", kernel->support*0.5*grid.cellSize.x/rh, kernel->support);      
+      sys->log<System::MESSAGE>("[BDHI::FCM] Interpolation kernel support: %g rh max distance, %d cells total", kernel->support*0.5*grid.cellSize.x/rh, kernel->support);
 
       sys->log<System::MESSAGE>("[BDHI::FCM] h: %g %g %g", grid.cellSize.x, grid.cellSize.y, grid.cellSize.z);
       sys->log<System::MESSAGE>("[BDHI::FCM] Cell volume: %e", grid.cellSize.x*grid.cellSize.y*grid.cellSize.z);
@@ -122,10 +122,10 @@ namespace uammd{
 	 kernel->support >= grid.cellDim.y or
 	 kernel->support >= grid.cellDim.z)
 	sys->log<System::ERROR>("[BDHI::FCM] Kernel support is too big, try lowering the tolerance or increasing the box size!.");
-      
+
       CudaSafeCall(cudaStreamCreate(&stream));
       CudaSafeCall(cudaStreamCreate(&stream2));
-  
+
       /*The quantity spreaded to the grid in real or wave space*/
       /*The layout of this array is
 	fx000, fy000, fz000, fx001, fy001, fz001..., fxnnn, fynnn, fznnn. n=ncells-1
@@ -136,9 +136,9 @@ namespace uammd{
 	velocities when interpolating from the grid to the particles*/
       int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
       gridVelsFourier.resize(3*ncells, cufftComplex());
-      
+
       initCuFFT();
-  
+
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
     }
@@ -146,7 +146,7 @@ namespace uammd{
     void FCM::initCuFFT(){
       CufftSafeCall(cufftCreate(&cufft_plan_forward));
       CufftSafeCall(cufftCreate(&cufft_plan_inverse));
-      
+
       /*I will be handling workspace memory*/
       CufftSafeCall(cufftSetAutoAllocation(cufft_plan_forward, 0));
       CufftSafeCall(cufftSetAutoAllocation(cufft_plan_inverse, 0));
@@ -187,7 +187,7 @@ namespace uammd{
       size_t cufftWorkSize = std::max(cufftWorkSizef, cufftWorkSizei)+10;
       size_t free_mem, total_mem;
       CudaSafeCall(cudaMemGetInfo(&free_mem, &total_mem));
-      
+
       sys->log<System::DEBUG>("[BDHI::FCM] Necessary work space for cuFFT: %s, available: %s, total: %s",
 			      printUtils::prettySize(cufftWorkSize).c_str(),
 			      printUtils::prettySize(free_mem).c_str(),
@@ -201,7 +201,7 @@ namespace uammd{
 
       cufftWorkArea.resize(cufftWorkSize);
       auto d_cufftWorkArea = thrust::raw_pointer_cast(cufftWorkArea.data());
-      
+
       CufftSafeCall(cufftSetWorkArea(cufft_plan_forward, (void*)d_cufftWorkArea));
       CufftSafeCall(cufftSetWorkArea(cufft_plan_inverse, (void*)d_cufftWorkArea));
     }
@@ -224,17 +224,17 @@ namespace uammd{
 	int numberParticles = pg->getNumberParticles();
 	int BLOCKSIZE = 128;
 	int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-	int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0); 
+	int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 
 	fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(Mv, make_real3(0.0), numberParticles);
       }
       Mdot_far<vtype>(Mv, v, st);
-      
+
     }
     namespace FCM_ns{
-      
+
       using cufftComplex3 = FCM::cufftComplex3;
-      
+
       /*This function takes a node index and returns the corresponding wave number*/
       template<class vec3>
       inline __device__ vec3 cellToWaveNumber(const int3 &cell, const int3 &cellDim, const vec3 &L){
@@ -272,20 +272,20 @@ namespace uammd{
 	  const real3 vi = (fi-k*kfi);
 	  res.x.y = vi.x;
 	  res.y.y = vi.y;
-	  res.z.y = vi.z;	  
+	  res.z.y = vi.z;
 	}
 	return res;
       }
-      
+
       /*Scales fourier transformed forces in the regular grid to obtain velocities,
-	(Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F	
+	(Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F
 	 Input: gridForces = FFTf·S·F
-	 Output:gridVels = B·FFTf·S·F -> B \propto (I-k^k/|k|^2) 
+	 Output:gridVels = B·FFTf·S·F -> B \propto (I-k^k/|k|^2)
        */
       /*A thread per fourier node*/
       __global__ void forceFourier2Vel(cufftComplex3 * gridForces, /*Input array*/
 				       cufftComplex3 * gridVels, /*Output array, can be the same as input*/
-				       real vis,				       
+				       real vis,
 				       Grid grid/*Grid information and methods*/
 				       ){
 	/*Get my cell*/
@@ -297,7 +297,7 @@ namespace uammd{
 	if(cell.x>=grid.cellDim.x/2+2) return;
 	if(cell.y>=grid.cellDim.y) return;
 	if(cell.z>=grid.cellDim.z) return;
-	
+
 	const int icell = grid.getCellIndex(cell);
 	if(icell == 0){
 	  gridVels[0] = {0,0, 0,0, 0,0};
@@ -312,14 +312,14 @@ namespace uammd{
 
 	factor.x *= B;
 	factor.y *= B;
-	factor.z *= B;	
-	
+	factor.z *= B;
+
 	/*Store vel in global memory, note that this is overwritting any previous value in gridVels*/
 	gridVels[icell] = projectFourier(k, factor);
       }
 
       /*Computes the long range stochastic velocity term
-	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw = 
+	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
 	= σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
 	This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds 1/√σ·√B(k)·dWw.
 	Keeping special care that v_k = v*_{N-k}, which implies that dWw_k = dWw*_{N-k}
@@ -327,11 +327,11 @@ namespace uammd{
 	Launch a thread per cell grid/fourier node
       */
       __global__ void fourierBrownianNoise(/*Values of vels on each cell*/
-					   cufftComplex3 *__restrict__ gridVelsFourier, 
+					   cufftComplex3 *__restrict__ gridVelsFourier,
 					   Grid grid, /*Grid parameters. Size of a cell, number of cells...*/
 					   real prefactor,/* sqrt(2·T/(dt·dV))*/
 					   real vis,
-					   //Parameters to seed the RNG					   
+					   //Parameters to seed the RNG
 					   ullint seed,
 					   ullint step
 					   ){
@@ -343,8 +343,8 @@ namespace uammd{
 	/*This indesx is computed here to use it as a seed for the RNG*/
 	int icell = grid.getCellIndex(cell);
 	/*cuFFT R2C and C2R only store half of the innermost dimension, the one that varies the fastest
-      
-	  The input of R2C is real and the output of C2R is real. 
+
+	  The input of R2C is real and the output of C2R is real.
 	  The only way for this to be true is if v_k={i,j,k} = v*_k{N-i, N-j, N-k}
 
 	  So the conjugates are redundant and the is no need to compute them nor store them except on two exceptions.
@@ -358,15 +358,15 @@ namespace uammd{
 	if(cell.z >= grid.cellDim.z) return;
 
 	const int ncells = grid.getNumberCells();
-	/*K=0 is not added, no stochastic motion is added to the center of mass*/	
+	/*K=0 is not added, no stochastic motion is added to the center of mass*/
 	if((cell.x == 0 and cell.y == 0 and cell.z == 0) or
 	   /*These terms will be computed along its conjugates*/
-	   /*These are special because the conjugate of k_i=0 is k_i=N_i, 
+	   /*These are special because the conjugate of k_i=0 is k_i=N_i,
 	     which is not stored and therfore must not be computed*/
 	   (cell.x==0 and cell.y == 0 and 2*cell.z >= grid.cellDim.z+1) or
 	   (cell.x==0 and 2*cell.y >= grid.cellDim.y+1)) return;
-	    
-	/*Compute gaussian complex noise dW, 
+
+	/*Compute gaussian complex noise dW,
 	  std = prefactor -> ||z||^2 = <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
 	/*A complex random number for each direction*/
 	cufftComplex3 noise;
@@ -387,7 +387,7 @@ namespace uammd{
 	  These are the 8 vertex of the inferior left cuadrant. The O points:
                +--------+--------+
               /|       /|       /|
-             / |      / |      / | 
+             / |      / |      / |
             +--------+--------+  |
            /|  |    /|  |    /|  |
           / |  +---/-|--+---/-|--+
@@ -396,12 +396,12 @@ namespace uammd{
          |  O-----|--O-----|--+	 |
          | /|6 |  | /|7 |  | /|	 |
          |/ |  +--|/-|--+--|/-|--+
-         O--------O--------+  |	/ 
-         |5 |/    |4 |/    |  |/  
-         |  O-----|--O-----|--+	  
-     ^   | / 3    | / 2    | /  ^ 
-     |   |/       |/       |/  /  
-     kz  O--------O--------+  ky  
+         O--------O--------+  |	/
+         |5 |/    |4 |/    |  |/
+         |  O-----|--O-----|--+
+     ^   | / 3    | / 2    | /  ^
+     |   |/       |/       |/  /
+     kz  O--------O--------+  ky
          kx ->     1
 	*/
 	/*Handle nyquist points*/
@@ -420,7 +420,7 @@ namespace uammd{
                	     (cell.x==0  && isYnyquist  && isZnyquist) or  //6
                	     (isXnyquist && isYnyquist  && isZnyquist);    //7
 	}
-	
+
 	if(nyquist){
 	  /*Nyquist points are their own conjugates, so they must be real.
 	    ||r||^2 = <x^2> = ||Real{z}||^2 = <Real{z}^2>·sqrt(2) =  prefactor*/
@@ -437,48 +437,48 @@ namespace uammd{
 	  /*Get my scaling factor B, Fourier representation of FCM*/
 	  const real B = invk2/vis;
 	  const real Bsq = sqrt(B/real(ncells));
-	  
+
 	  cufftComplex3 factor = noise;
 	  factor.x *= Bsq;
 	  factor.y *= Bsq;
-	  factor.z *= Bsq;	  
-	  
+	  factor.z *= Bsq;
+
 	  gridVelsFourier[icell] += projectFourier(k, factor);
 	}
 	/*Compute for conjugate v_{N-k} if needed*/
-	
+
 	/*Take care of conjugate wave number -> v_{Nx-kx,Ny-ky, Nz-kz}*/
 	/*The special cases k_i=0 do not have conjugates, a.i N-k = N which is not stored*/
-	
+
 	if(nyquist) return; //Nyquist points do not have conjugates
 
-	/*Conjugates are stored only when kx == Nx/2 or kx=0*/	
+	/*Conjugates are stored only when kx == Nx/2 or kx=0*/
 	if(cell.x == grid.cellDim.x-cell.x or cell.x == 0){
 	  /*The only case with x conjugates is when kx = Nx-kx or kx=0, so this line is not needed*/
 	  //if(cell.x > 0) cell.x = grid.cellDim.x-cell.x;
 	  /*k_i=N_i is not stored, so do not conjugate them, the necessary exclusions are at the start of the kernel*/
 	  if(cell.y > 0) cell.y = grid.cellDim.y-cell.y;
 	  if(cell.z > 0) cell.z = grid.cellDim.z-cell.z;
-	  
+
 	  icell = grid.getCellIndex(cell);
-	  
+
 	  const real3 k = cellToWaveNumber(cell, grid.cellDim, grid.box.boxSize);
 
 	  const real invk2 = real(1.0)/dot(k,k);
 	  /*Get my scaling factor B,  Fourier representation of FCM*/
 	  const real B = invk2/vis;
 
-	  const real Bsq = sqrt(B/real(ncells));	  
+	  const real Bsq = sqrt(B/real(ncells));
 	  cufftComplex3 factor = noise;
 	  /*v_{N-k} = v*_k, so the complex noise must be conjugated*/
 	  factor.x.y *= real(-1.0);
 	  factor.y.y *= real(-1.0);
 	  factor.z.y *= real(-1.0);
-	  
+
 	  factor.x *= Bsq;
 	  factor.y *= Bsq;
 	  factor.z *= Bsq;
-	  
+
 	  gridVelsFourier[icell] += projectFourier(k, factor);
 	}
       }
@@ -489,18 +489,18 @@ namespace uammd{
 	inline __device__ real3 operator()(vtype q){ return make_real3(q);}
       };
 
-      
+
     }
-    
+
     //Spreads the particle quantity v to the grid, AKA applies the operator S to i.e the force.
     template<typename vtype>
     void FCM::spreadParticles(vtype *quantity, cudaStream_t st){
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
-      
+
       auto tr = thrust::make_transform_iterator(quantity, FCM_ns::toReal3());
-      
+
       ibm->spread(pos.begin(), tr, d_gridVels, grid, numberParticles, st);
     }
 
@@ -515,7 +515,7 @@ namespace uammd{
 
       auto d_gridVels = thrust::raw_pointer_cast(gridVelsFourier.data());
       auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
-            
+
       sys->log<System::DEBUG2>("[BDHI::FCM] Taking grid to wave space");
       {
 	/*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
@@ -532,7 +532,7 @@ namespace uammd{
 	/*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
 	//Launch a 3D grid of threads, a thread per cell.
 	//Only the second half of the cells in the innermost (x) coordinate need to be processed, the rest are redundant and not used by cufft.
-      
+
 	dim3 NthreadsCells = dim3(8,8,8);
 	dim3 NblocksCells;
 	{
@@ -540,8 +540,8 @@ namespace uammd{
 	  NblocksCells.x= (ncellsx/NthreadsCells.x + ((ncellsx%NthreadsCells.x)?1:0));
 	  NblocksCells.y= grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
 	  NblocksCells.z= grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
-	}	
-	
+	}
+
 	FCM_ns::forceFourier2Vel<<<NblocksCells, NthreadsCells, 0, st>>>
 	  ((cufftComplex3*) d_gridVelsFourier, //Input: FFT·S·F
 	   (cufftComplex3*) d_gridVelsFourier, //Output: B·FFT·S·F
@@ -556,8 +556,8 @@ namespace uammd{
 	  real dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
 	  real prefactor = sqrt(2*temperature/(dt*dV)); //See eq. 53 in [1]
 	  FCM_ns::fourierBrownianNoise<<<NblocksCells, NthreadsCells, 0, st>>>(
-			//In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw 
-			(cufftComplex3*)d_gridVelsFourier, 
+			//In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
+			(cufftComplex3*)d_gridVelsFourier,
 			grid,
 			prefactor, // 1/√σ· sqrt(2*T/dt),
 			viscosity,
@@ -583,7 +583,7 @@ namespace uammd{
     //Interpolates the velocities of the grid to the particle positions and adds it to an array
     //\vec{Mv} = h^3·St·\vec{v}
     void FCM::interpolateParticles(real3 *Mv, cudaStream_t st){
-      sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");	    
+      sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
@@ -593,7 +593,7 @@ namespace uammd{
 
     /*Compute M·F and B·dW in Fourier space
       σ = dx*dy*dz; h^3 in [1]
-      Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw = 
+      Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
       = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
     */
     template<typename vtype>
@@ -604,7 +604,7 @@ namespace uammd{
 	int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
 	int BLOCKSIZE = 128;
 	int Nthreads = BLOCKSIZE<ncells?BLOCKSIZE:ncells;
-	int Nblocks  =  ncells/Nthreads +  ((ncells%Nthreads!=0)?1:0); 
+	int Nblocks  =  ncells/Nthreads +  ((ncells%Nthreads!=0)?1:0);
 
 	sys->log<System::DEBUG2>("[BDHI::FCM] Setting vels to zero...");
 	//Note that the same storage space is used for Fourier and real space

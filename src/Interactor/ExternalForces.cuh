@@ -1,7 +1,7 @@
 /*Raul P.Pelaez. 2017. External Forces Module.
   Computes a force acting on each particle due to an external potential.
   i.e harmonic confinement, gravity...
-  
+
   Needs a functor transverser with at least one of function out of these three; force, energy, virial that takes any needed parameters and return the force, energy of virial of a given particle, i.e:
 
 struct HarmonicWall{
@@ -9,7 +9,7 @@ struct HarmonicWall{
   real k = 0.1;
   HarmonicWall(real zwall):zwall(zwall){
   }
-  
+
   __device__ __forceinline__ real3 force(const real4 &pos){
 
     return make_real3(0.0f, 0.0f, -k*(pos.z-zwall));
@@ -18,7 +18,7 @@ struct HarmonicWall{
 
   //If this function is not present, energy is assumed to be zero
   // __device__ __forceinline__ real energy(const real4 &pos){
-    
+
   //   return real(0.5)*k*pow(pos.z-zwall, 2);
   // }
 
@@ -41,7 +41,7 @@ Here is an example in which more properties are needed to compute the force:
 struct ReallyComplexExternalForce{
   real drag;
   ReallyComplexExternalForce(real drag):drag(drag){}
-  
+
   __device__ __forceinline__ real4 force(const real4 &pos, real3 vel, int id, real mass){
   if(id>1000)
     return make_real4(0.0f, 0.0f, -0.1f*pos.z*mass-drag*vel, 0.0f);
@@ -90,7 +90,7 @@ namespace uammd{
     }
   };
 
-  
+
   template<class Functor>
   class ExternalForces: public Interactor, public ParameterUpdatableDelegate<Functor>{
     cudaStream_t stream;
@@ -114,10 +114,10 @@ namespace uammd{
 
     ~ExternalForces(){
     }
-  
-    void sumForce(cudaStream_t st) override; /*implemented below*/   
-    real sumEnergy() override;   
-  
+
+    void sumForce(cudaStream_t st) override; /*implemented below*/
+    real sumEnergy() override;
+
   private:
     std::shared_ptr<Functor> tr;
   };
@@ -132,11 +132,11 @@ namespace uammd{
     template<class Functor, class ...T, size_t ...Is>
     __device__ inline real3 unpackTupleAndCallForce_impl(Functor &f,
 							 std::tuple<T...> &arrays,
-							 int i, //Element of the array to dereference 
+							 int i, //Element of the array to dereference
 							 //Nasty variadic template trick
 							 index_sequence<Is...>){
       return f.force(*(std::get<Is>(arrays)+i)...);
-      
+
     }
 
     //This function allows to call unpackTuple hiding the make_index_sequence trick
@@ -161,7 +161,7 @@ namespace uammd{
 
       //Sum the result of calling f(<all the requested input>) to my particle's force
       const real3 F = make_real3(force[myParticleIndex]) + unpackTupleAndCallForce(f, myParticleIndex, arrays);
-      force[myParticleIndex] = make_real4(F); 
+      force[myParticleIndex] = make_real4(F);
     }
 
 
@@ -169,12 +169,12 @@ namespace uammd{
   template<class Functor>
   void ExternalForces<Functor>::sumForce(cudaStream_t st){
     sys->log<System::DEBUG1>("[ExternalForces] Computing forces...");
-    
+
     int numberParticles = pg->getNumberParticles();
-    
+
     int blocksize = 128;
     int Nthreads = blocksize<numberParticles?blocksize:numberParticles;
-    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);    
+    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
 
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
@@ -208,7 +208,7 @@ namespace uammd{
 
       template<class T, bool general = has_energy<T>::value>  struct energyDelegator;
 
-      
+
       template<class T> struct energyDelegator<T, true>{
 	template<class ...args>
 	static inline __device__ __host__ real energy(T &f, args... t){return f.energy(t...);}
@@ -231,11 +231,11 @@ namespace uammd{
     template<class Functor, class ...T, size_t ...Is>
     __device__ inline real unpackTupleAndCallEnergy_impl(Functor &f,
 						    std::tuple<T...> &arrays,
-						    int i, //Element of the array to dereference 
+						    int i, //Element of the array to dereference
 						    //Nasty variadic template trick
 						    index_sequence<Is...>){
       return SFINAE::energyDelegator<Functor>().energy(f, *(std::get<Is>(arrays)+i)...);
-      
+
     }
 
     //This function allows to call unpackTuple hiding the make_index_sequence trick
@@ -265,16 +265,16 @@ namespace uammd{
 
   }
 
-  
+
   template<class Functor>
   real ExternalForces<Functor>::sumEnergy(){
     sys->log<System::DEBUG2>("[ExternalForces] Computing forces...");
-    
+
     int numberParticles = pg->getNumberParticles();
-    
+
     int blocksize = 128;
     int Nthreads = blocksize<numberParticles?blocksize:numberParticles;
-    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);    
+    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
 
     auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
@@ -282,10 +282,10 @@ namespace uammd{
     ExternalForces_ns::computeEnergyGPU<<<Nblocks, Nthreads>>>(*tr, numberParticles,
 							       groupIterator, energy.raw(), tr->getArrays(pd.get()));
 
-    
+
     return 0;
   }
-    
+
 
 
 }

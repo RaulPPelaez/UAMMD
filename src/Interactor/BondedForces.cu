@@ -28,12 +28,12 @@ namespace uammd{
 	       sys,
 	       "BondedForces/" + type_name<BondType>()),
     bondForce(bondForce), TPP(64){
-    
+
     //BondedForces does not care about any parameter update, but the BondType might.
     this->setDelegate(&(this->bondForce));
 
     int numberParticles = pg->getNumberParticles();
-    
+
     sys->log<System::MESSAGE>("[BondedForces] Initialized");
 
     sys->log<System::MESSAGE>("[BondedForces] Using: %s", type_name<BondType>().c_str());
@@ -80,7 +80,7 @@ namespace uammd{
 			      bondList.size()/2, bondListFP.size());
 
     /*Upload and init GPU*/
-    init();  
+    init();
   }
 
 
@@ -130,24 +130,24 @@ namespace uammd{
   template<class BondType>
   void BondedForces<BondType>::initParticleParticle(){
     int numberParticles = pg->getNumberParticles();
-    // ****************************************Pair bonds********************************************* 
+    // ****************************************Pair bonds*********************************************
     //This algorithm is identical to the one used in PairForces to sort by cell
     //First store all bonded pairs. That means i j and j i
     //The first ones are readed given, the complementary have to be generated
-    
+
     int BLOCKSIZE = 128;
     int Nthreads = BLOCKSIZE<nbonds?BLOCKSIZE:nbonds;
-    int Nblocks  =  nbonds/Nthreads +  ((nbonds%Nthreads!=0)?1:0); 
+    int Nblocks  =  nbonds/Nthreads +  ((nbonds%Nthreads!=0)?1:0);
 
     sys->log<System::DEBUG>("[BondedForces] Duplicating bonds");
     auto d_bondList = thrust::raw_pointer_cast(bondList.data());
-    
+
     BondedForces_ns::dupicateBonds<<<Nblocks, Nthreads>>>(d_bondList, nbonds);
 
     sys->log<System::DEBUG>("[BondedForces] Sorting bonds");
     /*Sort in the i index to construct bondStart and bondEnd*/
     thrust::sort(bondList.begin(), bondList.end(), BondedForces_ns::BondComp<Bond>());
-    
+
     nbonds = bondList.size();
     //We have a list of bonds ordered by its first particle, so; All the particles
     // bonded with particle i=0, all particles "" i=1...
@@ -161,10 +161,10 @@ namespace uammd{
     fori(0, h_bondList.size()){
       particlesWithBonds.insert(h_bondList[i].i);
     }
-    
+
     int nParticlesWithBonds = particlesWithBonds.size();
     sys->log<System::DEBUG>("[BondedForces] %d particles with bonds found", nParticlesWithBonds);
-    
+
     bondStart.resize(nParticlesWithBonds, nullptr);
     nbondsPerParticle.resize(nParticlesWithBonds, 0);
 
@@ -183,10 +183,10 @@ namespace uammd{
       nbondsi++;
       if(inext != i){
 	if(index == 0)
-	  h_bondStart[0] = thrust::raw_pointer_cast(bondList.data());    
+	  h_bondStart[0] = thrust::raw_pointer_cast(bondList.data());
 	else
 	  h_bondStart[index] = thrust::raw_pointer_cast(bondList.data())+b+1-nbondsi;
-	
+
 	h_nbondsPerParticle[index] = nbondsi;
 
 	index++;
@@ -200,12 +200,12 @@ namespace uammd{
     TPP = std::max(TPP, 32);
     sys->log<System::MESSAGE>("[BondedForces] Mean bonds per particle: %d", meanBondsPerParticle);
     sys->log<System::DEBUG>("[BondedForces] Using %d threads per particle", TPP);
-        
+
   }
 
   template<class BondType>
   void BondedForces<BondType>::initFixedPoint(){
-    int numberParticles = pg->getNumberParticles();    
+    int numberParticles = pg->getNumberParticles();
     sys->log<System::DEBUG>("[BondedForces] Sorting fixed point bonds");
     //Sort in the i index to construct bondStart and bondEnd
     thrust::sort(bondListFP.begin(), bondListFP.end(), BondedForces_ns::BondComp<BondFP>());
@@ -216,13 +216,13 @@ namespace uammd{
     fori(0, h_bondList.size()){
       particlesWithBonds.insert(h_bondList[i].i);
     }
-    
+
     int nParticlesWithBonds = particlesWithBonds.size();
     sys->log<System::DEBUG>("[BondedForces] %d particles with fixed point bonds found", nParticlesWithBonds);
-    
+
     bondStartFP.resize(nParticlesWithBonds, nullptr);
     nbondsPerParticleFP.resize(nParticlesWithBonds, 0);
-      
+
     sys->log<System::DEBUG>("[BondedForces] Filling bondStartFP");
 
     //Fill helper data structures
@@ -236,10 +236,10 @@ namespace uammd{
       nbondsi++;
       if(inext != i){
 	if(index == 0)
-	  bondStartFP[0] = thrust::raw_pointer_cast(bondListFP.data());    
+	  bondStartFP[0] = thrust::raw_pointer_cast(bondListFP.data());
 	else
 	  bondStartFP[index] = thrust::raw_pointer_cast(bondListFP.data())+b+1-nbondsi;
-	
+
 	nbondsPerParticleFP[index] = nbondsi;
 
 	index++;
@@ -251,7 +251,7 @@ namespace uammd{
   namespace BondedForces_ns{
 
     //I do not really like how this is written now, but it really improves performance...
-    
+
     //This version assigns a block for each particle (thread threadIdx.x handles the bond threadIdx.x of particle blockIdx.x) Much faster when particles have many bonds per particle (>32 maybe)
     template<class Bond, class BondType, int THREADS_PER_BLOCK>
     __global__ void computeBondedForcesBlockPerParticle(real4* __restrict__ force, const real4* __restrict__ pos,
@@ -271,7 +271,7 @@ namespace uammd{
 	Shared info;
 	typename BlockReduce::TempStorage temp_storage;
       } shared;
-       
+
       __shared__ int index;
 
       //Bond list for my particle
@@ -289,37 +289,37 @@ namespace uammd{
       //Instead of launching a thread per particle and discarding those without any bond,
       //I store an additional array of size N_particles_with_bonds that contains the indices
       //of the particles that are involved in at least one bond. And only launch N_particles_with_bonds blocks
-      
-      //Each thread in a block computes the force on particle p due to one (or several) bonds      
+
+      //Each thread in a block computes the force on particle p due to one (or several) bonds
 
       //My local force accumulator
       real3 f = make_real3(real(0.0));
-      
-      __syncthreads();    
+
+      __syncthreads();
       for(int b = threadIdx.x; b<shared.info.nbonds; b += blockDim.x){
-	
+
 	//Read bond info
 	const auto bond = shared.info.bondList[b];
 	//Bring pos of other particle
 	const real3 posj = make_real3(pos[id2index[bond.j]]);
-    
+
 	//Compute force
 	real3 r12 =  shared.info.posi-posj;
-	//Sum force 
+	//Sum force
 	f += bondForce.force(shared.info.p, bond.j, r12, bond.bond_info);
       }
 
       //Sum the forces of all threads in my block
       real3 ft;
       if(threadIdx.x < shared.info.nbonds){
-	ft = BlockReduce(shared.temp_storage).Sum(f);	
+	ft = BlockReduce(shared.temp_storage).Sum(f);
       }
       __syncthreads();
       //First thread writes to memory
       if(threadIdx.x == 0){
 	force[index] += make_real4(ft);
       }
-      
+
     }
 
 
@@ -332,7 +332,7 @@ namespace uammd{
 					   const int * __restrict__ id2index, int N){
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=N) return;
-      
+
       auto bondList = bondStart[id];
       //Number of bonds for my particle
       const int nbonds = nbondsPerParticle[id];
@@ -340,23 +340,23 @@ namespace uammd{
       const int p = bondList[0].i;
       const int index = id2index[p];
       const real3 posi = make_real3(pos[index]);
-            
+
       real3 f = make_real3(real(0.0));
-      
+
       for(int b = 0; b<nbonds; b++){
-	
+
 	//Read bond info
 	const auto bond = bondList[b];
 	//Bring pos of other particle
 	const real3 posj = make_real3(pos[id2index[bond.j]]);
-    
+
 	//Compute force
 	real3 r12 =  posi-posj;
-      
+
 	f += bondForce.force(p, bond.j, r12, bond.bond_info);
       }
-   
-      force[index] += make_real4(f);	
+
+      force[index] += make_real4(f);
     }
 
 
@@ -368,7 +368,7 @@ namespace uammd{
 						  const int* __restrict__ nbondsPerParticle,
 						  BondType bondForce,
 						  const int * __restrict__ id2index){
-      extern __shared__ char shMem[];      
+      extern __shared__ char shMem[];
       real3 *forceTotal = (real3*) shMem; //Each thread has a force
       /*
       real4 &posi = *((real4*)(shMem+blockDim.x*sizeof(real4)));
@@ -376,7 +376,7 @@ namespace uammd{
       int &p = *((int*)&nbonds + sizeof(int));
       Bond* &bondList = *((Bond**)&p+sizeof(int));
       */
-      
+
       //Bond list for my particle
       const Bond *bondList = bondStart[blockIdx.x];
       //Number of bonds for my particle
@@ -389,23 +389,23 @@ namespace uammd{
       //Instead of launching a thread per particle and discarding those without any bond,
       //I store an additional array of size N_particles_with_bonds that contains the indices
       //of the particles that are involved in at least one bond. And only launch N_particles_with_bonds blocks
-      
+
       //Each thread in a block computes the force on particle p due to one (or several) bonds
-      
-            
-      real3 f = make_real3(real(0.0));          
 
 
-      //__syncthreads();    
+      real3 f = make_real3(real(0.0));
+
+
+      //__syncthreads();
       for(int b = threadIdx.x; b<nbonds; b += blockDim.x){
-	
+
 	//Read bond info
-	auto bond = bondList[b];	
-    
+	auto bond = bondList[b];
+
 	//Compute force
 	real3 r12 =  posi - bond.pos;
-      
-        
+
+
 
 	f += bondForce.force(p,-1, r12, bondList[b].bond_info);
       }
@@ -423,7 +423,7 @@ namespace uammd{
 	force[id2index[p]] += make_real4(ft);
       }
 
-    }     
+    }
   }
 
 
@@ -434,12 +434,12 @@ namespace uammd{
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
 
     auto id2index = pd->getIdOrderedIndices(access::location::gpu);
-      
+
     auto d_bondStart = thrust::raw_pointer_cast(bondStart.data());
     auto d_nbondsPerParticle = thrust::raw_pointer_cast(nbondsPerParticle.data());
     uint Nparticles_with_bonds = bondStart.size();
 
-    
+
     if(TPP<=32 || Nparticles_with_bonds < 5000){ //Empirical magic numbers, could probably be chosen better
       int Nthreads= 128;
       int Nblocks=Nparticles_with_bonds/Nthreads + ((Nparticles_with_bonds%Nthreads)?1:0);
@@ -483,10 +483,10 @@ namespace uammd{
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
 
       auto id2index = pd->getIdOrderedIndices(access::location::gpu);
-      
+
       int numberParticlesWithBonds = bondStartFP.size();
       auto d_bondStart = thrust::raw_pointer_cast(bondStartFP.data());
-      auto d_nbondsPerParticle = thrust::raw_pointer_cast(nbondsPerParticleFP.data());      
+      auto d_nbondsPerParticle = thrust::raw_pointer_cast(nbondsPerParticleFP.data());
       BondedForces_ns::computeBondedForcesFixedPoint
 	<<<numberParticlesWithBonds,	TPP, TPP*sizeof(real3), st>>>(
 								      force.raw(), pos.raw(),
@@ -496,7 +496,7 @@ namespace uammd{
 								      id2index);
     }
 
-  
+
   }
   template<class BondType>
   real BondedForces<BondType>::sumEnergy(){

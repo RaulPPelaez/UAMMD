@@ -1,7 +1,7 @@
 /*Raul P. Pelaez 2017. Box logic
-  
+
   This object is used throughout UAMMD to retrieve information about the box the particles are in (if any).
-  
+
   It can be used to apply periodic boundary conditions and check if a position lies inside of it
 
 */
@@ -14,7 +14,7 @@
 namespace uammd{
   struct Box{
     real3 boxSize, minusInvBoxSize;
-  
+
     Box():Box(0){}
     Box(real L):Box(make_real3(L)){}
     Box(real2 L):Box(make_real3(L, 0)){}
@@ -27,7 +27,7 @@ namespace uammd{
     inline void setPeriodicity(bool x, bool y, bool z){
       if(!x) minusInvBoxSize.x = 0;
       if(!y) minusInvBoxSize.y = 0;
-      if(!z) minusInvBoxSize.z = 0;      
+      if(!z) minusInvBoxSize.z = 0;
     }
     inline __host__ __device__ real3 apply_pbc(const real3 &r) const{
       //return  r - floorf(r/L+real(0.5))*L; //MIC Algorithm

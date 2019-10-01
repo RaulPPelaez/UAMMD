@@ -1,26 +1,26 @@
 /*Raul P.Pelaez 2017. Smoothed Particle Hydrodynamics
-  
+
   SPH is an Interactor module, any simplectic integrator can be used with it (i.e VerletNVE).
-  
+
   Computes a force on each particle as:
   Fi = sum_j[  mj·(Pj/rhoj^2 + Pi/rhoi^2 + visij)·grad_i(Wij) ]
 
   Where:
     j: The neighbours of i (within a distance given by the support of Wij)
-    
+
     m: mass
     P: Pressure
     rho: Density
     vis: Artificial viscosity
 
     W: Interpolation kernel, a smooth decaying function with a close support. See SPH_ns::Kernel
-    
+
   The density on a given particle i is interpolated from its neighbours as:
    rho_i = sum_j[ mj·Wij ]
 
   The Pressure is given by an equation-of-state depending on interpolated properties of the particles. Currently:
     Pi = K·(rho_i-rho0)
-    
+
   An artificial viscosity is introduced to allow shock phenomena ans stabilize the algorithm.
    visij = -nu( vij·rij)/(rij^2+epsilon)
     epsilon ~ 0.001
@@ -54,7 +54,7 @@ namespace uammd{
 	shared_ptr<ParticleGroup> pg,
 	shared_ptr<System> sys,
 	Parameters par);
-    
+
     SPH(shared_ptr<ParticleData> pd,
 	shared_ptr<System> sys,
 	Parameters par):
@@ -63,7 +63,7 @@ namespace uammd{
     ~SPH();
     void sumForce(cudaStream_t st) override;
     real sumEnergy() override;
-    //real sumVirial() override{ return 0;}    
+    //real sumVirial() override{ return 0;}
 
   private:
     shared_ptr<CellList> nl;
@@ -74,12 +74,12 @@ namespace uammd{
     real viscosity;
 
     thrust::device_vector<real> density, pressure;
-    
+
   };
 
 }
 
 #include"SPH.cu"
-  
+
 #endif
 

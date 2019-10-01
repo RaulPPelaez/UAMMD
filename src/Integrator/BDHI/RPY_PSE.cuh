@@ -27,7 +27,7 @@ namespace uammd{
     public:
       RPYPSE_near(real rh, real psi, real normalization, real rcut):
 	rh(rh), psi(psi), normalization(normalization), rcut(rcut){}
-      
+
       double2 FandG(double r);
       __device__ __host__ inline real2 operator()(double r){
 	return make_real2(this->FandG(r)/normalization);
@@ -40,12 +40,12 @@ namespace uammd{
 		       double f4, double f5, double f6, double f7);
     };
 
-    
+
     double2 RPYPSE_near::FandG(double r){
       double r2 = r*r;
       if(r>=rcut) return make_double2(0.0, 0.0);
       if(r<=real(0.0)){
-      /*(6*pi*vis*a)*Mr(0) = F(0)(I-r^r) + G(0)(r^r) = F(0) = (6*pi*vis*a)*Mii_r . 
+      /*(6*pi*vis*a)*Mr(0) = F(0)(I-r^r) + G(0)(r^r) = F(0) = (6*pi*vis*a)*Mii_r .
 	See eq. A4 in [1] and RPYPSE_nearTextures*/
 	double pi = M_PI;
 	double f0 = (1.0/(4*sqrt(pi)*psi*rh))*(1-exp(-4*rh*rh*psi*psi)+4*sqrt(pi)*rh*psi*std::erfc(2*rh*psi));
@@ -64,11 +64,11 @@ namespace uammd{
 
       double r3 = r2*r;
       double r4 = r3*r;
-      
+
       double f0, f1, f2, f3, f4 ,f5, f6, f7;
       double g0, g1, g2, g3, g4 ,g5, g6, g7;
 
-      
+
       if(r>2*rh){
 	f0 =(64.0*rh4*psi4 + 96.0*rh2*r2*psi4
 	     - 128.0*rh*r3*psi4 + 36.0*r4*psi4-3.0)/
@@ -82,13 +82,13 @@ namespace uammd{
 
 	g0 = (-64.0*rh4*psi4+96.0*rh2*r2*psi4-64.0*rh*r3*psi4 + 12.0*r4*psi4 +3.0)/
 	  (64.0*rh*r3*psi4);
-	
-	
+
+
 	g4 = (4.0*psi4*a2mr*a2mr*a2mr*(2.0*rh+3.0*r)-3.0)/(128.0*rh*r3*psi4);
 
 	g5 = 0;
 
-      
+
       }
       else{
 	f0 = (-16.0*rh4-24.0*rh2*r2+32.0*rh*r3-9.0*r4)/
@@ -105,7 +105,7 @@ namespace uammd{
 	g4 = 0;
 
 	g5 = (3.0 - 4.0*psi4*a2mr*a2mr*a2mr*(2.0*rh+3.0*r))/(128.0*rh*r3*psi4);
-	
+
       }
       f1 = (-2.0*psi2*a2pr*(4.0*rh2-4.0*rh*r+9.0*r2) + 2.0*rh -3.0*r)/
 	(128.0*rh*r3*psi3*sqrt(M_PI));
@@ -114,7 +114,7 @@ namespace uammd{
 	(128.0*rh*r3*psi3*sqrt(M_PI));
 
       f3 = 3.0*(6.0*r2*psi2+1.0)/(64.0*sqrt(M_PI)*rh*r2*psi3);
-      
+
       f6 = (4.0*psi4*a2pr*a2pr*(4.0*rh2-4.0*rh*r+9.0*r2)-3.0)/
 	(256.0*rh*r3*psi4);
 
@@ -129,9 +129,9 @@ namespace uammd{
       g3 = (3.0*(2.0*r2*psi2-1.0))/(32.0*sqrt(M_PI)*rh*r2*psi3);
 
       g6 = (3.0-4.0*psi4*(2.0*rh-3.0*r)*a2pr*a2pr*a2pr)/(128.0*rh*r3*psi4);
-      
+
       g7 = -3.0*(4.0*r4*psi4+1.0)/(64.0*rh*r3*psi4);
-        
+
       return {params2FG(r, f0, f1, f2, f3, f4, f5, f6, f7),
 	  params2FG(r, g0, g1, g2, g3, g4, g5, g6, g7)};
     }
@@ -144,7 +144,7 @@ namespace uammd{
       double psisq = psi*psi;
       double a2mr = 2*rh-r;
       double a2pr = 2*rh+r;
-      double rsq = r*r;      
+      double rsq = r*r;
       return  f0 + f1*exp(-psisq*a2pr*a2pr)  +
 	f2*exp(-a2mr*a2mr*psisq) + f3*exp(-psisq*rsq) +
 	f4*erfc(a2mr*psi) + f5*erfc(-a2mr*psi) +

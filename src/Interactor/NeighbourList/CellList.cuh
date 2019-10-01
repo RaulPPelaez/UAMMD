@@ -11,8 +11,8 @@
   1. Providing a Transverser to it
   2. Asking for a NeighbourContainer from it
   3. Asking for a neigbour list from it
-  4. Any additional mechanism own to the particular instance (a.i. you can get the cell list binning structure with CellList) 
- 
+  4. Any additional mechanism own to the particular instance (a.i. you can get the cell list binning structure with CellList)
+
   Methods 1. and 2. are the fastest ones it the list is to be used once/twice per construction, as both methods are not force to construct a neighbour list explicitly.
 
   Forcing the NeighbourList to construct a neighbour list explicitly with method 3. incurs the overhead of construction, but might be the fastest way if the list is to be used multiple times per construction.
@@ -26,7 +26,7 @@
   -Provide an iterator with the number of neighbours of each particle.
   -Provide a "transverse" method that takes a Transverser and goes through every pair of particles with it (See NBodyForces.cuh or RadialPotential.cuh)
   -Provide a NeighbourContainer able to provide, for each particle, a forward iterator with its neighbours.*
- 
+
   *Note that this does not imply that a neighbour list is constructed, just that the iterator is able to provide the neighbours.
 
 
@@ -41,14 +41,14 @@ USAGE:
 
  //THE DIFFERENT INTERFACE METHODS
 
- //Traverse the list using the internal CellList mechanism(Method 1.1) 
+ //Traverse the list using the internal CellList mechanism(Method 1.1)
  cl->transverseList([A transverser],cudaStream);
 
  //Traverse the list constructing a neighbour list explicitly (Method 1.2)
  //This is similar to Method 3. in that a neighbour list is constructed, but a transverser can be used directly.
  //Method 1.1 will be faster if the list is used once/twice per construction, method 1.2 might be faster otherwise
  cl->transverseListWithNeighbourList([A transverser], cudastream);
-  
+
 
  //Get a NeighbourContainer (Method 2.). This is equivalent to Method 1.1 (see transverseList kernel), but instead of having to provide a Transverser you can use this structure to get iterators to the neighbours of each particle (as the aforementioned kernel does) and process them manually. This allows for more versatility.
  //See examples/NeighbourListIterator.cu for an example
@@ -58,19 +58,19 @@ USAGE:
  //Get a neighbour list to traverse manually, this will generate the neighbour list whereas traverseList just uses the cell list. (Method 3.). See more info about this structure below
  auto nl = cl->getNeighbourList();
 
- 
+
 
  //Get a cell list to use manually, which provides a spatial binning and a list with the bin of each particle (Method 4.)
  auto cell_list_data = cl->getCellList();
 
 
-  
 
-Regarding Method 3. 
+
+Regarding Method 3.
   The list for a certain particle i starts at nl.particleOffset[i], after nl.numberNeighbours[i], the neighbour list for particle i contains undefined data. i is the index of a particle referred to its group (global id if the group contains all particles).
 
 
-   See PairForces.cu or examples/NeighbourListIterator.cu for examples on how to use a NL.   
+   See PairForces.cu or examples/NeighbourListIterator.cu for examples on how to use a NL.
 
 References:
 
@@ -101,7 +101,7 @@ TODO:
 namespace uammd{
   namespace CellList_ns{
     constexpr int EMPTY_CELL = std::numeric_limits<int>::max();
-    
+
     //sortPos contains the particle position sorted in a way that ensures that all particles in a cell are one after the other
     //You can identify where each cell starts and end by transversing this vector and searching for when the cell of a particle is  different from the previous one
     template<class InputIterator>
@@ -109,13 +109,13 @@ namespace uammd{
 				 int *cellStart, int *cellEnd,
 				 int N, Grid grid){
       /*A thread per particle*/
-      uint id = blockIdx.x*blockDim.x + threadIdx.x;      
+      uint id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id<N){//If my particle is in range
-	
+
 	uint icell, icell2;
 	/*Get my icell*/
 	icell = grid.getCellIndex(grid.getCell(make_real3(sortPos[id])));
-      
+
 	/*Get the previous part.'s icell*/
 	if(id>0){ /*Shared memory target VVV*/
 	  icell2 = grid.getCellIndex(grid.getCell(make_real3(sortPos[id-1])));
@@ -127,14 +127,14 @@ namespace uammd{
 	if(id ==0 || icell != icell2){
 	  //Then my particle is the first of my cell
 	  cellStart[icell] = id;
-	
+
 	  //If my i is the start of a cell, it is also the end of the previous
 	  //Except if I am the first one
 	  if(id>0)
 	    cellEnd[icell2] = id;
 	}
-	//If I am the last particle my cell ends 
-	if(id == N-1) cellEnd[icell] = N;      
+	//If I am the last particle my cell ends
+	if(id == N-1) cellEnd[icell] = N;
       }
 
     }
@@ -150,7 +150,7 @@ namespace uammd{
   				       int N){
       const int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id >= N) return;
-      
+
       //The indices provided to getInfo are order agnostic, they will be the indices of the particles inside the group.
       const int ori = globalIndex[groupIndex[id]];
 #if CUB_PTX_ARCH < 300
@@ -158,9 +158,9 @@ namespace uammd{
 #else
       constexpr auto cubModifier = cub::LOAD_LDG;
 #endif
-      
+
       const real4 pi = cub::ThreadLoad<cubModifier>(sortPos + id);
-      
+
       /*Delegator makes possible to call transverseList with a simple Transverser
 	(a transverser that only uses positions, with no getInfo method) by using
 	SFINAE*/
@@ -170,7 +170,7 @@ namespace uammd{
       */
       //Initial value of the quantity
       auto quantity = tr.zero();
-      SFINAE::Delegator<Transverser> del;            
+      SFINAE::Delegator<Transverser> del;
       del.getInfo(tr, ori);
       //for(auto n: ni){
       ni.set(id);
@@ -185,8 +185,8 @@ namespace uammd{
 				  pi, pj));
       }
       tr.set(ori, quantity);
-    }    
-    
+    }
+
     //This can be faster using several threads per particle, I am sure...
     //The neighbourList and nNeighbours arrays store particles indexes in internal sort index,
     // you can change between this order and group order using gid = groupIndex[id], and between group index and
@@ -203,7 +203,7 @@ namespace uammd{
 				      int* tooManyNeighboursFlag){
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=N) return;
-      
+
       int nneigh = 0;
       const int offset = id*maxNeighbours;
 
@@ -226,7 +226,7 @@ namespace uammd{
 	    atomicMax(tooManyNeighboursFlag, nneigh);
 	    return;
 	  }
-	  neighbourList[offset + nneigh-1] = cur_j;		  
+	  neighbourList[offset + nneigh-1] = cur_j;
 	}
       }
       //Include self interactions
@@ -234,18 +234,18 @@ namespace uammd{
       nNeighbours[id] = nneigh+1;
 
     }
-    
+
     //Applies a transverser to the verlet list
     template<class Transverser, class InputIterator>
     __global__ void transverseNeighbourList(Transverser tr,
 					    InputIterator sortPos,
 					    const int *groupIndex, //Transforms a sortPos index into a group index
 					    //Transforms a group index into a global index
-					    ParticleGroup::IndexIterator globalIndex, 
+					    ParticleGroup::IndexIterator globalIndex,
 					    int *neighbourList, int *numberNeighbours, int stride,
 					    int N, Box Box){
       int id = blockIdx.x*blockDim.x + threadIdx.x;
-      if(id>=N) return;     
+      if(id>=N) return;
       //The indices provided to getInfo are order agnostic, they will be the indices of the particles inside the group.
       const int gid = groupIndex[id]; //Index of particle "id" inside the particle group
       const int ori = globalIndex[gid]; //Index of particle "gid" in the global array
@@ -286,8 +286,8 @@ namespace uammd{
     int maxNeighboursPerParticle;
     int *tooManyNeighboursFlagGPU; //Set to !=0 if a particle has more neighbours than allowed
     ParticleSorter ps;  //hash sort handler
-    
-    shared_ptr<ParticleData> pd; 
+
+    shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
     shared_ptr<System> sys;
 
@@ -317,7 +317,7 @@ namespace uammd{
       force_next_update = true;
     }
 
-    
+
     //Returns the index of the first neigbour of particle index
     struct NeighbourListOffsetFunctor{
       NeighbourListOffsetFunctor(int str, int* groupIndex):stride(str), groupIndex(groupIndex){}
@@ -332,11 +332,11 @@ namespace uammd{
     // an array
     using CountingIterator = cub::CountingInputIterator<int>;
     using StrideIterator = cub::TransformInputIterator<int, NeighbourListOffsetFunctor, CountingIterator>;
-    
-    
+
+
   public:
     static constexpr auto EMPTY_CELL = CellList_ns::EMPTY_CELL;
-    
+
     CellList(shared_ptr<ParticleData> pd,
 	     shared_ptr<System> sys): CellList(pd, std::make_shared<ParticleGroup>(pd, sys), sys){
     }
@@ -345,17 +345,17 @@ namespace uammd{
 	     shared_ptr<ParticleGroup> pg,
 	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys), ps(sys){
       sys->log<System::MESSAGE>("[CellList] Created");
-      
+
       maxNeighboursPerParticle = 32;
-      
+
       //I want to know if the number of particles has changed
       pd->getNumParticlesChangedSignal()->connect([this](int Nnew){this->handleNumParticlesChanged(Nnew);});
-      pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});      
-      
+      pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});
+
       //The flag has managed memory
       //cudaMallocHost(&tooManyNeighboursFlagGPU, sizeof(int), cudaHostAllocMapped);
       CudaSafeCall(cudaMalloc(&tooManyNeighboursFlagGPU, sizeof(int)));
-      CudaSafeCall(cudaMemset(tooManyNeighboursFlagGPU, 0, sizeof(int))); 
+      CudaSafeCall(cudaMemset(tooManyNeighboursFlagGPU, 0, sizeof(int)));
       //An event to check for the flag during list construction
       CudaSafeCall(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
     }
@@ -368,7 +368,7 @@ namespace uammd{
       CudaCheckError();
     }
 
-    
+
     //The data structure needed to use the neighbour list from outside
     struct NeighbourListData{
       int * neighbourList;
@@ -391,22 +391,22 @@ namespace uammd{
 	  numberNeighbours.resize(numberParticles);
 	}
 	catch(thrust::system_error &e){
-	  sys->log<System::CRITICAL>("[CellList] Thrust could not resize neighbour list with error: %s", e.what());  
+	  sys->log<System::CRITICAL>("[CellList] Thrust could not resize neighbour list with error: %s", e.what());
 	}
-	
+
 
 	rebuildNlist = false;
-	//Try to fill the neighbour list until success (the construction will fail if a particle has too many neighbours)      
+	//Try to fill the neighbour list until success (the construction will fail if a particle has too many neighbours)
 	int Nthreads=128;
 	int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-      
+
 	auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
 	int flag;
 	do{
-	  flag = 0;	  
+	  flag = 0;
 	  auto neighbourList_ptr = thrust::raw_pointer_cast(neighbourList.data());
 	  auto numberNeighbours_ptr = thrust::raw_pointer_cast(numberNeighbours.data());
-	  sys->log<System::DEBUG3>("[CellList] fill Neighbour List");		
+	  sys->log<System::DEBUG3>("[CellList] fill Neighbour List");
 	  //For each particle, transverse the neighbour cells using the cell list
 	  // and decide if they need to be included in the neighbour list.
 	  CellList_ns::fillNeighbourList<<<Nblocks, Nthreads, 0, st>>>(sortPos_ptr,
@@ -419,11 +419,11 @@ namespace uammd{
 								       tooManyNeighboursFlagGPU);
 	  CudaSafeCall(cudaEventRecord(event, st));
 	  CudaSafeCall(cudaEventSynchronize(event));
-	  
+
 	  CudaSafeCall(cudaMemcpy(&flag, tooManyNeighboursFlagGPU, sizeof(int), cudaMemcpyDeviceToHost));
 	  //If a particle has to many neighbours, increase the maximum neighbours allowed and try again.
 	  if(flag != 0){
-	    this->maxNeighboursPerParticle += 32;//((flag-maxNeighboursPerParticle)/32+1)*32;	  
+	    this->maxNeighboursPerParticle += 32;//((flag-maxNeighboursPerParticle)/32+1)*32;
 	    sys->log<System::DEBUG>("[CellList] Resizing list to %d neighbours per particle",
 				    maxNeighboursPerParticle);
 
@@ -434,43 +434,43 @@ namespace uammd{
 	      neighbourList.resize(numberParticles*maxNeighboursPerParticle);
 	    }
 	    catch(thrust::system_error &e){
-	      sys->log<System::CRITICAL>("[CellList] Thrust could not resize neighbour list with error: %s", e.what());	      
+	      sys->log<System::CRITICAL>("[CellList] Thrust could not resize neighbour list with error: %s", e.what());
 	    }
 
 	  }
 	}while(flag!=0);
-      
+
       }
       //If the list does not need rebuild, refill sortPos in case positions have changed
       else{
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);     
+	auto pos = pd->getPos(access::location::gpu, access::mode::read);
 	auto posGroupIterator = pg->getPropertyInputIterator(pos.raw(), access::location::gpu);
 	ps.applyCurrentOrder(posGroupIterator, sortPos.begin(), numberParticles, st);
       }
 
-      
+
       auto neighbourList_ptr = thrust::raw_pointer_cast(neighbourList.data());
       auto numberNeighbours_ptr = thrust::raw_pointer_cast(numberNeighbours.data());
 
       NeighbourListData nl;
       nl.neighbourList = neighbourList_ptr;
       nl.numberNeighbours = numberNeighbours_ptr;
-      
+
       nl.particleStride = StrideIterator(CountingIterator(0),
 					 NeighbourListOffsetFunctor(maxNeighboursPerParticle, ps.getSortedIndexArray(numberParticles)));
       return nl;
     }
 
-    
+
     //Use a transverser to transverse the list using directly the cell list (without constructing a neighbour list)
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
       int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
-            
+
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-      
+
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
       // auto cellStart_ptr = thrust::raw_pointer_cast(cellStart.data());
       // auto cellEnd_ptr = thrust::raw_pointer_cast(cellEnd.data());
@@ -489,7 +489,7 @@ namespace uammd{
 						       this->getGroupIndexIterator(),
 						       globalIndex,
 									       this->getNeighbourContainer(),
-						       numberParticles);      
+						       numberParticles);
       CudaCheckError();
     }
 
@@ -503,7 +503,7 @@ namespace uammd{
 
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-      
+
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
 
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
@@ -535,12 +535,12 @@ namespace uammd{
       if(cutOff.x != currentCutOff.x) return true;
       if(cutOff.y != currentCutOff.y) return true;
       if(cutOff.z != currentCutOff.z) return true;
-      
+
       if(box.boxSize.x != currentBox.boxSize.x) return true;
       if(box.boxSize.y != currentBox.boxSize.y) return true;
       if(box.boxSize.z != currentBox.boxSize.z) return true;
       return false;
-      
+
     }
 
     //Force the cell list to work with a certain grid
@@ -553,8 +553,8 @@ namespace uammd{
        	 (grid.cellDim.z < 3 and grid.box.boxSize.z != real(0.0))){
        	sys->log<System::CRITICAL>("[CellList] I cannot work with less than 3 cells per dimension!");
       }
-      
-      //In the case of 3 cells per direction all the particles are checked anyway      
+
+      //In the case of 3 cells per direction all the particles are checked anyway
       if(grid.cellDim.x != 3 or
        	 grid.cellDim.y != 3 or
        	 (grid.cellDim.z != 3 and grid.box.boxSize.z != real(0.0))){
@@ -565,7 +565,7 @@ namespace uammd{
 	}
       }
       if(this->needsRebuild(grid.box, cutOff) == false) return;
-      
+
       sys->log<System::DEBUG1>("[CellList] Updating list");
 
       //Get the list parameters
@@ -577,24 +577,24 @@ namespace uammd{
       try{
 	if(cellStart.size()!= ncells) cellStart.resize(ncells);
 	if(cellEnd.size()!= ncells) cellEnd.resize(ncells);
-      }      
+      }
       catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[CellList] Thrust could not resize cell list with error: %s", e.what());	
+	sys->log<System::CRITICAL>("[CellList] Thrust could not resize cell list with error: %s", e.what());
       }
 
       auto cellStart_ptr = thrust::raw_pointer_cast(cellStart.data());
       auto cellEnd_ptr = thrust::raw_pointer_cast(cellEnd.data());
       cub::CountingInputIterator<int> it(0);
-      
+
       int Nthreads=512;
       int Nblocks=ncells/Nthreads + ((ncells%Nthreads)?1:0);
-      
+
       //Reset cellStart
       fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(cellStart_ptr, it,
 						CellList_ns::EMPTY_CELL, ncells);
       CudaCheckError();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      
+
       auto posGroupIterator = pg->getPropertyInputIterator(pos.raw(), access::location::gpu);
 
       //Sort particle positions by cell morton hash
@@ -608,12 +608,12 @@ namespace uammd{
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
       ps.applyCurrentOrder(posGroupIterator, sortPos_ptr, numberParticles, st);
       CudaCheckError();
-      
+
 
       //Fill cell list (cellStart and cellEnd) using the sorted array
       Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       sys->log<System::DEBUG3>("[CellList] fill Cell List");
-      
+
       CellList_ns::fillCellList<<<Nblocks, Nthreads, 0, st>>>(sortPos_ptr, //posGroupIterator,
        							      cellStart_ptr,
        							      cellEnd_ptr,
@@ -626,9 +626,9 @@ namespace uammd{
       updateNeighbourList(box, make_real3(cutOff), st);
     }
     void updateNeighbourList(Box box, real3 cutOff, cudaStream_t st = 0){
-      
+
       Grid a_grid = Grid(box, cutOff);
-      
+
        int3 cellDim = a_grid.cellDim;
        if(cellDim.x < 3) cellDim.x = 3;
        if(cellDim.y < 3) cellDim.y = 3;
@@ -636,11 +636,11 @@ namespace uammd{
 
        a_grid = Grid(box, cellDim);
 
-      updateNeighbourList(a_grid, cutOff, st);              
+      updateNeighbourList(a_grid, cutOff, st);
     }
 
 
-    
+
     //This accesor function is part of CellList only, not part of the NeighbourList interface
     //They allow to obtain a reference to the cell list structures to use them outside
     struct CellListData{
@@ -651,7 +651,7 @@ namespace uammd{
       const int * cellStart, *cellEnd;
       const real4 *sortPos;   //Particle positions in internal index
       const int* groupIndex; //Transformation between internal indexes and group indexes
-      Grid grid;	
+      Grid grid;
     };
     CellListData getCellList(){
       this->updateNeighbourList(currentBox, currentCutOff);
@@ -662,7 +662,7 @@ namespace uammd{
 	cl.sortPos     =  thrust::raw_pointer_cast(sortPos.data());
       }
       catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[CellList] Thrust could not access cellList arrays with error: %s", e.what());  
+	sys->log<System::CRITICAL>("[CellList] Thrust could not access cellList arrays with error: %s", e.what());
       }
       int numberParticles = pg->getNumberParticles();
       cl.groupIndex =  ps.getSortedIndexArray(numberParticles);
@@ -671,7 +671,7 @@ namespace uammd{
     }
 
 
-    
+
     class NeighbourContainer; //forward declaration for befriending
   private:
     class NeighbourIterator; //forward declaration for befriending
@@ -706,21 +706,21 @@ namespace uammd{
       public thrust::iterator_adaptor<
  NeighbourIterator,
    int,   Neighbour,
-   thrust::any_system_tag,   
+   thrust::any_system_tag,
    thrust::forward_device_iterator_tag,
    Neighbour,   int
    >{
       friend class thrust::iterator_core_access;
-      
+
       int i; //Particle index
       int j; //Current neighbour index
       CellListData nl;
-      
+
       int ci; //Current cell
-      
+
       int3 celli; //Cell of particle i
       int lastParticle; //Index of last particle in current cell
-            
+
       //Take j to the start of the next cell and return true, if no more cells remain then return false
       __device__ bool nextcell(){
 	do{
@@ -729,12 +729,12 @@ namespace uammd{
 	  cellj.x += ci%3-1;
 	  cellj.y += (ci/3)%3-1;
 	  cellj.z +=  ci/9-1;
-	  
+
 	  cellj = nl.grid.pbc_cell(cellj);
 	  const int icellj = nl.grid.getCellIndex(cellj);
-	  
+
 	  j = nl.cellStart[icellj];
-	  lastParticle = j==EMPTY_CELL?-1:nl.cellEnd[icellj];	  
+	  lastParticle = j==EMPTY_CELL?-1:nl.cellEnd[icellj];
 	  ci++;
 	  if(ci >= 9*(is2D?1:3)) return false;
 	}while(j == EMPTY_CELL);
@@ -742,7 +742,7 @@ namespace uammd{
       }
       //Take j to the next neighbour
       __device__  void increment(){
-	if(++j == lastParticle) j = nextcell()?j:-1;	
+	if(++j == lastParticle) j = nextcell()?j:-1;
       }
       __device__ Neighbour dereference() const{
 	return Neighbour(j, nl.groupIndex, nl.sortPos);
@@ -752,14 +752,14 @@ namespace uammd{
       //Can only be advanced
       __device__  void decrement() = delete;
       __device__  Neighbour operator[](int i) = delete;
-      
+
       __device__  bool equal(NeighbourIterator const& other) const{
 	return other.i == i and other.j==j;
       }
 
     public:
       //j==-1 means there are no more neighbours and the iterator is invalidated
-      __device__  operator bool(){ return j!= -1;}      
+      __device__  operator bool(){ return j!= -1;}
 
     private:
       friend class NeighbourContainer;
@@ -788,7 +788,7 @@ namespace uammd{
       return NeighbourContainer(nl);
     }
 
-    
+
     const real4* getPositionIterator(){
       return thrust::raw_pointer_cast(sortPos.data());
     }
@@ -796,7 +796,7 @@ namespace uammd{
       auto nl = getCellList();
       return nl.groupIndex;
     }
-    
+
   };
 
 

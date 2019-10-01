@@ -1,5 +1,5 @@
-/* Raul P. Pelaez 2017. ParticleSorter.
-   
+/* Raul P. Pelaez 2019. ParticleSorter.
+
    A helper class to sort particles according to their positions following a certain rule.
    This rule can be a morton hash, so the particle positions are sorted to follow a Z-order curve, a cell hash, particle ID...
 

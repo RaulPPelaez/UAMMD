@@ -11,14 +11,14 @@ namespace uammd{
     cufftComplex_t<T> x,y,z;
 
     using cufftComplex3 = cufftComplex3_t<T>;
-    
+
     friend inline  __device__ __host__ cufftComplex3 operator+(const cufftComplex3 &a, const cufftComplex3 &b){
       return {a.x + b.x, a.y + b.y, a.z + b.z};
     }
     friend inline  __device__ __host__ void operator+=(cufftComplex3 &a, const cufftComplex3 &b){
       a.x += b.x; a.y += b.y; a.z += b.z;
     }
-  
+
     friend inline  __device__ __host__ cufftComplex3 operator-(const cufftComplex3 &a, const cufftComplex3 &b){
       return {a.x - b.x, a.y - b.y, a.z - b.z};
     }
@@ -27,28 +27,28 @@ namespace uammd{
     }
 
 
-  
+
     friend inline  __device__ __host__ cufftComplex3 operator*(const cufftComplex3 &a, real b){
       cufftComplex3 res;
       res.x = a.x * b;
       res.y = a.y * b;
       res.z = a.z * b;
-      return res;    
+      return res;
     }
     friend inline  __device__ __host__ cufftComplex3 operator*(real b, const cufftComplex3 &a){
       return a*b;
     }
     friend inline  __device__ __host__ void operator*=(cufftComplex3 &a, real b){
       a = a*b;
-    }      
+    }
 
-  
+
     friend inline  __device__ __host__ cufftComplex3 operator/(const cufftComplex3 &a, real b){
       cufftComplex3 res;
       res.x = a.x / b;
       res.y = a.y / b;
       res.z = a.z / b;
-      return res;    
+      return res;
     }
     friend inline  __device__ __host__ cufftComplex3 operator/(real b, const cufftComplex3 &a){
       cufftComplex3 res;
@@ -59,11 +59,11 @@ namespace uammd{
     }
     friend inline  __device__ __host__ void operator/=(cufftComplex3 &a, real b){
       a = a/b;
-    }      
+    }
 
   };
 
-  
+
 
 
 }

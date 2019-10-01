@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. ParticleGroup 
+/*Raul P. Pelaez 2017. ParticleGroup
 
   ParticleGroup allows to track a certain subset of the particles in the system.
 
@@ -40,7 +40,7 @@ You can request the current indices of the particles in a group with:
 
   auto pos = pd->getPos(access::location::gpu, access::mode::read);
   auto posIter = pg->getPropertyInputIterator<cub::LOAD_LDG>(pos.raw(), access::location::gpu); //or cpu
-  
+
 */
 
 #ifndef PARTICLEGROUP_CUH
@@ -63,27 +63,27 @@ namespace uammd{
     //Select all the particles
     class All{
     public:
-      All(){}    
+      All(){}
       static constexpr bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
 	return true;
-      }    
+      }
     };
 
     class None{
     public:
-      None(){}    
+      None(){}
       static constexpr bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
 	return false;
-      }    
+      }
     };
 
     //Select particles with ID in a certain range
     class IDRange{
       int firstID, lastID;
-    public:    
+    public:
       IDRange(int first, int last):
 	firstID(first),
-	lastID(last){      
+	lastID(last){
       }
 
       bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
@@ -109,17 +109,17 @@ namespace uammd{
 	pos = simulationBox.apply_pbc(pos);
 	pos += origin;
 	return domain.isInside(pos);
-      }    
+      }
     };
 
     //Select particles by type (pos.w)
     class Type{
       std::vector<int> typesToSelect;
     public:
-      Type(int type): typesToSelect({type}){      
+      Type(int type): typesToSelect({type}){
       }
-      
-      Type(std::vector<int> typesToSelect): typesToSelect(typesToSelect){      
+
+      Type(std::vector<int> typesToSelect): typesToSelect(typesToSelect){
       }
       bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
 	int type_i = int(pd->getPos(access::cpu, access::read).raw()[particleIndex].w);
@@ -127,15 +127,15 @@ namespace uammd{
 	  if(type_i==type) return true;
 	}
 	return false;
-      }    
+      }
 
-    
-    
+
+
 
     };
   };
 
-  namespace ParticleGroup_ns{  
+  namespace ParticleGroup_ns{
     //Updates the indices of the particles in a group using pd->getIdOrderedIndices()
     __global__ void updateGroupIndices(//An array that stores the indices of the particles in the group per id.
 				       const int * __restrict__ id2index,
@@ -157,7 +157,7 @@ namespace uammd{
     // You can ask ParticleGroup to return you:
     // -The particle IDs of its members.
     // -The current indices of its members in the ParticleData arrays.
-  
+
     // You can ask for the indices as a raw memory pointer or as a custom iterator.
     // Asking for the raw memory is a risky bussiness, as this array may not even exists (i.e if all particles in the system are in the group, it might decide to not create it, as it would be unnecessary). In this case, you will get a nullptr.
 
@@ -176,7 +176,7 @@ namespace uammd{
     int numberParticles, totalParticles;
 
     bool allParticlesInGroup = false;
-  
+
     std::string name;
 
     connection reorderConnection;
@@ -213,13 +213,13 @@ namespace uammd{
     void addParticlesByCurrentIndex(access::location loc, const int *indices, int N);
     //Update index list if needed
     void computeIndexList(bool forceUpdate = false);
-  
+
     void handleReorder(){
       sys->log<System::DEBUG>("[ParticleGroup] Handling reorder signal in group %s", this->name.c_str());
       if(!allParticlesInGroup && numberParticles > 0){
 	needsIndexListUpdate = true;
       }
-    }    
+    }
 
     //Access the index array only if it is not a nullptr (AKA if the group does not contain all particles)
     struct IndexAccess{
@@ -234,11 +234,11 @@ namespace uammd{
 
     //Transform sequential indexing to indices of particle sin group
     using IndexIterator = cub::TransformInputIterator<int, IndexAccess, cub::CountingInputIterator<int>>;
-    
+
     static IndexIterator make_index_iterator(const int *indices){
       return IndexIterator(cub::CountingInputIterator<int>(0), IndexAccess(indices));
     }
-     
+
     //Get a raw memory pointer to the index list if it exists
     inline const int * getIndicesRawPtr(access::location loc){
       if(this->allParticlesInGroup || numberParticles == 0 ) return nullptr;
@@ -260,11 +260,11 @@ namespace uammd{
       }
       return ptr;
     }
-    
+
     //Get an iterator with the indices of particles in this group
     inline IndexIterator getIndexIterator(access::location loc){
       auto ptr = getIndicesRawPtr(loc);
-      return make_index_iterator(ptr);			   
+      return make_index_iterator(ptr);
     }
 
     //Simply reads an iterator, optionally a cub cache mode can be selected
@@ -289,21 +289,21 @@ namespace uammd{
     template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT, class Iterator>
     accessIterator<Iterator, modifier> make_access_iterator(const Iterator &it, access::location loc){
       return accessIterator<Iterator, modifier>(this->getIndexIterator(loc),
-						TransformIndex<Iterator, modifier>(it));      
+						TransformIndex<Iterator, modifier>(it));
     }
-    
+
   public:
 
     //Returns an iterator that will have size pg->getNumberParticles() and will iterate over the
     // particles in the group.
     //For example, If a group contains only the particle with id=10, passing pd->getPos(...).raw() to this function
     // will return an iterator so that iterator[0] = pos[10]; and it will take into account any possible reordering of the pos array.
-    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT, class Iterator>	     
+    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT, class Iterator>
     accessIterator<Iterator, modifier> getPropertyInputIterator(const Iterator & property,
 								access::location loc){
       return this->make_access_iterator<modifier>(property, loc);
     }
-              
+
     int getNumberParticles(){
       return this->numberParticles;
     }
@@ -318,26 +318,26 @@ namespace uammd{
 			       shared_ptr<ParticleData> pd, shared_ptr<System> sys, std::string name):
     pd(pd), sys(sys), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created with selector %s",
-			      name.c_str(), type_name<ParticleSelector>().c_str());  
+			      name.c_str(), type_name<ParticleSelector>().c_str());
     totalParticles = pd->getNumParticles();
     /*Create ID list in CPU*/
     std::vector<int> ids;
     for(int i=0;i<totalParticles;i++){
       if(selector.isSelected(i, pd))
-	ids.push_back(i);    
+	ids.push_back(i);
     }
     numberParticles = ids.size();
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s contains %d particles.",
-			      name.c_str(), numberParticles);    
+			      name.c_str(), numberParticles);
     /*Handle the case in which all particles belong to the group*/
     if(numberParticles==totalParticles){
       allParticlesInGroup = true;
     }
     else{
       myParticlesIdsGPU = ids;
-      
+
       //Connect to reorder signal, index list needs to be updated each time a reorder occurs
-      reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});      
+      reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});
       //Allocate
       myParticlesIndicesGPU.resize(numberParticles);
       //Force update (creation) of the index list)
@@ -378,23 +378,23 @@ namespace uammd{
 			       shared_ptr<ParticleData> pd, shared_ptr<System> sys,
 			       std::string name):
     pd(pd), sys(sys), name(name){
-    sys->log<System::MESSAGE>("[ParticleGroup] Group %s created from ID list.", name.c_str());   
+    sys->log<System::MESSAGE>("[ParticleGroup] Group %s created from ID list.", name.c_str());
     numberParticles = std::distance(begin, end);
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s contains %d particles.", name.c_str(), numberParticles);
     this->totalParticles = pd->getNumParticles();
-  
+
     if(numberParticles == totalParticles){
-      this->allParticlesInGroup = true;    
+      this->allParticlesInGroup = true;
     }
     else{
-      reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});      
-      
+      reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});
+
       //Create ID list in CPU
       myParticlesIdsGPU.assign(begin, end);
       myParticlesIndicesGPU.resize(numberParticles);
       /*Force update (creation) of the index list)*/
-      this->computeIndexList(true);    
-    }    
+      this->computeIndexList(true);
+    }
   }
 
 
@@ -413,9 +413,9 @@ namespace uammd{
     if(this->needsIndexListUpdate || forceUpdate){//Update only if needed
       sys->log<System::DEBUG>("[ParticleGroup] Updating group %s after last particle sorting", name.c_str());
 
-      
+
       const int *id2index = pd->getIdOrderedIndices(access::location::gpu);
-      
+
       int Nthreads=(numberParticles>=512)?512:numberParticles;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
 
@@ -424,9 +424,9 @@ namespace uammd{
       ParticleGroup_ns::updateGroupIndices<<<Nblocks, Nthreads>>>(id2index,
 						myParticlesIndicesGPU_ptr,
 						myParticlesIdsGPU_ptr,
-						numberParticles);      
+						numberParticles);
       this->needsIndexListUpdate = false;
-      updateHostVector = true;      
+      updateHostVector = true;
       sys->log<System::DEBUG1>("[ParticleGroup] Updating group %s DONE!", name.c_str());
     }
   }
@@ -441,14 +441,14 @@ namespace uammd{
     const int *id2index = pd->getIdOrderedIndices(access::location::gpu);
     int Nthreads=(N>=128)?128:N;
     int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
-    
+
     int *myParticlesIndicesGPU_ptr = thrust::raw_pointer_cast(myParticlesIndicesGPU.data());
     int *myParticlesIdsGPU_ptr = thrust::raw_pointer_cast(myParticlesIdsGPU.data());
     if(!st) CudaSafeCall(cudaStreamCreate(&st));
-    
+
     auto copyKind = cudaMemcpyDeviceToDevice;
     if(loc==access::location::cpu)  copyKind = cudaMemcpyHostToDevice;
-    
+
     CudaSafeCall(cudaMemcpyAsync(myParticlesIdsGPU_ptr+numberParticlesPrev, ids,
 				 N*sizeof(int), copyKind, st));
 
@@ -458,7 +458,7 @@ namespace uammd{
       d_ids = myParticlesIdsGPU_ptr + numberParticlesPrev;
       upSt = 0;
     }
-    
+
     ParticleGroup_ns::updateGroupIndices<<<Nblocks, Nthreads, 0, upSt>>>(id2index,
 					      myParticlesIndicesGPU_ptr + numberParticlesPrev,
 					      d_ids,
@@ -489,14 +489,14 @@ namespace uammd{
     const int *id2index = pd->getIdOrderedIndices(access::location::gpu);
     int Nthreads=(N>=128)?128:N;
     int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
-    
+
     int *myParticlesIndicesGPU_ptr = thrust::raw_pointer_cast(myParticlesIndicesGPU.data());
     int *myParticlesIdsGPU_ptr = thrust::raw_pointer_cast(myParticlesIdsGPU.data());
-    
+
     if(!st) CudaSafeCall(cudaStreamCreate(&st));
     auto copyKind = cudaMemcpyDeviceToDevice;
     if(loc==access::location::cpu)  copyKind = cudaMemcpyHostToDevice;
-    
+
     CudaSafeCall(cudaMemcpyAsync(myParticlesIndicesGPU_ptr+numberParticlesPrev, indices,
 				 N*sizeof(int), copyKind, st));
     auto index2id = pd->getId(access::location::gpu, access::mode::read);

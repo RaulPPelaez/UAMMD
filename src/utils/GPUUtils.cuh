@@ -1,6 +1,6 @@
 /*Raul P. Pelaez 2017. Some GPU utilities
 
-  
+
  */
 #ifndef GPUUTILS_CUH
 #define GPUUTILS_CUH
@@ -14,7 +14,7 @@ namespace uammd{
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     if(id>=N) return;
 
-    array[id] = value;	            
+    array[id] = value;
   }
 
   template<class T, class OutputIterator, class Iterator>
@@ -30,7 +30,7 @@ namespace uammd{
   __global__ void copyGPU(InputIterator d_in, OutputIterator d_out, int N){
     int id = blockIdx.x*blockDim.x + threadIdx.x;
     if(id>=N) return;
-  
+
     d_out[id] = d_in[id];
   }
 

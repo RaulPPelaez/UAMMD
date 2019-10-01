@@ -2,7 +2,7 @@
 
   PairForces Module is an interactor that computes short range forces.
   Computes the interaction between neighbour particles (pairs of particles closer tan rcut).
-    
+
   For that, it uses a NeighbourList and computes the force given by Potential for each pair of particles. It sums the force for all neighbours of every particle.
 
   See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces   for more info.
@@ -58,23 +58,23 @@ namespace uammd{
     void print_info(){
       sys->log<System::MESSAGE>("[PairForces] Using: %s Neighbour List.", type_name<NeighbourList>());
       //nl.print();
-      sys->log<System::MESSAGE>("[PairForces] Using: %s potential.", type_name<Potential>());	
+      sys->log<System::MESSAGE>("[PairForces] Using: %s potential.", type_name<Potential>());
     }
 
 
   private:
     shared_ptr<NeighbourList> nl;
     shared_ptr<NBody> nb;
-    shared_ptr<Potential> pot;    
+    shared_ptr<Potential> pot;
     Box box;
     real rcut;
-  
+
   };
 
 
 }
 
 #include"PairForces.cu"
-  
+
 #endif
 

@@ -3,7 +3,7 @@
   Performs a NVT MD simulation of a LJ liquid.
   It uses the VerletNVT::GronbechJensen integrator.
   It allows for testing of the LJ potential and the integrator by using it to reproduce the eq of state.
-  
+
 */
 
 #include"uammd.cuh"
@@ -34,10 +34,10 @@ bool shift;
 std::string outfile, energyOutfile;
 
 void readParameters(std::string datamain, shared_ptr<System> sys);
-int main(int argc, char *argv[]){ 
+int main(int argc, char *argv[]){
   auto sys = make_shared<System>();
   readParameters("data.main", sys);
-  
+
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
 
@@ -48,17 +48,17 @@ int main(int argc, char *argv[]){
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     auto energy = pd->getEnergy(access::location::cpu, access::mode::readwrite);
-    auto initial =  initLattice(box.boxSize, numberParticles, sc);    
+    auto initial =  initLattice(box.boxSize, numberParticles, sc);
     fori(0,numberParticles){
       pos.raw()[i] = initial[i];
       pos.raw()[i].w = 0;
       energy.raw()[i] = 0;
-    }    
+    }
   }
-  
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");    
 
-  
+  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
+
   using NVT = VerletNVT::GronbechJensen;
   NVT::Parameters par;
   par.temperature = temperature;
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]){
     sys->log<System::MESSAGE>("[System] LJ Parameters: sigma %e, epsilon %e, cutOff %e·sigma, shift: truncated and shifted", sigma, epsilon, cutOff);
   else
     sys->log<System::MESSAGE>("[System] LJ Parameters: sigma %e, epsilon %e, cutOff %e·sigma, shift: truncated", sigma, epsilon, cutOff);
-  
+
   auto pot = make_shared<Potential::LJ>(sys);
   {
 
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]){
       sys->log<System::DEBUG1>("[System] Writing to disk...");
       {
 	auto pos = pd->getPos(access::location::cpu, access::mode::read);
-	const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);            
+	const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
 	out<<"#Lx="<<0.5*box.boxSize.x<<";Ly="<<0.5*box.boxSize.y<<";Lz="<<0.5*box.boxSize.z<<";"<<endl;
 	real3 p;
 	fori(0,numberParticles){
@@ -137,15 +137,15 @@ int main(int argc, char *argv[]){
 	  energy.raw()[i] = 0;
 	}
 	eout<<(0.5*U)/numberParticles<<" "<<(K)/numberParticles<<endl;
-	  
+
       }
-    }    
+    }
 
     if(j%500 == 0){
       pd->sortParticles();
     }
   }
-  
+
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", numberSteps/totalTime);
   sys->finish();
@@ -160,7 +160,7 @@ void readParameters(std::string datamain, shared_ptr<System> sys){
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("numberSteps", InputFile::Required)>>numberSteps;
   in.getOption("printSteps", InputFile::Required)>>printSteps;
-  in.getOption("relaxSteps", InputFile::Required)>>relaxSteps; 
+  in.getOption("relaxSteps", InputFile::Required)>>relaxSteps;
   in.getOption("dt", InputFile::Required)>>dt;
   in.getOption("numberParticles", InputFile::Required)>>numberParticles;
   in.getOption("sigma", InputFile::Required)>>sigma;
@@ -169,6 +169,6 @@ void readParameters(std::string datamain, shared_ptr<System> sys){
   in.getOption("shiftLJ", InputFile::Required)>>shift;
   in.getOption("outfile", InputFile::Required)>>outfile;
   in.getOption("energyOutfile", InputFile::Required)>>energyOutfile;
-  in.getOption("cutOff", InputFile::Required)>>cutOff;  
+  in.getOption("cutOff", InputFile::Required)>>cutOff;
 
 }

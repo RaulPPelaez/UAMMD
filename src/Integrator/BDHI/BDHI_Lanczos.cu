@@ -1,6 +1,6 @@
 /*Raul P. Pelaez 2017.
-  BDHI Lanczos submodule. 
-  
+  BDHI Lanczos submodule.
+
   Computes the mobility matrix on the fly when needed, so it is a mtrix free method.
 
   M·F is computed as an NBody interaction (a dense Matrix vector product).
@@ -24,15 +24,15 @@ namespace uammd{
 
     Lanczos::Lanczos(shared_ptr<ParticleData> pd,
 		     shared_ptr<ParticleGroup> pg,
-		     shared_ptr<System> sys,		       
+		     shared_ptr<System> sys,
 		     Parameters par):
       pd(pd), pg(pg), sys(sys),
       hydrodynamicRadius(par.hydrodynamicRadius),
       temperature(par.temperature),
       tolerance(par.tolerance),
       rpy(par.viscosity),par(par){
-      
-      sys->log<System::MESSAGE>("[BDHI::Lanczos] Initialized");  
+
+      sys->log<System::MESSAGE>("[BDHI::Lanczos] Initialized");
 
       //Lanczos algorithm computes,
       //given an object that computes the product of a Matrix(M) and a vector(v), sqrt(M)·v
@@ -51,7 +51,7 @@ namespace uammd{
 
       //Init rng
       curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
-    
+
       curandSetPseudoRandomGeneratorSeed(curng, sys->rng().next());
 
       thrust::device_vector<real> noise(30000);
@@ -62,7 +62,7 @@ namespace uammd{
 
     }
 
-  
+
     Lanczos::~Lanczos(){
 
     }
@@ -73,11 +73,11 @@ namespace uammd{
       /*Each thread handles one particle with the other N, including itself*/
       /*That is 3 full lines of M, or 3 elements of M·v per thread, being the x y z of ij with j=0:N-1*/
       /*In other words. M is made of NxN boxes of size 3x3,
-	defining the x,y,z mobility between particle pairs, 
+	defining the x,y,z mobility between particle pairs,
 	each thread handles a row of boxes and multiplies it by three elements of v*/
       /*vtype can be real3 or real4*/
       template<class vtype>
-      struct NbodyMatrixFreeMobilityDot{    
+      struct NbodyMatrixFreeMobilityDot{
 	typedef real3 computeType;
 	typedef real4 infoType; //v[i], radius[i]
 	NbodyMatrixFreeMobilityDot(vtype* v,
@@ -110,7 +110,7 @@ namespace uammd{
 	    return f*vj;
 	  /*This expression is a little obfuscated, Mij*vj = f(rij)·I + g(rij)/rij^2 · \vec{rij}\diadic \vec{rij} ) · \vec{vij}
 	    Where f and g are the hydrodinamic kernel coefficients
-	  */      
+	  */
 	  const real gv = gdivr2*dot(rij, vj);
 	  /*gv = g(r)·( vx·rx + vy·ry + vz·rz )*/
 	  /*(g(r)·v·(r(diadic)r) )_ß = gv·r_ß*/
@@ -155,10 +155,10 @@ namespace uammd{
     }
 
     void Lanczos::computeMF(real3* MF, cudaStream_t st){
-      /*For M·v product. Being M the Mobility and v an arbitrary array. 
+      /*For M·v product. Being M the Mobility and v an arbitrary array.
 	The M·v product can be seen as an Nbody interaction Mv_j = sum_i(Mij*vi)
 	Where Mij = RPY( |rij|^2 ).
-    
+
 	Although M is 3Nx3N, it is treated as a Matrix of NxN boxes of size 3x3,
 	and v is a vector3.
       */
@@ -170,9 +170,9 @@ namespace uammd{
 
       real * radius_ptr =  this->hydrodynamicRadius>0?nullptr:radius.raw();
       myTransverser Mv_tr(force.raw(), MF, this->hydrodynamicRadius, radius_ptr, rpy);
- 
+
       NBody nbody(pd, pg, sys);
-  
+
       nbody.transverse(Mv_tr, st);
     }
 
@@ -186,10 +186,10 @@ namespace uammd{
 	/*Lanczos Algorithm needs a functor that provides the dot product of M and a vector*/
 	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
 	real * radius_ptr =  this->hydrodynamicRadius>0?nullptr:radius.raw();
-	
+
 	Lanczos_ns::Dotctor<real3> Mdot(rpy, this->hydrodynamicRadius, radius_ptr, nbody, st);
 
-	//Filling V instead of an external array (for v in sqrt(M)·v) is faster 
+	//Filling V instead of an external array (for v in sqrt(M)·v) is faster
 	real *noise = lanczosAlgorithm->getV(numberParticles);
 	curandGenerateNormal(curng, noise,
 			     3*numberParticles + (3*numberParticles)%2,
@@ -204,7 +204,7 @@ namespace uammd{
     // 	divMTransverser(real3* divM, real M0, real rh): divM(divM), M0(M0), rh(rh){
     // 	  this->invrh = 1.0/rh;
     // 	}
-    
+
     // 	inline __device__ real3 zero(){ return make_real3(real(0.0));}
     // 	inline __device__ real3 compute(const real4 &pi, const real4 &pj){
     // 	  /*Work in units of rh*/
@@ -224,7 +224,7 @@ namespace uammd{
     // 	  }
     // 	}
     // 	inline __device__ void accumulate(real3 &total, const real3 &cur){total += cur;}
-    
+
     // 	inline __device__ void set(int id, const real3 &total){
     // 	  divM[id] = M0*total*invrh;
     // 	}
@@ -239,9 +239,9 @@ namespace uammd{
     // void Lanczos::computeDivM(real3* divM, cudaStream_t st){
     //   sys->log<System::DEBUG1>("[BDHI::Lanczos] divM");
     //   Lanczos_ns::divMTransverser divMtr(divM, selfMobility, hydrodynamicRadius);
-  
+
     //   NBody nbody(pd, pg, sys);
-  
+
     //   nbody.transverse(divMtr, st);
     // }
   }

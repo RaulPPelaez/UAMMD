@@ -2,18 +2,18 @@
 
   This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
   that conserves the temperature, volume and number of particles.
-  
+
   Uses a simple thermostat with velocity damping and a gaussian noise force.
 
  Usage:
- 
+
     Create the module as any other integrator with the following parameters:
-    
-    
+
+
     auto sys = make_shared<System>();
     auto pd = make_shared<ParticleData>(N,sys);
     auto pg = make_shared<ParticleGroup>(pd,sys, "All");
-    
+
     using NVT = VerletNVT::Basic;
     NVT::Parameters par;
      par.temperature = 1.0;
@@ -22,15 +22,15 @@
      par.is2D = false;
 
     auto verlet = make_shared<NVT>(pd, pg, sys, par);
-      
+
     //Add any interactor
     verlet->addInteractor(...);
     ...
-    
+
     //forward simulation 1 dt:
-    
+
     verlet->forwardTime();
-    
+
  */
 
 #include"../VerletNVT.cuh"
@@ -47,16 +47,16 @@ namespace uammd{
       __global__ void initialVelocities(real3* vel, const real* mass,
 					ParticleGroup::IndexIterator indexIterator, //global index of particles in my group
 					real vamp, bool is2D, int N, uint seed){
-	int id = blockIdx.x*blockDim.x + threadIdx.x;      
+	int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>=N) return;
 	Saru rng(id, seed);
 	int i = indexIterator[id];
-	
+
 	real mass_i = real(1.0);
 	if(mass) mass_i = mass[i];
-	
+
 	double3 noisei = make_double3(rng.gd(0, vamp/mass_i), rng.gd(0, vamp/mass_i).x); //noise[id];
-	
+
 	int index = indexIterator[i];
 	vel[index].x = noisei.x;
 	vel[index].y = noisei.y;
@@ -64,18 +64,18 @@ namespace uammd{
 	  vel[index].z = noisei.z;
 	}
       }
-    
+
     }
 
     Basic::Basic(shared_ptr<ParticleData> pd,
 		 shared_ptr<ParticleGroup> pg,
-		 shared_ptr<System> sys,		       
+		 shared_ptr<System> sys,
 		 Basic::Parameters par):
       Basic(pd, pg, sys, par, "VerletNVT::Basic"){}
-    
+
       Basic::Basic(shared_ptr<ParticleData> pd,
 		   shared_ptr<ParticleGroup> pg,
-		   shared_ptr<System> sys,		       
+		   shared_ptr<System> sys,
 		   Basic::Parameters par,
 		   std::string name):
       Integrator(pd, pg, sys, name),
@@ -105,18 +105,18 @@ namespace uammd{
       {
 	auto vel_handle = pd->getVel(access::location::gpu, access::mode::write);
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
-      
+
 	real velAmplitude = sqrt(3.0*temperature);
-      	
+
 	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
 
-      
+
 	Basic_ns::initialVelocities<<<Nblocks, Nthreads>>>(vel_handle.raw(),
 							   mass.raw(),
 							   groupIterator,
 							   velAmplitude, is2D, numberParticles,
 							   sys->rng().next32());
-      
+
       }
 
       cudaStreamCreate(&stream);
@@ -124,7 +124,7 @@ namespace uammd{
     }
 
 
-  
+
     Basic::~Basic(){
       cudaStreamDestroy(stream);
     }
@@ -158,17 +158,17 @@ namespace uammd{
 	if(radius){
 	  radius_i = radius[i];
 	}
-	
+
 	Saru rng(id, stepNum, seed);
-	
+
 	noiseAmplitude *= sqrtf(0.5*radius_i*invMass);
-	
+
 	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), rng.gf(0, noiseAmplitude).x); //noise[id];
-	
+
 	const real damping = real(6.0)*real(M_PI)*viscosity*radius_i;
 
 	vel[i] += (make_real3(force[i])-damping*vel[i])*(dt*real(0.5)*invMass) + noisei;
-	
+
 	if(is2D) vel[i].z = real(0.0);
 
 	//In the first step, upload positions
@@ -183,25 +183,25 @@ namespace uammd{
 
 
     }
-  
+
     //Move the particles in my group 1 dt in time.
     void Basic::forwardTime(){
       for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
-    
+
       steps++;
       sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
-    
+
       int numberParticles = pg->getNumberParticles();
-    
+
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
 
-    
+
       //First simulation step is special
       if(steps==1){
 	{
 	  auto groupIterator = pg->getIndexIterator(access::location::gpu);
-	  auto force = pd->getForce(access::location::gpu, access::mode::write);     
+	  auto force = pd->getForce(access::location::gpu, access::mode::write);
 	  fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
 	}
 	for(auto forceComp: interactors){
@@ -220,7 +220,7 @@ namespace uammd{
 	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 	auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
-	
+
 	//Mass is assumed 1 for all particles if it has not been set.
 	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
 	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
@@ -240,17 +240,17 @@ namespace uammd{
       //Compute all the forces
       for(auto forceComp: interactors) forceComp->sumForce(stream);
 
-    
+
       //Second integration step
       {
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
-      
+
 	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 	auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
-      
+
 	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
-	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);     
+	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
 
 	Basic_ns::integrateGPU<2><<<Nblocks, Nthreads, 0 , stream>>>(pos.raw(),
 								     vel.raw(),

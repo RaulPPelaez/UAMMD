@@ -19,8 +19,8 @@
 Usage:
 
    See PairForces.cu for a simple example on how to use a NL.
-   Typically transverseList will do a much better job at using the list than asking for it and manually transversing it. But it could be useful if the list is to be used many times per step. 
- 
+   Typically transverseList will do a much better job at using the list than asking for it and manually transversing it. But it could be useful if the list is to be used many times per step.
+
 
 TODO:
 100- Make verletRadiusMultiplier self optimized somehow.
@@ -49,13 +49,13 @@ namespace uammd{
     template<class GroupIterator>
     __global__ void updateLastPos(real4 *pos,
 				  real4 *lastPos,
-				  GroupIterator groupIndexes,		
+				  GroupIterator groupIndexes,
 				  int numberParticles){
 
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=numberParticles) return;
       int gid = groupIndexes[id];
-      lastPos[id] = pos[gid];      
+      lastPos[id] = pos[gid];
     }
 
 
@@ -80,12 +80,12 @@ namespace uammd{
       if(dot(rij, rij)>=(maxDist*maxDist)){
 	atomicAdd(updateFlag, 1u);
       }
-    }   
-    
+    }
+
   }
   class VerletList{
   protected:
-    shared_ptr<ParticleData> pd; 
+    shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
     shared_ptr<System> sys;
 
@@ -97,13 +97,13 @@ namespace uammd{
     Box currentBox;
 
     bool force_next_update = true;
-    
+
     connection reorderConnection;
-    
+
     thrust::device_vector<real4> lastPos;
     uint *updateFlagGPU;
   public:
-        
+
     VerletList(shared_ptr<ParticleData> pd,
 	       shared_ptr<System> sys):
       VerletList(pd, std::make_shared<ParticleGroup>(pd, sys), sys){ }
@@ -133,7 +133,7 @@ namespace uammd{
     CellList::NeighbourListData getNeighbourList(cudaStream_t st = 0){
       return cl->getNeighbourList(st);
     }
-    
+
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[VerletList] Transversing Verlet list with %s", type_name<Transverser>().c_str());
@@ -145,7 +145,7 @@ namespace uammd{
 
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto groupIndexesIterator  = pg->getIndexIterator(access::location::gpu);      
+      auto groupIndexesIterator  = pg->getIndexIterator(access::location::gpu);
 
       try{
 	lastPos.resize(numberParticles);
@@ -166,7 +166,7 @@ namespace uammd{
       CudaCheckError();
       sys->log<System::DEBUG2>("[VerletList] Checking for rebuild");
       pd->hintSortByHash(box, make_real3(cutOff*verletRadiusMultiplier));
-      
+
       if(force_next_update){
 	force_next_update = false;
 	currentCutOff = cutOff;
@@ -203,9 +203,9 @@ namespace uammd{
       real thresholdDistance = (verletRadiusMultiplier*currentCutOff-currentCutOff)/2.0;
       {
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	auto groupIndexesIterator  = pg->getIndexIterator(access::location::gpu);      
+	auto groupIndexesIterator  = pg->getIndexIterator(access::location::gpu);
 	sys->log<System::DEBUG3>("[VerletList] lastPos size: %d", lastPos.size());
-	
+
 	VerletList_ns::checkLastPos<<<numberParticles/128+1, 128, 0, st>>>(pos.raw(),
 									   thrust::raw_pointer_cast(lastPos.data()),
 									   groupIndexesIterator,
@@ -222,7 +222,7 @@ namespace uammd{
 	int zero = 0;
 	CudaSafeCall(cudaMemcpy(updateFlagGPU, &zero, sizeof(uint), cudaMemcpyHostToDevice));
 	sys->log<System::DEBUG3>("[VerletList] %d particles moved beyond the threshold (%e), forcing rebuild.",
-				 updateFlag, thresholdDistance);	
+				 updateFlag, thresholdDistance);
 	this->updateLastPos();
 	return true;
       }
@@ -231,7 +231,7 @@ namespace uammd{
 	return false;
       }
     }
-    
+
     void updateNeighbourList(Box box, real cutOff, cudaStream_t st = 0){
       if(this->needsRebuild(box, cutOff, st) == false) return;
       sys->log<System::DEBUG3>("[VerletList] Updating list");

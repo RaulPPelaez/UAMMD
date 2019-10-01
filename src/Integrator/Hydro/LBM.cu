@@ -1,4 +1,4 @@
-/* Raul P. Pelaez 2018. Lattice Boltzmann Integrator. 
+/* Raul P. Pelaez 2018. Lattice Boltzmann Integrator.
    This file implements the D3Q19 LBM scheme with PBC using the pull-in scheme.
 
 
@@ -42,8 +42,8 @@ namespace uammd{
 	  0,
 	  3, 2, 1,
 	  4};
-	  
-	
+
+
 	__constant__ real wi[19] = {
 	  1.0/36.0,
 	  1.0/36.0, 1.0/18.0, 1.0/36.0,
@@ -66,7 +66,7 @@ namespace uammd{
 
 	    return feq;
 	}
-	
+
 	__global__ void lbm_kernel(real * sourceGrid, real *destGrid,
 				   int *cellType,
 				   real soundSpeed,
@@ -80,11 +80,11 @@ namespace uammd{
 				 id/(grid.cellDim.x*grid.cellDim.y));
 
 
-	  
+
 	  constexpr int numberVelocities = 19;
 	  real density = real(0.0);
 	  real3 velocity = make_real3(real(0.0));
-	
+
 	  real fi[numberVelocities];
 
 
@@ -94,10 +94,10 @@ namespace uammd{
 	    cellj = grid.pbc_cell(cellj);
 	    int icellj = grid.getCellIndex(cellj);
 	    fi[i] = sourceGrid[icellj+i*ncells];
-	    
+
 	    density += fi[i];
 	    velocity += fi[i]*make_real3(velocities[i]);
-	  }	  
+	  }
 	  velocity *= soundSpeed/density;
 
 	  int icell = grid.getCellIndex(celli);
@@ -106,16 +106,16 @@ namespace uammd{
 	    for(int i = 0; i<numberVelocities; i++){
 	      destGrid[icell + i*ncells] = fi[opposite[i]];
 	    }
-	    return; 
+	    return;
 	  }
-	  
+
 	  for(int i = 0; i<numberVelocities; i++){
 	    real feq = equilibriumDistribution(i, velocity, density, soundSpeed);
 	    destGrid[icell + i*ncells] = fi[i] -  (real(1.0)/relaxTime)*(fi[i] - feq);
 	  }
 	}
-	  
-      
+
+
 
       __global__ void particles2Grid(int *cellType,
 				     real4  *pos,
@@ -150,7 +150,7 @@ namespace uammd{
 	  int3 cellj = make_int3(celli.x + i%supportCells.x - P.x,
 				 celli.y + (i/supportCells.x)%supportCells.y - P.y,
 				 celli.z + i/(supportCells.x*supportCells.y) - P.z );
-	  cellj = grid.pbc_cell(cellj);	  	  
+	  cellj = grid.pbc_cell(cellj);
 	  const int jcell = grid.getCellIndex(cellj);
 	  real3 rij = grid.box.apply_pbc(pi-make_real3(cellj)*grid.cellSize - cellPosOffset);
 	  real r2 = dot(rij, rij);
@@ -160,12 +160,12 @@ namespace uammd{
       }
 
 
-	
-	
 
 
-				    
-		       
+
+
+
+
 
 	__global__ void lbm_initial(real * sourceGrid, real *destGrid,
 				    real soundSpeed,
@@ -181,14 +181,14 @@ namespace uammd{
 	  real density = real(1.0)/(grid.cellSize.x*grid.cellSize.y*grid.cellSize.z);
 	  real3 velocity = make_real3(real(0.0));
 	  int icell = grid.getCellIndex(celli);
-	  
+
 	  for(int i = 0; i<numberVelocities; i++){
-	    real feq = equilibriumDistribution(i, velocity, density, soundSpeed);	    
-	    sourceGrid[icell + i*ncells] = feq;	 
+	    real feq = equilibriumDistribution(i, velocity, density, soundSpeed);
+	    sourceGrid[icell + i*ncells] = feq;
 	    //if(celli.x==grid.cellDim.x/2 and celli.y==grid.cellDim.y/2 and celli.z ==grid.cellDim.z/2 && i==6)    sourceGrid[icell + i*ncells] *= 10;
 	    //if(celli.x==0 && i==6)    sourceGrid[icell + i*ncells] *= 10;
-	    if(celli.x>grid.cellDim.x/2){	      
-	      sourceGrid[icell + i*ncells] *= 0.5;	      
+	    if(celli.x>grid.cellDim.x/2){
+	      sourceGrid[icell + i*ncells] *= 0.5;
 	    }
 	    else{
 	      if(i==7)
@@ -197,8 +197,8 @@ namespace uammd{
 	  }
 	}
       }
-    
-  
+
+
       D3Q19::D3Q19(shared_ptr<ParticleData> pd,
 		   shared_ptr<System> sys,
 		   Parameters par):
@@ -216,11 +216,11 @@ namespace uammd{
 	int ncells = grid.getNumberCells();
 
 
-	
-	// real cellSize = grid.cellSize.x;	
-	// soundSpeed = cellSize/dt;       
+
+	// real cellSize = grid.cellSize.x;
+	// soundSpeed = cellSize/dt;
 	// relaxTime = 0.5 + 3*viscosity*dt/(cellSize*cellSize);
-	
+
 	sys->log<System::MESSAGE>("[LBM::D3Q19] Cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
 	sys->log<System::MESSAGE>("[LBM::D3Q19] ncells: %d", ncells);
 	sys->log<System::MESSAGE>("[LBM::D3Q19] soundSpeed: %e", this->soundSpeed);
@@ -228,9 +228,9 @@ namespace uammd{
 	sys->log<System::MESSAGE>("[LBM::D3Q19] viscosity: %e", viscosity);
 
 	sourceGrid.resize(ncells*numberVelocities, 0.0);
-	
+
         cellType.resize(ncells, 0);
-	
+
 	destGrid = sourceGrid;
 	int Nthreads = 64;
 	int Nblocks = ncells/Nthreads+1;
@@ -257,18 +257,18 @@ namespace uammd{
 	real *destGrid_ptr = thrust::raw_pointer_cast(destGrid.data());
 
 
-	
 
 
 
-	 int numberParticles = pd->getNumParticles();	
+
+	 int numberParticles = pd->getNumParticles();
 	 int *cellType_ptr = thrust::raw_pointer_cast(cellType.data());
 	 fillWithGPU<<<Nblocks, Nthreads>>>(cellType_ptr, 0, ncells);
 	 auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	 auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);	 
+	 auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
 
-	 
-	 
+
+
 	 D3Q19_ns::particles2Grid<<<numberParticles, 32>>>(cellType_ptr,
 							   pos.raw(),
 							   radius.raw(),
@@ -282,16 +282,16 @@ namespace uammd{
 						    relaxTime/dt,
 						    grid,
 						    ncells);
-	
+
 	destGrid.swap(sourceGrid);
 
       }
       void D3Q19::write(){}
-      
+
       void D3Q19::writePNG(){
-	
+
 	thrust::host_vector<real> h_data = sourceGrid;
-	
+
 	int ncells = grid.getNumberCells();
 	std::vector<unsigned char> image(4*grid.cellDim.x*grid.cellDim.y,0);
 	real max = 0;
@@ -312,7 +312,7 @@ namespace uammd{
 	    }
 	  }
 	}
-	
+
 	fori(0, grid.cellDim.x){
 	  forj(0,grid.cellDim.y){
 	    //for(int kz = 0; kz<grid.cellDim.z; kz++){
@@ -323,8 +323,8 @@ namespace uammd{
 	      int icell = grid.getCellIndex(make_int3(i, j, kz));
 	      for(int k = 0; k<19; k++){
 		density += h_data[icell+ncells*k];
-	
-	      }       
+
+	      }
 	      unsigned char R = std::min((unsigned char)255, (unsigned char)(((density-min)/(max-min))*255) );
 	      unsigned char B = 255-R;
 	      image[4*(i+grid.cellDim.x*j)] = R;

@@ -2,9 +2,9 @@
 
   PairForces Module is an interactor that computes short range forces.
 
-  Computes the interaction between neighbour particles (pairs of particles closer tan rcut). 
-  If the value of rcut reaches a certain threshold, the computation will be 
-    
+  Computes the interaction between neighbour particles (pairs of particles closer tan rcut).
+  If the value of rcut reaches a certain threshold, the computation will be
+
   For that, it uses a NeighbourList or an Nbody interaction and computes the force given by Potential for each pair of particles. It sums the force for all neighbours of every particle.
 
   See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces   for more info.
@@ -22,7 +22,7 @@ namespace uammd{
   template<class MyPotential, class NL>
   PairForces<MyPotential, NL>::PairForces(shared_ptr<ParticleData> pd,
 					shared_ptr<ParticleGroup> pg,
-					shared_ptr<System> sys,		       
+					shared_ptr<System> sys,
 					Parameters par,
 					shared_ptr<MyPotential> pot):
     Interactor(pd, pg, sys,
@@ -38,27 +38,27 @@ namespace uammd{
     this->setDelegate(pot.get());
   }
 
-  
+
   template<class MyPotential, class NL>
   template<class Transverser>
   void PairForces<MyPotential, NL>::sumTransverser(Transverser &tr, cudaStream_t st){
     this->rcut = pot->getCutOff();
-    
+
     sys->log<System::DEBUG3>("[PairForces] Using cutOff: %f", this->rcut);
-    
+
 
     bool useNeighbourList = true;
-    
+
 
     //If the cutoff distance is too high, fall back to an NBody interaction
     int3 ncells = make_int3(box.boxSize/rcut);
 
     if(ncells.x <=3 || ncells.y <= 3 || (ncells.z <=3 && ncells.z>0) ){
-      useNeighbourList = false;      
+      useNeighbourList = false;
     }
 
-   
-    
+
+
     if(useNeighbourList){
       if(!nl){
 	//A neighbour list must know just my system information at construction
@@ -70,11 +70,11 @@ namespace uammd{
       nl->updateNeighbourList(box, rcut, st);
 
       sys->log<System::DEBUG2>("[PairForces] Transversing neighbour list");
-    
+
       //nl->transverseListWithNeighbourList(tr, st);
       nl->transverseList(tr, st);
 
-      
+
 
     }
     else{
@@ -82,20 +82,20 @@ namespace uammd{
 	nb = std::make_shared<NBody>(pd, pg, sys);
       }
       sys->log<System::DEBUG2>("[PairForces] Transversing NBody");
-	
+
       nb->transverse(tr, st);
 
     }
-    
-    
+
+
   }
-    
+
   template<class MyPotential, class NL>
   void PairForces<MyPotential, NL>::sumForce(cudaStream_t st){
     sys->log<System::DEBUG1>("[PairForces] Summing forces");
 
     auto ft = pot->getForceTransverser(box, pd);
-    
+
     this->sumTransverser(ft, st);
   }
 
@@ -112,6 +112,6 @@ namespace uammd{
       this->sumTransverser(et, st);
     return 0;
   }
-    
+
 
 }

@@ -30,7 +30,7 @@ int main(){
   int end_bit = (msb+cub_extra_bits);
   end_bit = std::min(end_bit, 32);
 
-  
+
   cerr<<"Number of elements: "<<N<<endl;
   thrust::device_vector<uint> key(N), key_alt(N);
   thrust::device_vector<int> value(N), value_alt(N);
@@ -46,7 +46,7 @@ int main(){
   {
     thrust::host_vector<int> valueCPU(N);
     thrust::host_vector<int> keyCPU(N);
-  
+
     for(int i = 0; i<N; i++){
       valueCPU[i]  = i;
 
@@ -58,19 +58,19 @@ int main(){
   //Correct sort with thrust
   auto value_thrust = value;
   auto key_thrust = key;
-  thrust::stable_sort_by_key(key_thrust.begin(), key_thrust.end(), value_thrust.begin());  
+  thrust::stable_sort_by_key(key_thrust.begin(), key_thrust.end(), value_thrust.begin());
 
 
-  //Try to sort with cub, select end_bit as the msb of the largest hash + cub_extra_bits  
+  //Try to sort with cub, select end_bit as the msb of the largest hash + cub_extra_bits
   int min_key = *(thrust::min_element(key.begin(), key.end()));
 
-  
+
   cerr<<"Most significant bit in max key value ("<<max_key<<"): "<<msb<<endl;
   cerr<<"Min key: "<<min_key<<endl;
 
   cerr<<"end_bit to cub::SortPairs: "<<end_bit<<endl;
 
-  
+
   size_t temp_storage_bytes = 0;
   void * d_temp_storage = nullptr;
 
@@ -80,21 +80,21 @@ int main(){
 				  db_value,
 				  N,
 				  0, end_bit);
-			
+
   /*Allocate temporary storage*/
   cudaMalloc(&d_temp_storage, temp_storage_bytes);
 
   cerr<<temp_storage_bytes<<" bytes Allocated for cub"<<endl;
   /**Perform the Radix sort on the value/key pair**/
   err = cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
-				  db_key, 
+				  db_key,
 				  db_value,
 				  N,
 				  0, end_bit);
 
   key.swap(key_alt);
   value.swap(value_alt);
-  
+
   cudaFree(d_temp_storage);
 
   {
@@ -109,17 +109,17 @@ int main(){
       cerr<<value_thrustCPU[i]<<" ";
     }
     cerr<<endl;
-    
+
     for(int i = 0; i<N; i++){
       if(valueCPU[i] != value_thrustCPU[i]){
 	cerr<<endl<<" ERROR in "<<i<<"th element!!"<<endl;
 	cerr<<"Result is: "<<valueCPU[i]<<endl;
-	cerr<<"Should be:"<<value_thrustCPU[i]<<endl;	
+	cerr<<"Should be:"<<value_thrustCPU[i]<<endl;
 	exit(1);
       }
     }
-  } 
+  }
   cerr<<"SUCCESS!!"<<endl;
-  
+
   return 0;
 }

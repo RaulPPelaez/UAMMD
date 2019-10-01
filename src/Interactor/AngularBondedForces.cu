@@ -14,7 +14,7 @@
 
 namespace uammd{
 
- 
+
   template<class BondType>
   AngularBondedForces<BondType>::AngularBondedForces(shared_ptr<ParticleData> pd,
 						     shared_ptr<System> sys,
@@ -37,44 +37,44 @@ namespace uammd{
     std::vector<std::vector<int>> isInBonds(numberParticles);
     if(!in)
       sys->log<System::CRITICAL>("[AngularBondedForces] File %s cannot be opened.", par.readFile.c_str());
-    
+
     in>>nbonds;
     std::vector<Bond> blst(nbonds); //Temporal storage for the bonds in the file
 
-  
+
     sys->log<System::MESSAGE>("[AngularBondedForces] Detected: %d particle-particle-particle bonds", nbonds);
-    
+
     if(nbonds>0){
       std::set<int> pwb; //Particles with bonds
-      for(int b=0; b<nbonds; b++){	  
+      for(int b=0; b<nbonds; b++){
 	int i, j, k;
 	if(!(in>>i>>j>>k))
 	  sys->log<System::CRITICAL>("[AngularBondedForces] ERROR! Bond file ended too soon! Expected %d lines, found %d", nbonds, b);
-	       
+
 	isInBonds[i].push_back(b);
 	isInBonds[j].push_back(b);
 	isInBonds[k].push_back(b);
-	
+
 	blst[b].i = i;
 	blst[b].j = j;
 	blst[b].k = k;
-	
+
 	blst[b].bond_info = BondType::readBond(in);
-	
+
 	pwb.insert(i);
 	pwb.insert(j);
 	pwb.insert(k);
       }
       particlesWithBonds.assign(pwb.begin(), pwb.end());
     }
-  
-  
+
+
     const int NparticleswithBonds = particlesWithBonds.size();
-      
+
     bondStart.resize(NparticleswithBonds, 0xffFFffFF);
     bondEnd.resize(NparticleswithBonds, 0);
-    
-    thrust::host_vector<Bond> bondListCPU(3*nbonds);   
+
+    thrust::host_vector<Bond> bondListCPU(3*nbonds);
 
     //Fill bondList, bondStart and bondEnd
     //BondList has the following format:
@@ -83,8 +83,8 @@ namespace uammd{
     fori(0, NparticleswithBonds){
 
       const int index = particlesWithBonds[i];
-      const int nbondsi = isInBonds[index].size();      
-      
+      const int nbondsi = isInBonds[index].size();
+
       int offset;
       if(i>0) offset = bondEnd[i-1];
       else    offset = 0;
@@ -95,13 +95,13 @@ namespace uammd{
       bondStart[i] = offset;
     }
 
-  
+
     nbonds *= 3; //We store all the bonds in which every particle is involved, per particle.
 
     //Upload bondList to GPU
     bondList = bondListCPU;
     sys->log<System::MESSAGE>("[AngularBondedForces] %d particles are involved in at least one bond.",particlesWithBonds.size());
-    
+
     struct AngularBondCompareLessThan{
       bool operator()(const Bond& lhs, const Bond &rhs) const{
 	if((lhs.i < rhs.i and lhs.j < rhs.j and lhs.k < rhs.k)
@@ -114,7 +114,7 @@ namespace uammd{
 
     {
       std::set<Bond, AngularBondCompareLessThan> checkDuplicates;
-      
+
       fori(0, blst.size()){
 	if(!checkDuplicates.insert(blst[i]).second)
 	  sys->log<System::WARNING>("[AngularBondedForces] Bond %d %d %d with index %d is duplicated!", blst[i].i, blst[i].j, blst[i].k, i);
@@ -150,10 +150,10 @@ namespace uammd{
       //Current index of my particle in the global arrays
       const int index = id2index[id_i];
       const real3 posp = make_real3(pos[index]);
-  
+
       const int first = bondStart[tid];
       const int last = bondEnd[tid];
-   
+
       real3 f = make_real3(real(0.0));
 
 
@@ -189,7 +189,7 @@ namespace uammd{
 	f += bondType.force(i,j,k,
 			    index,
 			    posi, posj, posk,
-			    bond.bond_info);	
+			    bond.bond_info);
       }
 
       //The fisrt thread sums all the contributions
@@ -213,7 +213,7 @@ namespace uammd{
   void AngularBondedForces<BondType>::sumForce(cudaStream_t st){
     if(nbonds>0){
       int Nparticles_with_bonds = particlesWithBonds.size();
-      
+
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto d_bondStart = thrust::raw_pointer_cast(bondStart.data());
@@ -222,7 +222,7 @@ namespace uammd{
       auto d_bondList = thrust::raw_pointer_cast(bondList.data());
 
       auto id2index = pd->getIdOrderedIndices(access::location::gpu);
-      
+
       Bonded_ns::computeAngularBondedForce<<<Nparticles_with_bonds,
 	TPP,
 	TPP*sizeof(real3)>>>(force.raw(), pos.raw(),

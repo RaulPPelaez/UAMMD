@@ -1,5 +1,5 @@
 /*Raul P. Pelaez 2017. NBody Interactor module. All particles interact with all the others.
-  
+
   See https://github.com/RaulPPelaez/UAMMD/wiki/NBody-Forces for more information
 
   NBody needs a transverser with the information of what to compute for each particle given all the others.
@@ -33,7 +33,7 @@ namespace uammd{
 
   //NBodyForces uses NBody under the hood, which is used as a neighbour list (through a Transverser).
   //See the wiki for more info on transversers. You can see an example in "NBody.cuh" or "RadialPotential.cuh"
-  
+
   //In this case, NBodyForces needs a Potential, which can provide transversers to compute force, energy and virial.
   template<class MyPotential>
   class NBodyForces: public Interactor, public ParameterUpdatableDelegate<MyPotential>{
@@ -65,11 +65,11 @@ namespace uammd{
 
     ~NBodyForces(){}
 
-    
-    void sumForce(cudaStream_t st) override{     
+
+    void sumForce(cudaStream_t st) override{
       auto tr = pot->getForceTransverser(box, pd);
       nb->transverse(tr, st);
-    } 
+    }
     real sumEnergy() override{
       auto et = Potential::getIfHasEnergyTransverser<MyPotential>::get(pot, box, pd);
       //If a null transverser has been issued, just return 0
@@ -86,7 +86,7 @@ namespace uammd{
     }
 
   private:
-    
+
     shared_ptr<MyPotential> pot;
     Box box;
     shared_ptr<NBody> nb;

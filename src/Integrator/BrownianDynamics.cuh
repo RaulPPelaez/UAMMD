@@ -49,7 +49,7 @@ Set initial state
 
   auto bd = make_shared<BD::EulerMaruyama>(pd, pg, sys, par);
 
-See exampleS/BD.cu for an example  
+See exampleS/BD.cu for an example
 
 */
 #ifndef BROWNIANEULERMARUYAMAINTEGRATOR_CUH
@@ -58,7 +58,7 @@ See exampleS/BD.cu for an example
 #include"Integrator.cuh"
 
 namespace uammd{
-  namespace BD{    
+  namespace BD{
     class EulerMaruyama: public Integrator{
     public:
       struct Parameters{
@@ -79,7 +79,7 @@ namespace uammd{
       EulerMaruyama(shared_ptr<ParticleData> pd,
 		    shared_ptr<System> sys,
 		    Parameters par):
-	EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}		      
+	EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
 
       ~EulerMaruyama();
 
@@ -91,12 +91,12 @@ namespace uammd{
       real hydrodynamicRadius = real(-1.0);
       real temperature = real(0.0);
       real sqrt2MTdt;
-      real dt;  
+      real dt;
 
       bool is2D;
 
       cudaStream_t forceStream;
-      
+
       int steps;
       uint seed;
     };

@@ -1,12 +1,12 @@
 /*Raul P. Pelaez 2017. Positively Split Edwald BDHI Module
-  
+
   As this is a BDHI module. BDHI_PSE computes the terms M·F and B·dW in the differential equation:
             dR = K·R·dt + M·F·dt + sqrt(2Tdt)· B·dW
-  
+
   The mobility, M, is computed according to the Rotne-Prager-Yamakawa (RPY) tensor.
 
-  The computation uses periodic boundary conditions (PBC) 
-  and partitions the RPY tensor in two, positively defined contributions [1], so that: 
+  The computation uses periodic boundary conditions (PBC)
+  and partitions the RPY tensor in two, positively defined contributions [1], so that:
       M = Mr + Mw
        Mr - A real space short range contribution.
        Mw - A wave space long range contribution.
@@ -16,7 +16,7 @@
      B·dW = sqrt(Mr)·dWr + sqrt(Mw)·dWw
 ####################      Short Range     #########################
 
- 
+
   Mr·F: The short range contribution of M·F is computed using a neighbour list (this is like a sparse matrix-vector product in which each element is computed on the fly), see PSE_ns::RPYNearTransverser.
         The RPY near part function (see Apendix 1 in [1]) is precomputed and stored in texture memory,
 	see PSE_ns::RPYPSE_nearTextures.
@@ -32,21 +32,21 @@
 	 -S: An operator that spreads each element of a vector to a regular grid using a gaussian kernel.
 	 -FFT: Fast fourier transform operator.
 	 -B: A fourier scaling factor in wave space to transform forces to velocities, see eq.9 in [1].
-	 
-        Related functions: 
+
+        Related functions:
 	FFT: cufftExecR2C (forward), cufftC2R(inverse)
 	S: PSE_ns::particles2Grid (S), PSE_ns::grid2Particles (σ·St)
 	B: PSE_ns::fillFourierScalingFactor, PSE_ns::forceFourier2vel
 
   sqrt(Mw)·dWw: The far range stochastic contribution is computed in fourier space along M·F as:
-               Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw = 
+               Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
                             = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
 	        Only one St·FFTi is needed, the stochastic term is added as a velocity in fourier space.                dWw is a gaussian random vector of complex numbers, special care must be taken to ensure the correct conjugacy properties needed for the FFT. See PSE_ns::fourierBrownianNoise
 
 Therefore, in the case of Mdot_far, for computing M·F, Bw·dWw is also summed.
 
 computeBdW computes only the real space stochastic contribution.
- 
+
 References:
 
 [1]  Rapid Sampling of Stochastic Displacements in Brownian Dynamics Simulations
@@ -73,7 +73,7 @@ See BDHI_PSE.cu for more info.
 #define cufftComplex cufftDoubleComplex
 #define cufftReal cufftDoubleReal
 #define cufftExecR2C cufftExecD2Z
-#define cufftExecC2R cufftExecZ2D 
+#define cufftExecC2R cufftExecZ2D
 #define CUFFT_C2R CUFFT_Z2D
 #define CUFFT_R2C CUFFT_D2Z
 
@@ -81,7 +81,7 @@ See BDHI_PSE.cu for more info.
 
 namespace uammd{
   namespace BDHI{
-  
+
     class PSE{
     public:
 
@@ -97,8 +97,8 @@ namespace uammd{
 	  Parameters par);
       ~PSE();
       void setup_step(              cudaStream_t st = 0);
-      void computeMF(real3* MF,     cudaStream_t st = 0);    
-      void computeBdW(real3* BdW,   cudaStream_t st = 0);  
+      void computeMF(real3* MF,     cudaStream_t st = 0);
+      void computeBdW(real3* BdW,   cudaStream_t st = 0);
       void computeDivM(real3* divM, cudaStream_t st = 0);
       void finish_step(             cudaStream_t st = 0);
 
@@ -127,13 +127,13 @@ namespace uammd{
       ullint seed;
 
       real hydrodynamicRadius;
-      
+
       real temperature;
       real dt;
       real M0;
       real psi; /*Splitting factor*/
-    
-      /****Near (real space) part *****/    
+
+      /****Near (real space) part *****/
       /*Rodne Prager Yamakawa PSE near real space part textures*/
       thrust::device_vector<real2> tableDataRPY; //Storage for tabulatedFunction
       shared_ptr<TabulatedFunction<real2>> RPY_near;
@@ -146,16 +146,16 @@ namespace uammd{
       shared_ptr<LanczosAlgorithm> lanczos;
 
       /****Far (wave space) part) ******/
-      real kcut; /*Wave space cutoff and corresponding real space grid size */			
+      real kcut; /*Wave space cutoff and corresponding real space grid size */
       Grid grid; /*Wave space Grid parameters*/
-    
+
       /*Grid interpolation kernel parameters*/
       int3 P; //Gaussian spreading/interpolation kernel support points in each direction (total support=2*P+1)*/
       real3 m, eta; // kernel width and gaussian splitting in each direction
 
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
-      
+
       thrust::device_vector<cufftComplex> gridVelsFourier; //Interpolated grid forces/velocities in fourier space
       thrust::device_vector<real3> fourierFactor;  // Fourier scaing factors to go from F to V in wave space
 

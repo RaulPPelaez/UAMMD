@@ -9,7 +9,7 @@
 using namespace std;
 using namespace uammd;
 
-int main(int argc, char * argv[]){  
+int main(int argc, char * argv[]){
   auto sys = make_shared<System>(argc, argv);
   int N;
 
@@ -25,10 +25,10 @@ int main(int argc, char * argv[]){
       pos[i].w = 0;
     }
   }
-  
 
 
-  using AngularBondType = AngularBondedForces_ns::AngularBond; 
+
+  using AngularBondType = AngularBondedForces_ns::AngularBond;
   using Angular = AngularBondedForces<AngularBondType>;
 
   Angular::Parameters ang_params;
@@ -42,7 +42,7 @@ int main(int argc, char * argv[]){
   BondedForces::Parameters params;
   params.file = "harmonic.bonds";
   auto bf = make_shared<BondedForces>(pd, sys, params);
-  
+
   BD::EulerMaruyama::Parameters par;
   par.temperature = 0;
   par.viscosity = 1.0;
@@ -69,8 +69,8 @@ int main(int argc, char * argv[]){
     }
     }
   }
-  
-  
-  
+
+
+
   return 0;
 }

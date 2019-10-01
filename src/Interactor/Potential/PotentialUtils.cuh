@@ -1,6 +1,6 @@
 /*Raul P. Pelaez 2018. Some utilities for working with Potentials.
 
-  
+
  */
 #ifndef POTENTIALUTILS_CUH
 #define POTENTIALUTILS_CUH
@@ -24,7 +24,7 @@ namespace uammd{
       }
 
     };
-  
+
     template<class T>
     struct getIfHasEnergyTransverser<T, false>{
       template<class ...Types>
