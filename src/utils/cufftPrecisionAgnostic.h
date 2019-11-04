@@ -14,12 +14,12 @@ namespace uammd{
     template<class T> struct cufftTypeAgnostic;
     template<> struct cufftTypeAgnostic<double>{using type=cufftDoubleReal;};
     template<> struct cufftTypeAgnostic<float>{using type=cufftReal;};
-  
+
     template<class T> struct cufftComplexType;
     template<> struct cufftComplexType<double>{using type=cufftDoubleComplex;};
     template<> struct cufftComplexType<float>{using type=cufftComplex;};
   }
-  
+
   template<class T> using cufftReal_t = typename detail::cufftTypeAgnostic<T>::type;
 
   template<class T> using cufftComplex_t = typename detail::cufftComplexType<T>::type;
@@ -46,7 +46,7 @@ namespace uammd{
 				     cufftComplex_t<double> *d_out){
 
     return cufftExecD2Z(plan, d_in, d_out);
-  
+
   }
 
 

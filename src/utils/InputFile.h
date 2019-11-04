@@ -5,9 +5,9 @@
 
   #Lines starting with '#' will be ignored
   [option] [argument1] [argument2] ...
-  
+
   You can have an option with no arguments
-  
+
   Additionally you can use the special shell option, which will run the rest of the line as a bash command when encountered and wait for it to finish.
 
 USAGE:
@@ -25,7 +25,7 @@ USAGE:
 
    //Or none!
    bool isOptionPresent = bool(inputFile.getOption("someOption"));
-   
+
    //You can check if an option is present in the file by casting to bool somehow
    //i.e
    if(!(inputFile.getOption("NotPresentOption"))){
@@ -36,7 +36,7 @@ USAGE:
    if(!(inputFile.getOption("someOption")>>anInt>>aFloat>>aString)){
       cerr<<"Some parameter missing in the option!"<<endl;
    }
-   
+
 
 
    getOption will return an std::istringstream, so you can work with its output as such.
@@ -89,8 +89,8 @@ namespace uammd{
 	  word = line;
 	  line = std::string();
 	}
-	else{	   
-	  word = line.substr(0, space_after_option);	    
+	else{
+	  word = line.substr(0, space_after_option);
 	  line = line.substr(space_after_option, line.size());
 	  auto start_of_args = line.find_first_not_of(" \t\n");
 	  if(start_of_args == std::string::npos){
@@ -105,18 +105,18 @@ namespace uammd{
 	  sys->log<System::DEBUG3>("[InputFile] Executing shell command: %s", line.c_str());
 	  int rc = std::system(line.c_str());
 	  if(rc < 0){
-	    sys->log<System::ERROR>("[InputFile] Shell command execution failed with code %d: %s", rc, line.c_str());	    
+	    sys->log<System::ERROR>("[InputFile] Shell command execution failed with code %d: %s", rc, line.c_str());
 	  }
 	  return;
 	}
-					 
+
 	options.emplace_back(std::make_pair(word, line));
 
       }
     }
   public:
     enum OptionType{Required, Optional};
-    
+
     InputFile(std::string name, shared_ptr<System> sys):fileName(name),
 							sys(sys){
       struct stat stat_buf;
@@ -136,12 +136,12 @@ namespace uammd{
       process_line(line);
     }
 
-    
-    //Returns a reference because g++-4.8 doesnt allow to std::move an stringstream... 
+
+    //Returns a reference because g++-4.8 doesnt allow to std::move an stringstream...
     std::istringstream& getOption(std::string op, OptionType type = OptionType::Optional){
       static std::istringstream ret;
       ret.str();
-      ret.clear();      
+      ret.clear();
       sys->log<System::DEBUG1>("[InputFile] Looking for option %s in file %s",  op.c_str(), fileName.c_str());
       for(auto s: options){
 	if(std::get<0>(s).compare(op)==0){
@@ -156,7 +156,7 @@ namespace uammd{
 	sys->log<System::CRITICAL>("[InputFile] Option %s not found in %s!",op.c_str(), fileName.c_str());
       }
       //std::stringstream bad_ss(std::string(""));
-      //bad_ss.setstate(std::ios::failbit);      
+      //bad_ss.setstate(std::ios::failbit);
       //return  bad_ss;
       ret.setstate(std::ios::failbit);
       if(op.compare("shell") == 0){
@@ -164,7 +164,7 @@ namespace uammd{
       }
 
       return ret;
-      
+
     }
 
   };

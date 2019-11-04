@@ -24,8 +24,15 @@ std::ostream& operator<<(std::ostream& out, const real4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
 }
 
+std::ostream& operator<<(std::ostream& out, const int3 &f){
+  return out<<f.x<<" "<<f.y<<" "<<f.z;
+}
+std::ostream& operator<<(std::ostream& out, const int4 &f){
+  return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
+}
 
-/*A timer class to measure time, just use 
+
+/*A timer class to measure time, just use
   t.tic to start and t.toc to get elapsed seconds*/
 class Timer{
   struct timeval start, end;
@@ -36,7 +43,7 @@ public:
   void tic(){ gettimeofday(&start, NULL); }
   float toc(){
     gettimeofday(&end, NULL);
-    return ((end.tv_sec  - start.tv_sec) * 1000000u + 
+    return ((end.tv_sec  - start.tv_sec) * 1000000u +
 	    end.tv_usec - start.tv_usec) / 1.e6;
   }
 };
@@ -55,8 +62,8 @@ public:
   }
   explicit Xorshift128plus(uint64_t s0){
     setSeed(s0);
-  } 
-  
+  }
+
   Xorshift128plus(){
     /* The PRNG state must be seeded so that it is not everywhere zero. */
     s[0] = 12679825035178159220ULL;
@@ -88,7 +95,7 @@ public:
   double2 uniform2(double min, double max){
     return {uniform(min, max), uniform(min, max)};
   }
-  
+
   double gaussian(double mean, double std){
 
     constexpr double pi2 = 2.0*M_PI;
@@ -115,20 +122,20 @@ public:
   double3 gaussian3(double mean, double std){
     return make_double3(gaussian(mean, std),
 			gaussian(mean, std),
-			gaussian(mean, std));		      
+			gaussian(mean, std));
   }
 
   double2 gaussian2(double mean, double std){
     return make_double2(gaussian(mean, std),
 			gaussian(mean, std));
-		
+
   }
 
   void setSeed(uint64_t s0, uint64_t s1){
     s[0] = s0;  s[1] = s1;
   }
   void setSeed(uint64_t s0){
-    s[0] = s0;  s[1] = (s0+15438657923749336752ULL)%RANDOM_MAX;  
+    s[0] = s0;  s[1] = (s0+15438657923749336752ULL)%RANDOM_MAX;
   }
 
 };

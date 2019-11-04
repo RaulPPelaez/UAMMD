@@ -1,9 +1,9 @@
 /*Raul P. Pelaez 2017. C++ useful constructions.
-  
+
   Code to ease working with variadic templates, C++14+ features not present in C++11...
-  
+
 References:
-[1] https://www.murrayc.com/permalink/2015/12/05/modern-c-variadic-template-parameters-and-tuples  
+[1] https://www.murrayc.com/permalink/2015/12/05/modern-c-variadic-template-parameters-and-tuples
 
 */
 
@@ -76,6 +76,6 @@ namespace SFINAE{
 
 
 
-  
+
 }
 #endif
