@@ -29,6 +29,10 @@ namespace uammd{
       if(!y) minusInvBoxSize.y = 0;
       if(!z) minusInvBoxSize.z = 0;
     }
+    inline __host__ __device__ bool isPeriodicX() const{return minusInvBoxSize.x != 0;}
+    inline __host__ __device__ bool isPeriodicY() const{return minusInvBoxSize.y != 0;}
+    inline __host__ __device__ bool isPeriodicZ() const{return minusInvBoxSize.z != 0;}
+
     inline __host__ __device__ real3 apply_pbc(const real3 &r) const{
       //return  r - floorf(r/L+real(0.5))*L; //MIC Algorithm
       const real3 offset = floorf(r*minusInvBoxSize + real(0.5)); //MIC Algorithm
@@ -47,6 +51,18 @@ namespace uammd{
 	return boxSize.x*boxSize.y*boxSize.z;
       else
 	return boxSize.x*boxSize.y;
+    }
+
+    bool operator == (const Box &other) const {
+      return boxSize.x == other.boxSize.x and
+	boxSize.y == other.boxSize.y and
+	boxSize.z == other.boxSize.z and
+	isPeriodicX() == other.isPeriodicX() and
+	isPeriodicY() == other.isPeriodicY() and
+	isPeriodicZ() == other.isPeriodicZ();
+    }
+    bool operator != (const Box &other) const{
+      return !(this->operator==(other));
     }
   };
 
