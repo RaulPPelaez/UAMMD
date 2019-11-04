@@ -72,6 +72,13 @@ Regarding Method 3.
 
    See PairForces.cu or examples/NeighbourListIterator.cu for examples on how to use a NL.
 
+
+
+Implementation notes:
+
+  I noticed that filling CellStart with an "empty cell" flag was taking a great amount of time when a there are a lot of cells (big boxes or small cut offs). So instead of filling cellStart with some value and storing the first particle of each non-empty cell, now cellStart stores the index of the first particle of a cell plus a certain hash that changes at each construction. This hash allows to encode "empty cell" as cellStart[icell] < hash instead of cellStart[icell] = someFixedValueGreaterThanNumberParticles. This makes resetting cellStart unnecesary. One only has to clean cellStart at first construction and when this hash is such that hash+numberParticles >= std::numeric_limits<uint>::max().
+
+
 References:
 
 [1] http://developer.download.nvidia.com/assets/cuda/files/particles.pdf
@@ -106,7 +113,8 @@ namespace uammd{
     //You can identify where each cell starts and end by transversing this vector and searching for when the cell of a particle is  different from the previous one
     template<class InputIterator>
     __global__ void fillCellList(InputIterator sortPos,
-				 int *cellStart, int *cellEnd,
+				 uint *cellStart, int *cellEnd,
+				 uint currentValidCell,
 				 int N, Grid grid){
       /*A thread per particle*/
       uint id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -126,7 +134,7 @@ namespace uammd{
 	//my i is the start of a cell
 	if(id ==0 || icell != icell2){
 	  //Then my particle is the first of my cell
-	  cellStart[icell] = id;
+	  cellStart[icell] = id+currentValidCell;
 
 	  //If my i is the start of a cell, it is also the end of the previous
 	  //Except if I am the first one
@@ -275,7 +283,10 @@ namespace uammd{
 
   class CellList{
   protected:
-    thrust::device_vector<int> cellStart, cellEnd;
+    thrust::device_vector<uint> cellStart;
+    uint currentValidCell;
+    int currentValidCell_counter;
+    thrust::device_vector<int>  cellEnd;
     //int3 cellDim;
     Grid grid;
     //The neighbour list has the following format: [ neig0_0, neigh1_0,... neighmaxNeigh_0, neigh0_1..., neighmaxNeigh_numberParticles]
@@ -310,6 +321,7 @@ namespace uammd{
 	neighbourList.resize(numberParticles*maxNeighboursPerParticle);
 	numberNeighbours.resize(numberParticles);
       }
+      currentValidCell_counter = -1;
       force_next_update = true;
     }
     void handlePosWriteRequested(){
@@ -358,6 +370,7 @@ namespace uammd{
       CudaSafeCall(cudaMemset(tooManyNeighboursFlagGPU, 0, sizeof(int)));
       //An event to check for the flag during list construction
       CudaSafeCall(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+      currentValidCell_counter = -1;
     }
     ~CellList(){
       sys->log<System::DEBUG>("[CellList] Destroyed");
@@ -472,8 +485,6 @@ namespace uammd{
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
 
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
-      // auto cellStart_ptr = thrust::raw_pointer_cast(cellStart.data());
-      // auto cellEnd_ptr = thrust::raw_pointer_cast(cellEnd.data());
 
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
 
@@ -535,10 +546,8 @@ namespace uammd{
       if(cutOff.x != currentCutOff.x) return true;
       if(cutOff.y != currentCutOff.y) return true;
       if(cutOff.z != currentCutOff.z) return true;
+      if(box != currentBox) return true;
 
-      if(box.boxSize.x != currentBox.boxSize.x) return true;
-      if(box.boxSize.y != currentBox.boxSize.y) return true;
-      if(box.boxSize.z != currentBox.boxSize.z) return true;
       return false;
 
     }
@@ -575,7 +584,10 @@ namespace uammd{
 
       //Resize if needed
       try{
-	if(cellStart.size()!= ncells) cellStart.resize(ncells);
+	if(cellStart.size()!= ncells){
+	  currentValidCell_counter = -1;
+	  cellStart.resize(ncells);
+	}
 	if(cellEnd.size()!= ncells) cellEnd.resize(ncells);
       }
       catch(thrust::system_error &e){
@@ -584,14 +596,30 @@ namespace uammd{
 
       auto cellStart_ptr = thrust::raw_pointer_cast(cellStart.data());
       auto cellEnd_ptr = thrust::raw_pointer_cast(cellEnd.data());
-      cub::CountingInputIterator<int> it(0);
+
 
       int Nthreads=512;
-      int Nblocks=ncells/Nthreads + ((ncells%Nthreads)?1:0);
 
-      //Reset cellStart
-      fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(cellStart_ptr, it,
-						CellList_ns::EMPTY_CELL, ncells);
+      if(currentValidCell_counter == -1 or
+	 (ullint)(numberParticles)*(currentValidCell_counter+2) >= ullint(std::numeric_limits<uint>::max())-1ull){
+
+	currentValidCell = numberParticles;
+	currentValidCell_counter = 1;
+
+	int Nblocks=ncells/Nthreads + ((ncells%Nthreads)?1:0);
+	auto it = thrust::make_counting_iterator<int>(0);
+	//Reset cellStart
+	sys->log<System::DEBUG3>("[CellList] Resetting cellStart, current_counter: %llu %llu", (ullint)(numberParticles)*(currentValidCell_counter-1), ullint(std::numeric_limits<uint>::max()) - 2ull*numberParticles - 1ull);
+	fillWithGPU<<<Nblocks, Nthreads, 0, st>>>(cellStart_ptr, it,
+						  0, ncells);
+      }
+      else{
+	currentValidCell_counter++;
+	currentValidCell = uint(numberParticles)*currentValidCell_counter;
+	sys->log<System::DEBUG3>("[CellList] Update currentValidCell to: %llu, steps to 2^32: %d",
+				 (ullint)currentValidCell,
+				 (std::numeric_limits<uint>::max()-currentValidCell)/uint(numberParticles));
+      }
       CudaCheckError();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
 
@@ -609,16 +637,18 @@ namespace uammd{
       ps.applyCurrentOrder(posGroupIterator, sortPos_ptr, numberParticles, st);
       CudaCheckError();
 
+      {
+	//Fill cell list (cellStart and cellEnd) using the sorted array
+	int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+	sys->log<System::DEBUG3>("[CellList] fill Cell List, currentValidCell: %d", currentValidCell);
 
-      //Fill cell list (cellStart and cellEnd) using the sorted array
-      Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-      sys->log<System::DEBUG3>("[CellList] fill Cell List");
-
-      CellList_ns::fillCellList<<<Nblocks, Nthreads, 0, st>>>(sortPos_ptr, //posGroupIterator,
-       							      cellStart_ptr,
-       							      cellEnd_ptr,
-       							      numberParticles,
-       							      grid);
+	CellList_ns::fillCellList<<<Nblocks, Nthreads, 0, st>>>(sortPos_ptr, //posGroupIterator,
+								cellStart_ptr,
+								cellEnd_ptr,
+								currentValidCell,
+								numberParticles,
+								grid);
+      }
       CudaCheckError();
       rebuildNlist = true;
     }
@@ -648,10 +678,12 @@ namespace uammd{
       //cellStart[i] stores the index of the first particle in cell i (in internal index)
       //cellEnd[i] stores the last particle in cell i (in internal index)
       //So the number of particles in cell i is cellEnd[i]-cellStart[i]
-      const int * cellStart, *cellEnd;
+      const uint * cellStart;
+      const int  * cellEnd;
       const real4 *sortPos;   //Particle positions in internal index
       const int* groupIndex; //Transformation between internal indexes and group indexes
       Grid grid;
+      uint VALID_CELL;
     };
     CellListData getCellList(){
       this->updateNeighbourList(currentBox, currentCutOff);
@@ -667,6 +699,7 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       cl.groupIndex =  ps.getSortedIndexArray(numberParticles);
       cl.grid = grid;
+      cl.VALID_CELL = currentValidCell;
       return cl;
     }
 
@@ -721,23 +754,28 @@ namespace uammd{
       int3 celli; //Cell of particle i
       int lastParticle; //Index of last particle in current cell
 
+      uint VALID_CELL;
       //Take j to the start of the next cell and return true, if no more cells remain then return false
       __device__ bool nextcell(){
+	const bool is2D = nl.grid.cellDim.z<=1;
+	if(ci >= (is2D?9:27)) return false;
+	bool empty;
 	do{
-	  const bool is2D = nl.grid.cellDim.z==1;
 	  int3 cellj = celli;
 	  cellj.x += ci%3-1;
 	  cellj.y += (ci/3)%3-1;
-	  cellj.z +=  ci/9-1;
+	  cellj.z =  is2D?0:(celli.z+ci/9-1);
 
 	  cellj = nl.grid.pbc_cell(cellj);
 	  const int icellj = nl.grid.getCellIndex(cellj);
 
-	  j = nl.cellStart[icellj];
-	  lastParticle = j==EMPTY_CELL?-1:nl.cellEnd[icellj];
+	  const uint cs = nl.cellStart[icellj];
+	  empty = cs<VALID_CELL;
+	  lastParticle = empty?-1:nl.cellEnd[icellj];
 	  ci++;
-	  if(ci >= 9*(is2D?1:3)) return false;
-	}while(j == EMPTY_CELL);
+	  j = empty?-1:int(cs-VALID_CELL);
+	  if(ci >= (is2D?9:27)) return !empty;
+	}while(empty);
 	return true;
       }
       //Take j to the next neighbour
@@ -764,7 +802,7 @@ namespace uammd{
     private:
       friend class NeighbourContainer;
       __device__ NeighbourIterator(int i, CellListData nl, bool begin):
-	i(i),j(-2), nl(nl), ci(0), lastParticle(-1){
+	i(i),j(-2), nl(nl), ci(0), lastParticle(-1), VALID_CELL(nl.VALID_CELL){
 	if(begin){
 	  celli = nl.grid.getCell(make_real3(cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos+i)));
 	  increment();
