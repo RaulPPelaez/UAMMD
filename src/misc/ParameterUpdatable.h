@@ -49,7 +49,7 @@
 
 
 
-#define DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_T(type, name) DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_R(type, name) 
+#define DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_T(type, name) DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_R(type, name)
 #define DECLARE_UPDATE_FUNCTION_NAME_DELEGATE_R(type, name) \
   virtual void update  ## name (type  val) { if(delegate) delegate->update ## name (val);}
 
@@ -61,15 +61,15 @@
 
 
 namespace uammd{
-  
+
   class ParameterUpdatable{
   public:
-    
+
     // virtual void updateTimeStep(real dt){};
-    
+
 
     PARAMETER_LOOP(DECLARE_UPDATE_FUNCTION)
-    
+
   };
 
 
@@ -79,10 +79,10 @@ namespace uammd{
   template<class T>
   class ParameterUpdatableDelegate<T, true>: public virtual ParameterUpdatable{
   private:
-    T *delegate = nullptr; 
+    T *delegate = nullptr;
   public:
     void setDelegate(T* del){ this->delegate = del;}
-    
+
     PARAMETER_LOOP(DECLARE_UPDATE_FUNCTION_DELEGATE)
   };
 
@@ -90,13 +90,13 @@ namespace uammd{
   class ParameterUpdatableDelegate<T, false>: public virtual ParameterUpdatable{
   public:
     void setDelegate(T* del){}
-    
+
   };
 
 
-  
-  
-  
+
+
+
 
 
 }
