@@ -789,7 +789,7 @@ namespace uammd{
 
     //Use a transverser to transverse the tree structure directly (without constructing a neighbour list)
     template<class Transverser>
-    void transverseList(Transverser &tr, real maxCutOff = 0, cudaStream_t st = 0){
+    void transverseList(Transverser &tr, cudaStream_t st = 0){
       int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[LBVHList] Transversing Cell List with %s", type_name<Transverser>().c_str());
 
