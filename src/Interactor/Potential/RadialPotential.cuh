@@ -105,6 +105,9 @@ namespace uammd{
 	  inline __device__ resultType zero(){
 	    this->typeParameters.zero();
 	    return resultType();}
+	  inline __device__ real getCutOff2BetweenTypes(int ti, int tj){
+	    return this->typeParameters(ti, tj).cutOff2;
+	  }
 
 	};
 
