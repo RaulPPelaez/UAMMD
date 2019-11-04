@@ -118,6 +118,7 @@ VECATTR float3 make_float3(float a){return make_float3(a, a, a);}
 
 VECATTR float3 make_float3(int3 a){return make_float3(a.x, a.y, a.z);}
 VECATTR float3 make_float3(float3 a){return make_float3(a.x, a.y, a.z);}
+VECATTR float3 make_float3(float4 a){return make_float3(a.x, a.y, a.z);}
 
 VECATTR  float3 operator +(const float3 &a, const float3 &b){return make_float3(
 										a.x + b.x,
