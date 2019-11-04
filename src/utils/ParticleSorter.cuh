@@ -33,15 +33,18 @@ REFERENCES:
 #include"utils/Grid.cuh"
 #include"System/System.h"
 #include"utils/debugTools.cuh"
+#include"third_party/type_names.h"
 #include<third_party/cub/cub.cuh>
-
+#include<bits/stdc++.h>
 namespace uammd{
 
   namespace Sorter{
 
     struct MortonHash{
+      Grid grid;
+      MortonHash(Grid grid): grid(grid){}
       //Interleave a 10 bit number in 32 bits, fill one bit and leave the other 2 as zeros. See [1]
-      static inline __host__ __device__ uint encodeMorton(const uint &i){
+      inline __host__ __device__ uint encodeMorton(const uint &i) const{
 	uint x = i;
 	x &= 0x3ff;
 	x = (x | x << 16) & 0x30000ff;
@@ -51,31 +54,47 @@ namespace uammd{
 	return x;
       }
       /*Fuse three 10 bit numbers in 32 bits, producing a Z order Morton hash*/
-      static inline __host__ __device__ uint hash(const int3 &cell, const Grid &grid){
+      inline __host__ __device__ uint hash(int3 cell) const{
 	return encodeMorton(cell.x) | (encodeMorton(cell.y) << 1) | (encodeMorton(cell.z) << 2);
       }
+
+      inline __host__ __device__ uint operator()(real4 pos) const{
+	const int3 cell = grid.getCell(pos);
+	return hash(cell);
+      }
+
     };
     //The hash is the cell 1D index, this pattern is better than random for neighbour transverse, but worse than Morton
-    struct CellHash{
-      static inline __device__ __host__ uint hash(const int3 &cell, const Grid &grid){
-	return cell.x + cell.y*grid.cellDim.x + cell.z*grid.cellDim.x*grid.cellDim.z;
+    struct CellIndexHash{
+      Grid grid;
+      CellIndexHash(Grid grid): grid(grid){}
+      inline __device__ __host__ uint hash(int3 cell) const{
+	return grid.getCellIndex(cell);
       }
+      inline __host__ __device__ uint operator()(real4 pos) const{
+	const int3 cell = grid.getCell(pos);
+	return hash(cell);
+      }
+
     };
 
-    /*Assign a hash to each particle*/
-    template<class HashComputer = MortonHash, class InputIterator>
-    __global__ void computeHash(InputIterator pos,
-				int* __restrict__ index,
-				uint* __restrict__ hash , int N,
-				Grid grid){
-      const int i = blockIdx.x*blockDim.x + threadIdx.x;
-      if(i>=N) return;
-      const real3 p = make_real3(pos[i]);
 
-      const int3 cell = grid.getCell(p);
-      /*The particleIndex array will be sorted by the hashes, any order will work*/
-      const uint ihash = HashComputer::hash(cell, grid);
-      /*Before ordering by hash the index in the array is the index itself*/
+    int clz(uint n){
+      n |= (n >>  1);
+      n |= (n >>  2);
+      n |= (n >>  4);
+      n |= (n >>  8);
+      n |= (n >> 16);
+      return 32-ffs(n - (n >> 1));
+    }
+
+    template<class HashIterator>
+    __global__ void assignHash(HashIterator hasher,
+			       int* __restrict__ index,
+			       uint* __restrict__ hash , int N){
+      const int i = blockIdx.x*blockDim.x + threadIdx.x;
+      if(i >= N) return;
+      const uint ihash = hasher[i];
       index[i] = i;
       hash[i]  = ihash;
     }
@@ -131,8 +150,10 @@ namespace uammd{
 						     st));
       }
       auto alloc = sys->getTemporaryDeviceAllocator<char>();
-      auto cuptr = alloc.allocate(temp_storage_bytes);
-      void* d_temp_storage_ptr = thrust::raw_pointer_cast(cuptr);
+      std::shared_ptr<char> d_temp_storage(alloc.allocate(temp_storage_bytes),
+					   [=](char* ptr){ alloc.deallocate(ptr);});
+
+      void* d_temp_storage_ptr = d_temp_storage.get();
       /**Perform the Radix sort on the index/hash pair**/
       CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage_ptr, temp_storage_bytes,
 						   hash,
@@ -140,7 +161,6 @@ namespace uammd{
 						   N,
 						   0, end_bit,
 						   st));
-      alloc.deallocate(cuptr, temp_storage_bytes);
     }
     //Return the most significant bit of an unsigned integral type
     template <typename T> inline int msb(T n){
@@ -155,30 +175,33 @@ namespace uammd{
       return 0;
     }
 
-    template<class HashType = Sorter::MortonHash, class InputIterator>
-    void updateOrderByCellHash(InputIterator pos, uint N, Box box, int3 cellDim, cudaStream_t st = 0){
+    template<class HashIterator>
+    void updateOrderWithCustomHash(HashIterator &hasher,
+				   uint N, uint maxHash = std::numeric_limits<uint>::max(),
+				   cudaStream_t st = 0){
+      sys->log<System::DEBUG1>("[ParticleSorter] Updating with custom hash iterator: %s", type_name<HashIterator>().c_str());
+      sys->log<System::DEBUG1>("[ParticleSorter] Assigning hash to %d elements", N);
+      sys->log<System::DEBUG2>("[ParticleSorter] Maximum hash 0x%x ( dec: %u ) last bit: %d",
+			       maxHash, maxHash, 32-Sorter::clz(maxHash) );
       init = true;
-      if(hash.size() != N){hash.resize(N); hash_alt.resize(N);}
-      if(index.size()!= N){index.resize(N); index_alt.resize(N);}
-
+      hash.resize(N); hash_alt.resize(N);
+      index.resize(N); index_alt.resize(N);
 
       int Nthreads=128;
       int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
-      Grid grid(box, cellDim);
-      Sorter::computeHash<HashType><<<Nblocks, Nthreads, 0, st>>>(pos,
-								  thrust::raw_pointer_cast(index.data()),
-								  thrust::raw_pointer_cast(hash.data()),
-								  N,
-								  grid);
+
+      Sorter::assignHash<<<Nblocks, Nthreads, 0, st>>>(hasher,
+						       thrust::raw_pointer_cast(index.data()),
+						       thrust::raw_pointer_cast(hash.data()),
+						       N);
+
       auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(index.data()),
 					     thrust::raw_pointer_cast(index_alt.data()));
       auto db_hash  = cub::DoubleBuffer<uint>(thrust::raw_pointer_cast(hash.data()),
 					      thrust::raw_pointer_cast(hash_alt.data()));
 
-      uint maxHash = HashType::hash(cellDim, grid);
-
       //Cub just needs this endbit at least
-      int maxbit = int(std::log2(maxHash)+0.5)+1;
+      int maxbit = 32-Sorter::clz(maxHash);
       maxbit = std::min(maxbit, 32);
 
       this->sortByKey(db_index,
@@ -190,6 +213,18 @@ namespace uammd{
       if(db_hash.selector)  hash.swap(hash_alt);
 
       originalOrderNeedsUpdate = true;
+    }
+
+    template<class CellHasher = Sorter::MortonHash, class InputIterator>
+    void updateOrderByCellHash(InputIterator pos, uint N, Box box, int3 cellDim, cudaStream_t st = 0){
+      Grid grid(box, cellDim);
+      CellHasher hasher(grid);
+      auto hashIterator = thrust::make_transform_iterator(pos,
+							  hasher);
+      this->updateOrderWithCustomHash(hashIterator,
+				      N,
+				      hasher.hash(cellDim-1),
+				      st);
     }
 
     //Reorder with a custom key, store in orginal_index
@@ -260,6 +295,9 @@ namespace uammd{
       return thrust::raw_pointer_cast(index.data());
     }
 
+    uint * getSortedHashes(){
+      return thrust::raw_pointer_cast(hash.data());
+    }
     //Update and return reorder with a custom key
     int * getIndexArrayById(int * id, int N, cudaStream_t st = 0){
       if(!init) return nullptr;
