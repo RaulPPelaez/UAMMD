@@ -1,5 +1,5 @@
 /* Raul P. Pelaez 2017. UAMMD System
-   
+
    Contains basic information and utilities about the system UAMMD is running on.
 
    Provides a logger and a CPU rng
@@ -33,7 +33,7 @@ namespace uammd{
     enum location{cpu, gpu, managed, nodevice};
     enum mode{read, write, readwrite, nomode};
   };
-  
+
   struct SystemParameters{
 
     int device = -1;
@@ -47,15 +47,21 @@ namespace uammd{
   #else
   constexpr int maxLogLevel = 6;
   #endif
-  
+
   class System{
   public:
-    
-    using device_temporary_memory_resource = uammd::device_pool_memory_resource;
-    template<class T>
-    using allocator = uammd::polymorphic_allocator<T, device_temporary_memory_resource>;
 
-  private:    
+    //using resource = uammd::managed_memory_resource;
+    using resource = uammd::device_memory_resource;
+    using device_temporary_memory_resource = uammd::pool_memory_resource_adaptor<resource>;
+
+    template<class T>
+    using allocator_thrust = uammd::polymorphic_allocator<T, device_temporary_memory_resource,
+								  thrust::cuda::pointer<T>>;
+    template<class T>
+    using allocator = uammd::polymorphic_allocator<T , device_temporary_memory_resource>;
+
+  private:
     Xorshift128plus m_rng;
     SystemParameters sysPar;
     Timer tim;
@@ -64,9 +70,11 @@ namespace uammd{
 
     int m_argc = 0;
     char ** m_argv = nullptr;
-    std::shared_ptr<device_temporary_memory_resource> m_memory_resource;
-    
-  public:    
+
+    resource m_memory_resource;
+    std::shared_ptr<device_temporary_memory_resource> m_pool_memory_resource;
+
+  public:
     System():System(0, nullptr){}
     System(int argc, char *argv[]): m_argc(argc), m_argv(argv){
       tim.tic();
@@ -75,7 +83,7 @@ namespace uammd{
       CudaSafeCall(cudaDeviceSynchronize());
       auto seed = 0xf31337Bada55D00dULL^time(NULL);
       m_rng.setSeed(seed);
-      
+
       int dev = -1;
       size_t cuda_printf_limit;
 
@@ -98,9 +106,9 @@ namespace uammd{
       CudaSafeCall(cudaFree(0));
       cudaDeviceProp deviceProp;
       CudaSafeCall(cudaGetDeviceProperties(&deviceProp, dev));
-      
+
       log<System::MESSAGE>("[System] Using device: %s with id: %d", deviceProp.name, dev);
-      
+
       sysPar.device = dev;
       sysPar.cuda_arch = 100*deviceProp.major + 10*deviceProp.minor;
       if(sysPar.cuda_arch >= 600){
@@ -116,12 +124,12 @@ namespace uammd{
 
       if(sysPar.cuda_arch < sysPar.minimumCudaArch)
 	log<System::CRITICAL>("[System] Unsupported Configuration, the GPU must have at least compute capability %d (%d.%d found)", sysPar.minimumCudaArch, deviceProp.major, deviceProp.minor);
-      m_memory_resource = std::make_shared<device_temporary_memory_resource>();
+      m_pool_memory_resource = std::make_shared<device_temporary_memory_resource>(&m_memory_resource);
       CudaCheckError();
 
     }
-    
-    
+
+
     void finish(){
       CudaCheckError();
       cudaDeviceSynchronize();
@@ -160,8 +168,8 @@ namespace uammd{
 	  va_start(args, fmt);
 	  fprintf(stderr, "\e[92m[MESSAGE] \e[0m");
 	  vfprintf(stderr, fmt, args);
-	  fprintf(stderr, "\n");    
-	}    
+	  fprintf(stderr, "\n");
+	}
 	if(level==STDERR){
 	  va_list args;
 	  va_start(args, fmt);
@@ -180,17 +188,17 @@ namespace uammd{
 	  va_start(args, fmt);
 	  fprintf(stderr, "\e[96m[ DEBUG ] \e[0m");
 	  vfprintf(stderr, fmt, args);
-	  fprintf(stderr, "\n");     
+	  fprintf(stderr, "\n");
 	}
 	if(level>=DEBUG1 && level<=DEBUG7){
 	  va_list args;
 	  va_start(args, fmt);
 	  fprintf(stderr, "\e[96m[ DEBUG ] \e[0m");
 	  vfprintf(stderr, fmt, args);
-	  fprintf(stderr, "\n");     
+	  fprintf(stderr, "\n");
 	}
       }
-    }  
+    }
 
     Xorshift128plus& rng(){ return m_rng;}
 
@@ -201,11 +209,11 @@ namespace uammd{
       return sysPar;
     }
 
-    template<class T>
+    template<class T = char>
     allocator<T> getTemporaryDeviceAllocator(){
-      return allocator<T>(m_memory_resource.get());
+      return allocator<T>(m_pool_memory_resource.get());
     }
-    
+
   };
 
 
@@ -216,7 +224,7 @@ namespace uammd{
     fori(0,60) separator += "━";
     separator += "┓";
     log<System::MESSAGE>("%s", separator.c_str());
-    
+
     string line1 = "\033[94m╻\033[0m \033[94m╻┏━┓┏┳┓┏┳┓╺┳┓\033[0m";
     string line2 = "\033[94m┃\033[0m \033[94m┃┣━┫┃┃\033[34m┃┃┃┃\033[0m \033[34m┃┃\033[0m";
     string line3 = "\033[34m┗━┛╹\033[0m \033[34m╹╹\033[0m \033[34m╹╹\033[0m \033[34m╹╺┻┛\033[0m";
@@ -242,7 +250,7 @@ namespace uammd{
 
     log<System::MESSAGE>("%s", line.c_str());
   }
-  
-  
+
+
 }
 #endif

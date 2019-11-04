@@ -8,6 +8,10 @@ System::allocator is a polymorphic allocator, which makes a thrust::device_vecto
 #include<thrust/device_vector.h>
 #include<thrust/host_vector.h>
 #include<memory>
+
+
+#include<vector>
+
 using namespace uammd;
 
 int main(){
@@ -15,18 +19,27 @@ int main(){
   //Only the first iteration incurs a cudaMalloc, and cudaFree is called only when sys goes out of scope.
   fori(0,10){
     auto alloc = sys->getTemporaryDeviceAllocator<char>();
-    thrust::device_vector<char, System::allocator<char>> vec(alloc);
+    thrust::device_vector<char, System::allocator_thrust<char>> vec(alloc);
     vec.resize(10000);
   }
 
   //You can interchange with a thrust vector using the default allocator.
   {
     auto alloc = sys->getTemporaryDeviceAllocator<char>();
-    thrust::device_vector<char, System::allocator<char>> vec(alloc);
+    thrust::device_vector<char, System::allocator_thrust<char>> vec(alloc);
     vec.resize(10000);
     thrust::host_vector<char> host_copy_with_default_allocator(vec);
     thrust::device_vector<char> device_copy_with_default_allocator(vec);
   }
+  {
+    //Using the allcoator with a shared_ptr
+     std::shared_ptr<int> temp;
+     {
+       auto alloc = sys->getTemporaryDeviceAllocator<int>();
+       temp = std::shared_ptr<int>(alloc.allocate(1000), [=](int* ptr){ alloc.deallocate(ptr);});
+     }
+  }
+
   sys->finish();
   return 0;
 }
