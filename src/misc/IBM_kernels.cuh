@@ -37,20 +37,19 @@ namespace uammd{
     struct GaussianKernel{
       int support;
       GaussianKernel(real3 h, real tolerance){
-
 	real amin = 0.55;
 	real amax = 1.65;
 	real x = -log10(2*tolerance)/10.0;
 	real factor = std::min(amin + x*(amax-amin), amax);
 
-	this->hydrodynamicRadius = h.x*factor*sqrt(M_PIl);
-	real sigma = hydrodynamicRadius/sqrt(M_PIl);
+
+	real sigma = h.x*factor/sqrt(M_PIl);
 	this->prefactor = pow(2*M_PI*sigma*sigma, -1.5);
 	this->tau  = -0.5/(sigma*sigma);
 	this->support = int(2*(sqrt(1.0/tau*log(0.9*tolerance)/(h.x*h.x) + 0.5))+0.5);
 	if(support < 3 ) support = 3;
 
-	hydrodynamicRadius = hydrodynamicRadius;//-4.3145e-6*h.x;
+	this->hydrodynamicRadius = sigma*sqrt(M_PIl);
       }
 
       inline __host__ __device__ real phi(real r) const{
@@ -263,45 +262,45 @@ namespace uammd{
 	integral *= (rmax-rmin)/(real)Nr;
 	return integral;
       }
-
-      real3 invh;
-      real w;
       real beta;
-      real pref;
       real hydrodynamicRadius;
-      real norm;
+      real invnorm;
+      real prefactor;
+      real w;
     public:
       int support;
-      BarnettMagland(real3 h, real tolerance = 1e-10):
-	invh(1.0/h){
+      BarnettMagland(real3 h, real tolerance){
 
-	w=h.x*(-log10(tolerance*0.25)+1)/1.6;
-	w = std::max(h.x,w);
-	beta=3.7*w;
+        this-> w = abs(log10(tolerance))+1;
+	//real3 alpha = w*h*0.5;
+	//Empirically found to have the minimum translational variace of the hydrodynamic radius
+	this->beta=1.841*w;
 
-	this->support = int(2*w/h.x+0.5);
+	this->support = int(w + 0.5);
 
-	this->pref = invh.x*invh.y*invh.z;
-
-	norm = 1;
+	this->invnorm = 1;
 	{
 	  auto foo = [&](real r){ return this->phi(r);};
-	  norm = integrate(foo, -w, w, 1000000);
+	  real norm = integrate(foo, -1.0, 1.0, 1000000)*w*0.5;
+	  this->invnorm = 1.0/norm;
 	}
-	{//Totally empirical
-	  auto foo = [&](real r){ return pow(this->phi(r),2);}; //Inverse of the volume
-	  hydrodynamicRadius = h.x/(integrate(foo, -w, w, 1000000)*2);
-	  hydrodynamicRadius = hydrodynamicRadius*(0.99973532-0.0119735/w-0.0642921/w/w+0.150367/w/w/w-0.094169/w/w/w/w);
+	this->prefactor = 1/(h.x*h.y*h.z);
+	{//Totally empirical, starting from approximating the BM kernel to a Gaussian
+	  double c = 0.552088;
+	  double b = 0.618579;
+	  hydrodynamicRadius = h.x*3.0*w/sqrt(2*M_PI)*(pow(beta, -c) - b/beta);
 	}
+
       }
-      inline __host__  __device__ real phi(real r) const{
-	const real z = r/(w);
+      inline __host__  __device__ real phi(real z) const{
 	const real z2 = z*z;
 	if(z2>real(1.0)) return 0;
-	return exp(beta*(sqrt(real(1.0)-z*z)-real(1.0)))/norm;
+	return exp(beta*(sqrt(real(1.0)-z2)-real(1.0)))*invnorm;
       }
       inline __device__ real delta(real3 rvec, real3 h) const{
-	return pref*phi(rvec.x*invh.x)*phi(rvec.y*invh.y)*phi(rvec.z*invh.z);
+	return phi(rvec.x/(real(0.5)*w*h.x))*
+	  phi(rvec.y/(real(0.5)*w*h.y))*
+	  phi(rvec.z/(real(0.5)*w*h.z))/(h.x*h.y*h.z);
       }
 
       inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
@@ -313,7 +312,6 @@ namespace uammd{
 	}
       }
     };
-
 
 
 
