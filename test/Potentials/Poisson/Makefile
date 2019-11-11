@@ -4,7 +4,7 @@
 ARCH=
 
 #Uncomment to compile in double precision mode, single by default
-#DOUBLE_PRECISION=-DDOUBLE_PRECISION
+DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
 #CXX=clang++-5.0
@@ -40,78 +40,17 @@ endif
 
 
 
-INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../src -I ../src/third_party
+INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../../../src -I ../../../src/third_party
 OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
 BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets -lineinfo -src-in-ptx
 
-all: 
-	$(BASIC_LINE)  $(FILE)
-
-test: benchmark lj ljMult dpd bdhi bd bonds sph mcnvt fcm dambreak quasi2D temporary_memory neighbour_list_iterator error_handling poisson
-
-
-benchmark:
-	$(BASIC_LINE) benchmark.cu -o benchmark
-lj:
-	$(BASIC_LINE) LJ.cu -o lj
-
-ljMult:
-	$(BASIC_LINE) LJMultipleTypes.cu -o ljMult
-
-dpd:
-	$(BASIC_LINE) DPD.cu -o dpd
-
-bdhi:
-	$(BASIC_LINE) BDHI.cu -llapacke -lcblas -lcurand -lcublas -lcusolver -lcufft  -lgomp -o bdhi
-
-quasi2D:
-	$(BASIC_LINE) q2D.cu -lcufft  -o q2D
-
-logo:
-	$(BASIC_LINE) logo.cu -lcurand -lcublas -llapacke -lcblas -lcufft  -o logo
-
-fcm:
-	$(BASIC_LINE) FCM.cu  -lcufft  -llapacke -lcblas -lcurand -lcublas -lcusolver -o fcm
-
-fib:
-	$(BASIC_LINE) FIB.cu -lcurand -lcufft  -o fib
-
-icm:
-	$(BASIC_LINE) ICM.cu  -lcufft -lcudart -o icm
-
-lbm:
-	$(BASIC_LINE) LBM.cu -o lbm -lpng
-
-bd:
-	$(BASIC_LINE) BD.cu -lcurand -o bd
-
-bonds:
-	$(BASIC_LINE)  Bonds.cu -lcurand -o bonds
-
-sph:
-	$(BASIC_LINE) SPH_test.cu -lcurand -o sph
-
-mcnvt:
-	$(BASIC_LINE) MCNVT.cu  -o mcnvt
-
-
-dambreak:
-	$(BASIC_LINE) dambreak.cu  -o dambreak
-
-temporary_memory:
-	$(BASIC_LINE) temporary_memory.cu  -o temporary_memory
-
-neighbour_list_iterator:
-	$(BASIC_LINE) NeighbourListIterator.cu  -o neighbour_list_iterator
-
-error_handling:
-	$(BASIC_LINE) error_handling.cu  -o error_handling
+all: poisson
 
 poisson:
 	$(BASIC_LINE) Poisson.cu  -o poisson -lcufft
 
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D temporary_memory neighbour_list_iterator error_handling poisson
+	rm -f poisson
 
 
 
