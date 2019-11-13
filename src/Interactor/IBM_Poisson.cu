@@ -16,29 +16,53 @@ namespace uammd{
 		   Poisson::Parameters par):
     Interactor(pd, pg, sys, "IBM::Poisson"),
     epsilon(par.epsilon),
-    box(par.box){
+    box(par.box),
+    split(par.split),
+    gw(par.gw){
 
     double h;
-    if(par.upsampling>0) h = par.upsampling;
-    else h = (1.3 - std::min((-log10(par.tolerance))/10.0, 0.9))*par.gw;
-
+    double farFieldGaussianWidth = par.gw;
+    if(par.split > 0) farFieldGaussianWidth = sqrt(par.gw*par.gw+1.0/(4.0*par.split*par.split));
+    if(par.upsampling>0) h = 1.0/par.upsampling;
+    else h = (1.3 - std::min((-log10(par.tolerance))/10.0, 0.9))*farFieldGaussianWidth;
+    h = std::min(h, box.boxSize.x/16.0);
+    sys->log<System::MESSAGE>("[Poisson] Proposed h: %g", h);
     {
-      int3 cellDim = nextFFTWiseSize3D(make_int3(box.boxSize/h+0.5));
+      int3 cellDim = nextFFTWiseSize3D(make_int3(box.boxSize/h));
       grid = Grid(par.box, cellDim);
       h = grid.cellSize.x;
     }
+    sys->log<System::MESSAGE>("[Poisson] Selected h: %g", h);
     int ncells = grid.getNumberCells();
 
-    auto kernel = std::make_shared<Kernel>(par.tolerance, par.gw, h);
+    auto kernel = std::make_shared<Kernel>(par.tolerance, farFieldGaussianWidth, h);
 
     ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
 
+    kernel->support = std::min(kernel->support, grid.cellDim.x/2-2);
+    if(split>0){
+      long double E=1;
+      long double r = farFieldGaussianWidth;
+      while(abs(E)>par.tolerance){
+	r+=0.001l;
+	E = 1.0l/(4.0l*M_PIl*epsilon*r)*(erf(r/(2.0l*gw))- erf(r/sqrt(4.0l*gw*gw+1/(split*split))));
+      }
+      nearFieldCutOff = std::min(r, box.boxSize.x/1.999l);
+    }	
+    
     sys->log<System::MESSAGE>("[Poisson] tolerance: %g", par.tolerance);
     sys->log<System::MESSAGE>("[Poisson] support: %d", kernel->support);
     sys->log<System::MESSAGE>("[Poisson] epsilon: %g", epsilon);
+    sys->log<System::MESSAGE>("[Poisson] Gaussian source width: %g", par.gw);
     sys->log<System::MESSAGE>("[Poisson] cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
     sys->log<System::MESSAGE>("[Poisson] box size: %g %g %g", box.boxSize.x, box.boxSize.y, box.boxSize.z);
-
+    if(par.split> 0){
+      sys->log<System::MESSAGE>("[Poisson] Ewald split mode enabled");
+      sys->log<System::MESSAGE>("[Poisson] split: %g", par.split);
+      sys->log<System::MESSAGE>("[Poisson] Far field width: %g, (%g times original width)",
+				farFieldGaussianWidth, 1/par.gw*sqrt(1/(4*par.split*par.split)+par.gw*par.gw));
+      sys->log<System::MESSAGE>("[Poisson] Near field cut off: %g", nearFieldCutOff);
+    }
     CudaSafeCall(cudaStreamCreate(&st));
     CudaCheckError();
     initCuFFT();
@@ -103,9 +127,94 @@ namespace uammd{
     CufftSafeCall(cufftSetWorkArea(cufft_plan_inverse, (void*)d_cufftWorkArea));
   }
 
-  void Poisson::sumForce(cudaStream_t st){
-    sys->log<System::DEBUG2>("[Poisson] Sum Force");
+  namespace Poisson_ns{
 
+    struct NearFieldEnergyTransverser{
+      using returnInfo = real;
+      
+      NearFieldEnergyTransverser(real* energy_ptr, real* charge,
+			   real ep, real sp, real gw, Box box):
+	energy_ptr(energy_ptr), charge(charge),
+	epsilon(ep), split(sp), gw(gw), box(box){}
+
+      inline __device__ returnInfo zero() const{ return 0.0f;}
+      inline __device__ real getInfo(int pi) const{ return charge[pi];}
+      
+      inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
+	real E = 0;
+	real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
+	real r2 = dot(rij, rij);
+	if(r2>gw*gw*gw*gw){
+	  real r = sqrt(r2);
+	  E = chargei*(1.0/(4.0*M_PI*epsilon*r)*(erf(r/(2*gw)) - erf(r/sqrt(4*gw*gw+1/(split*split)))));
+	}
+	else{
+	  const real pi32 = pow(M_PI,1.5);
+	  const real gw2 = gw*gw;
+	  const real invsp2 = 1.0/(split*split);
+	  const real selfterm = 1.0/(4*pi32*gw) - 1.0/(2*pi32*sqrt(4*gw2+invsp2));
+	  const real r2term = 1.0/(6.0*pi32*pow(4.0*gw2 + invsp2, 1.5)) - 1.0/(48.0*pi32*gw2*gw);
+	  const real r4term = 1.0/(640.0*pi32*gw2*gw2*gw) - 1.0/(20.0*pi32*pow(4*gw2+invsp2,2.5));
+	  E = chargei/epsilon*(selfterm+r2*r2term + r2*r2*r4term);
+	}
+	return E;
+      }
+      inline __device__ void accumulate(returnInfo &total, const returnInfo &current) const {total += current;}
+      inline __device__ void set(uint pi, const returnInfo &total) const {energy_ptr[pi] += total;}
+    private:
+      real* energy_ptr;
+      real* charge;
+      real epsilon, split, gw;
+      Box box;
+    };
+
+    struct NearFieldForceTransverser{
+      using returnInfo = real3;
+      
+      NearFieldForceTransverser(real4* force_ptr, real* charge,
+				 real ep, real sp, real gw, Box box):
+	force_ptr(force_ptr), charge(charge),
+	epsilon(ep), split(sp), gw(gw), box(box){}
+
+      inline __device__ returnInfo zero() const{ return returnInfo();}
+      inline __device__ real getInfo(int pi) const{ return charge[pi];}
+      
+      inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
+
+	real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
+	real r2 = dot(rij, rij);
+	real r = sqrt(r2);
+	real gw2 = gw*gw;
+	real newgw = sqrt(gw2+1/(4.0*split*split));
+	real newgw2 = newgw*newgw;
+	real fmod = 0;
+	if(r2>gw*gw*gw*gw){
+	  real invrterm = exp(-0.25*r2/newgw2)/sqrt(M_PI*newgw2) - exp(-0.25*r2/gw2)/sqrt(M_PI*gw2);
+	  real invr2term = erf(0.5*r/newgw) - erf(0.5*r/gw);
+	  
+	  fmod += 1/(4*M_PI)*( invrterm/r - invr2term/r2);
+	}
+	else if (r2>0){
+	  const real pi32 = pow(M_PI, 1.5);
+	  real rterm = 1/(24*pi32)*(1.0/(gw2*gw) - 1/(newgw2*newgw));
+	  real r3term = 1/(160*pi32)*(1.0/(newgw2*newgw2*newgw) - 1.0/(gw2*gw2*gw));
+	  fmod += r*rterm+r2*r*r3term;
+	}
+	if(r2>0) return chargei/epsilon*fmod*rij/r;
+	else return real3();
+      }
+      inline __device__ void accumulate(returnInfo &total, const returnInfo &current) const {total += current;}
+      inline __device__ void set(uint pi, const returnInfo &total) const {force_ptr[pi] += make_real4(total);}
+    private:
+      real4* force_ptr;
+      real* charge;
+      real epsilon, split, gw;
+      Box box;
+    };
+
+
+  }
+  void Poisson::farField(cudaStream_t st){
     try{
       gridCharges.resize(2*grid.cellDim.y*grid.cellDim.z*(grid.cellDim.x+1));
       gridForceEnergy.resize(grid.getNumberCells());
@@ -115,7 +224,7 @@ namespace uammd{
     catch(thrust::system_error &e){
       sys->log<System::CRITICAL>("[Poisson] Thrust could not reset grid data with error &s", e.what());
     }
-    sys->log<System::DEBUG2>("[Poisson] Wave part");
+    sys->log<System::DEBUG2>("[Poisson] Far field computation");
     spreadCharges();
     forwardTransformCharge();
     convolveFourier();
@@ -123,10 +232,49 @@ namespace uammd{
     interpolateFields();
 
   }
+  void Poisson::sumForce(cudaStream_t st){
+    sys->log<System::DEBUG2>("[Poisson] Sum Force");
+
+    farField(st);
+    
+    if(split>0){
+      sys->log<System::DEBUG2>("[Poisson] Near field force computation");
+      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
+
+      nl->updateNeighbourList(box, nearFieldCutOff, st);
+      auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
+      auto charge = pd->getCharge(access::location::gpu, access::mode::read);
+      {
+	auto tr = Poisson_ns::NearFieldForceTransverser(force.begin(), charge.begin(),
+							epsilon, split, gw, box);
+	nl->transverseList(tr, st);
+      }
+    }
+
+
+
+  }
 
   real Poisson::sumEnergy(){
     sys->log<System::DEBUG2>("[Poisson] Sum Energy");
-    sumForce(0);
+    cudaStream_t st = 0;
+    farField(st);
+    if(split>0){
+
+      sys->log<System::DEBUG2>("[Poisson] Near field energy computation");
+      sys->log<System::WARNING>("[Poisson] Not subtracting adding phi(0,0,0)");
+      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
+
+      nl->updateNeighbourList(box, nearFieldCutOff, st);
+      auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
+      auto charge = pd->getCharge(access::location::gpu, access::mode::read);
+      {
+      auto tr = Poisson_ns::NearFieldEnergyTransverser(energy.begin(), charge.begin(),
+						 epsilon, split, gw, box);
+      nl->transverseList(tr, st);
+      }
+    }
+
     return 0;
   }
 
@@ -148,15 +296,15 @@ namespace uammd{
     }
 
     __global__ void chargeFourier2ForceAndEnergy(cufftComplex* gridCharges,
-					cufftComplex4* gridForceEnergy,
-				        real epsilon,
-					Grid grid){
+						 cufftComplex4* gridForceEnergy,
+						 real epsilon,
+						 Grid grid){
       int3 cell;
       cell.x= blockIdx.x*blockDim.x + threadIdx.x;
       cell.y= blockIdx.y*blockDim.y + threadIdx.y;
       cell.z= blockIdx.z*blockDim.z + threadIdx.z;
 
-      if(cell.x>=grid.cellDim.x/2+1) return;
+      if(cell.x>=grid.cellDim.x/2+2) return;
       if(cell.y>=grid.cellDim.y) return;
       if(cell.z>=grid.cellDim.z) return;
 
@@ -168,17 +316,37 @@ namespace uammd{
 	return;
       }
 
-      const real B = 1.0/(k2*epsilon*grid.getNumberCells());
+      const real B = real(1.0)/(k2*epsilon*grid.getNumberCells());
 
       const int i_icell = cell.x + (cell.y + cell.z*grid.cellDim.y)*(grid.cellDim.x/2+1);
 
       const cufftComplex fk = gridCharges[i_icell];
       cufftComplex4 force = cufftComplex4();
 
-      force.x.x = k.x*fk.y*B; force.x.y = -k.x*fk.x*B;
-      force.y.x = k.y*fk.y*B; force.y.y = -k.y*fk.x*B;
-      force.z.x = k.z*fk.y*B; force.z.y = -k.z*fk.x*B;
-      force.w = fk*B; //Energy
+      bool nyquist = false;
+      { //Is the current wave number a nyquist point?
+       	bool isXnyquist = (cell.x == grid.cellDim.x - cell.x) && (grid.cellDim.x%2 == 0);
+       	bool isYnyquist = (cell.y == grid.cellDim.y - cell.y) && (grid.cellDim.y%2 == 0);
+       	bool isZnyquist = (cell.z == grid.cellDim.z - cell.z) && (grid.cellDim.z%2 == 0);
+
+       	nyquist =  (isXnyquist && cell.y==0   && cell.z==0)  or  //1
+       	  (isXnyquist && isYnyquist  && cell.z==0)  or  //2
+       	  (cell.x==0  && isYnyquist  && cell.z==0)  or  //3
+       	  (isXnyquist && cell.y==0   && isZnyquist) or  //4
+       	  (cell.x==0  && cell.y==0   && isZnyquist) or  //5
+       	  (cell.x==0  && isYnyquist  && isZnyquist) or  //6
+       	  (isXnyquist && isYnyquist  && isZnyquist);    //7
+      }
+
+      if(nyquist) force = cufftComplex4();
+      else{
+	force.x.x = k.x*fk.y*B; force.x.y = -k.x*fk.x*B;
+	force.y.x = k.y*fk.y*B; force.y.y = -k.y*fk.x*B;
+	force.z.x = k.z*fk.y*B; force.z.y = -k.z*fk.x*B;
+      }
+      force.w = fk*B;
+      // force.w.x = abs(fk.x*fk.x -fk.y*fk.y)*B; //Energy
+      // force.w.y = abs(2*fk.x*fk.y)*B; //Energy
 
       const int o_icell = grid.getCellIndex(cell);
       gridForceEnergy[o_icell] = force;

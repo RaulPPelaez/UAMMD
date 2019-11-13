@@ -14,6 +14,9 @@ int main(int argc, char *argv[]){
   real L = std::stod(argv[1]);
   real r = std::stod(argv[2]);
   real tolerance = std::stod(argv[3]);
+  real gw = std::stod(argv[4]);
+  real split = std::stod(argv[5]);
+  
   auto sys = make_shared<System>(argc, argv);
 
   auto pd = make_shared<ParticleData>(N, sys);
@@ -38,8 +41,9 @@ int main(int argc, char *argv[]){
 
   par.box = box;
   par.epsilon = 1;
-  par.gw = 1.0;
+  par.gw = gw;
   par.tolerance = tolerance;
+  par.split = split;
   //par.upsampling = 1.0;
   auto poisson = make_shared<Poisson>(pd, pg, sys, par);
   {
@@ -51,11 +55,11 @@ int main(int argc, char *argv[]){
 		 energy.begin(), energy.end(), real());
   }
 
-  poisson->sumEnergy();
+  poisson->sumForce(0);
 
   {
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-      auto energy = pd->getEnergy(access::location::cpu, access::mode::read);
+      auto force = pd->getForce(access::location::cpu, access::mode::read);
       auto charge = pd->getCharge(access::location::cpu, access::mode::read);
 
       real3 p;
@@ -63,7 +67,7 @@ int main(int argc, char *argv[]){
 	real4 pc = pos[i];
 	p = make_real3(pc);
 	int type = charge[i];
-	std::cout<<std::setprecision(15)<<p<<" q: "<<charge[i]<<" E: "<<energy[i]<<endl;
+	std::cout<<std::setprecision(15)<<p<<" q: "<<charge[i]<<" F: "<<force[i]<<endl;
       }
   }
 

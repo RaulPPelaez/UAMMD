@@ -53,6 +53,8 @@ namespace uammd{
     using cufftComplex = cufftComplex_t<real>;
     using cufftReal = cufftReal_t<real>;
 
+    using NeighbourList = CellList;
+    
     struct Parameters{
       real upsampling = -1.0;
       int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
@@ -61,6 +63,7 @@ namespace uammd{
       real tolerance = 1e-5;
       real gw = -1;
       int support = -1;
+      real split = -1;
     };
     Poisson(shared_ptr<ParticleData> pd,
 	    shared_ptr<ParticleGroup> pg,
@@ -73,7 +76,8 @@ namespace uammd{
 
   private:
     shared_ptr<IBM<Kernel>> ibm;
-
+    shared_ptr<NeighbourList> nl;
+    
     cufftHandle cufft_plan_forward, cufft_plan_inverse;
 
     template<class T>
@@ -89,6 +93,7 @@ namespace uammd{
 
     void initCuFFT();
 
+    void farField(cudaStream_t st);
     void spreadCharges();
     void forwardTransformCharge();
     void convolveFourier();
@@ -99,6 +104,9 @@ namespace uammd{
     Grid grid; /*Wave space Grid parameters*/
 
     real epsilon;
+    real split;
+    real gw;
+    real nearFieldCutOff;
   };
 
 }

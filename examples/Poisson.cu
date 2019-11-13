@@ -13,6 +13,7 @@ using std::endl;
 int main(int argc, char *argv[]){
 
   int N = 2;
+  real gw = std::stod(argv[3]);
   real L = std::stod(argv[1]);
   real r = std::stod(argv[2]);
   auto sys = make_shared<System>(argc, argv);
@@ -43,9 +44,10 @@ int main(int argc, char *argv[]){
 
   par.box = box;
   par.epsilon = 1;
-  par.gw = 1.0;
-  par.tolerance = 1e-7;
-  //par.upsampling = 1.0;
+  par.gw = gw;
+  par.tolerance = 1e-8;
+  par.split = std::stod(argv[4]);
+  //par.upsampling = 4.0;
   auto poisson = make_shared<Poisson>(pd, pg, sys, par);
   {
     auto force = pd->getForce(access::location::gpu, access::mode::write);
@@ -56,12 +58,13 @@ int main(int argc, char *argv[]){
 		 energy.begin(), energy.end(), real());
   }
 
-  //poisson->sumForce(0);
-  poisson->sumEnergy();
+  poisson->sumForce(0);
+  //poisson->sumEnergy();
 
   {
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       auto energy = pd->getEnergy(access::location::cpu, access::mode::read);
+      auto force = pd->getForce(access::location::cpu, access::mode::read);
       auto charge = pd->getCharge(access::location::cpu, access::mode::read);
 
       real3 p;
@@ -69,7 +72,7 @@ int main(int argc, char *argv[]){
 	real4 pc = pos[i];
 	p = make_real3(pc);
 	int type = charge[i];
-	std::cout<<std::setprecision(15)<<p<<" q: "<<charge[i]<<" E: "<<energy[i]<<endl;
+	std::cout<<std::setprecision(15)<<p<<" q: "<<charge[i]<<" F: "<<force[i]<<endl;
       }
   }
 
