@@ -77,8 +77,13 @@ namespace uammd{
   public:
     using pointer = typename super::pointer;
     ~pool_memory_resource_adaptor(){
-      free_all();
-      if(this->free_res) free(this->res);
+      try{
+	free_all();
+	if(this->free_res) free(this->res);
+      }
+      catch(...){
+
+      }
     }
 
     pool_memory_resource_adaptor(MR* resource): res(resource){}
