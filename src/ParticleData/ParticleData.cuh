@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. ParticleData.
+/*Raul P. Pelaez 2019. ParticleData.
   Handles and stores all properties a particle can have.
   However they are only initialized when they are asked for the first time.
   Offers a way to access this properties.
@@ -76,9 +76,6 @@
   reorderSignal() -> void : Triggered when the global sorting of particles changes
   [PROPERTY]WrittenSignal() -> void: Triggered when PROPERTY has been requested with the write or readwrite flag (notice that the signal is emitted at requesting of the property, so the requester has writing rights
 
-  TODO:
-  100- Try libsigc++ if boost becomes a problem
-
 */
 #ifndef PARTICLEDATA_CUH
 #define PARTICLEDATA_CUH
@@ -87,9 +84,7 @@
 #include"ParticleData/Property.cuh"
 #include"utils/ParticleSorter.cuh"
 
-//#include<boost/signals2.hpp>
 #include<third_party/nod/nod.hpp>
-//#include<boost/signals2/signal_type.hpp>
 #include<third_party/boost/preprocessor.hpp>
 #include<third_party/boost/preprocessor/stringize.hpp>
 #include<third_party/boost/preprocessor/seq/for_each.hpp>
@@ -98,7 +93,6 @@
 #include <thrust/system_error.h>
 
 #include"utils/vector.cuh"
-
 
 //List here all the properties with this syntax:
 /*       ((PropertyName, propertyName, TYPE))				\      */
@@ -123,16 +117,6 @@ namespace uammd{
   using signal = typename nod::unsafe_signal<T>;
 
   using connection = nod::connection;
-
-  // template<class T>
-  // using signal = typename boost::signals2::signal_type
-  //   <
-  //   T,
-  //     boost::signals2::keywords::mutex_type<boost::signals2::dummy_mutex>
-  //     >::type;
-
-  // using connection = boost::signals2::connection;
-
 
   //Get the Name (first letter capital) from a tuple in the property list
 #define PROPNAME_CAPS(tuple) BOOST_PP_TUPLE_ELEM(3, 0 ,tuple)
@@ -181,12 +165,12 @@ namespace uammd{
     thrust::host_vector<int> originalOrderIndexCPU;
     bool originalOrderIndexCPUNeedsUpdate;
     Hints hints;
+
   public:
     ParticleData() = delete;
     ParticleData(int numberParticles, shared_ptr<System> sys);
     ~ParticleData(){
       sys->log<System::DEBUG>("[ParticleData] Destroyed");
-      CudaCheckError();
     }
 
 
@@ -206,7 +190,6 @@ namespace uammd{
     //Define getProperty() functions for all properties in list
     PROPERTY_LOOP(GET_PROPERTY)
 
-
         //Generate getters for all properties except ID
 #define GET_PROPERTY_IF_ALLOC_T(Name,name)  GET_PROPERTY_IF_ALLOC_R(Name,name)
 #define GET_PROPERTY_IF_ALLOC_R(Name, name)					\
@@ -223,9 +206,6 @@ namespace uammd{
     //Define getProperty() functions for all properties in list
     PROPERTY_LOOP(GET_PROPERTY_IF_ALLOC)
 
-
-
-
     //Generate isPropAllocated for all properties
 #define IS_ALLOCATED_T(Name, name) IS_ALLOCATED_R(Name, name)
 #define IS_ALLOCATED_R(Name, name)					\
@@ -235,15 +215,12 @@ namespace uammd{
 
     PROPERTY_LOOP(IS_ALLOCATED)
 
-    //Sort the particles to improve a certain kind of access pattern.
     void sortParticles();
 
-    //Return an array that allows to access the particles in an ID ordered manner (as they started)
     const int * getIdOrderedIndices(access::location dev){
       sys->log<System::DEBUG5>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
       auto id = getId(access::location::gpu, access::mode::read);
       int *sortedIndex = particle_sorter->getIndexArrayById(id.raw(), numberParticles);
-      if(!sortedIndex) sortedIndex = id.raw();
       sys->log<System::DEBUG6>("[ParticleData] Id reorder completed.");
       if(dev == access::location::gpu){
 	return sortedIndex;
@@ -263,12 +240,9 @@ namespace uammd{
 	else{
 	  return thrust::raw_pointer_cast(originalOrderIndexCPU.data());
 	}
-
       }
-
-
     }
-    //Apply newest order to a certain iterator
+
     template<class InputIterator, class OutputIterator>
     void applyCurrentOrder(InputIterator in, OutputIterator out, int numElements){
       particle_sorter->applyCurrentOrder(in, out, numElements);
@@ -278,22 +252,22 @@ namespace uammd{
       return particle_sorter->getSortedIndexArray(numberParticles);
     }
 
+    void changeNumParticles(int Nnew);
+
+    int getNumParticles(){ return this->numberParticles;}
 
     shared_ptr<signal<void(void)>> getReorderSignal(){
       sys->log<System::DEBUG>("[ParticleData] Reorder signal requested");
       return this->reorderSignal;
     }
 
-
-    //Generate getters for all properties except ID
 #define GET_PROPERTY_SIGNAL_T(Name,name)  GET_PROPERTY_SIGNAL_R(Name,name)
 #define GET_PROPERTY_SIGNAL_R(Name, name)				\
-  inline shared_ptr<signal<void(void)>> get ## Name ## WriteRequestedSignal(){ \
-    return this->name ## WriteRequestedSignal;				\
+    inline shared_ptr<signal<void(void)>> get ## Name ## WriteRequestedSignal(){ \
+      return this->name ## WriteRequestedSignal;			\
     }
 #define GET_PROPERTY_SIGNAL(r, data, tuple) GET_PROPERTY_SIGNAL_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
     PROPERTY_LOOP(GET_PROPERTY_SIGNAL)
-
 
     void emitReorder(){
       sys->log<System::DEBUG>("[ParticleData] Emitting reorder signal...");
@@ -304,19 +278,16 @@ namespace uammd{
       return this->numParticlesChangedSignal;
     }
 
-    void changeNumParticles(int Nnew);
-    int getNumParticles(){ return this->numberParticles;}
 
+    void hintSortByHash(Box hash_box, real3 hash_cutOff){
+      hints.orderByHash = true;
+      hints.hash_box = hash_box;
+      hints.hash_cutOff = hash_cutOff;
 
-
-  void hintSortByHash(Box hash_box, real3 hash_cutOff){
-    hints.orderByHash = true;
-    hints.hash_box = hash_box;
-    hints.hash_cutOff = hash_cutOff;
-
-  }
+    }
 
   private:
+
     void emitNumParticlesChanged(int Nnew){
       (*numParticlesChangedSignal)(Nnew);
     }
@@ -334,18 +305,16 @@ namespace uammd{
     PROPERTY_LOOP(INIT_PROPERTIES)
   {
     sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);
+
     id.resize(numberParticles);
     CudaCheckError();
+
     auto id_prop = id.data(access::location::gpu, access::mode::write);
 
-    //Fill Ids with 0..numberParticle (id[i] = i)
     cub::CountingInputIterator<int> ci(0);
-    try{
-      thrust::copy(ci, ci + numberParticles, thrust::device_ptr<int>(id_prop.raw()));
-    }
-    catch(thrust::system_error &e){
-      sys->log<System::CRITICAL>("[ParticleData] Thrust could not copy ID vector. Error: %s", e.what());
-    }
+    thrust::copy(thrust::cuda::par,
+		 ci, ci + numberParticles,
+		 id_prop.begin());
 
     particle_sorter = std::make_shared<ParticleSorter>(sys);
   }
@@ -353,9 +322,9 @@ namespace uammd{
   //Sort the particles to improve a certain kind of access pattern.
   void ParticleData::sortParticles(){
     sys->log<System::DEBUG>("[ParticleData] Sorting particles...");
-    //Orders according to positions
+
     {
-      auto posPtr     = pos.data(access::gpu, access::write);
+      auto posPtr     = pos.data(access::gpu, access::read);
       if(hints.orderByHash || !hints.orderByType){
 	int3 cellDim = make_int3(hints.hash_box.boxSize/hints.hash_cutOff);
 	particle_sorter->updateOrderByCellHash(posPtr.raw(), numberParticles, hints.hash_box, cellDim);
@@ -376,9 +345,7 @@ namespace uammd{
     PROPERTY_LOOP(APPLY_CURRENT_ORDER)
 
     originalOrderIndexCPUNeedsUpdate = true;
-    //Notify all connected entities of the reordering
     this->emitReorder();
-
   }
 
 
