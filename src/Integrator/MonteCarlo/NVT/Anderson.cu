@@ -407,14 +407,15 @@ namespace uammd {
 						     int selected_i, //CellList index of the selected particle
 						     real4 oldPos, //Previous pos
 						     real4 newPos, //Moved pos
-						     const int *cellStart, const int *cellEnd,
+						     const uint *cellStart, const int *cellEnd,
 						     Grid grid,
 						     const int *groupIndex,
 						     const ParticleGroup::IndexIterator &globalIndex,
 						     const real4 * sortPos,
 						     real3 origin,
 						     PotentialTransverser &tr,
-						     ExternalPot &eP){
+						     ExternalPot &eP,
+						     uint VALID_CELL){
 
 
 	//Calls ExternalPot::energy if it exists, returns 0 otherwise
@@ -443,7 +444,7 @@ namespace uammd {
 	  const int icellj = grid.getCellIndex(cellj);
 
 	  const int firstParticle = cellStart[icellj];
-	  if(firstParticle == CellList_ns::EMPTY_CELL) continue;
+	  if(firstParticle < VALID_CELL) continue;
 	  //Continue only if there are particles in this cell
 	  //Index of the last particle in the cell's list
 	  const int lastParticle = cellEnd[icellj];
@@ -472,7 +473,7 @@ namespace uammd {
       template<bool countTries, bool is2D,
 	       class PotentialTransverser, class ExternalPot>
       __global__ void MCStepKernel(PotentialTransverser tr, ExternalPot eP,
-				   const int *cellStart,  const int *cellEnd,
+				   const uint *cellStart,  const int *cellEnd,
 				   int3 offset, //Current subgrid
 				   Grid grid,
 				   int attemptsPerCell,
@@ -484,7 +485,8 @@ namespace uammd {
 				   real jumpSize, //Max size of a random particle displacement
 				   int step, ullint seed, //RNG seeds
 				   uint* tried, uint* accepted, //Per cell acceptance counters
-				   int ncells) {
+				   int ncells,
+				   uint VALID_CELL) {
 
 	//Compute my cell
 	int3 celli;
@@ -505,7 +507,7 @@ namespace uammd {
 	const int icell = grid.getCellIndex(celli);
 
 	const int firstParticle = cellStart[icell];
-	if(firstParticle == CellList_ns::EMPTY_CELL) return;
+	if(firstParticle < VALID_CELL) return;
 
 	const int nincell  = cellEnd[icell] - firstParticle;
 
@@ -545,7 +547,7 @@ namespace uammd {
 						  groupIndex, globalIndex,
 						  sortPos,
 						  origin,
-						  tr, eP);
+							tr, eP, VALID_CELL);
 	  //Metropolis acceptance rule
 	  const real Z = rng.f();
 	  const real acceptanceProbabilty = thrust::min(real(1.0), exp(-beta*dH));
@@ -616,7 +618,8 @@ namespace uammd {
 	   jumpSize,
 	   steps, seed,
 	   triedChanges_ptr, acceptedChanges_ptr,
-	   ncells);
+	   ncells,
+	   clData.VALID_CELL);
 	CudaCheckError();
       }
 
