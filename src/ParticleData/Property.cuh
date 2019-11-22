@@ -1,10 +1,9 @@
-/*Raul P. Pelaez 2017. Property, a container for a particle property (pos, force, vel...)
+/*Raul P. Pelaez 2019. Property, a container for a particle property (pos, force, vel...)
 
-  Stores a GPU and CPU version of the information, has two copies of the GPU version for swapping.
-  The CPU and the GPU copie arrays are only created when asked for them.
+  Maintains a GPU and CPU version, has two copies of the GPU version for fast swapping.
+  Each copy is allocated when first requested.
 
-  Controls the acces of the data in a way such as that a property that is currently being read cannot be written to, or one being written to cannot be read.
-
+  Requesting a property reference in read mode prevents other users from requesting a write reference and viceversa.
 
 */
 #ifndef PROPERTY_CUH
@@ -34,9 +33,13 @@ namespace uammd{
     T *ptr;
     size_t m_size;
     bool *isBeingRead, *isBeingWritten;
-    access::mode mode;
     bool isCopy = false; //true if this instance was created when passed to a cuda kernel
     friend class thrust::iterator_core_access;
+
+    void unlockProperty(){
+      *isBeingWritten = false;
+      *isBeingRead = false;
+    }
 
   public:
 
@@ -44,67 +47,139 @@ namespace uammd{
       super_t(nullptr),
       ptr(nullptr),
       m_size(0),
-      isBeingRead(nullptr), isBeingWritten(nullptr),
-      mode(access::mode::nomode){}
+      isBeingRead(nullptr), isBeingWritten(nullptr)
+      {}
+
     property_ptr(T* ptr,
 		 bool *isBeingWritten, bool *isBeingRead,
-		 access::mode mode,
 		 size_t in_size):
       super_t(ptr),
       ptr(ptr),
       m_size(in_size),
       isBeingWritten(isBeingWritten),
-      isBeingRead(isBeingRead),
-      mode(mode)
-    {
-      if(mode==access::mode::write || mode==access::mode::readwrite){
-	*isBeingWritten = true;
-      }
-      else if(mode == access::mode::read){
-	*isBeingRead = true;
-      }
-    }
+      isBeingRead(isBeingRead)
+    {}
+
     __host__ __device__ property_ptr(const property_ptr& _orig ):super_t(_orig.ptr) { *this = _orig; isCopy = true; }
+
     __host__ __device__ ~property_ptr(){
 #ifdef __CUDA_ARCH__
       return;
 #else
       if(isCopy) return;
-      if(ptr){
-	if(mode==access::mode::write || mode==access::mode::readwrite) *isBeingWritten = false;
-	else{
-	  *isBeingRead = false;
-	}
-      }
+      if(ptr)
+	unlockProperty();
 #endif
     }
+
     __host__ __device__ T* raw() const { return ptr;}
+
     __host__ __device__ T* get() const { return raw();}
-    __host__ __device__ Iterator end() const{ return begin()+size();}
+
+    __host__ __device__ Iterator end() const{
+      if(ptr)
+	return begin()+size();
+      else
+	return nullptr;
+    }
+
     __host__ __device__ Iterator begin() const{ return get();}
+
     __host__ __device__ size_t size() const{ return m_size;}
+  };
 
-
-    //Swap one of the Property containers for an external one
-    // void swapContainer(thrust::device_vector<T> &swappable){
-    //   father_property->swapGPUContainer(swappable);
-    // }
-    // void swapContainer(std::vector<T> &swappable){
-    //   father_property->swapCPUContainer(swappable);
-    // }
-
+  struct illegal_property_access: public std::runtime_error{
+    using std::runtime_error::runtime_error;
   };
 
   template<class T>
   struct Property{
     friend class ParticleData;
+  public:
+    using valueType = T;
+    using iterator = property_ptr<valueType>;
+    Property(): Property(0, "noName", nullptr){}
+    Property(std::string name, shared_ptr<System> sys): Property(0, name, sys){}
+    Property(int N, std::string name, shared_ptr<System> sys):N(N), name(name), sys(sys)
+    {
+      sys->log<System::DEBUG>("[Property] Property %s created with size %d", name.c_str(), N);
+      CudaCheckError();
+      //There is no benefit from using managed memory for Properties, at least for now (arch <=600)
+      //I would like to leave the possibility here though.
+      if(false and sys->getSystemParameters().managedMemoryAvailable){
+	sys->log<System::DEBUG1>("[Property] Property %s is using managed memory");
+	this->isManaged = true;
+      }
+    }
+    ~Property() = default;
+
+    void resize(int Nnew){
+      N = Nnew;
+    }
+
+    void swapInternalBuffers(){
+      try{
+	tryToResizeAndSwapInternalContainers();
+      }
+      catch(...){
+	sys->log<System::ERROR>("[Property] Exception raised during internal container swap");
+	throw;
+      }
+    }
+
+    void swapCPUContainer(std::vector<T> &outsideHostVector){
+      sys->log<System::DEBUG1>("[Property] Swapping internal CPU container of property (%s)", name.c_str());
+      swapWithExternalContainer(hostVector, outsideHostVector);
+      forceUpdate(access::location::gpu);
+    }
+
+    void swapGPUContainer(thrust::device_vector<T> &outsideDeviceVector){
+      sys->log<System::DEBUG1>("[Property] Swapping internal CPU container of property (%s)", name.c_str());
+      swapWithExternalContainer(deviceVector, outsideDeviceVector);
+      forceUpdate(access::location::cpu);
+    }
+
+    iterator data(access::location dev, access::mode mode){
+      sys->log<System::DEBUG5>("[Property] %s requested from %d (0=cpu, 1=gpu, 2=managed) with access %d (0=r, 1=w, 2=rw)",
+			       name.c_str(), dev, mode);
+      try{
+	return tryToGetData(dev,mode);
+      }
+      catch(...){
+	sys->log<System::ERROR>("[Property] Exception raised in data request for property "+name);
+	throw;
+      }
+    }
+
+    iterator begin(access::location dev, access::mode mode){
+      return data(dev, mode);
+    }
+
+    void forceUpdate(access::location dev){
+      switch(dev){
+      case access::location::cpu:
+	this->hostVectorNeedsUpdate = true;
+	break;
+      case access::location::gpu:
+	this->deviceVectorNeedsUpdate = true;
+	break;
+      }
+    }
+
+    std::string getName() const{ return this->name;}
+
+    int size() const{ return this->N;}
+
+    bool isAllocated() const{ return this->N>0;}
+
   private:
+
     thrust::device_vector<T> deviceVector, deviceVector_alt;
     std::vector<T> hostVector;
     uammd::managed_vector<T> managedVector, managedVector_alt;
 
     uint N = 0;
-    bool deviceVectorNeedsUpdate = false, hostVectorNeedsUpdate= true;
+    bool deviceVectorNeedsUpdate = false, hostVectorNeedsUpdate = false;
     string name;
     bool isBeingWritten = false, isBeingRead= false;
     bool isManaged = false;
@@ -121,187 +196,127 @@ namespace uammd{
 	return thrust::raw_pointer_cast(deviceVector_alt.data());
       }
     }
-  public:
-    using valueType = T;
-    using iterator = property_ptr<valueType>;
-    Property(): Property(0, "noName", nullptr){}
-    Property(std::string name, shared_ptr<System> sys): Property(0, name, sys){}
-    Property(int N, std::string name, shared_ptr<System> sys):N(N), name(name), sys(sys)
-    {
-      sys->log<System::DEBUG>("[Property] Property %s created with size %d", name.c_str(), N);
-      CudaCheckError();
-      //There is no benefit from using managed memory for Properties, at least for now (arch <=600)
-      //I would like to leave the possibility here though.
-      if(false and sys->getSystemParameters().managedMemoryAvailable){
-	sys->log<System::DEBUG1>("[Property] Property %s is using managed memory");
-	this->isManaged = true;
-      }
-      //if(N==0) return;
-      //deviceVector.resize(N);
-    }
-    ~Property() = default;
-    void resize(int Nnew){
 
-      this->N = Nnew;
-      if(isManaged){
-	sys->log<System::DEBUG>("[Property] Resizing Managed version of %s to %d particles", name.c_str(), Nnew);
-	try{
-	  managedVector.resize(N);
-	  if(managedVector_alt.size() > 0)managedVector_alt.resize(N);
-	}
-	catch(const thrust::system_error &e){
-	  sys->log<System::CRITICAL>("[Property] Thrust failed at managedVector.resize(%d) with address %p with the message: %s",
-				     Nnew, thrust::raw_pointer_cast(managedVector.data()), e.what());
-	}
-      }
-      else{
-	try{
-	  sys->log<System::DEBUG>("[Property] Resizing GPU version of %s to %d particles", name.c_str(), Nnew);
-	  deviceVector.resize(Nnew);
-	  if(deviceVector_alt.size()>0){
-	    sys->log<System::DEBUG1>("[Property] Resizing alt GPU version of %s", name.c_str());
+    property_ptr<T> tryToGetData(access::location dev, access::mode mode){
+      const bool requestedForWriting = (mode==access::mode::write or mode==access::mode::readwrite);
 
-	    deviceVector_alt.resize(Nnew);
+      throwIfIllegalDataRequest(mode);
+
+      lockIfNecesary(mode);
+
+      switch(dev){
+      case access::location::cpu:
+	if(hostVector.size()!= N){
+	  sys->log<System::DEBUG1>("[Property] Resizing host version of " +
+				   name + " to " + std::to_string(N)+ " elements");
+	  hostVector.resize(N);
+	}
+	updateHostData();
+	if(requestedForWriting)
+	  deviceVectorNeedsUpdate=true;
+	return property_ptr<T>(hostVector.data(), &this->isBeingWritten, &this->isBeingRead, size());
+
+      case access::location::gpu:
+	if(deviceVector.size()!= N){
+	  sys->log<System::DEBUG1>("[Property] Resizing device version of " +
+				   name + " to " + std::to_string(N)+ " elements");
+	deviceVector.resize(N);
+	}
+	updateDeviceData();
+	if(requestedForWriting)
+	  hostVectorNeedsUpdate=true;
+	return property_ptr<T>(thrust::raw_pointer_cast(deviceVector.data()),
+			       &this->isBeingWritten, &this->isBeingRead, size());
+
+      case access::location::managed:
+	  if(!isManaged){
+	    throw std::runtime_error("[Property] Current system does not accept Managed memory requests.");
 	  }
-	}
-	catch(const thrust::system_error &e){
-	  sys->log<System::CRITICAL>("[Property] Thrust failed at deviceVector.resize(%d) with address %p with the message: %s",
-				     Nnew, thrust::raw_pointer_cast(deviceVector.data()), e.what());
-}
-	//Only resize CPU memory if it has been created
-	if(hostVector.size() > 0){
-	  hostVector.resize(Nnew);
-	  sys->log<System::DEBUG>("[Property] Resizing CPU version of %s to %d particles", name.c_str(), Nnew);
+	  if(sys->getSystemParameters().cuda_arch < 600)
+	    CudaSafeCall(cudaDeviceSynchronize());
+	  return property_ptr<T>(thrust::raw_pointer_cast(managedVector.data()),
+				 &this->isBeingWritten, &this->isBeingRead, size());
+
+      default:
+	throw std::runtime_error("[Property] Invalid location requested");
+      }
+    }
+
+    void throwIfIllegalDataRequest(access::mode mode){
+      const bool requestedForWriting = (mode==access::mode::write or mode==access::mode::readwrite);
+      const bool requestedForReading = (mode==access::mode::read);
+      {
+	const bool isIllegalRequestForWriting = (this->isBeingWritten or this->isBeingRead) and requestedForWriting;
+	const bool isIllegalRequestForReading = (this->isBeingWritten and requestedForReading);
+	if(isIllegalRequestForWriting or isIllegalRequestForReading){
+	  sys->log<System::ERROR>("[Property] You cant request " + name + " property for " +
+				  (this->isBeingWritten?"writing":"reading") + " while its locked!");
+	  throw illegal_property_access("Property "+name+" requested while locked");
 	}
       }
     }
 
-    void swapInternalBuffers(){
+    void lockIfNecesary(access::mode request_mode){
+      const bool requestedForWritting = (request_mode==access::mode::write or request_mode==access::mode::readwrite);
+      const bool requestedForReading = (request_mode==access::mode::read);
+      if(requestedForWritting)
+	this->isBeingWritten = true;
+      if(requestedForReading)
+	this->isBeingRead = true;
+    }
+    void updateHostData(){
+      if(hostVectorNeedsUpdate){
+	hostVector.resize(N);
+	CudaSafeCall(cudaMemcpy(hostVector.data(),
+				thrust::raw_pointer_cast(deviceVector.data()),
+				N*sizeof(T), cudaMemcpyDeviceToHost));
+	hostVectorNeedsUpdate=false;
+      }
+    }
+
+    void updateDeviceData(){
+      if(deviceVectorNeedsUpdate){
+	deviceVector = hostVector;
+	deviceVectorNeedsUpdate=false;
+      }
+    }
+
+    void tryToResizeAndSwapInternalContainers(){
       if(isManaged){
-	sys->log<System::DEBUG1>("[Property] Swapping Managed references of %s", name.c_str());
-	if(managedVector_alt.size() != N) managedVector_alt.resize(N);
+	sys->log<System::DEBUG1>("[Property] Swapping internal managed references of %s", name.c_str());
+	managedVector_alt.resize(N);
 	managedVector.swap(managedVector_alt);
       }
       else{
-	sys->log<System::DEBUG1>("[Property] Swapping GPU references of %s", name.c_str());
-	if(deviceVector_alt.size() != N) deviceVector_alt.resize(N);
-	deviceVector.swap(deviceVector_alt);
+	sys->log<System::DEBUG1>("[Property] Swapping internal device references of %s", name.c_str());
+        deviceVector_alt.resize(N);
+	managedVector.swap(managedVector_alt);
 	hostVectorNeedsUpdate = true;
       }
     }
-    void swapCPUContainer(std::vector<T> &outsideHostVector){
+
+    template<class InternalContainer, class ExternalContainer>
+    void tryToSwapWithExternalContainer(InternalContainer &myContainer, ExternalContainer &outsideContainer){
+      throwIfnotInSwappableState();
+      if(outsideContainer.size() != N) {
+	sys->log<System::DEBUG1>("[Property] Resizing input container, had %d elements, should have %d",
+				 outsideContainer.size(), N);
+	outsideContainer.resize(N);
+      }
+      myContainer.swap(outsideContainer);
+    }
+
+    void throwIfnotInSwappableState(){
       if(isManaged){
-	sys->log<System::ERROR>("[Property] Cannot swap the container of a Managed property (%s)", name.c_str());
-	return;
+	throw std::runtime_error("[Property] Cannot swap the container of a Managed property (" + name+")");
       }
-      sys->log<System::DEBUG1>("[Property] Swapping internal CPU container of property (%s)", name.c_str());
-      if(this->isBeingRead || this->isBeingWritten)
-	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
-
-      //Ensure the GPU version will be up to date the next time it is asked for
-      forceUpdate(access::location::gpu);
-      if(outsideHostVector.size() != N) {
-	sys->log<System::DEBUG1>("[Property] Resizing input container, had %d elements, should have %d", outsideHostVector.size(), N);
-	outsideHostVector.resize(N);
-      }
-
-      hostVector.swap(outsideHostVector);
-    }
-    void swapGPUContainer(thrust::device_vector<T> &outsideDeviceVector){
-      if(isManaged){
-	sys->log<System::ERROR>("[Property] Cannot swap the container of a Managed property (%s)", name.c_str());
-	return;
-      }
-
-      sys->log<System::DEBUG1>("[Property] Swapping internal GPU container of property (%s)", name.c_str());
-      if(this->isBeingRead || this->isBeingWritten)
-	sys->log<System::CRITICAL>("[Property] You cannot swap the container of a property (%s) while is being read or written!", name.c_str());
-      //Ensure the CPU version will be up to date the next time it is asked for
-      forceUpdate(access::location::cpu);
-
-      if(outsideDeviceVector.size() != N) {
-	sys->log<System::DEBUG1>("[Property] Resizing input container, had %d elements, should have %d", outsideDeviceVector.size(), N);
-	outsideDeviceVector.resize(N);
-      }
-
-      deviceVector.swap(outsideDeviceVector);
-    }
-
-    inline iterator begin(access::location dev, access::mode mode){
-      return data(dev, mode);
-    }
-    property_ptr<T> data(access::location dev, access::mode mode){
-      sys->log<System::DEBUG5>("[Property] %s requested from %d (0=cpu, 1=gpu, 2=managed) with access %d (0=r, 1=w, 2=rw)", name.c_str(), dev, mode);
-      if(this->isBeingWritten){
-	sys->log<System::CRITICAL>("[Property] You cant request %s property while its locked for writing!", name.c_str());
-      }
-
-      if(dev == access::location::managed and not isManaged){
-	sys->log<System::CRITICAL>("[Property] Current system does not accept Managed memory requests.");
-      }
-
-
-      if(isManaged){
-	if(sys->getSystemParameters().cuda_arch < 600)
-	  CudaSafeCall(cudaDeviceSynchronize());
-	auto ptr = thrust::raw_pointer_cast(managedVector.data());
-	return property_ptr<T>(ptr, &this->isBeingWritten, &this->isBeingRead, mode, size());
-      }
-      else{
-	if(mode==access::mode::write || mode==access::mode::readwrite){
-	  if(dev==access::location::gpu) hostVectorNeedsUpdate=true;
-	  else if(dev==access::location::cpu) deviceVectorNeedsUpdate=true;
-	  else { sys->log<System::CRITICAL>("[Property] Invalid access location in %s", name.c_str());}
-	  if(this->isBeingRead){
-	    sys->log<System::CRITICAL>("[Property] You cant write to %s property while its being read!", name.c_str());
-	  }
-	}
-
-	T *devicePtr = thrust::raw_pointer_cast(deviceVector.data());
-	T *hostPtr = hostVector.data();
-	switch(dev){
-	case access::location::cpu:
-	  //Allocate CPU memory only if asked for it
-	  if(this->hostVector.size() == 0){
-	    sys->log<System::DEBUG>("[Property] Resizing CPU version of %s to %d particles", name.c_str(), N);
-	    hostVector.resize(N);
-	    hostPtr = hostVector.data();
-	  }
-	  if(hostVectorNeedsUpdate){
-	    CudaSafeCall(cudaMemcpy(hostPtr, devicePtr, N*sizeof(T), cudaMemcpyDeviceToHost));
-	    hostVectorNeedsUpdate=false;
-	  }
-	  return property_ptr<T>(hostPtr, &this->isBeingWritten, &this->isBeingRead, mode, size());
-	case access::location::gpu:
-	  if(deviceVectorNeedsUpdate){
-	    CudaSafeCall(cudaMemcpy(devicePtr, hostPtr, N*sizeof(T), cudaMemcpyHostToDevice));
-	    deviceVectorNeedsUpdate=false;
-	  }
-	  return property_ptr<T>(devicePtr, &this->isBeingWritten, &this->isBeingRead, mode, size());
-	case access::location::nodevice:
-	default:
-	  return property_ptr<T>(nullptr, &this->isBeingWritten, &this->isBeingRead, mode, size());
-	}
+      if(this->isBeingRead || this->isBeingWritten){
+	sys->log<System::ERROR>("[Property] Cannot swap property %s while it is locked for writing/reading",
+				    name.c_str());
+	throw illegal_property_access("Property "+name+" requested while locked");
       }
     }
-    void forceUpdate(access::location dev){
-      switch(dev){
-      case access::location::cpu:
-	this->hostVectorNeedsUpdate = true;
-	break;
-      case access::location::gpu:
-	this->deviceVectorNeedsUpdate = true;
-	break;
-      case access::location::nodevice:
-      default:
-	this->deviceVectorNeedsUpdate = false;
 
-      }
-    }
-    std::string getName() const{ return this->name;}
-    int size() const{ return this->N;}
-    bool isAllocated() const{ return this->N>0;}
-    size_t typeSize() const{ return sizeof(valueType);}
   };
 
 }
