@@ -47,7 +47,7 @@ BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OP
 all: 
 	$(BASIC_LINE)  $(FILE)
 
-test: benchmark lj ljMult dpd bdhi bd bonds sph mcnvt fcm dambreak quasi2D temporary_memory neighbour_list_iterator
+test: benchmark lj ljMult dpd bdhi bd bonds sph mcnvt fcm dambreak quasi2D temporary_memory neighbour_list_iterator error_handling
 
 
 benchmark:
@@ -103,8 +103,12 @@ temporary_memory:
 
 neighbour_list_iterator:
 	$(BASIC_LINE) NeighbourListIterator.cu  -o neighbour_list_iterator
+
+error_handling:
+	$(BASIC_LINE) error_handling.cu  -o error_handling
+
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D temporary_memory neighbour_list_iterator
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D temporary_memory neighbour_list_iterator error_handling
 
 
 
