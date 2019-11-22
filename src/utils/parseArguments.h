@@ -1,47 +1,78 @@
-/*Raul P. Pelaez 2018
+/*Raul P. Pelaez 2019
   Some utilities to process argv and argc
 */
 #ifndef PARSEARGUMENTS_H
 #define PARSEARGUMENTS_H
 
 #include<sstream>
+#include<cstring>
+#include<vector>
+#include<iterator>
+#include"exception.h"
+
 namespace uammd{
-  //Ask for one or many arguments of any type after a flag from argv. returns true if numberArguments where found after flag
-  namespace input_parse{
-    template<class T>
-    bool parseArgument(int argc, char *argv[],
-		       const char *flag,  //What to look for
-		       T* result, int numberArguments=1){ //output and number of them
-      for(int i=1; i<argc; i++){ //Look for the flag
+  namespace detail{
 
-	if(strcmp(flag, argv[i]) == 0){ //If found it
-	  for(int j=0; j<numberArguments; j++)  result[j] = T();
-	  std::string line;  //convert char * to string for as many values as requested
-	  if(argc<i+numberArguments+1) return false;
-	  for(int j=0; j<numberArguments; j++){
-	    line += argv[i+j+1];
-	  }
-	  std::istringstream ss(line);
-	  //Store them in result
-	  for(int j=0; j<numberArguments; j++){
+    template<class T, class StringIterator>
+    static std::vector<T> stringsTovalues(StringIterator first, int numberValues){
+      std::stringstream ss;
 
-	    ss>>result[j];
-	  }
-	  return true;
-	}
+      try{
+      std::copy(first, first + numberValues,
+		std::ostream_iterator<std::string>(ss, " "));
       }
-      return false;
-    }
-    //Returns true if the flag is present in argv, flase otherwise
-    bool checkFlag(int argc, char *argv[],
-		   const char *flag){  //What to look for
-      for(int i=1; i<argc; i++){ //Look for the flag
-	if(strcmp(flag, argv[i]) == 0){ //If found it
-	  return true;
-	}
+      catch(...){
+	std::throw_with_nested(std::runtime_error("Not enough arguments in argv"));
       }
-      return false;
+
+      std::vector<T> vals(std::istream_iterator<T>(ss),{});
+
+      if(!ss.eof())
+	throw std::runtime_error("Invalid comand line argument");
+
+      return vals;
     }
+
   }
+
+  class CommandLineArgumentParser{
+    int m_argc = 0;
+    char **m_argv = nullptr;
+
+  public:
+    CommandLineArgumentParser(int argc, char **argv): m_argc(argc), m_argv(argv){}
+
+    template<class T>
+    T getFlagArgument(std::string flag){
+      auto val = getFlagArgumentMany<T>(flag, 1);
+      return *(std::begin(val));
+    }
+
+    template<class T>
+    std::vector<T> getFlagArgumentMany(std::string flag, int numberArguments){
+      if(numberArguments<1)
+	throw std::invalid_argument("Not enough arguments in argv");
+
+      for(int i=1; i<m_argc; i++){
+	if(flag.compare(m_argv[i]) == 0){
+	  auto firstArgument = m_argv+i+1;
+	  return detail::stringsTovalues<T>(firstArgument, numberArguments);
+
+	}
+      }
+
+      throw std::runtime_error("Flag not found");
+    }
+
+    bool isFlagPresent(std::string flag){
+      for(int i=1; i<m_argc; i++){
+	if(flag.compare(m_argv[i]) == 0){
+	  return true;
+	}
+      }
+      return false;
+    }
+
+  };
 }
 #endif
