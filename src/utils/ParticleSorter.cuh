@@ -78,7 +78,6 @@ namespace uammd{
 
     };
 
-
     int clz(uint n){
       n |= (n >>  1);
       n |= (n >>  2);
@@ -99,9 +98,6 @@ namespace uammd{
       hash[i]  = ihash;
     }
 
-
-
-    /*In case old position is a texture*/
     template<class InputIterator, class OutputIterator>
     __global__ void reorderArray(const InputIterator old,
 				 OutputIterator sorted,
@@ -114,16 +110,6 @@ namespace uammd{
   }
 
   class ParticleSorter{
-    bool init = false;
-    bool originalOrderNeedsUpdate = true;
-
-    int temp_storage_num_elements = 0;
-    size_t temp_storage_bytes = 0; //Additional storage needed by cub
-    thrust::device_vector<int>  original_index;
-    thrust::device_vector<int>  index, index_alt;
-    thrust::device_vector<uint> hash, hash_alt;
-    std::shared_ptr<System> sys;
-    /*Radix sort by key using cub, puts sorted versions of index,hash in index_alt, hash_alt*/
   public:
     ParticleSorter() = delete;
     ParticleSorter(std::shared_ptr<System> sys):sys(sys){};
@@ -132,17 +118,10 @@ namespace uammd{
     void sortByKey(cub::DoubleBuffer<int> &index,
 		   cub::DoubleBuffer<hashType> &hash,
 		   int N, cudaStream_t st = 0, int end_bit = sizeof(uint)*8){
-
-
-      //This uses the CUB API to perform a radix sort
-      //CUB orders by key an array pair and copies them onto another pair
-      /**Initialize CUB if more temp storage is needed**/
-      if(N > temp_storage_num_elements){
-	temp_storage_num_elements = N;
-	temp_storage_bytes = 0;
-
-	/*On first call, this function only computes the size of the required temporal storage*/
-	CudaSafeCall(cub::DeviceRadixSort::SortPairs(nullptr, temp_storage_bytes,
+      if(N > maxRequestedElements){
+        maxRequestedElements = N;
+	cub_temp_storage_bytes = 0;
+	CudaSafeCall(cub::DeviceRadixSort::SortPairs(nullptr, cub_temp_storage_bytes,
 						     hash,
 						     index,
 						     N,
@@ -150,12 +129,10 @@ namespace uammd{
 						     st));
       }
       auto alloc = sys->getTemporaryDeviceAllocator<char>();
-      std::shared_ptr<char> d_temp_storage(alloc.allocate(temp_storage_bytes),
+      std::shared_ptr<char> d_temp_storage(alloc.allocate(cub_temp_storage_bytes),
 					   [=](char* ptr){ alloc.deallocate(ptr);});
-
       void* d_temp_storage_ptr = d_temp_storage.get();
-      /**Perform the Radix sort on the index/hash pair**/
-      CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage_ptr, temp_storage_bytes,
+      CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage_ptr, cub_temp_storage_bytes,
 						   hash,
 						   index,
 						   N,
@@ -163,11 +140,10 @@ namespace uammd{
 						   st));
     }
     //Return the most significant bit of an unsigned integral type
-    template <typename T> inline int msb(T n){
+    template<typename T> inline int msb(T n){
       static_assert(std::is_integral<T>::value && !std::is_signed<T>::value,
 		    "msb<T>(): T must be an unsigned integral type.");
-
-      for (T i = std::numeric_limits<T>::digits - 1, mask = 1 << i;
+      for(T i = std::numeric_limits<T>::digits - 1, mask = 1 << i;
 	   i >= 0;
 	   --i, mask >>= 1){
 	if((n & mask) != 0) return i;
@@ -179,40 +155,18 @@ namespace uammd{
     void updateOrderWithCustomHash(HashIterator &hasher,
 				   uint N, uint maxHash = std::numeric_limits<uint>::max(),
 				   cudaStream_t st = 0){
-      sys->log<System::DEBUG1>("[ParticleSorter] Updating with custom hash iterator: %s", type_name<HashIterator>().c_str());
+      sys->log<System::DEBUG1>("[ParticleSorter] Updating with custom hash iterator: %s",
+			       type_name<HashIterator>().c_str());
       sys->log<System::DEBUG1>("[ParticleSorter] Assigning hash to %d elements", N);
       sys->log<System::DEBUG2>("[ParticleSorter] Maximum hash 0x%x ( dec: %u ) last bit: %d",
 			       maxHash, maxHash, 32-Sorter::clz(maxHash) );
-      init = true;
-      hash.resize(N); hash_alt.resize(N);
-      index.resize(N); index_alt.resize(N);
-
-      int Nthreads=128;
-      int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
-
-      Sorter::assignHash<<<Nblocks, Nthreads, 0, st>>>(hasher,
-						       thrust::raw_pointer_cast(index.data()),
-						       thrust::raw_pointer_cast(hash.data()),
-						       N);
-
-      auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(index.data()),
-					     thrust::raw_pointer_cast(index_alt.data()));
-      auto db_hash  = cub::DoubleBuffer<uint>(thrust::raw_pointer_cast(hash.data()),
-					      thrust::raw_pointer_cast(hash_alt.data()));
-
-      //Cub just needs this endbit at least
-      int maxbit = 32-Sorter::clz(maxHash);
-      maxbit = std::min(maxbit, 32);
-
-      this->sortByKey(db_index,
-		      db_hash,
-		      N,
-		      st, maxbit);
-      //Sometimes CUB will not swap the references in the DoubleBuffer
-      if(db_index.selector) index.swap(index_alt);
-      if(db_hash.selector)  hash.swap(hash_alt);
-
-      originalOrderNeedsUpdate = true;
+      try{
+	tryToUpdateOrderWithCustomHash(hasher, N, maxHash, st);
+      }
+      catch(...){
+	sys->log<System::ERROR>("ParticleSorter raised an exception in updateOrderWithCustomHash");
+	throw;
+      }
     }
 
     template<class CellHasher = Sorter::MortonHash, class InputIterator>
@@ -227,100 +181,144 @@ namespace uammd{
 				      st);
     }
 
-    //Reorder with a custom key, store in orginal_index
     void updateOrderById(int *id, int N, cudaStream_t st = 0){
-      int lastN = original_index.size();
-      if(lastN != N){
-	original_index.resize(N);
-      }
-      cub::CountingInputIterator<int> ci(0);
       try{
-	thrust::copy(ci, ci+N, original_index.begin());
+	tryToUpdateOrderById(id, N, st);
       }
-      catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[ParticleSorter] Thrust could not copy ID vector. Error: %s", e.what());
+      catch(...){
+	sys->log<System::ERROR>("Exception raised in ParticleSorter::updateOrderById");
+	throw;
       }
-
-
-      auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(original_index.data()),
-					     thrust::raw_pointer_cast(index_alt.data()));
-      //store current index in hash
-
-      //thrust::copy will assume cpu copy if the first argument is a raw pointer
-
-      int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
-      CudaSafeCall(cudaMemcpy(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice));
-
-      auto db_hash  = cub::DoubleBuffer<int>(
-					     d_hash,
-					     (int*)thrust::raw_pointer_cast(hash_alt.data()));
-      this->sortByKey(db_index,
-		      db_hash,
-		      N,
-		      st);
-
-      original_index.swap(index_alt);
     }
+
     //WARNING: _unsorted and _sorted cannot be aliased!
     template<class InputIterator, class OutputIterator>
-    void applyCurrentOrder(InputIterator d_property_unsorted,
-			   OutputIterator d_property_sorted,
+    void applyCurrentOrder(InputIterator d_property_unsorted, OutputIterator d_property_sorted,
 			   int N, cudaStream_t st = 0){
       int Nthreads=128;
       int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
-
       Sorter::reorderArray<<<Nblocks, Nthreads, 0, st>>>(d_property_unsorted,
 							 d_property_sorted,
 							 thrust::raw_pointer_cast(index.data()),
 							 N);
+      CudaCheckError();
     }
 
-    //Get current order keys
     int * getSortedIndexArray(int N){
-      int lastN = index.size();
-
-      if(lastN != N){
-	cub::CountingInputIterator<int> ci(lastN);
-        index.resize(N);
-	try{
-	  thrust::copy(ci, ci+(N-lastN), index.begin()+lastN);
-	}
-	catch(thrust::system_error &e){
-	  sys->log<System::CRITICAL>("[ParticleSorter] Thrust failed in %s(%d). Error: %s",
-				     __FILE__, __LINE__, e.what());
-	}
-
+      try{
+	return tryToGetSortedIndexArray(N);
       }
-
-      return thrust::raw_pointer_cast(index.data());
+      catch(...){
+	sys->log<System::ERROR>("Exception raised in ParticleSorter::getSortedIndexArray");
+	throw;
+      }
     }
 
     uint * getSortedHashes(){
       return thrust::raw_pointer_cast(hash.data());
     }
-    //Update and return reorder with a custom key
+
     int * getIndexArrayById(int * id, int N, cudaStream_t st = 0){
-      if(!init) return nullptr;
+      try{
+	return tryToGetIndexArrayById(id, N, st);
+      }
+      catch(...){
+	sys->log<System::ERROR>("Exception raised in ParticleSorter::getIndexArrayById");
+	throw;
+      }
+    }
+
+  private:
+    bool init = false;
+    bool originalOrderNeedsUpdate = true;
+
+    int maxRequestedElements = 0;
+    size_t cub_temp_storage_bytes = 0;
+
+    thrust::device_vector<int>  original_index;
+    thrust::device_vector<int>  index, index_alt;
+    thrust::device_vector<uint> hash, hash_alt;
+
+    std::shared_ptr<System> sys;
+
+    void tryToUpdateOrderById(int *id, int N, cudaStream_t st){
+      original_index.resize(N);
+      index_alt.resize(N);
+      hash.resize(N);
+      hash_alt.resize(N);
+
+      cub::CountingInputIterator<int> ci(0);
+      thrust::copy(thrust::cuda::par,
+		   ci, ci+N, original_index.begin());
+
+      int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
+      CudaSafeCall(cudaMemcpyAsync(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice,st));
+
+      auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(original_index.data()),
+					     thrust::raw_pointer_cast(index_alt.data()));
+      auto db_hash  = cub::DoubleBuffer<int>(d_hash,
+					     (int*)thrust::raw_pointer_cast(hash_alt.data()));
+      this->sortByKey(db_index, db_hash, N, st);
+      if(db_index.selector)
+	original_index.swap(index_alt);
+
+    }
+
+    template<class HashIterator>
+    void tryToUpdateOrderWithCustomHash(HashIterator &hasher, uint N, uint maxHash, cudaStream_t st){
+      init = true;
+      hash.resize(N);
+      index.resize(N);
+      int Nthreads=128;
+      int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
+      Sorter::assignHash<<<Nblocks, Nthreads, 0, st>>>(hasher,
+						       thrust::raw_pointer_cast(index.data()),
+						       thrust::raw_pointer_cast(hash.data()),
+						       N);
+      CudaCheckError();
+      hash_alt.resize(N);
+      index_alt.resize(N);
+      auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(index.data()),
+					     thrust::raw_pointer_cast(index_alt.data()));
+      auto db_hash  = cub::DoubleBuffer<uint>(thrust::raw_pointer_cast(hash.data()),
+					      thrust::raw_pointer_cast(hash_alt.data()));
+      //Cub just needs this endbit at least
+      int maxbit = 32-Sorter::clz(maxHash);
+      maxbit = std::min(maxbit, 32);
+      this->sortByKey(db_index, db_hash, N, st, maxbit);
+      CudaCheckError();
+      //Sometimes CUB will not swap the references in the DoubleBuffer
+      if(db_index.selector)
+	index.swap(index_alt);
+      if(db_hash.selector)
+	hash.swap(hash_alt);
+      originalOrderNeedsUpdate = true;
+    }
+
+    int * tryToGetSortedIndexArray(int N){
+      int lastN = index.size();
+      if(lastN != N){
+	cub::CountingInputIterator<int> ci(lastN);
+        index.resize(N);
+	thrust::copy(thrust::cuda::par, ci, ci+(N-lastN), index.begin()+lastN);
+      }
+      return thrust::raw_pointer_cast(index.data());
+    }
+
+    int * tryToGetIndexArrayById(int * id, int N, cudaStream_t st = 0){
+      if(!init) return id;
       if(originalOrderNeedsUpdate){
 	this->updateOrderById(id, N, st);
 	originalOrderNeedsUpdate = false;
       }
-
       int lastN = original_index.size();
-
       if(lastN != N){
 	original_index.resize(N);
-	try{
-	  thrust::copy(id, id+(N-lastN), original_index.begin()+lastN);
-	}
-	catch(thrust::system_error &e){
-	  sys->log<System::CRITICAL>("[ParticleSorter] Thrust failed in %s(%d). Error: %s",
-				     __FILE__, __LINE__, e.what());
-
-	}
+	thrust::copy(thrust::cuda::par, id, id+(N-lastN), original_index.begin()+lastN);
       }
       return thrust::raw_pointer_cast(original_index.data());
     }
+
   };
 }
 #endif
