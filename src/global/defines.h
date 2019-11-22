@@ -1,12 +1,12 @@
-/* Raul P. Pelaez 2018.
+/* Raul P. Pelaez 2019.
    Some basic defines and aliases for uammd
  */
 #ifndef UAMMD_DEFINES_H
 #define UAMMD_DEFINES_H
 #include"cuda_runtime.h"
-#define UAMMD_VERSION "0.6"
+#define UAMMD_VERSION "0.7"
 
-/*Comment to compile for double precision*/
+
 #ifndef DOUBLE_PRECISION
 #define SINGLE_PRECISION
 #endif
