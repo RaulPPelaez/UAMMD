@@ -33,7 +33,7 @@ int numberParticles;
 int numberSteps, printSteps;
 real temperature, viscosity;
 void readParameters(std::shared_ptr<System> sys, std::string file);
-
+bool periodicityX, periodicityY, periodicityZ;
 int main(int argc, char *argv[]){
 
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
@@ -51,10 +51,7 @@ int main(int argc, char *argv[]){
 
   //Some modules need a simulation box (i.e PairForces for the PBC)
   Box box(boxSize);
-  bool isPeriodicX = true;
-  bool isPeriodicY = false;
-  bool isPeriodicZ = false;
-  box.setPeriodicity(isPeriodicX, isPeriodicY, isPeriodicZ);
+  box.setPeriodicity(periodicityX, periodicityY, periodicityZ);
   //Initial positions
   {
     //Ask pd for a property like so:
@@ -172,6 +169,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
       default_options<<"outputFile /dev/stdout"<<std::endl;
       default_options<<"temperature 1.0"<<std::endl;
       default_options<<"viscosity 1"<<std::endl;
+      default_options<<"periodicity 1 1 1"<<std::endl;
     }
   }
 
@@ -185,4 +183,5 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
   in.getOption("outputFile", InputFile::Required)>>outputFile;
   in.getOption("temperature", InputFile::Required)>>temperature;
   in.getOption("viscosity", InputFile::Required)>>viscosity;
+  in.getOption("periodicity", InputFile::Required)>>periodicityX>>periodicityY>>periodicityZ;
 }
