@@ -63,14 +63,12 @@ namespace uammd{
       sys->log<System::WARNING>("[VerletNVE] Velocity will be overwritten to ensure energy conservation!");
     }
     
-    cudaStreamCreate(&stream);
+    CudaSafeCall(cudaStreamCreate(&stream));
   }
 
   
   VerletNVE::~VerletNVE(){
     cudaStreamDestroy(stream);
-    cudaFree(d_K);
-    cudaFree(d_tmp_storage);
   }
 
 

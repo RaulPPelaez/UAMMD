@@ -44,9 +44,7 @@ namespace uammd{
     cudaStream_t stream;
     int steps;
 
-    void * d_tmp_storage;
     size_t temp_storage_bytes;
-    real3 *d_K;
     
   public:
     struct Parameters{
