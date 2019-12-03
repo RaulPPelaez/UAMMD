@@ -40,6 +40,7 @@ inline void __cudaSafeCall(cudaError err, const char *file, const int line){
 }
 
 inline void __cudaCheckError(const char *file, const int line){
+  cudaError err;
 #ifdef CUDA_ERROR_CHECK_SYNC
   err = cudaDeviceSynchronize();
   if(cudaSuccess != err){
@@ -47,7 +48,7 @@ inline void __cudaCheckError(const char *file, const int line){
 				    std::string(file) + ":" + std::to_string(line), err);
   }
 #endif
-  cudaError err = cudaGetLastError();
+  err = cudaGetLastError();
   if(cudaSuccess != err){
     throw uammd::cuda_generic_error("CudaCheckError() failed at "+
 				    std::string(file) + ":" + std::to_string(line), err);
