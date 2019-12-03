@@ -78,10 +78,8 @@ namespace uammd{
       inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
 	real r2 = dot(r12, r12);
 	if(r2==real(0.0)) return real(0.0);
-
-	real invr = rsqrt(r2);
-	const real dr = real(1.0)-bi.r0*invr;
-      
+	real r = sqrt(r2);
+	const real dr = r-bi.r0;      
 	return real(0.5)*bi.k*dr*dr;
       }
     
@@ -105,16 +103,13 @@ namespace uammd{
       };
       inline __device__ real3 force(int i, int j, const real3 &r12, const BondInfo &bi){
 	real r2 = dot(r12, r12);
-	real r02 = bi.r0*bi.r0;
-    
+	real r02 = bi.r0*bi.r0;    
 	return -r02*bi.k/(r02-r2)*r12;
       }    
       inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
 	real r2 = dot(r12, r12);
-	real r02 = bi.r0*bi.r0;
-    
-	//return -r02*bi.k/(r02-r2);
-	return -real(0.5)*r02*log(real(1.0)-r2/r02);
+	real r02 = bi.r0*bi.r0;    
+	return -real(0.5)*bi.k*r02*log(real(1.0)-r2/r02);
       }
 
     
