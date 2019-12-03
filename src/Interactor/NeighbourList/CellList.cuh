@@ -533,21 +533,24 @@ namespace uammd{
       __device__ bool nextcell(){
 	const bool is2D = nl.grid.cellDim.z<=1;
 	if(ci >= (is2D?9:27)) return false;
-	bool empty;
+	bool empty = true;
 	do{
 	  int3 cellj = celli;
 	  cellj.x += ci%3-1;
 	  cellj.y += (ci/3)%3-1;
 	  cellj.z =  is2D?0:(celli.z+ci/9-1);
-
 	  cellj = nl.grid.pbc_cell(cellj);
-	  const int icellj = nl.grid.getCellIndex(cellj);
-
-	  const uint cs = nl.cellStart[icellj];
-	  empty = cs<VALID_CELL;
-	  lastParticle = empty?-1:nl.cellEnd[icellj];
+	  const bool isPeriodicCellInNonPeriodicBox = (!nl.grid.box.isPeriodicX() and abs(cellj.x-celli.x)>1) or
+	    (!nl.grid.box.isPeriodicY() and abs(cellj.y-celli.y)>1) or
+	    (!nl.grid.box.isPeriodicZ() and abs(cellj.z-celli.z)>1);
+	  if(!isPeriodicCellInNonPeriodicBox){
+	    const int icellj = nl.grid.getCellIndex(cellj);
+	    const uint cs = nl.cellStart[icellj];
+	    empty = cs<VALID_CELL;
+	    lastParticle = empty?-1:nl.cellEnd[icellj];
+	    j = empty?-1:int(cs-VALID_CELL);
+	  }
 	  ci++;
-	  j = empty?-1:int(cs-VALID_CELL);
 	  if(ci >= (is2D?9:27)) return !empty;
 	}while(empty);
 	return true;

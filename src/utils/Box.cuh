@@ -35,7 +35,10 @@ namespace uammd{
 
     inline __host__ __device__ real3 apply_pbc(const real3 &r) const{
       //return  r - floorf(r/L+real(0.5))*L; //MIC Algorithm
-      const real3 offset = floorf(r*minusInvBoxSize + real(0.5)); //MIC Algorithm
+      real3 offset = floorf(r*minusInvBoxSize + real(0.5)); //MIC Algorithm
+      if(!isPeriodicX()) offset.x = 0;
+      if(!isPeriodicY()) offset.y = 0;
+      if(!isPeriodicZ()) offset.z = 0;
       return  r + offset*boxSize;
     }
     template< class vecType>

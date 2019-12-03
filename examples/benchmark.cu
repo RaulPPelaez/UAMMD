@@ -51,6 +51,10 @@ int main(int argc, char *argv[]){
 
   //Some modules need a simulation box (i.e PairForces for the PBC)
   Box box(boxSize);
+  bool isPeriodicX = true;
+  bool isPeriodicY = false;
+  bool isPeriodicZ = false;
+  box.setPeriodicity(isPeriodicX, isPeriodicY, isPeriodicZ);
   //Initial positions
   {
     //Ask pd for a property like so:
