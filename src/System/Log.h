@@ -27,14 +27,14 @@ namespace uammd{
 	{MESSAGE , std::make_tuple(stderr, "\e[92m[MESSAGE] \e[0m", "\n")},
 	{STDERR , std::make_tuple(stderr, " ", "\n")},
 	{STDOUT , std::make_tuple(stdout, " ", "\n")},
-	{DEBUG , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")},
-	{DEBUG1 , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")},
-	{DEBUG2 , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")},
-	{DEBUG3 , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")},
-	{DEBUG4 , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")},
-	{DEBUG5 , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")},
-	{DEBUG6 , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")},
-	{DEBUG7 , std::make_tuple(stdout, "\e[96m[ DEBUG ] \e[0m", "\n")}
+	{DEBUG , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")},
+	{DEBUG1 , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")},
+	{DEBUG2 , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")},
+	{DEBUG3 , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")},
+	{DEBUG4 , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")},
+	{DEBUG5 , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")},
+	{DEBUG6 , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")},
+	{DEBUG7 , std::make_tuple(stderr, "\e[96m[ DEBUG ] \e[0m", "\n")}
       };
       return  printMap.at(level);
     }
