@@ -103,12 +103,13 @@
 			    ((Force, force, real4))    \
   			    ((Energy, energy, real))   \
 			    ((Vel, vel, real3))        \
-  			    ((Radius, radius, real))
+  			    ((Radius, radius, real))   \
+      			    ((Charge, charge, real))
 /*
 			    ((Torque, torque, real4))  \
   			    ((AngVel, angVel, real4))  \
   			    ((Dir, dir, real4))        \
-    			    ((Charge, charge, real))
+
 */
 
 namespace uammd{
