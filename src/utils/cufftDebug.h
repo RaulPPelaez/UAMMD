@@ -1,7 +1,7 @@
 
 #ifndef CUFFT_DEBUG_H
 #define CUFFT_DEBUG_H
-#include"debugTools.cuh"
+#include"utils/debugTools.h"
 #ifdef CUDA_ERROR_CHECK
 #define CUFFT_ERROR_CHECK
 #endif

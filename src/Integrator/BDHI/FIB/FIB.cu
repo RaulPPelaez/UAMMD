@@ -11,7 +11,7 @@ References:
 #include"FIB.cuh"
 #include"utils/cufftDebug.h"
 #include"utils/curandDebug.h"
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include"third_party/saruprng.cuh"
 #include"utils/cuda_lib_defines.h"
 namespace uammd{

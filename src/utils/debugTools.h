@@ -1,8 +1,8 @@
 /*Raul P. Pelaez 2019. Some utilities for debugging GPU code
 
  */
-#ifndef DEBUGTOOLS_CUH
-#define DEBUGTOOLS_CUH
+#ifndef DEBUGTOOLS_H
+#define DEBUGTOOLS_H
 
 #define CUDA_ERROR_CHECK
 
@@ -32,7 +32,7 @@ namespace uammd{
 inline void __cudaSafeCall(cudaError err, const char *file, const int line){
   #ifdef CUDA_ERROR_CHECK
   if (cudaSuccess != err){
-    cudaGetLastError(); //Reset CUDA error status    
+    cudaGetLastError(); //Reset CUDA error status
     throw uammd::cuda_generic_error("CudaSafeCall() failed at "+
 				    std::string(file) + ":" + std::to_string(line), err);
   }

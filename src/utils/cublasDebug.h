@@ -1,6 +1,6 @@
 #ifndef CUBLAS_DEBUG_H
 #define CUBLAS_DEBUG_H
-#include"debugTools.cuh"
+#include"debugTools.h"
 #ifdef CUDA_ERROR_CHECK
 #define CUBLAS_ERROR_CHECK
 #endif

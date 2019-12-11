@@ -6,7 +6,7 @@
 #include"utils/utils.h"
 #include"utils/exception.h"
 #include"utils/cxx_utils.h"
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include"utils/parseArguments.h"
 #include"System/Log.h"
 #include<cstring>

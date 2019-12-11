@@ -37,7 +37,7 @@ Some notes:
 #include"utils/cuda_lib_defines.h"
 #include<thrust/device_vector.h>
 #include"System/System.h"
-//#include"utils/debugTools.cuh"
+//#include"utils/debugTools.h"
 #include"utils/cublasDebug.h"
 #include<memory>
 namespace uammd{

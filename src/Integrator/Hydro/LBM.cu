@@ -11,7 +11,7 @@ References:
  */
 
 #include"LBM.cuh"
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include"misc/RPNG.cpp"
 
 namespace uammd{

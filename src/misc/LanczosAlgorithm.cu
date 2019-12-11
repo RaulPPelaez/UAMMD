@@ -17,7 +17,7 @@ References:
 #endif
 
 #include"lapack_and_blas_defines.h"
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include"utils/cublasDebug.h"
 
 #include<thrust/device_vector.h>

@@ -2,7 +2,7 @@
 #define CUSOLVER_DEBUG_H
 
 
-#include"debugTools.cuh"
+#include"debugTools.h"
 
 #ifdef CUDA_ERROR_CHECK
 #define CUSOLVER_ERROR_CHECK

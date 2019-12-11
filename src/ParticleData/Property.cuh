@@ -11,7 +11,7 @@
 
 #include"System/System.h"
 #include"utils/GPUUtils.cuh"
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include<thrust/device_vector.h>
 #include <thrust/iterator/iterator_adaptor.h>
 #include"third_party/managed_allocator.h"

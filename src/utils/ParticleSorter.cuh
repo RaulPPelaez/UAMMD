@@ -32,7 +32,7 @@ REFERENCES:
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
 #include"System/System.h"
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include"third_party/type_names.h"
 #include<third_party/cub/cub.cuh>
 #include<bits/stdc++.h>

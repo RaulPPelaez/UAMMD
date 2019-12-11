@@ -1,6 +1,6 @@
 #ifndef CURAND_DEBUG_H
 #define CURAND_DEBUG_H
-#include"debugTools.cuh"
+#include"debugTools.h"
 #ifdef CUDA_ERROR_CHECK
 #define CURAND_ERROR_CHECK
 #endif

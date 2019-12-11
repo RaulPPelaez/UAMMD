@@ -83,7 +83,7 @@ Special thanks to Marc Melendez and Florencio Balboa.
 #include<vector>
 #include<algorithm>
 #include<fstream>
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include"utils/cufftDebug.h"
 #include"utils/curandDebug.h"
 

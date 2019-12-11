@@ -25,7 +25,7 @@
 #define TABULATEDFUNCTION_CUH
 
 #include"global/defines.h"
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 
 namespace uammd{
 

@@ -7,7 +7,7 @@
 #include<vector>
 #include<algorithm>
 #include<fstream>
-#include"utils/debugTools.cuh"
+#include"utils/debugTools.h"
 #include"utils/cufftDebug.h"
 #include"utils/cxx_utils.h"
 #include"third_party/type_names.h"
