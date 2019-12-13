@@ -683,7 +683,7 @@ namespace uammd{
     void updateOrderAndStoreInSortPos(cudaStream_t st){
       const int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto posGroupIterator = pg->getPropertyInputIterator(pos.raw(), access::location::gpu);
+      auto posGroupIterator = pg->getPropertyInputIterator(pos.begin(), access::location::gpu);
       ps.updateOrderByCellHash<Sorter::MortonHash>(posGroupIterator,
 						   numberParticles,
 						   grid.box, grid.cellDim, st);
