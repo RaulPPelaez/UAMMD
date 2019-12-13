@@ -173,12 +173,9 @@ namespace uammd{
     void updateOrderByCellHash(InputIterator pos, uint N, Box box, int3 cellDim, cudaStream_t st = 0){
       Grid grid(box, cellDim);
       CellHasher hasher(grid);
-      auto hashIterator = thrust::make_transform_iterator(pos,
-							  hasher);
-      this->updateOrderWithCustomHash(hashIterator,
-				      N,
-				      hasher.hash(cellDim-1),
-				      st);
+      auto hashIterator = thrust::make_transform_iterator(pos, hasher);
+      auto maxHash = hasher.hash(cellDim-1);
+      this->updateOrderWithCustomHash(hashIterator, N, maxHash, st);
     }
 
     void updateOrderById(int *id, int N, cudaStream_t st = 0){
@@ -246,22 +243,16 @@ namespace uammd{
       index_alt.resize(N);
       hash.resize(N);
       hash_alt.resize(N);
-
       cub::CountingInputIterator<int> ci(0);
-      thrust::copy(thrust::cuda::par,
-		   ci, ci+N, original_index.begin());
-
+      thrust::copy(thrust::cuda::par, ci, ci+N, original_index.begin());
       int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
       CudaSafeCall(cudaMemcpyAsync(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice,st));
-
       auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(original_index.data()),
 					     thrust::raw_pointer_cast(index_alt.data()));
-      auto db_hash  = cub::DoubleBuffer<int>(d_hash,
-					     (int*)thrust::raw_pointer_cast(hash_alt.data()));
+      auto db_hash  = cub::DoubleBuffer<int>(d_hash, (int*)thrust::raw_pointer_cast(hash_alt.data()));
       this->sortByKey(db_index, db_hash, N, st);
       if(db_index.selector)
 	original_index.swap(index_alt);
-
     }
 
     template<class HashIterator>
