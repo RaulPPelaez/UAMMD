@@ -48,7 +48,7 @@ namespace uammd{
       grid = Grid(box, cellDim);
 
       auto kernel = std::make_shared<Kernel>(grid.cellSize, par.tolerance);
-      ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
+      ibm = std::make_shared<IBM<Kernel>>(sys, kernel, grid);
 
       double rh = this->getHydrodynamicRadius();
 
@@ -97,7 +97,7 @@ namespace uammd{
        	cellDim = nextFFTWiseSize3D(make_int3(box.boxSize/h));
        	grid = Grid(box, cellDim);
        	kernel = std::make_shared<Kernel>(grid.cellSize, par.tolerance);
-	ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
+	ibm = std::make_shared<IBM<Kernel>>(sys, kernel, grid);
        	rh = this->getHydrodynamicRadius();
       }
       long double M0 = this->getSelfMobility();
@@ -501,7 +501,7 @@ namespace uammd{
 
       auto tr = thrust::make_transform_iterator(quantity, FCM_ns::toReal3());
 
-      ibm->spread(pos.begin(), tr, d_gridVels, grid, numberParticles, st);
+      ibm->spread(pos.begin(), tr, d_gridVels, numberParticles, st);
     }
 
     //Takes grid forcing and transforms it to grid velocity, also adds the fluctuations.
@@ -588,7 +588,7 @@ namespace uammd{
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVelsFourier.data());
 
-      ibm->gather(pos.begin(), Mv, d_gridVels, grid, numberParticles, st);
+      ibm->gather(pos.begin(), Mv, d_gridVels, numberParticles, st);
     }
 
     /*Compute M·F and B·dW in Fourier space

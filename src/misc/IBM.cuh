@@ -43,48 +43,116 @@ REFERENCES:
 #include"global/defines.h"
 #include"utils/utils.h"
 #include"System/System.h"
+#include"IBM.cu"
+
 namespace uammd{
-  template<class Kernel>
+  namespace IBM_ns{
+    struct LinearIndex3D{
+      LinearIndex3D(int nx, int ny, int nz):nx(nx), ny(ny), nz(nz){}
+      
+      inline __device__ __host__ int operator()(int3 c) const{
+	return this->operator()(c.x, c.y, c.z);
+      }
+      
+      inline __device__ __host__ int operator()(int i, int j, int k) const{
+	return i + nx*(j+ny*k);
+      }
+      
+    private:
+      const int nx, ny, nz;
+    };
+
+    struct DefaultQuadratureWeights{
+      inline __host__ __device__ real operator()(int3 cellj, const Grid &grid) const{
+	return grid.getCellVolume(cellj);
+      }
+    };
+
+  }
+  
+  template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>
   class IBM{
     shared_ptr<Kernel> kernel;
     shared_ptr<System> sys;
+    Grid grid;
+    Index3D cell2index;
   public:
+    
+    IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index):      
+      sys(sys), kernel(kern), grid(a_grid), cell2index(cell2index){
+      sys->log<System::MESSAGE>("[IBM] Initialized with kernel: %s", type_name<Kernel>().c_str());
+    }
+    
+    IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid):
+      IBM(sys, kern, a_grid, Index3D(a_grid.cellDim.x, a_grid.cellDim.y,a_grid.cellDim.z )){}
 
-    IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern);
-
-    template<class Grid, class PosIterator,
-      class QuantityIterator,
-      class GridDataIterator>
+    template<class PosIterator, class QuantityIterator, class GridDataIterator>
     void spread(const PosIterator &pos, const QuantityIterator &v,
 		GridDataIterator &gridData,
-		Grid grid, int numberParticles, cudaStream_t st = 0);
+		int numberParticles, cudaStream_t st = 0){
+      sys->log<System::DEBUG2>("[IBM] Spreading");
+      int support = kernel->support;
+      int numberNeighbourCells = support*support*support;
+      int threadsPerParticle = std::min(32*(numberNeighbourCells/32), 512);
+      if(numberNeighbourCells < 64){
+	threadsPerParticle = 32;
+      }
+      if(grid.cellDim.z == 1){
+	IBM_ns::particles2GridD<true><<<numberParticles, threadsPerParticle, 0, st>>>
+	  (pos, v, gridData, numberParticles, grid, cell2index, *kernel);
+      }
+      else{
+	IBM_ns::particles2GridD<false><<<numberParticles, threadsPerParticle, 0, st>>>
+	  (pos, v, gridData, numberParticles, grid, cell2index, *kernel);
+      }
+    }
 
-    template<class Grid,
-      class PosIterator, class ResultIterator, class GridQuantityIterator>
+    template<class PosIterator, class ResultIterator, class GridQuantityIterator>
     void gather(const PosIterator &pos, const ResultIterator &Jq,
 		const GridQuantityIterator &gridData,
-		Grid & grid, int numberParticles, cudaStream_t st = 0);
+		int numberParticles, cudaStream_t st = 0){
+      IBM_ns::DefaultQuadratureWeights qw;
+      this->gather(pos, Jq, gridData, qw, numberParticles, st);
+    }
 
-    template<class Grid,
+    template<class PosIterator, class ResultIterator, class GridQuantityIterator,
+      class QuadratureWeights>
+    void gather(const PosIterator &pos, const ResultIterator &Jq,
+		const GridQuantityIterator &gridData,
+		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
+      if(grid.cellDim.z == 1)
+	gather<true>(pos, Jq, gridData, qw, numberParticles, st);
+      else
+	gather<false>(pos, Jq, gridData, qw, numberParticles, st);
+    }
+
+    template<bool is2D,
       class PosIterator, class ResultIterator, class GridQuantityIterator,
       class QuadratureWeights>
     void gather(const PosIterator &pos, const ResultIterator &Jq,
 		const GridQuantityIterator &gridData,
-		Grid & grid, const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0);
+		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
+      sys->log<System::DEBUG2>("[IBM] Gathering");
+      int support = kernel->support;
+      int numberNeighbourCells = support*support*support;
+      int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 512);
+      if(numberNeighbourCells < 64){
+	threadsPerParticle = 32;
+      }
+#define KERNEL(x) if(threadsPerParticle<=x){ IBM_ns::callGather<x, is2D>(numberParticles, st, pos, Jq, gridData, numberParticles, grid, cell2index, *kernel, qw); return;}
+      KERNEL(32)
+	KERNEL(64)
+	KERNEL(128)
+	KERNEL(256)
+	KERNEL(512)
+#undef KERNEL
 
-    template<bool is2D, class Grid,
-      class PosIterator, class ResultIterator, class GridQuantityIterator,
-      class QuadratureWeights>
-    void gather(const PosIterator &pos, const ResultIterator &Jq,
-		const GridQuantityIterator &gridData,
-		Grid & grid, const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0);
+    }
 
     shared_ptr<Kernel> getKernel(){ return this->kernel;}
 
   };
 
 }
-
-#include"IBM.cu"
 
 #endif

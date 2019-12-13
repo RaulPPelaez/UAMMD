@@ -58,10 +58,10 @@ namespace uammd{
 
       double width = hydroKernel->getGaussianVariance(par.hydrodynamicRadius);
       auto kernel = std::make_shared<Kernel>(support, width);
-      ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
+      ibm = std::make_shared<IBM<Kernel>>(sys, kernel, grid);
       {
 	auto kernelThermalDrift = std::make_shared<KernelThermalDrift>(support, width);
-	ibmThermalDrift = std::make_shared<IBM<KernelThermalDrift>>(sys, kernelThermalDrift);
+	ibmThermalDrift = std::make_shared<IBM<KernelThermalDrift>>(sys, kernelThermalDrift, grid);
       }
 
 
@@ -72,7 +72,7 @@ namespace uammd{
 	cellDim.z = 1;
        	grid = Grid(box, cellDim);
 	kernel = std::make_shared<Kernel>(support, width);
-	ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
+	ibm = std::make_shared<IBM<Kernel>>(sys, kernel, grid);
       }
       double rh = par.hydrodynamicRadius;
 
@@ -347,7 +347,7 @@ namespace uammd{
 	real variance = hydroKernel->getGaussianVariance(hydrodynamicRadius);
 	auto tr = thrust::make_constant_iterator<real>(temperature/variance);
 
-	ibmThermalDrift->spread(pos.begin(), tr, d_gridVels, grid, numberParticles, st2);
+	ibmThermalDrift->spread(pos.begin(), tr, d_gridVels, numberParticles, st2);
       }
 
       //Spread forces and thermal drift only when needed
@@ -355,7 +355,7 @@ namespace uammd{
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
 	auto f_tr = thrust::make_transform_iterator(force.begin(), BDHI2D_ns::toReal2());
 	  sys->log<System::DEBUG2>("[BDHI::BDHI2D] Spread particle forces");
-	  ibm->spread(pos.begin(), f_tr, d_gridVels, grid, numberParticles, st);
+	  ibm->spread(pos.begin(), f_tr, d_gridVels, numberParticles, st);
       }
       CudaSafeCall(cudaStreamSynchronize(st2));
       CudaCheckError();
@@ -441,7 +441,7 @@ namespace uammd{
       ibm->gather(pos,
 		  d_particleVels,
 		  d_gridVels,
-		  grid, numberParticles, st);
+		  numberParticles, st);
     }
 
     namespace BDHI2D_ns{
