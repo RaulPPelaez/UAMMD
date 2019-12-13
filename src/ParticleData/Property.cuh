@@ -199,35 +199,20 @@ namespace uammd{
 
     property_ptr<T> tryToGetData(access::location dev, access::mode mode){
       const bool requestedForWriting = (mode==access::mode::write or mode==access::mode::readwrite);
-
       throwIfIllegalDataRequest(mode);
-
       lockIfNecesary(mode);
-
       switch(dev){
       case access::location::cpu:
-	if(hostVector.size()!= N){
-	  sys->log<System::DEBUG1>("[Property] Resizing host version of " +
-				   name + " to " + std::to_string(N)+ " elements");
-	  hostVector.resize(N);
-	}
 	updateHostData();
 	if(requestedForWriting)
 	  deviceVectorNeedsUpdate=true;
 	return property_ptr<T>(hostVector.data(), &this->isBeingWritten, &this->isBeingRead, size());
-
       case access::location::gpu:
-	if(deviceVector.size()!= N){
-	  sys->log<System::DEBUG1>("[Property] Resizing device version of " +
-				   name + " to " + std::to_string(N)+ " elements");
-	deviceVector.resize(N);
-	}
 	updateDeviceData();
 	if(requestedForWriting)
 	  hostVectorNeedsUpdate=true;
 	return property_ptr<T>(thrust::raw_pointer_cast(deviceVector.data()),
 			       &this->isBeingWritten, &this->isBeingRead, size());
-
       case access::location::managed:
 	  if(!isManaged){
 	    throw std::runtime_error("[Property] Current system does not accept Managed memory requests.");
@@ -265,7 +250,12 @@ namespace uammd{
 	this->isBeingRead = true;
     }
     void updateHostData(){
+      if(hostVector.size()!= N){
+	sys->log<System::DEBUG1>("[Property] Resizing host version of " + name + " to " + std::to_string(N)+ " elements");
+	hostVector.resize(N);
+      }
       if(hostVectorNeedsUpdate){
+	sys->log<System::DEBUG2>("Updating host version of %s", name.c_str());
 	hostVector.resize(N);
 	CudaSafeCall(cudaMemcpy(hostVector.data(),
 				thrust::raw_pointer_cast(deviceVector.data()),
@@ -275,7 +265,12 @@ namespace uammd{
     }
 
     void updateDeviceData(){
+      if(deviceVector.size()!= N){
+	sys->log<System::DEBUG1>("[Property] Resizing device version of " + name + " to " + std::to_string(N)+ " elements");
+	deviceVector.resize(N);
+      }
       if(deviceVectorNeedsUpdate){
+	sys->log<System::DEBUG2>("Updating device version of %s", name.c_str());
 	deviceVector = hostVector;
 	deviceVectorNeedsUpdate=false;
       }
