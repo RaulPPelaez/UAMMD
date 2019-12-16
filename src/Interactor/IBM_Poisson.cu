@@ -37,7 +37,7 @@ namespace uammd{
 
     auto kernel = std::make_shared<Kernel>(par.tolerance, farFieldGaussianWidth, h);
 
-    ibm = std::make_shared<IBM<Kernel>>(sys, kernel);
+    ibm = std::make_shared<IBM<Kernel>>(sys, kernel, grid);
 
     kernel->support = std::min(kernel->support, grid.cellDim.x/2-2);
     if(split>0){
@@ -358,12 +358,11 @@ namespace uammd{
     int numberParticles = pg->getNumberParticles();
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     auto charges = pd->getCharge(access::location::gpu, access::mode::read);
-
     real* d_gridCharges = (real*)thrust::raw_pointer_cast(gridCharges.data());
-
-    ibm->spread(pos.begin(), charges.begin(), d_gridCharges, grid, numberParticles, st);
+    ibm->spread(pos.begin(), charges.begin(), d_gridCharges, numberParticles, st);
     CudaCheckError();
   }
+  
   void Poisson::forwardTransformCharge(){
     CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
     auto d_gridCharges = thrust::raw_pointer_cast(gridCharges.data());
@@ -471,7 +470,7 @@ namespace uammd{
     ibm->gather(pos.begin(),
    		f_tr,
    		d_gridForcesEnergies,
-   		grid, numberParticles, st);
+   		numberParticles, st);
 
 
   }
