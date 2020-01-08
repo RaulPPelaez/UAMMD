@@ -9,10 +9,10 @@
   RadialPotential is a base class for potentials that depend only on the distance of two particles.
 
   RadialPotential needs:
-      -A radial potential functor (with force and energy functions that take only distance) (See LJFunctor in  Potential.cuh)
+      -A radial potential functor (with force* and energy functions that take only distance) (See LJFunctor in  Potential.cuh)
       -A type parameter handler (See BasicParameterHandler.cuh)
 
-
+      *Notice that the force function in a RadialPotential must, in fact, return the modulus of the force divided by the distance, |f|/r.
   You can copy paste this file to create more complex potentials (ones that depend on any arbitrary particle property)
 
 

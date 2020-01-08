@@ -35,8 +35,9 @@ namespace uammd{
     //RadialPotential expects a functor with the rules of this one:
     //   -InputPairParameters, a type with the necessary parameters to differentiate between type pairs
     //   -PairParameters, a type with type pair parameters that the GPU computation will use (can be an alias of InputPairParameters).
-    //   -A force, energy and virial (not yet) functions taking a squared distance and a PairParameters
+    //   -A force*, energy and virial (not yet) functions taking a squared distance and a PairParameters
     //   -A processPairParameters function that transforms between InputPairParameters and PairParameters
+    //* Notice that the force function in a RadialPotential must, in fact, return the modulus of the force divided by the distance, |f|/r.
     struct LJFunctor{
       struct InputPairParameters{
 	real cutOff, sigma, epsilon;
@@ -54,10 +55,7 @@ namespace uammd{
 	const real invr2 = params.sigma2/r2;
 	const real invr6 = invr2*invr2*invr2;
 	const real invr8 = invr6*invr2;
-
 	real fmod = params.epsilonDivSigma2*(real(-48.0)*invr6 + real(24.0))*invr8;
-
-
 	if(params.shift != real(0.0)){
 	  fmod += params.shift*sqrtf(invr2);
 	}
@@ -65,13 +63,11 @@ namespace uammd{
       }
 
       static inline __host__ __device__ real energy(const real &r2, const PairParameters &params){
-
 	if(r2 >= params.cutOff2) return 0;
 	real invr2 = params.sigma2/r2;
 	real invr6 = invr2*invr2*invr2;
 	//This must be multiplied by 2 instead of 4 because sum_i(sum_j(E(rij))) = 2*E_total
 	real E = params.epsilonDivSigma2*params.sigma2*real(4.0)*invr6*(invr6-real(1.0));
-
 	if(params.shift != real(0.0)){
 	  //With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
 	  real rc = sqrt(params.cutOff2);
@@ -82,27 +78,20 @@ namespace uammd{
 	return E;
       }
 
-
-
-
       static inline __host__ PairParameters processPairParameters(InputPairParameters in_par){
-
 	PairParameters params;
 	params.cutOff2 = in_par.cutOff*in_par.cutOff;
 	params.sigma2 = in_par.sigma*in_par.sigma;
 	params.epsilonDivSigma2 = in_par.epsilon/params.sigma2;
-
 	if(in_par.shift){
 	  real invCutOff2 = params.sigma2/params.cutOff2;
 	  real invrc6 = invCutOff2*invCutOff2*invCutOff2;
 	  real invrc7 = invrc6*sqrtf(invCutOff2);
 	  real invrc13 = invrc7*invrc6;
-
 	  params.shift = params.epsilonDivSigma2*(real(48.0)*invrc13 - real(24.0)*invrc7);
 	}
 	else params.shift = real(0.0);
 	return params;
-
       }
 
     };
