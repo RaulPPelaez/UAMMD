@@ -15,13 +15,11 @@ Given a certain box and a number of cells, subdivides the box in that number of 
 namespace uammd{
 
   struct Grid{
-    /*A magic vector that transforms cell coordinates to 1D index when dotted*/
-    /*Simply: 1, ncellsx, ncellsx*ncellsy*/
     int3 gridPos2CellIndex;
 
-    int3 cellDim; //ncells in each size
+    int3 cellDim;
     real3 cellSize;
-    real3 invCellSize; /*The inverse of the cell size in each direction*/
+    real3 invCellSize;
     Box box;
     real cellVolume;
     Grid(): Grid(Box(), make_int3(0,0,0)){}
@@ -99,14 +97,19 @@ namespace uammd{
     }
 
     inline __host__ __device__ int getNumberCells() const{ return cellDim.x*cellDim.y*cellDim.z;}
+    
     inline __host__ __device__ real getCellVolume(int3 cell) const{ return getCellVolume();}
+    
     inline __host__ __device__ real getCellVolume() const{ return cellVolume;}
+    
     inline __host__ __device__ real3 getCellSize(int3 cell) const{return getCellSize();}
+    
     inline __host__ __device__ real3 getCellSize() const{return cellSize;}
 
     inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell) const{
       return box.apply_pbc(pos + box.boxSize*real(0.5) - cellSize*(make_real3(cell)+real(0.5)));
     }
+    
     inline __host__ __device__ real3 distanceToCellUpperLeftCorner(real3 pos, int3 cell) const{
       return box.apply_pbc(pos + box.boxSize*real(0.5) - cellSize*make_real3(cell));
     }
