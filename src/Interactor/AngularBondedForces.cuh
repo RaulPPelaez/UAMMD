@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. Three bonded forces, AKA three body springs.
+/*Raul P. Pelaez 2019. Three bonded forces, AKA three body springs.
 
   Joins three particles with an angle bond i---j---k
 
@@ -41,7 +41,10 @@
 #include"Interactor.cuh"
 #include"global/defines.h"
 #include<thrust/device_vector.h>
-//#include<limits>
+#include<vector>
+#include"utils/exception.h"
+#include<limits>
+
 namespace uammd{
 
   namespace AngularBondedForces_ns{
@@ -128,38 +131,147 @@ namespace uammd{
 	return bi;
       }
 
+    };    
+  }
+
+  namespace AngularBondedForces_ns{
+      
+    template<class Bond>
+    class BondProcessor{
+      int numberParticles;
+      std::vector<std::vector<int>> isInBonds;
+      std::vector<Bond> bondList;
+      std::set<int> particlesWithBonds;
+      
+      void registerParticleInBond(int particleIndex, int b){
+	isInBonds[particleIndex].push_back(b);
+	particlesWithBonds.insert(particleIndex);
+
+      }
+    public:
+      
+      BondProcessor(int numberParticles):
+      numberParticles(numberParticles),
+	isInBonds(numberParticles){
+      }
+      
+      void hintNumberBonds(int nbonds){
+	bondList.reserve(nbonds);
+      }
+      
+      void registerBond(Bond b){
+	int bondIndex = bondList.size();
+	bondList.push_back(b);
+	registerParticleInBond(b.i, bondIndex);
+	registerParticleInBond(b.j, bondIndex);
+	registerParticleInBond(b.k, bondIndex);
+      }
+      
+      std::vector<int> getParticlesWithBonds() const{
+	std::vector<int> pwb;
+	pwb.assign(particlesWithBonds.begin(), particlesWithBonds.end());
+	return std::move(pwb);
+      }
+
+      std::vector<Bond> getBondListOfParticle(int index) const{
+	std::vector<Bond> blst;
+	blst.resize(isInBonds[index].size());
+	fori(0, blst.size()){
+	  blst[i] = bondList[isInBonds[index][i]];
+	}
+	return std::move(blst);	
+      }
+
+      void  checkDuplicatedBonds(){
+	struct AngularBondCompareLessThan{
+	  bool operator()(const Bond& lhs, const Bond &rhs) const{
+	    bool lessThan = (lhs.i < rhs.i and lhs.j < rhs.j and lhs.k < rhs.k);
+	    bool lessThan2 = (lhs.i < rhs.k and lhs.j < rhs.j and lhs.k < rhs.i);
+	    if( lessThan or lessThan2)
+	      return true;
+	    else return false;
+	  }
+	};
+	std::set<Bond, AngularBondCompareLessThan> checkDuplicates;
+	fori(0, bondList.size()){
+	  if(!checkDuplicates.insert(bondList[i]).second)
+	    System::log<System::WARNING>("[AngularBondedForces] Bond %d %d %d with index %d is duplicated!",
+					 bondList[i].i, bondList[i].j, bondList[i].k, i);
+	}
+      }
     };
+    
+    class BondReader{
+      std::ifstream in;
+      int nbonds = 0;
+    public:
+      BondReader(std::string bondFile): in(bondFile){
+	if(!in){
+	  throw std::runtime_error("[BondReader] File " + bondFile + " cannot be opened.");
+	}
+	in>>nbonds;	    
+      }
+      
+      int getNumberBonds(){
+	return nbonds;
+      }
+      
+      template<class Bond, class BondType>
+      Bond readNextBond(){
+	int i, j, k;
+	if(!(in>>i>>j>>k)){
+	  throw std::ios_base::failure("File unreadable");
+	}
+	Bond bond;
+	bond.i = i;
+	bond.j = j;
+	bond.k = k;
+	bond.bond_info = BondType::readBond(in);
+	return bond;
+      }
+      
+    };
+      
   }
 
 
   template<class BondType>
   class AngularBondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
   public:
+    
     struct __align__(16) Bond{
       int i,j,k;
       typename BondType::BondInfo bond_info;
     };
+    
     struct Parameters{
       std::string readFile;
     };
+
     explicit AngularBondedForces(shared_ptr<ParticleData> pd,
 				 shared_ptr<System> sys,
 				 Parameters par,
 				 BondType bondType);
+    
     ~AngularBondedForces() = default;
 
     void sumForce(cudaStream_t st) override;
     real sumEnergy() override;
 
   private:
-
+    static constexpr int numberParticlesPerBond = 3;
+    using BondProcessor = AngularBondedForces_ns::BondProcessor<Bond>;
+    using BondReader = AngularBondedForces_ns::BondReader;
+    
+    BondProcessor readBondFile(std::string bondFile);
+    void generateBondList(const BondProcessor &bondProcessor);
+    
     int nbonds;
     thrust::device_vector<Bond> bondList;   //[All bonds involving the first particle with bonds, involving the second...] each bonds stores the id of the three particles in the bond. The id of the first/second... particle  with bonds is particlesWithBonds[i]
     thrust::device_vector<int> bondStart, bondEnd; //bondStart[i], Where the list of bonds of particle with bond number i start (the id of particle i is particlesWithBonds[i].
-    thrust::device_vector<int> particlesWithBonds; //IDs of particles involved in at least one bonds
-
+    thrust::device_vector<int> particlesWithBonds; //List of particle ids with at least one bond
     int TPP; //Threads per particle
-
+    
     BondType bondType;
   };
 
