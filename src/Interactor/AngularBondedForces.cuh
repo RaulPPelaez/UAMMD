@@ -55,7 +55,7 @@ namespace uammd{
 	real ang0, k;
       };
       inline __device__ real3 force(int i, int j, int k,
-				    int bond_index, //0,1 or 2
+				    int bond_index,
 				    const real3 &posi,
 				    const real3 &posj,
 				    const real3 &posk,
