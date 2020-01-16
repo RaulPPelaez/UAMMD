@@ -80,7 +80,7 @@ namespace uammd{
     
     IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index):      
       sys(sys), kernel(kern), grid(a_grid), cell2index(cell2index){
-      sys->log<System::MESSAGE>("[IBM] Initialized with kernel: %s", type_name<Kernel>().c_str());
+      sys->log<System::DEBUG2>("[IBM] Initialized with kernel: %s", type_name<Kernel>().c_str());
     }
     
     IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid):
