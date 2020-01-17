@@ -8,18 +8,29 @@
 
 #include <math.h>
 #include"global/defines.h"
+#include"utils/cxx_utils.h"
 
 typedef unsigned short ushort;
-
 typedef unsigned int uint;
 typedef unsigned long long int ullint;
 
-
-
-
 #define VECATTR inline __host__ __device__
 
+namespace uammd{
+  namespace detail{
+    template<class T> struct IsAnAdmisibleVectorType{
+      static constexpr bool value = uammd::SFINAE::is_one_of<T,
+	float2, float3, float4,
+	double2, double3, double4,
+	int2, int3, int4,
+	uint2, uint3, uint4	
+	>();
+    };
+  }
+}
 
+template<class T, uammd::SFINAE::enable_if_t<uammd::detail::IsAnAdmisibleVectorType<T>::value, int> = 0>
+VECATTR T operator -(const T& a){return T() - a;}
 
 /////////////////////FLOAT2///////////////////////////////
 
@@ -226,6 +237,7 @@ VECATTR  float3 operator /(const float &b, const float3 &a){
 VECATTR  void operator /=(float3 &a, const float &b){
   a *= 1.0f/b;
 }
+
 
 VECATTR  float3 floorf(const float3 &a){return make_float3(floorf(a.x), floorf(a.y), floorf(a.z));}
 
