@@ -15,11 +15,11 @@ namespace uammd{
   AngularBondedForces<BondType>::AngularBondedForces(shared_ptr<ParticleData> pd,
 						     shared_ptr<System> sys,
 						     Parameters par,
-						     BondType bondType_in):
+						     std::shared_ptr<BondType> bondType_in):
     Interactor(pd, sys, "AngularBondedForces"),
     TPP(32),
     bondType(bondType_in){
-    this->setDelegate(&bondType);
+    this->setDelegate(bondType);
     auto bondProcessor = readBondFile(par.readFile);
     generateBondList(bondProcessor);
     bondProcessor.checkDuplicatedBonds();
@@ -141,7 +141,7 @@ namespace uammd{
 			     d_particlesWithBonds,
 			     d_bondList,
 			     id2index,
-			     bondType);
+			     *bondType);
     }
 
   }

@@ -13,13 +13,13 @@ namespace uammd{
 
   template<class BondType>
   TorsionalBondedForces<BondType>::TorsionalBondedForces(shared_ptr<ParticleData> pd,
-						     shared_ptr<System> sys,
-						     Parameters par,
-						     BondType bondType_in):
+							 shared_ptr<System> sys,
+							 Parameters par,
+							 std::shared_ptr<BondType> bondType_in):
     Interactor(pd, sys, "TorsionalBondedForces"),
     TPP(32),
     bondType(bondType_in){
-    this->setDelegate(&bondType);
+    this->setDelegate(bondType);
     auto bondProcessor = readBondFile(par.readFile);
     generateBondList(bondProcessor);
     bondProcessor.checkDuplicatedBonds();
@@ -65,7 +65,7 @@ namespace uammd{
       blst = bondProcessor.getBondListOfParticle(index);
       const int nbondsi = blst.size();
       int offset = (i>0)?h_bondEnd[i-1]:0;
-      forj(0,nbondsi){
+      forj(0, nbondsi){
 	bondListCPU[offset+j] = blst[j];
       }
       h_bondEnd[i] = offset + nbondsi;
@@ -143,7 +143,7 @@ namespace uammd{
 			     d_particlesWithBonds,
 			     d_bondList,
 			     id2index,
-			     bondType);
+			     *bondType);
     }
 
   }

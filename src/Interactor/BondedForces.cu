@@ -22,7 +22,7 @@ namespace uammd{
   BondedForces<BondType>::BondedForces(shared_ptr<ParticleData> pd,
 				       shared_ptr<System> sys,
 				       Parameters par,
-				       BondType bondForce):
+				       std::shared_ptr<BondType> bondForce):
     Interactor(pd,
 	       std::make_shared<ParticleGroup>(pd, sys, "All"),
 	       sys,
@@ -30,7 +30,7 @@ namespace uammd{
     bondForce(bondForce), TPP(64){
 
     //BondedForces does not care about any parameter update, but the BondType might.
-    this->setDelegate(&(this->bondForce));
+    this->setDelegate(this->bondForce);
 
     int numberParticles = pg->getNumberParticles();
 
@@ -448,7 +448,7 @@ namespace uammd{
 	<<< Nblocks, Nthreads, 0, st>>>(
 	      force.raw(), pos.raw(),
 	      d_bondStart, d_nbondsPerParticle,
-	      bondForce,
+	      *bondForce,
 	      id2index, Nparticles_with_bonds);
     }
     else{
@@ -458,14 +458,14 @@ namespace uammd{
 	  <<<Nparticles_with_bonds, 128, 0, st>>>(
 		force.raw(), pos.raw(),
 		d_bondStart, d_nbondsPerParticle,
-		bondForce, id2index);
+		*bondForce, id2index);
       }
       else{
 	BondedForces_ns::computeBondedForcesBlockPerParticle<Bond, BondType, 64>
 	  <<<Nparticles_with_bonds, 64, 0, st>>>(
 	        force.raw(), pos.raw(),
 		d_bondStart, d_nbondsPerParticle,
-		bondForce, id2index);
+		*bondForce, id2index);
       }
 
     }
@@ -492,7 +492,7 @@ namespace uammd{
 								      force.raw(), pos.raw(),
 								      d_bondStart,
 								      d_nbondsPerParticle,
-								      bondForce,
+								      *bondForce,
 								      id2index);
     }
 

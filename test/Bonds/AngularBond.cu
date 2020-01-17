@@ -26,23 +26,6 @@ int main(int argc, char * argv[]){
     }
   }
 
-
-
-  using AngularBondType = AngularBondedForces_ns::AngularBond;
-  using Angular = AngularBondedForces<AngularBondType>;
-
-  Angular::Parameters ang_params;
-  Box box (128);
-  ang_params.readFile = "angular.bonds";
-  auto abf = make_shared<Angular>(pd, sys, ang_params, AngularBondType(box));
-
-  using BondType = BondedType::Harmonic;
-  using BondedForces = BondedForces<BondType>;
-
-  BondedForces::Parameters params;
-  params.file = "harmonic.bonds";
-  auto bf = make_shared<BondedForces>(pd, sys, params);
-
   BD::EulerMaruyama::Parameters par;
   par.temperature = 0;
   par.viscosity = 1.0;
@@ -51,8 +34,26 @@ int main(int argc, char * argv[]){
 
   auto bd = make_shared<BD::EulerMaruyama>(pd, sys, par);
 
-  bd->addInteractor(bf);
-  bd->addInteractor(abf);
+  {
+    using AngularBondType = AngularBondedForces_ns::AngularBond;
+    using Angular = AngularBondedForces<AngularBondType>;
+
+    Angular::Parameters ang_params;
+    Box box (128);
+    ang_params.readFile = "angular.bonds";
+  
+    auto bondCompute = std::make_shared<AngularBondType>(box);
+    auto abf = make_shared<Angular>(pd, sys, ang_params, bondCompute);
+    bd->addInteractor(abf);
+  }
+  {
+    using BondType = BondedType::Harmonic;
+    using BondedForces = BondedForces<BondType>;
+    BondedForces::Parameters params;
+    params.file = "harmonic.bonds";
+    auto bf = make_shared<BondedForces>(pd, sys, params);
+    bd->addInteractor(bf);
+  }
 
   ofstream out("pos.dat");
 

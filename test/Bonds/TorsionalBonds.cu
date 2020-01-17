@@ -13,9 +13,7 @@ using namespace uammd;
 int main(int argc, char * argv[]){
   auto sys = make_shared<System>(argc, argv);
   int N;
-
   ifstream in("init.pos");
-
   in>>N;
   auto pd = make_shared<ParticleData>(N, sys);
   {
@@ -25,51 +23,43 @@ int main(int argc, char * argv[]){
       in>>pos[i].x>>pos[i].y>>pos[i].z;
       pos[i].w = 0;
     }
-  }
-
-
-
-  using TorsionalBondType = TorsionalBondedForces_ns::TorsionalBond;
-  using Torsional = TorsionalBondedForces<TorsionalBondType>;
-
-  Torsional::Parameters ang_params;
-  Box box (128);
-  ang_params.readFile = "torsional.bonds";
-  auto abf = make_shared<Torsional>(pd, sys, ang_params, TorsionalBondType(box));
-
-  using BondType = BondedType::Harmonic;
-  using BondedForces = BondedForces<BondType>;
-
-  BondedForces::Parameters params;
-  params.file = "harmonic.bonds";
-  auto bf = make_shared<BondedForces>(pd, sys, params);
-
+  }    
   BD::EulerMaruyama::Parameters par;
   par.temperature = 0;
   par.viscosity = 1.0;
   par.hydrodynamicRadius = 1.0;
   par.dt = 0.1;
-
   auto bd = make_shared<BD::EulerMaruyama>(pd, sys, par);
-
-  bd->addInteractor(bf);
-  bd->addInteractor(abf);
+  {
+    using TorsionalBondType = TorsionalBondedForces_ns::TorsionalBond;
+    using Torsional = TorsionalBondedForces<TorsionalBondType>;  
+    Torsional::Parameters ang_params;
+    Box box (128);
+    ang_params.readFile = "torsional.bonds";
+    auto bondType = std::make_shared<TorsionalBondType>(box);
+    auto abf = make_shared<Torsional>(pd, sys, ang_params, bondType);
+    bd->addInteractor(abf);    
+  }
+  {
+    using BondType = BondedType::Harmonic;
+    using BondedForces = BondedForces<BondType>;
+    BondedForces::Parameters params;
+    params.file = "harmonic.bonds";
+    auto bf = make_shared<BondedForces>(pd, sys, params);
+    bd->addInteractor(bf);
+  }
   {    
     using AngularBondType = AngularBondedForces_ns::AngularBond;
     using Angular = AngularBondedForces<AngularBondType>;
-
     Angular::Parameters ang_params;
     Box box (128);
     ang_params.readFile = "angular.bonds";
-    auto angbf = make_shared<Angular>(pd, sys, ang_params, AngularBondType(box));
+    auto bondType = std::make_shared<AngularBondType>(box);
+    auto angbf = make_shared<Angular>(pd, sys, ang_params, bondType);
     bd->addInteractor(angbf);
   }
-  
-  ofstream out("pos.dat");
-
-
+  ofstream out("pos.dat"); 
   forj(0,10000){
-
     bd->forwardTime();
     if(j%10==0){
     auto ps = pd->getPos(access::location::cpu, access::mode::read);

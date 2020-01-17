@@ -223,7 +223,7 @@ namespace uammd{
     explicit TorsionalBondedForces(shared_ptr<ParticleData> pd,
 				   shared_ptr<System> sys,
 				   Parameters par,
-				   BondType bondType);
+				   std::shared_ptr<BondType> bondType = std::make_shared<BondType>());
     
     ~TorsionalBondedForces() = default;
 
@@ -244,7 +244,7 @@ namespace uammd{
     thrust::device_vector<int> particlesWithBonds; //List of particle ids with at least one bond
     int TPP; //Threads per particle
     
-    BondType bondType;
+    std::shared_ptr<BondType> bondType;
   };
 
 }

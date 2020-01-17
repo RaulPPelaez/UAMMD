@@ -160,18 +160,13 @@ namespace uammd{
     explicit BondedForces(shared_ptr<ParticleData> pd,
 			  shared_ptr<System> sys,
 			  Parameters par,
-			  BondType bondForce);
-    explicit BondedForces(shared_ptr<ParticleData> pd,
-			  shared_ptr<System> sys,
-			  Parameters par):
-      BondedForces(pd, sys, par, BondType()){}
-
-
-
-
+			  std::shared_ptr<BondType> bondForce = std::make_shared<BondType>());
     ~BondedForces();
+    
     void callComputeBondedForces(cudaStream_t st);
+    
     void sumForce(cudaStream_t st = 0) override;
+    
     real sumEnergy() override;
     //real sumVirial() override;
 
@@ -190,7 +185,7 @@ namespace uammd{
     thrust::device_vector<BondFP*> bondStartFP;
     thrust::device_vector<int> nbondsPerParticleFP;
 
-    BondType bondForce;
+    std::shared_ptr<BondType> bondForce;
 
     int TPP; // Threads per particle
 
