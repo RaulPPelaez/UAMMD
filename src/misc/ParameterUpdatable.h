@@ -67,11 +67,9 @@ namespace uammd{
 
     // virtual void updateTimeStep(real dt){};
 
-
     PARAMETER_LOOP(DECLARE_UPDATE_FUNCTION)
 
   };
-
 
   template<class T, bool isParameterUpdatable = std::is_base_of<ParameterUpdatable, T>::value>
     class ParameterUpdatableDelegate;
@@ -82,6 +80,7 @@ namespace uammd{
     T *delegate = nullptr;
   public:
     void setDelegate(T* del){ this->delegate = del;}
+    void setDelegate(std::shared_ptr<T> del){ this->delegate = del.get();}
 
     PARAMETER_LOOP(DECLARE_UPDATE_FUNCTION_DELEGATE)
   };
@@ -90,12 +89,8 @@ namespace uammd{
   class ParameterUpdatableDelegate<T, false>: public virtual ParameterUpdatable{
   public:
     void setDelegate(T* del){}
-
+    void setDelegate(std::shared_ptr<T> del){}
   };
-
-
-
-
 
 
 
