@@ -25,7 +25,7 @@ FILE=benchmark.cu
 LOG_LEVEL=5
 
 #Uncomment to add debug flags to nvcc
-#DEBUG=  -src-in-ptx -g -G -DUAMMD_DEBUG
+#DEBUG=  -src-in-ptx -g -DUAMMD_DEBUG
 
 #Flags to $(CXX)
 CPU= -O3 -funroll-loops  -fno-math-errno -fno-signed-zeros  -march=native -fPIC -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-sign-compare
@@ -44,10 +44,10 @@ INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I $(UAMMD_ROOT)/src -I $(UAMMD_ROOT)/src/t
 OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
 BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets -lineinfo -src-in-ptx
 
-all: quasi2D
+all: q2D
 
 
-quasi2D:
+q2D:
 	$(BASIC_LINE) q2D.cu -lcufft  -o q2D
 
 clean:

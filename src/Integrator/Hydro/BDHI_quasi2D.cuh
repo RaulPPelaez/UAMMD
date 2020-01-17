@@ -90,7 +90,9 @@ namespace uammd{
 	static inline __host__ __device__ real getGaussianVariance(real a){
 	  return pow(a*0.66556976637237890625, 2);
 	}
+	 
 	static constexpr inline bool hasThermalDrift(){ return false;}
+	
 	inline __device__ real2 operator()(real k2, real a){
 	  const real fk = 0;
 	  const real gk = real(1.0)/(k2*k2);
@@ -100,22 +102,20 @@ namespace uammd{
       //See eq. 20 and beyond in [1]
       struct Quasi2D{
 	static constexpr inline bool hasThermalDrift(){ return true;}
+	
 	static inline __host__ __device__ real getGaussianVariance(real a){
 	  return pow(a/sqrt(M_PI), 2);
 	}
+	
 	inline __device__ real2 operator()(real k2, real a){
 	  const real k = sqrt(k2);
-	  const real invk3 = real(1.0)/(k*k*k);
+	  const real invk3 = real(1.0)/(k2*k);
 	  constexpr real inv_sqrtpi = 0.564189583547756; //1/sqrt(pi)
-	  constexpr real invpi = 1.0/M_PI;
-	  const real fk = real(0.5)*invpi*invk3*(-k*a +
-						 + exp(k2*invpi*a*a)*(k2*a*a + real(M_PI)*real(0.5))*erfc(k*a*inv_sqrtpi)
-						 );
-	  const real gk = real(0.5)*invk3*erfc(k*a*inv_sqrtpi)*exp(k2*a*a*invpi);
+	  const real kp = k*a*inv_sqrtpi;	  	  
+	  const real fk = real(0.5)*invk3*(erfc(kp)*(real(0.5)+kp*kp)*exp(kp*kp) - kp*inv_sqrtpi);
+	  const real gk = real(0.5)*invk3*erfc(kp)*exp(kp*kp);
 	  return {fk, gk};
 	}
-
-
       };
 
       template<bool thermalDrift>
@@ -159,7 +159,7 @@ namespace uammd{
       using cufftReal = BDHI2D_ns::cufftReal;
 
       struct Parameters: BDHI::Parameters{
-	int2 cells = make_int2(-1, -1); //Number of Fourier nodes in each direction
+	int2 cells = make_int2(-1, -1);
 	std::shared_ptr<HydroKernel> hydroKernel;
       };
 
@@ -179,29 +179,45 @@ namespace uammd{
       real dt;
       real viscosity;
       real hydrodynamicRadius;
-
-      std::shared_ptr<IBM<Kernel>> ibm;
-      std::shared_ptr<IBM<KernelThermalDrift>> ibmThermalDrift;
+      real tolerance;
+      
+      std::shared_ptr<Kernel> ibmKernel;
+      std::shared_ptr<KernelThermalDrift> ibmKernelThermalDrift;
       std::shared_ptr<HydroKernel> hydroKernel;
 
       Box box;
 
       Grid grid;
-
+#ifndef UAMMD_DEBUG
+      template<class T> using gpu_container = thrust::device_vector<T>;
+#else
+      template<class T> using gpu_container = thrust::device_vector<T, managed_allocator<T>>;
+#endif
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
-      thrust::device_vector<char> cufftWorkArea; //Work space for cufft
-      // thrust::device_vector<cufftComplex> gridVelsFourier;
-      // thrust::device_vector<real2> particleVels;
-
-      managed_vector<cufftComplex> gridVelsFourier;
-      managed_vector<real2> particleVels;
+      gpu_container<char> cufftWorkArea;
+      gpu_container<cufftComplex2> gridVelsFourier;
+      gpu_container<real2> particleVels;
 
       cudaStream_t st, st2;
-
+      
+      void checkInputParametersValidity(Parameters par);
+      void initializeGrid(Parameters par);
+      void initializeInterpolationKernel(Parameters par);
+      void resizeContainers();
       void initCuFFT();
+      void printStartingMessages();
+
+      void resetContainers();
       void spreadParticles();
+      void spreadThermalDrift();
+      void spreadParticleForces();
       void convolveFourier();
-      void interpolateParticles();
+      void forwardTransformVelocities();
+      void applyGreenFunctionConvolutionFourier();
+      void addStochastichTermFourier();
+      void inverseTransformVelocities();
+      void interpolateVelocities();
+      void updateParticlePositions();
 
     };
   }

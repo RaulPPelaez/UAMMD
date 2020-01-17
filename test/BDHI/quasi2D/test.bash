@@ -1,18 +1,8 @@
-
-
-
-
-
-
-
-
-
-
-
-make
+make 
 
 if ! ls tools/fastmsd >/dev/null 2>&1
 then
+    mkdir -p tools
     cd tools
     git clone https://github.com/raulppelaez/MeanSquareDisplacement    
     cd MeanSquareDisplacement
@@ -25,36 +15,41 @@ then
 fi
 
 
-T=1.23234
-vis=2.23536
-phi=1
-a=3.9782
+#Random numbers, the test should be independent on the values of these parameters
+#Temperature
+T=$(head -100 /dev/urandom | cksum | awk '{srand($1);print 1+rand();}')
+#Viscosity
+vis=$(head -100 /dev/urandom | cksum | awk '{srand($1);print 1+rand();}')
+#Hydrodynamic radus
+a=$(head -100 /dev/urandom | cksum | awk '{srand($1);print 1+rand();}')
+
 tol=1e-4
 
 function checkSelfDiffusion {
-    scheme=$1
-    for l in $( seq 16 8 512)
+    scheme=$1    
+    for l in $(seq 16 32 512)
     do
-	L=$(echo 1  | awk '{print '$l'*'$a';}')
-	
-	N=$(echo 1 | awk '{print int('$phi'*'$L'**2/(3.1415*'$a'*'$a') +0.5)}')
-
-	Nsteps=1000
-	dt=0.0001
-	if [ "$scheme" == "quasi2D" ] ; then
-	    D0=$(echo 1 | awk '{pi=atan2(0,-1); print '$T'/(6*pi*'$vis'*'$a')*(1/(1+4.41/'$l')) }')
-	elif [ "$scheme" == "true2D" ] ; then
-	    D0=$(echo 1 | awk '{pi=atan2(0,-1); print '$T'/(4*pi*'$vis')*log('$l'/(3.71))}')
-	else
-	    >&2 echo "Unknown scheme!"
-	    exit
-	fi
-
-	msdtmp=$(mktemp)
-	
-	cat<<EOF | ./q2D /dev/stdin 2> /dev/null | tools/fastmsd -N $N -Nsteps $Nsteps -precision float 2> /dev/null | awk '{print $1*'$dt', ($2+$3)/(4*'$D0')}' > $msdtmp
-
+	Ntry=10
+	for i_try in $(seq $Ntry)
+	do
+	    phi=0.5
+	    L=$(echo 1  | awk '{print '$l'*'$a';}')	
+	    N=$(echo 1 | awk '{print int('$phi'*'$L'**2/(3.1415*'$a'*'$a') + 0.55)}')
+	    Nsteps=1000
+	    if [ "$scheme" == "quasi2D" ] ; then
+		D0=$(echo 1 | awk '{pi=atan2(0,-1); printf "%.15g\n", '$T'/(6*pi*'$vis'*'$a')*(1/(1+4.41/'$l')) }')
+	    elif [ "$scheme" == "true2D" ] ; then
+		D0=$(echo 1 | awk '{pi=atan2(0,-1); printf "%.15g\n", '$T'/(4*pi*'$vis')*(log('$l')-1.3105329259115095183)}')
+	    else
+		>&2 echo "Unknown scheme!"
+		exit
+	    fi
+	    t0=$(echo $a $D0 | awk '{print ($1*$1)/$2}');
+	    dt=$(echo $t0 | awk '{print 0.0001*$1}');
+	    msdtmp=$(mktemp)
+	    cat<<EOF | ./q2D /dev/stdin 2> /dev/null | tools/fastmsd -N $N -Nsteps $Nsteps -precision double 2> /dev/null | awk '{print $1*'$dt', ($2+$3)/(4*'$D0')}' > $msdtmp
 		scheme 	       	     	$scheme
+		test 			selfDiffusion
 		boxSize			$L $L
 		cells 			-1 -1
 		numberSteps		$Nsteps
@@ -64,26 +59,71 @@ function checkSelfDiffusion {
 		viscosity		$vis
 		temperature		$T
 		hydrodynamicRadius	$a
-		loadParticles 		0	
 		numberParticles		$N
-		tolerance		$tol
-		
+		tolerance		$tol		
 		output			/dev/stdout 
 EOF
+	    maxtime=$(echo 1 | awk '{print 5*'$dt'}')       
+	    slope=$(cat $msdtmp | awk '$1<='$maxtime'' |
+			awk '{
+			    xy += $1*$2;
+		    	    x+=$1; y+=$2;
+			    x2+=$1*$1
+			  }
+			  END{
+			    m=(NR*xy - x*y)/(NR*x2-x*x);       
+			    print m;
+			  }')
 
-
-	maxtime=$(echo 1 | awk '{print 5*'$dt'}')
-	
-	slope=$(cat $msdtmp | awk '$1<='$maxtime'' | awk '{xy += $1*$2; x+=$1; y+=$2; x2+=$1*$1}END{m=(NR*xy - x*y)/(NR*x2-x*x); print m;}')
-	rm -f $msdtmp *.ps
-	
-	echo $l $slope;
-    done | awk '{print $1, (1.0-$2); fflush(stdout)}'
+	    rm -f $msdtmp *.ps	
+	    echo $l $slope;
+	done | awk '{printf "%.15g %.15g \n", $1, (1.0-$2);}' |
+	    datamash -W groupby 1 mean 2 sstdev 2 count 1 |
+	    awk '{printf "%.15g %.15g %.15g\n", $1, $2, $3/sqrt($4);}'
+    done 
 }
 
-checkSelfDiffusion "true2D"   > selfDiffusionDeviation.true2D
+function checkSelfMobility {
+    scheme=$1
+    for l in $( seq 32 32 1024)
+    do
+	L=$(echo 1  | awk '{print '$l'*'$a';}')	
+	Nsteps=1
+	dt=1
+	if [ "$scheme" == "quasi2D" ] ; then
+	    M0=$(echo 1 | awk '{pi=atan2(0,-1); printf "%.15g\n", 1.0/(6*pi*'$vis'*'$a')*(1/(1+4.41/'$l')) }')
+	elif [ "$scheme" == "true2D" ] ; then
+	    M0=$(echo 1 | awk '{pi=atan2(0,-1); printf "%.15g\n", 1.0/(4*pi*'$vis')*(log('$l')-1.3105329259115095183)}')
+	else
+	    >&2 echo "Unknown scheme!"
+	    exit
+	fi
+	pullForce=$(echo 1 | awk '{print '$a'/('$M0'*'$dt');}')
+	msdtmp=$(mktemp)	
+	cat<<EOF | ./q2D /dev/stdin 2> /dev/null | awk '{printf "%g %.15g\n", '$l', sqrt((1.0-($1)/('$M0'))^2); fflush(stdout);}'
+		scheme 	       	     	$scheme
+		test 			selfMobility
+		boxSize			$L $L
+		cells 			-1 -1
+		dt			$dt
+		viscosity		$vis
+		temperature		0
+		hydrodynamicRadius	$a
+		tolerance		$tol
+		F 			$pullForce			
+		output			/dev/stdout 
+EOF
+    done
+}
 
-checkSelfDiffusion "quasi2D"   > selfDiffusionDeviation.quasi2D
+
+checkSelfDiffusion "true2D"   > selfDiffusionDeviation.true2D
+checkSelfDiffusion "quasi2D"  > selfDiffusionDeviation.quasi2D
+
+checkSelfMobility "true2D"   > selfMobilityDeviation.true2D
+checkSelfMobility "quasi2D"   > selfMobilityDeviation.quasi2D
+
+
 
 
 
