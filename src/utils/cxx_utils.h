@@ -2,8 +2,8 @@
 
   Code to ease working with variadic templates, C++14+ features not present in C++11...
 
-References:
-[1] https://www.murrayc.com/permalink/2015/12/05/modern-c-variadic-template-parameters-and-tuples
+  References:
+  [1] https://www.murrayc.com/permalink/2015/12/05/modern-c-variadic-template-parameters-and-tuples
 
 */
 
@@ -53,25 +53,33 @@ namespace uammd{
   template <std::size_t ... Is>
   struct make_index_sequence<0, Is...> : index_sequence<Is...> {};
 
-namespace SFINAE{
-  //This magic macro creates a struct such that has_X<T>::value will be true if
-  // T has a callable member called X and false otherwise (at compile time).
-#define SFINAE_DEFINE_HAS_MEMBER(X)			\
-  template <typename T>  \
-  class has_##X  \
-  {  \
-    using one = char;  \
-    using two = long;  \
-  \
-    template <class C> static constexpr inline one test( decltype(&C::X) ) ;	\
-    template <class C> static constexpr inline two test(...);  \
-  \
-  public:  \
-    static constexpr bool value = std::is_same<decltype(test<T>(0)),one>::value; \
-  };  \
+  namespace SFINAE{
+    //This magic macro creates a struct such that has_X<T>::value will be true if
+    // T has a callable member called X and false otherwise (at compile time).
+#define SFINAE_DEFINE_HAS_MEMBER(X)					\
+    template <typename T>						\
+    class has_##X							\
+    {									\
+      using one = char;							\
+      using two = long;							\
+									\
+      template <class C> static constexpr inline one test( decltype(&C::X) ) ; \
+      template <class C> static constexpr inline two test(...);		\
+									\
+    public:								\
+      static constexpr bool value = std::is_same<decltype(test<T>(0)),one>::value; \
+    };									\
 
+    template< bool B, class T = void > using enable_if_t = typename std::enable_if<B,T>::type;    
+    template< bool B, class T, class F > using conditional_t = typename std::conditional<B,T,F>::type;
+    
+    template<class...> struct disjunction : std::false_type {};
+    template<class B1> struct disjunction<B1> : B1 {};
+    template<class B1, class... Bn> struct disjunction<B1, Bn...> : conditional_t<bool(B1::value), B1, disjunction<Bn...>>{};
+    template<class... B> inline constexpr bool disjunction_v(){return disjunction<B...>::value;}
+    template<typename T, typename... Ts> constexpr bool is_one_of(){return disjunction_v<std::is_same<T, Ts>...>();}
 
-}
+  }
 
 
 
