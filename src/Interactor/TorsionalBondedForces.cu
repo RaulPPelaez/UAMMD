@@ -105,7 +105,7 @@ namespace uammd{
 	real3 posi = (index==i)?posp:make_real3(pos[i]);
 	real3 posj = (index==j)?posp:make_real3(pos[j]);
 	real3 posk = (index==k)?posp:make_real3(pos[k]);
-	real3 posl = (index==k)?posp:make_real3(pos[l]);
+	real3 posl = (index==l)?posp:make_real3(pos[l]);
 	f += bondType.force(i,j,k,l,
 			    index,
 			    posi, posj, posk, posl,
