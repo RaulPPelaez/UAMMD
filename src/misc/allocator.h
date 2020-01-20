@@ -8,6 +8,7 @@
 #include<thrust/system/cuda/pointer.h>
 #include<thrust/system/cuda/memory.h>
 #include"utils/debugTools.cuh"
+#include"utils/exception.h"
 #include<map>
 
 namespace uammd{
@@ -17,10 +18,11 @@ namespace uammd{
     class memory_resource{
     public:
       using pointer = T;
-      pointer allocate(std::size_t bytes, std::size_t alignment = alignof(std::max_align_t)){
+      using max_align_t = long double; //This C++11 alias is not available in std with g++-4.8.5 
+      pointer allocate(std::size_t bytes, std::size_t alignment = alignof(max_align_t)){
 	return do_allocate(bytes, alignment);
       }
-      void deallocate(pointer p, std::size_t bytes, std::size_t alignment = alignof(std::max_align_t)){
+      void deallocate(pointer p, std::size_t bytes, std::size_t alignment = alignof(max_align_t)){
 	return do_deallocate(p, bytes, alignment);
       }
 
