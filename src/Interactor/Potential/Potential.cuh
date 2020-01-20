@@ -66,7 +66,6 @@ namespace uammd{
 	if(r2 >= params.cutOff2) return 0;
 	real invr2 = params.sigma2/r2;
 	real invr6 = invr2*invr2*invr2;
-	//This must be multiplied by 2 instead of 4 because sum_i(sum_j(E(rij))) = 2*E_total
 	real E = params.epsilonDivSigma2*params.sigma2*real(4.0)*invr6*(invr6-real(1.0));
 	if(params.shift != real(0.0)){
 	  //With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
