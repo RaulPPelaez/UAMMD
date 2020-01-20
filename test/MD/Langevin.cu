@@ -17,7 +17,6 @@
 
 
 using namespace uammd;
-using namespace std;
 
 
 real3 boxSize;
@@ -32,7 +31,7 @@ real cutOff;
 real temperature;
 bool shift;
 std::string outfile, energyOutfile;
-
+using namespace std;
 void readParameters(std::string datamain, shared_ptr<System> sys);
 int main(int argc, char *argv[]){
   auto sys = make_shared<System>();
