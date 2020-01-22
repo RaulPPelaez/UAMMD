@@ -15,6 +15,20 @@ then
 fi
 
 
+if ! ls tools/rdf >/dev/null 2>&1
+then
+    mkdir -p tools
+    cd tools
+    git clone https://github.com/RaulPPelaez/RadialDistributionFunction
+    cd RadialDistributionFunction
+    mkdir build; cd build; cmake ..; make; cd ..	
+    cp build/bin/rdf ../
+    cd ..
+    cd ..
+    rm -rf tools/RadialDistributionFunction
+fi
+
+
 #Random numbers, the test should be independent on the values of these parameters
 #Temperature
 T=$(head -100 /dev/urandom | cksum | awk '{srand($1);print 1+rand();}')
@@ -117,11 +131,42 @@ EOF
 }
 
 
+function checkRadialDistributionFunction {
+    scheme=$1
+    L=128
+    N=16384
+    Nsteps=1000000
+    printSteps=1000
+    Nsnapshots=$(echo $Nsteps $printSteps | awk '{print int($1/$2);}')
+    dt=0.005
+    cat<<EOF | ./q2D /dev/stdin 2> /dev/null | tools/rdf -N $N -Nsnapshots $Nsnapshots -precision double -L $L -nbins 100 -rcut $a -dim 2D 2> /dev/null | awk '{print $1/'$a', $2, $3}' 
+		scheme 	       	     	$scheme
+		test 			selfDiffusion
+		boxSize			$L $L
+		cells 			-1 -1
+		numberSteps		$Nsteps
+		printSteps	       	$printSteps
+		dt			$dt
+		relaxSteps		0
+		viscosity		$vis
+		temperature		$T
+		hydrodynamicRadius	$a
+		numberParticles		$N
+		tolerance		$tol		
+		output			/dev/stdout 
+EOF
+
+
+
+}
 checkSelfDiffusion "true2D"   > selfDiffusionDeviation.true2D
 checkSelfDiffusion "quasi2D"  > selfDiffusionDeviation.quasi2D
 
 checkSelfMobility "true2D"   > selfMobilityDeviation.true2D
 checkSelfMobility "quasi2D"   > selfMobilityDeviation.quasi2D
+
+checkRadialDistributionFunction "true2D"   > rdf.true2D
+checkRadialDistributionFunction "quasi2D"   > rdf.quasi2D
 
 
 
