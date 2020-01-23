@@ -125,6 +125,15 @@ namespace uammd{
 	return make_real3(0);
       }
 
+      inline __device__ real energy(int i, int j, int k,
+				    int bond_index,
+				    const real3 &posi,
+				    const real3 &posj,
+				    const real3 &posk,
+				    const BondInfo &bond_info){
+	return 0;
+      }
+
       static BondInfo readBond(std::istream &in){
 	BondInfo bi;
 	in>>bi.k>>bi.ang0;

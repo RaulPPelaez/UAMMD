@@ -108,7 +108,17 @@ namespace uammd{
 	}
         return real3();
       }
-
+      
+      inline __device__ real energy(int j, int k, int m, int n,
+				    int bond_index,
+				    const real3 &posj,
+				    const real3 &posk,
+				    const real3 &posm,
+				    const real3 &posn,
+				    const BondInfo &bond_info){
+	return 0;
+      }
+      
       static BondInfo readBond(std::istream &in){
 	BondInfo bi;
 	in>>bi.k>>bi.phi0;

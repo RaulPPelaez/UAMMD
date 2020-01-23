@@ -123,7 +123,7 @@ namespace uammd{
       }
     }
   }
-  
+     
   template<class BondType>
   void TorsionalBondedForces<BondType>::sumForce(cudaStream_t st){
     if(nbonds>0){
@@ -137,7 +137,7 @@ namespace uammd{
       auto id2index = pd->getIdOrderedIndices(access::location::gpu);
       Bonded_ns::computeTorsionalBondedForce<<<Nparticles_with_bonds,
 	TPP,
-	TPP*sizeof(real3)>>>(force.raw(), pos.raw(),
+	TPP*sizeof(real3)>>>(force.begin(), pos.raw(),
 			     d_bondStart,
 			     d_bondEnd,
 			     d_particlesWithBonds,
@@ -148,8 +148,75 @@ namespace uammd{
 
   }
 
+  
+  namespace Bonded_ns{
+    template<class Bond, class BondType>
+    __global__ void computeTorsionalBondedEnergy(real* __restrict__ energy,
+						 const real4* __restrict__ pos,
+						 const int* __restrict__ bondStart,
+						 const int* __restrict__ bondEnd,
+						 const int* __restrict__ particlesWithBonds,
+						 const Bond* __restrict__ bondList,
+						 const int * __restrict__ id2index,
+						 BondType bondType){
+      extern __shared__ real energyTotal[];
+      const int tid = blockIdx.x;
+      const int id_i = particlesWithBonds[tid];
+      const int index = id2index[id_i];
+      const real3 posp = make_real3(pos[index]);
+      const int first = bondStart[tid];
+      const int last = bondEnd[tid];
+      real f = real();
+      for(int b = first + threadIdx.x; b < last; b += blockDim.x){
+	auto bond = bondList[b];
+	const int i = id2index[bond.i];
+	const int j = id2index[bond.j];
+	const int k = id2index[bond.k];
+	const int l = id2index[bond.l];
+	real3 posi = (index==i)?posp:make_real3(pos[i]);
+	real3 posj = (index==j)?posp:make_real3(pos[j]);
+	real3 posk = (index==k)?posp:make_real3(pos[k]);
+	real3 posl = (index==l)?posp:make_real3(pos[l]);
+	f += bondType.energy(i,j,k,l,
+			     index,
+			     posi, posj, posk, posl,
+			     bond.bond_info);
+      }
+      energyTotal[threadIdx.x] = f;
+      __syncthreads();
+      //TODO Implement a warp reduction
+      if(threadIdx.x==0){
+	real ft = real(0.0);
+	for(int i=0; i<blockDim.x; i++){
+	  ft += energyTotal[i];
+	}
+	energy[index] += ft;
+      }
+    }
+    
+  }
+
   template<class BondType>
   real TorsionalBondedForces<BondType>::sumEnergy(){
+    if(nbonds>0){
+      int Nparticles_with_bonds = particlesWithBonds.size();
+      auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
+      auto pos = pd->getPos(access::location::gpu, access::mode::read);
+      auto d_bondStart = thrust::raw_pointer_cast(bondStart.data());
+      auto d_bondEnd = thrust::raw_pointer_cast(bondEnd.data());
+      auto d_particlesWithBonds = thrust::raw_pointer_cast(particlesWithBonds.data());
+      auto d_bondList = thrust::raw_pointer_cast(bondList.data());
+      auto id2index = pd->getIdOrderedIndices(access::location::gpu);
+      Bonded_ns::computeTorsionalBondedEnergy<<<Nparticles_with_bonds,
+	TPP,
+	TPP*sizeof(real)>>>(energy.begin(), pos.begin(),
+			    d_bondStart,
+			    d_bondEnd,
+			    d_particlesWithBonds,
+			    d_bondList,
+			    id2index,
+			    *bondType);
+    }
     return 0;
   }
 
