@@ -182,14 +182,24 @@ namespace uammd{
 	return std::move(blst);	
       }
 
-      void  checkDuplicatedBonds(){
+      void checkDuplicatedBonds(){
 	struct AngularBondCompareLessThan{
-	  bool operator()(const Bond& lhs, const Bond &rhs) const{
-	    bool lessThan = (lhs.i < rhs.i and lhs.j < rhs.j and lhs.k < rhs.k);
-	    bool lessThan2 = (lhs.i < rhs.k and lhs.j < rhs.j and lhs.k < rhs.i);
-	    if( lessThan or lessThan2)
+	  bool operator()(const Bond& lhs, const Bond &rhs) const{	    
+	    auto lhs_t = std::make_tuple(lhs.i, lhs.j, lhs.k);
+	    auto rhs_t = std::make_tuple(rhs.i, rhs.j, rhs.k);
+	    if(std::get<2>(lhs_t) < std::get<0>(lhs_t)){
+	      std::swap(std::get<2>(lhs_t), std::get<0>(lhs_t));
+	    }
+	    if(std::get<2>(rhs_t) < std::get<0>(rhs_t)){
+	      std::swap(std::get<2>(rhs_t), std::get<0>(rhs_t));
+	    }
+	    const bool lessThan = lhs_t < rhs_t;
+	    if(lessThan){
 	      return true;
-	    else return false;
+	    }
+	    else{
+	      return false;
+	    }
 	  }
 	};
 	std::set<Bond, AngularBondCompareLessThan> checkDuplicates;
@@ -233,7 +243,6 @@ namespace uammd{
     };
       
   }
-
 
   template<class BondType>
   class AngularBondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
