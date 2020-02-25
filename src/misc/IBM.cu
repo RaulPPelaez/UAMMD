@@ -40,8 +40,7 @@ namespace uammd{
       return newval;
     }
 
-    /*Spreads the 3D quantity v (defined on the particle positions) to a grid
-
+    /*Spreads the quantity v (defined on the particle positions) to a grid
       S v(z) = v(x) = \sum_{z}{ v(z)*\delta(||z-x||^2) }
       Where:
       - S is the spreading operator
@@ -50,28 +49,31 @@ namespace uammd{
       - "x" is the position of a grid cell
       - \delta() is the window function
     */
-    template<bool is2D, class Grid, class Index3D, class Kernel,
-      class PosIterator,
-      class ParticleQuantityIterator, class GridQuantityIterator>
-    __global__ void particles2GridD(const PosIterator pos, /*Particle positions*/
-				    const ParticleQuantityIterator  v,   /*Per particle quantity to spread*/
-				    GridQuantityIterator  __restrict__ gridQuantity, /*Spreaded values, size ncells*/
-				    int N, /*Number of particles*/
-				    Grid grid, /*Grid information and methods*/
-				    Index3D cell2index,
-				    Kernel kernel){
+    template<bool is2D, class Grid, class Index3D, class InterpolationKernel,
+      class ParticlePosIterator,
+      class ParticleQuantityIterator, class GridQuantityOutputIterator>
+    __global__ void particles2GridD(const ParticlePosIterator pos,
+				    const ParticleQuantityIterator particleQuantity,
+				    GridQuantityOutputIterator gridQuantity,
+				    int numberParticles,
+				    Grid grid,
+				    Index3D cell2index, //Index of a 3d cell in gridQuantity
+				    InterpolationKernel kernel
+				    ){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
-      using QuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
+      using GridQuantityType = typename std::iterator_traits<GridQuantityOutputIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityIterator>::value_type;
-      if(id>=N) return;
+      static_assert(std::is_convertible<GridQuantityType, ParticleQuantityType>::value,
+		    "Particle quantity type must be convertible to grid quantity type");
+      if(id>=numberParticles) return;
       __shared__ real3 pi;
       __shared__ ParticleQuantityType vi; 
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
       if(tid==0){
 	pi = make_real3(pos[id]);
-	vi = v[id];
+	vi = particleQuantity[id];
 	celli = grid.getCell(pi);
 	const auto invCellSize = real(1.0)/grid.getCellSize(celli);
 	P = make_int3(kernel.support/2);
@@ -112,32 +114,34 @@ namespace uammd{
       This is the discretization of an integral and thus requires quadrature weigths for each element.
         Which in a regular grid is just the cell size, h. But can in general be something depending on the position.
     */
-
-
     template<int TPP, bool is2D, class Grid,
-      class Kernel,
-      class PosIterator, class ResultIterator, class GridQuantityIterator,
+      class InterpolationKernel,
+      class ParticlePosIterator, class ParticleQuantityOutputIterator,
+      class GridQuantityIterator,
       class Index3D,
       class QuadratureWeights>
-    __global__ void grid2ParticlesDTPP(PosIterator pos, /*Particle positions*/
-				       ResultIterator Jq, /*Result for each particle*/
-				       GridQuantityIterator gridQuantity, /*Values in the grid*/
-				       int N, /*Number of markers*/
+    __global__ void grid2ParticlesDTPP(const ParticlePosIterator pos, 
+				       ParticleQuantityOutputIterator particleQuantity,
+				       const GridQuantityIterator gridQuantity,
+				       int numberParticles,
 				       Grid grid,
-				       Index3D cell2index,
-				       Kernel kernel,
-				       QuadratureWeights qw /*Quadrature weights*/
+				       Index3D cell2index, //Index of a 3d cell in gridQuantity
+				       InterpolationKernel kernel,
+				       QuadratureWeights qw
 				       ){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
+      using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityOutputIterator>::value_type;
+      static_assert(std::is_convertible<ParticleQuantityType, GridQuantityType>::value,
+		    "Grid quantity type must be convertible to particle quantity type");
       using BlockReduce = cub::BlockReduce<GridQuantityType, TPP>;
       GridQuantityType result = GridQuantityType();
       __shared__ real3 pi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
       __shared__ typename BlockReduce::TempStorage temp_storage;
-      if(id<N){
+      if(id<numberParticles){
 	if(tid==0){
 	  pi = make_real3(pos[id]);
 	  celli = grid.getCell(pi);
@@ -152,12 +156,11 @@ namespace uammd{
 	}
       }
       __syncthreads();
-      if(id<N){
+      if(id<numberParticles){
 	const int supportCells = kernel.support;
 	int numberNeighbourCells = supportCells*supportCells;
 	if(!is2D)  numberNeighbourCells *= supportCells;
 	for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
-	  //current neighbour cell
 	  int3 cellj = make_int3(celli.x + i%supportCells - P.x,
 				 celli.y + (i/supportCells)%supportCells - P.y,
 				 is2D?0:(celli.z + i/(supportCells*supportCells) - P.z));
@@ -172,9 +175,8 @@ namespace uammd{
       }
       GridQuantityType total = BlockReduce(temp_storage).Sum(result);
       __syncthreads();
-      if(tid==0 and id<N){
-	using ResultType = typename std::iterator_traits<ResultIterator>::value_type;
-	Jq[id] += static_cast<ResultType>(total);
+      if(tid==0 and id<numberParticles){
+	particleQuantity[id] += total;
       }
     }
 
