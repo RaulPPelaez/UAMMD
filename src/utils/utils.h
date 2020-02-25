@@ -7,8 +7,8 @@
 References:
 [1] https://en.wikipedia.org/wiki/Xorshift#xorshift.2B
  */
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef UAMMD_UTILS_H
+#define UAMMD_UTILS_H
 #include<cstdint>
 #include<limits>
 #include<sys/time.h>
