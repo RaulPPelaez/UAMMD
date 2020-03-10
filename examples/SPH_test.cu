@@ -114,7 +114,7 @@ int main(int argc, char *argv[]){
   //When additional parameters are needed, they need to be supplied in a form similar to this:
   {
     auto vel = pd->getVel(access::location::gpu, access::mode::write);
-    thrust::fill(thrust::device, vel.begin(), vel.end(), real3());
+    thrust::fill(thrust::cuda::par, vel.begin(), vel.end(), real3());
   }
 
   VerletNVE::Parameters par;
