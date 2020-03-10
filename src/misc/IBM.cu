@@ -64,8 +64,6 @@ namespace uammd{
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityOutputIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityIterator>::value_type;
-      static_assert(std::is_convertible<GridQuantityType, ParticleQuantityType>::value,
-		    "Particle quantity type must be convertible to grid quantity type");
       if(id>=numberParticles) return;
       __shared__ real3 pi;
       __shared__ ParticleQuantityType vi; 
