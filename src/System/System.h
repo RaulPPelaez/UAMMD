@@ -1,6 +1,6 @@
 // Raul P. Pelaez 2019. UAMMD System
-#ifndef SYSTEM_H
-#define SYSTEM_H
+#ifndef UAMMD_SYSTEM_H
+#define UAMMD_SYSTEM_H
 
 #include"global/defines.h"
 #include"utils/utils.h"
@@ -8,7 +8,7 @@
 #include"utils/cxx_utils.h"
 #include"utils/debugTools.cuh"
 #include"utils/parseArguments.h"
-#include"Log.h"
+#include"System/Log.h"
 #include<cstring>
 #include<ostream>
 #include<iostream>
@@ -43,14 +43,15 @@ namespace uammd{
 
   class System{
   public:
-
-    //using resource = uammd::managed_memory_resource;
+#ifndef UAMMD_DEBUG
+    using resource = uammd::managed_memory_resource;
+#else
     using resource = uammd::device_memory_resource;
+#endif
     using device_temporary_memory_resource = uammd::pool_memory_resource_adaptor<resource>;
-
     template<class T>
     using allocator_thrust = uammd::polymorphic_allocator<T, device_temporary_memory_resource,
-								  thrust::cuda::pointer<T>>;
+							  thrust::device_ptr<T>>;
     template<class T>
     using allocator = uammd::polymorphic_allocator<T , device_temporary_memory_resource>;
 
@@ -72,9 +73,6 @@ namespace uammd{
 
     int m_argc = 0;
     char ** m_argv = nullptr;
-
-    resource m_memory_resource;
-    std::shared_ptr<device_temporary_memory_resource> m_pool_memory_resource;
 
     CommandLineOptions processInputArguments(){
       log<DEBUG1>("[System] Reading command line arguments");
@@ -155,7 +153,6 @@ namespace uammd{
       std::string line;
       fori(0,29) line += "━ ";
       log<System::MESSAGE>("%s", line.c_str());
-      m_pool_memory_resource = std::make_shared<device_temporary_memory_resource>(&m_memory_resource);
       CudaCheckError();
     }
 
@@ -163,7 +160,6 @@ namespace uammd{
       log<DEBUG2>("[System] finish");
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
-      m_pool_memory_resource.reset();
       this->printFarewell();
     }
 
@@ -189,8 +185,8 @@ namespace uammd{
     }
 
     template<class T = char>
-    allocator<T> getTemporaryDeviceAllocator(){
-      return allocator<T>(m_pool_memory_resource.get());
+    static allocator<T> getTemporaryDeviceAllocator(){
+      return allocator<T>();
     }
 
   };

@@ -18,17 +18,15 @@ int main(){
   auto sys = std::make_shared<System>();
   //Only the first iteration incurs a cudaMalloc, and cudaFree is called only when sys goes out of scope.
   fori(0,10){
-    auto alloc = sys->getTemporaryDeviceAllocator<char>();
-    thrust::device_vector<char, System::allocator_thrust<char>> vec(alloc);
+    thrust::device_vector<char, System::allocator_thrust<char>> vec;
     vec.resize(10000);
   }
 
   //You can interchange with a thrust vector using the default allocator.
   {
-    auto alloc = sys->getTemporaryDeviceAllocator<char>();
-    thrust::device_vector<char, System::allocator_thrust<char>> vec(alloc);
+    thrust::device_vector<char, System::allocator_thrust<char>> vec;
     vec.resize(10000);
-    thrust::host_vector<char> host_copy_with_default_allocator(vec);
+    //thrust::host_vector<char> host_copy_with_default_allocator(vec);
     thrust::device_vector<char> device_copy_with_default_allocator(vec);
   }
   {
