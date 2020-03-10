@@ -1,0 +1,8 @@
+-xcuda
+--cuda-gpu-arch=sm_52
+-DMAXLOGLEVEL=5
+-std=c++11
+-O3
+-I/home/raul/tmp/uammd/src
+-I/home/raul/tmp/uammd/src/third_party
+--cuda-path=/usr/local/cuda-8.0
