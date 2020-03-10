@@ -14,6 +14,7 @@ to create an Integrator module inherit from Integrator and overload the virtual 
 
 #include"System/System.h"
 #include"ParticleData/ParticleData.cuh"
+#include"ParticleData/ParticleGroup.cuh"
 #include"Interactor/Interactor.cuh"
 #include<memory>
 #include<vector>

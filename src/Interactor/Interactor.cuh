@@ -21,6 +21,7 @@ See PairForces.cuh or examples/LJ.cu for an example.
 
 #include"System/System.h"
 #include"ParticleData/ParticleData.cuh"
+#include"ParticleData/ParticleGroup.cuh"
 
 #include<memory>
 #include<vector>
