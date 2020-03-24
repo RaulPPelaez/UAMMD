@@ -167,6 +167,10 @@ namespace uammd{
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys,
 	  Parameters par);
+      BDHI2D(shared_ptr<ParticleData> pd,
+	     shared_ptr<System> sys,
+	     Parameters par);
+
       ~BDHI2D();
 
       virtual void forwardTime() override;

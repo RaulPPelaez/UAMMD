@@ -16,6 +16,12 @@
 #include<thrust/tuple.h>
 namespace uammd{
   namespace BDHI{
+        template<class HydroKernel>
+    BDHI2D<HydroKernel>::BDHI2D(shared_ptr<ParticleData> pd,
+				shared_ptr<System> sys,
+				Parameters par):
+      BDHI2D(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
+
     template<class HydroKernel>
     BDHI2D<HydroKernel>::BDHI2D(shared_ptr<ParticleData> pd,
 	     shared_ptr<ParticleGroup> pg,
