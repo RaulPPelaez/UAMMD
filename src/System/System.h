@@ -99,18 +99,20 @@ namespace uammd{
 
     void initializeCUDA(){
       try{
-	CudaSafeCall(cudaSetDevice(sysPar.device));
+	if(sysPar.device>=0){
+	  CudaSafeCall(cudaSetDevice(sysPar.device));
+	}
 	CudaSafeCall(cudaFree(0));
 	CudaSafeCall(cudaDeviceSynchronize());
 	CudaCheckError();
       }
       catch(...){
 	log<System::ERROR>("[System] Exception raised at CUDA initialization");
-	std::throw_with_nested(std::runtime_error("Unable to initialize CUDA"));
+	throw;
       }
       log<System::MESSAGE>("[System] CUDA initialized");
     }
-
+    
     void storeComputeCapability(){
       cudaDeviceProp deviceProp;
       CudaSafeCall(cudaGetDeviceProperties(&deviceProp, sysPar.device));
@@ -140,11 +142,14 @@ namespace uammd{
       auto seed = 0xf31337Bada55D00dULL^time(NULL);
       m_rng.setSeed(seed);
       auto options = processInputArguments();
-      sysPar.device = 0;
-      if(options.device>0){
+      sysPar.device = -1;
+      if(options.device>=0){
 	sysPar.device = options.device;
       }
       this->initializeCUDA();
+      if(options.device<0){
+	CudaSafeCall(cudaGetDevice(&(sysPar.device)));
+      }	
       if(options.cuda_printf_limit > 0){
 	CudaSafeCall(cudaDeviceSetLimit(cudaLimitPrintfFifoSize,
 					options.cuda_printf_limit));
