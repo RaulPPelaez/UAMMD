@@ -362,7 +362,7 @@ namespace uammd{
     ibm->spread(pos.begin(), charges.begin(), d_gridCharges, numberParticles, st);
     CudaCheckError();
   }
-  
+
   void Poisson::forwardTransformCharge(){
     CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
     auto d_gridCharges = thrust::raw_pointer_cast(gridCharges.data());
