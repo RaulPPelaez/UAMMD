@@ -163,6 +163,8 @@ namespace uammd{
       case access::location::gpu:
 	this->deviceVectorNeedsUpdate = true;
 	break;
+      default:
+	break;
       }
     }
 
@@ -173,8 +175,11 @@ namespace uammd{
     bool isAllocated() const{ return this->N>0;}
 
   private:
-
+    #ifdef UAMMD_DEBUG
+    thrust::device_vector<T, managed_allocator<T>> deviceVector, deviceVector_alt;
+    #else
     thrust::device_vector<T> deviceVector, deviceVector_alt;
+    #endif
     std::vector<T> hostVector;
     uammd::managed_vector<T> managedVector, managedVector_alt;
 
