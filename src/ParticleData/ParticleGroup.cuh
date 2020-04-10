@@ -320,27 +320,20 @@ namespace uammd{
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created with selector %s",
 			      name.c_str(), type_name<ParticleSelector>().c_str());
     totalParticles = pd->getNumParticles();
-    /*Create ID list in CPU*/
     std::vector<int> ids;
     for(int i=0;i<totalParticles;i++){
       if(selector.isSelected(i, pd))
 	ids.push_back(i);
     }
     numberParticles = ids.size();
-    sys->log<System::MESSAGE>("[ParticleGroup] Group %s contains %d particles.",
-			      name.c_str(), numberParticles);
-    /*Handle the case in which all particles belong to the group*/
+    sys->log<System::MESSAGE>("[ParticleGroup] Group %s contains %d particles.", name.c_str(), numberParticles);
     if(numberParticles==totalParticles){
       allParticlesInGroup = true;
     }
     else{
       myParticlesIdsGPU = ids;
-
-      //Connect to reorder signal, index list needs to be updated each time a reorder occurs
       reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});
-      //Allocate
       myParticlesIndicesGPU.resize(numberParticles);
-      //Force update (creation) of the index list)
       this->computeIndexList(true);
     }
   }
