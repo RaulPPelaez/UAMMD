@@ -62,7 +62,7 @@ namespace uammd{
     if(pd->isVelAllocated() && initVelocities){
       sys->log<System::WARNING>("[VerletNVE] Velocity will be overwritten to ensure energy conservation!");
     }
-    
+
     CudaSafeCall(cudaStreamCreate(&stream));
   }
 

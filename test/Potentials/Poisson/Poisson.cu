@@ -16,7 +16,7 @@ int main(int argc, char *argv[]){
   real tolerance = std::stod(argv[3]);
   real gw = std::stod(argv[4]);
   real split = std::stod(argv[5]);
-  
+
   auto sys = make_shared<System>(argc, argv);
 
   auto pd = make_shared<ParticleData>(N, sys);

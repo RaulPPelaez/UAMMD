@@ -45,7 +45,7 @@ namespace uammd{
     int steps;
 
     size_t temp_storage_bytes;
-    
+
   public:
     struct Parameters{
       real energy = 0;
