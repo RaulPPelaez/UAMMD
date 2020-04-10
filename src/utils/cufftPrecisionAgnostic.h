@@ -21,7 +21,6 @@ namespace uammd{
   }
 
   template<class T> using cufftReal_t = typename detail::cufftTypeAgnostic<T>::type;
-
   template<class T> using cufftComplex_t = typename detail::cufftComplexType<T>::type;
 
   template<class T> struct CUFFT_Real2Complex;
@@ -29,49 +28,51 @@ namespace uammd{
   template<> struct CUFFT_Real2Complex<float>{static constexpr cufftType value=CUFFT_R2C;};
 
   template<class prec>
-  cufftResult cufftExecReal2Complex(cufftHandle &plan,
-			     cufftReal_t<prec>* d_in,
-			     cufftComplex_t<prec> *d_out);
-  template<>
-  cufftResult cufftExecReal2Complex<float>(cufftHandle &plan,
-				    cufftReal_t<float>* d_in,
-				    cufftComplex_t<float> *d_out){
+  cufftResult cufftExecReal2Complex(cufftHandle &plan, cufftReal_t<prec>* d_in, cufftComplex_t<prec> *d_out);
 
+  template<>
+  cufftResult cufftExecReal2Complex<float>(cufftHandle &plan, cufftReal_t<float>* d_in, cufftComplex_t<float> *d_out){
     return cufftExecR2C(plan, d_in, d_out);
   }
 
   template<>
-  cufftResult cufftExecReal2Complex<double>(cufftHandle &plan,
-				     cufftReal_t<double>* d_in,
-				     cufftComplex_t<double> *d_out){
-
+  cufftResult cufftExecReal2Complex<double>(cufftHandle &plan, cufftReal_t<double>* d_in, cufftComplex_t<double> *d_out){
     return cufftExecD2Z(plan, d_in, d_out);
-
   }
-
 
   template<class T> struct CUFFT_Complex2Real;
   template<> struct CUFFT_Complex2Real<double>{static constexpr cufftType value=CUFFT_Z2D;};
   template<> struct CUFFT_Complex2Real<float>{static constexpr cufftType value=CUFFT_C2R;};
 
   template<class real>
-  cufftResult cufftExecComplex2Real(cufftHandle &plan,
-			     cufftComplex_t<real>* d_in,
-			     cufftReal_t<real> *d_out);
-  template<>
-  cufftResult cufftExecComplex2Real<float>(cufftHandle &plan,
-				    cufftComplex_t<float> *d_in,
-				    cufftReal_t<float> *d_out){
-    return cufftExecC2R(plan, d_in, d_out);
+  cufftResult cufftExecComplex2Real(cufftHandle &plan, cufftComplex_t<real>* d_in, cufftReal_t<real> *d_out);
 
+  template<>
+  cufftResult cufftExecComplex2Real<float>(cufftHandle &plan, cufftComplex_t<float> *d_in, cufftReal_t<float> *d_out){
+    return cufftExecC2R(plan, d_in, d_out);
   }
 
   template<>
-  cufftResult cufftExecComplex2Real<double>(cufftHandle &plan,
-				     cufftComplex_t<double> *d_in,
-				     cufftReal_t<double> *d_out){
-
+  cufftResult cufftExecComplex2Real<double>(cufftHandle &plan, cufftComplex_t<double> *d_in, cufftReal_t<double> *d_out){
     return cufftExecZ2D(plan, d_in, d_out);
   }
+
+  template<class T> struct CUFFT_Complex2Complex;
+  template<> struct CUFFT_Complex2Complex<double>{static constexpr cufftType value=CUFFT_Z2Z;};
+  template<> struct CUFFT_Complex2Complex<float>{static constexpr cufftType value=CUFFT_C2C;};
+
+  template<class real>
+  cufftResult cufftExecComplex2Complex(cufftHandle &plan, cufftComplex_t<real>* d_in, cufftComplex_t<real> *d_out, int direction);
+
+  template<>
+  cufftResult cufftExecComplex2Complex<float>(cufftHandle &plan, cufftComplex_t<float> *d_in, cufftComplex_t<float> *d_out, int direction){
+    return cufftExecC2C(plan, d_in, d_out, direction);
+  }
+
+  template<>
+  cufftResult cufftExecComplex2Complex<double>(cufftHandle &plan, cufftComplex_t<double> *d_in, cufftComplex_t<double> *d_out, int direction){
+    return cufftExecZ2Z(plan, d_in, d_out, direction);
+  }
+
 }
 #endif
