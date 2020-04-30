@@ -9,7 +9,8 @@
 
 #ifndef CXX_UTILS_H
 #define CXX_UTILS_H
-#include<string>
+#include <string>
+#include <memory>
 namespace uammd{
 
   namespace stringUtils{
@@ -82,6 +83,10 @@ namespace uammd{
   }
 
 
+  template<typename T, typename ...Args>
+  std::unique_ptr<T> make_unique( Args&& ...args ){
+    return std::unique_ptr<T>( new T( std::forward<Args>(args)... ) );
+  }
 
 
 
