@@ -72,7 +72,7 @@ namespace uammd{
 	     class PosIterator,
 	     class ParticleQuantityIterator, class GridQuantityIterator>
     __global__ void particles2GridD(const PosIterator pos,
-				    const ParticleQuantityIterator  v,
+				    const ParticleQuantityIterator  particleQuantity,
 				    GridQuantityIterator  __restrict__ gridQuantity,
 				    int numberParticles,
 				    Grid grid,
@@ -80,7 +80,7 @@ namespace uammd{
 				    Kernel kernel){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
-      using GridQuantityType = typename std::iterator_traits<GridQuantityOutputIterator>::value_type;
+      using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityIterator>::value_type;
       if(id>=numberParticles) return;
       __shared__ real3 pi;
@@ -162,7 +162,7 @@ namespace uammd{
 	if(tid==0){
 	  pi = make_real3(pos[id]);
 	  celli = grid.getCell(pi);
-	  support = detail::GetSupport<Kernel>::get(kernel, celli);
+	  support = detail::GetSupport<InterpolationKernel>::get(kernel, celli);
 	  P = support/2;
 	  //Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
 	  const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
