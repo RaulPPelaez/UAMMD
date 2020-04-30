@@ -1,5 +1,7 @@
 #include"IBM.cuh"
 #include<third_party/type_names.h>
+#include <type_traits>
+#include<third_party/cub/cub.cuh>
 
 namespace uammd{
 
@@ -40,7 +42,24 @@ namespace uammd{
       return newval;
     }
 
-    /*Spreads the quantity v (defined on the particle positions) to a grid
+    namespace detail{
+      SFINAE_DEFINE_HAS_MEMBER(getSupport)
+
+      template<class Kernel, bool def = has_getSupport<Kernel>::value> int3 getSupport(Kernel &kernel, int3 cell);
+
+      template<class Kernel, bool def = has_getSupport<Kernel>::value> struct GetSupport;
+      
+      template<class Kernel> struct GetSupport<Kernel, true>{
+	static __device__ int3 get(Kernel &kernel, int3 cell){return kernel.getSupport(cell);}
+      };
+      
+      template<class Kernel> struct GetSupport<Kernel, false>{
+	static __device__ int3 get(Kernel &kernel, int3 cell){return make_int3(kernel.support);}
+      };
+    }
+
+    /*Spreads the 3D quantity v (defined on the particle positions) to a grid
+
       S v(z) = v(x) = \sum_{z}{ v(z)*\delta(||z-x||^2) }
       Where:
       - S is the spreading operator
@@ -49,47 +68,48 @@ namespace uammd{
       - "x" is the position of a grid cell
       - \delta() is the window function
     */
-    template<bool is2D, class Grid, class Index3D, class InterpolationKernel,
-      class ParticlePosIterator,
-      class ParticleQuantityIterator, class GridQuantityOutputIterator>
-    __global__ void particles2GridD(const ParticlePosIterator pos,
-				    const ParticleQuantityIterator particleQuantity,
-				    GridQuantityOutputIterator gridQuantity,
+    template<bool is2D, class Grid, class Index3D, class Kernel,
+	     class PosIterator,
+	     class ParticleQuantityIterator, class GridQuantityIterator>
+    __global__ void particles2GridD(const PosIterator pos,
+				    const ParticleQuantityIterator  v,
+				    GridQuantityIterator  __restrict__ gridQuantity,
 				    int numberParticles,
 				    Grid grid,
-				    Index3D cell2index, //Index of a 3d cell in gridQuantity
-				    InterpolationKernel kernel
-				    ){
+				    Index3D cell2index,
+				    Kernel kernel){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityOutputIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityIterator>::value_type;
       if(id>=numberParticles) return;
       __shared__ real3 pi;
-      __shared__ ParticleQuantityType vi; 
+      __shared__ ParticleQuantityType vi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
+      __shared__ int3 support;
       if(tid==0){
 	pi = make_real3(pos[id]);
 	vi = particleQuantity[id];
-	celli = grid.getCell(pi);
-	const auto invCellSize = real(1.0)/grid.getCellSize(celli);
-	P = make_int3(kernel.support/2);
+	celli = grid.getCell(pi);	
+	support = detail::GetSupport<Kernel>::get(kernel, celli);
+	P = (support/2);
 	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	if(kernel.support%2==0){
+	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
+	if(shift.x or shift.y or shift.z){
+	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
 	  const real3 pi_pbc = grid.box.apply_pbc(pi);
-	  P -= make_int3( (pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5) );
+	  P -= make_int3(((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5)))*shift;
 	}
 	if(is2D) P.z = 0;
       }
-      const int supportCells = kernel.support;
-      int numberNeighbourCells = supportCells*supportCells;
-      if(!is2D)  numberNeighbourCells *= supportCells;
       __syncthreads();
+      int numberNeighbourCells = support.x*support.y;
+      if(!is2D)  numberNeighbourCells *= support.z;
       for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
-	int3 cellj = make_int3(celli.x + i%supportCells - P.x,
-			       celli.y + (i/supportCells)%supportCells - P.y,
-			       is2D?0:(celli.z + i/(supportCells*supportCells) - P.z));
+	int3 cellj = make_int3(celli.x + i%support.x - P.x,
+			       celli.y + (i/support.x)%support.y - P.y,
+			       is2D?0:(celli.z + i/(support.x*support.y) - P.z));
 	cellj = grid.pbc_cell(cellj);
 	const real3 rij = grid.distanceToCellCenter(pi, cellj);
 	const auto weight = vi*kernel.delta(rij, grid.getCellSize(cellj));
@@ -131,37 +151,37 @@ namespace uammd{
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityOutputIterator>::value_type;
-      static_assert(std::is_convertible<ParticleQuantityType, GridQuantityType>::value,
-		    "Grid quantity type must be convertible to particle quantity type");
       using BlockReduce = cub::BlockReduce<GridQuantityType, TPP>;
       GridQuantityType result = GridQuantityType();
       __shared__ real3 pi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
       __shared__ typename BlockReduce::TempStorage temp_storage;
+      __shared__ int3 support;
       if(id<numberParticles){
 	if(tid==0){
 	  pi = make_real3(pos[id]);
 	  celli = grid.getCell(pi);
-	  P = make_int3(kernel.support/2);
+	  support = detail::GetSupport<Kernel>::get(kernel, celli);
+	  P = support/2;
 	  //Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	  if(kernel.support%2==0){
-	    const real3 invCellSize = real(1.0)/grid.getCellSize(celli);
+	  const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
+	  if(shift.x or shift.y or shift.z){
+	    const auto invCellSize = real(1.0)/grid.getCellSize(celli);
 	    const real3 pi_pbc = grid.box.apply_pbc(pi);
-	    P -= make_int3( (pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5) );
+	    P -= make_int3(((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5)))*shift;
 	  }
 	  if(is2D) P.z = 0;
 	}
       }
       __syncthreads();
       if(id<numberParticles){
-	const int supportCells = kernel.support;
-	int numberNeighbourCells = supportCells*supportCells;
-	if(!is2D)  numberNeighbourCells *= supportCells;
+	int numberNeighbourCells = support.x*support.y;
+	if(!is2D)  numberNeighbourCells *= support.z;
 	for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
-	  int3 cellj = make_int3(celli.x + i%supportCells - P.x,
-				 celli.y + (i/supportCells)%supportCells - P.y,
-				 is2D?0:(celli.z + i/(supportCells*supportCells) - P.z));
+	  int3 cellj = make_int3(celli.x + i%support.x - P.x,
+				 celli.y + (i/support.x)%support.y - P.y,
+				 is2D?0:(celli.z + i/(support.x*support.y) - P.z));
 	  cellj = grid.pbc_cell(cellj);
 	  const real3 rij = grid.distanceToCellCenter(pi, cellj);
 	  const auto weight = kernel.delta(rij, grid.getCellSize(cellj));
@@ -181,7 +201,7 @@ namespace uammd{
     template<int threadsPerParticle, bool is2D, class ...T> void callGather(int numberParticles, cudaStream_t st, T... args){
       grid2ParticlesDTPP<threadsPerParticle, is2D><<<numberParticles, threadsPerParticle, 0, st>>>(args...);
     }
-    
+
   }
 }
 

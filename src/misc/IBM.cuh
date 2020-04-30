@@ -44,20 +44,21 @@ REFERENCES:
 #include"utils/utils.h"
 #include"System/System.h"
 #include"IBM.cu"
+#include "utils/Grid.cuh"
 
 namespace uammd{
   namespace IBM_ns{
     struct LinearIndex3D{
       LinearIndex3D(int nx, int ny, int nz):nx(nx), ny(ny), nz(nz){}
-      
+
       inline __device__ __host__ int operator()(int3 c) const{
 	return this->operator()(c.x, c.y, c.z);
       }
-      
+
       inline __device__ __host__ int operator()(int i, int j, int k) const{
 	return i + nx*(j+ny*k);
       }
-      
+
     private:
       const int nx, ny, nz;
     };
@@ -69,7 +70,7 @@ namespace uammd{
     };
 
   }
-  
+
   template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>
   class IBM{
     shared_ptr<Kernel> kernel;
@@ -77,12 +78,12 @@ namespace uammd{
     Grid grid;
     Index3D cell2index;
   public:
-    
-    IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index):      
+
+    IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index):
       sys(sys), kernel(kern), grid(a_grid), cell2index(cell2index){
       sys->log<System::DEBUG2>("[IBM] Initialized with kernel: %s", type_name<Kernel>().c_str());
     }
-    
+
     IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid):
       IBM(sys, kern, a_grid, Index3D(a_grid.cellDim.x, a_grid.cellDim.y,a_grid.cellDim.z )){}
 
