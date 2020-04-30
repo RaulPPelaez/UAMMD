@@ -27,4 +27,4 @@ armadillo*
 \#*
 work
 examples/data.main*
-examples/*.dat
+*.dat
