@@ -4,7 +4,7 @@
 ARCH=
 
 #Uncomment to compile in double precision mode, single by default
-#DOUBLE_PRECISION=-DDOUBLE_PRECISION
+DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
 #C++ compiler, I tested up to clang++-5.0
 #CXX=clang++-5.0

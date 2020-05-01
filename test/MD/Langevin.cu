@@ -97,6 +97,8 @@ int main(int argc, char *argv[]){
 
   std::ofstream out(outfile);
   std::ofstream eout(energyOutfile);
+  eout.precision(2*sizeof(uammd::real));
+  out.precision(2*sizeof(uammd::real));
   Timer tim;
   tim.tic();
 
