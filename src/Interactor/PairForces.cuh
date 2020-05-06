@@ -17,26 +17,25 @@
 #include"third_party/type_names.h"
 
 namespace uammd{
-  /*This makes the class valid for any NeighbourList*/
   template<class Potential, class NeighbourList = CellList>
   class PairForces: public Interactor, public ParameterUpdatableDelegate<Potential>{
   public:
     struct Parameters{
       Box box;
-      //You can provide a neighbour list from outside that will be used by PairForces
-      shared_ptr<NeighbourList> nl=shared_ptr<NeighbourList>(nullptr);
+      shared_ptr<NeighbourList> nl = shared_ptr<NeighbourList>(nullptr);
     };
     PairForces(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
 	       Parameters par,
 	       shared_ptr<Potential> pot = std::make_shared<Potential>());
-    PairForces(shared_ptr<ParticleData> pd,
-	       shared_ptr<System> sys,
-	       Parameters par,
-	       shared_ptr<Potential> pot = std::make_shared<Potential>()):
-      PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par, pot){
-    }
+
+    PairForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+               Parameters par,
+               shared_ptr<Potential> pot = std::make_shared<Potential>())
+        : PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys,
+                     par, pot) {
+      }
 
     ~PairForces(){
       sys->log<System::DEBUG>("[PairForces] Destroyed.");
@@ -45,19 +44,20 @@ namespace uammd{
     void updateBox(Box box) override{
       sys->log<System::DEBUG3>("[PairForces] Box updated.");
       this->box = box;
-      //In case the potential wants to handle updateBox
       ParameterUpdatableDelegate<Potential>::updateBox(box);
     }
+
     void sumForce(cudaStream_t st) override;
+
     real sumEnergy() override;
-    //real sumVirial() override{ return 0;}
-    //sumForce and sumEnergy are defined through this function
+
+    real sumForceEnergy(cudaStream_t st) override;
+
     template<class Transverser>
     void sumTransverser(Transverser &tr, cudaStream_t st);
 
     void print_info(){
       sys->log<System::MESSAGE>("[PairForces] Using: %s Neighbour List.", type_name<NeighbourList>());
-      //nl.print();
       sys->log<System::MESSAGE>("[PairForces] Using: %s potential.", type_name<Potential>());
     }
 
@@ -68,10 +68,7 @@ namespace uammd{
     shared_ptr<Potential> pot;
     Box box;
     real rcut;
-
   };
-
-
 }
 
 #include"PairForces.cu"
