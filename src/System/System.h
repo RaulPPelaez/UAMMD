@@ -208,6 +208,11 @@ namespace uammd{
     log<System::MESSAGE>("%s Version: %s", line2.c_str(), UAMMD_VERSION);
     log<System::MESSAGE>("%s",line3.c_str());
     log<System::MESSAGE>("Compiled at: %s %s", __DATE__, __TIME__);
+#ifdef DOUBLE_PRECISION
+    log<System::MESSAGE>("Compiled in double precision mode");
+#else
+    log<System::MESSAGE>("Compiled in single precision mode");
+#endif
     std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     log<System::MESSAGE>("Computation started at %s", std::ctime(&time));
   }
