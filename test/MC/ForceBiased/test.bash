@@ -12,7 +12,7 @@ acceptanceRatio=0.5
 
 cd tools
 #Download rdf
-if ! test  rdf
+if ! test -f rdf
 then
    git clone https://github.com/raulppelaez/RadialDistributionFunction RDF
    cd RDF
