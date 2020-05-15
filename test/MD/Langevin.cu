@@ -8,7 +8,7 @@
 
 #include"uammd.cuh"
 #include"Integrator/VerletNVT.cuh"
-#include"Interactor/NeighbourList/CellList.cuh"
+#include"Interactor/NeighbourList/VerletList.cuh"
 #include"Interactor/PairForces.cuh"
 #include"Interactor/Potential/Potential.cuh"
 #include"utils/InitialConditions.cuh"
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]){
   par.viscosity = 1.0/(M_PI);
   auto verlet = make_shared<NVT>(pd, pg, sys, par);
 
-  using PairForces = PairForces<Potential::LJ>;
+  using PairForces = PairForces<Potential::LJ, VerletList>;
   if(shift)
     sys->log<System::MESSAGE>("[System] LJ Parameters: sigma %e, epsilon %e, cutOff %e·sigma, shift: truncated and shifted", sigma, epsilon, cutOff);
   else
