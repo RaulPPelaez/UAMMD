@@ -34,6 +34,7 @@ namespace uammd{
     size_t m_size;
     bool *isBeingRead, *isBeingWritten;
     bool isCopy = false; //true if this instance was created when passed to a cuda kernel
+    access::location device;
     friend class thrust::iterator_core_access;
 
     void unlockProperty(){
@@ -47,17 +48,18 @@ namespace uammd{
       super_t(nullptr),
       ptr(nullptr),
       m_size(0),
-      isBeingRead(nullptr), isBeingWritten(nullptr)
+      isBeingRead(nullptr), isBeingWritten(nullptr), device(access::location::nodevice)
       {}
 
     property_ptr(T* ptr,
 		 bool *isBeingWritten, bool *isBeingRead,
-		 size_t in_size):
+		 size_t in_size,
+		 access::location dev):
       super_t(ptr),
       ptr(ptr),
       m_size(in_size),
       isBeingWritten(isBeingWritten),
-      isBeingRead(isBeingRead)
+      isBeingRead(isBeingRead), device(dev)
     {}
 
     __host__ __device__ property_ptr(const property_ptr& _orig ):super_t(_orig.ptr) { *this = _orig; isCopy = true; }
@@ -86,6 +88,10 @@ namespace uammd{
     __host__ __device__ Iterator begin() const{ return get();}
 
     __host__ __device__ size_t size() const{ return m_size;}
+
+    access::location location() const{
+      return device;
+    }
   };
 
   struct illegal_property_access: public std::runtime_error{
@@ -211,13 +217,13 @@ namespace uammd{
 	updateHostData();
 	if(requestedForWriting)
 	  deviceVectorNeedsUpdate=true;
-	return property_ptr<T>(hostVector.data(), &this->isBeingWritten, &this->isBeingRead, size());
+	return property_ptr<T>(hostVector.data(), &this->isBeingWritten, &this->isBeingRead, size(), dev);
       case access::location::gpu:
 	updateDeviceData();
 	if(requestedForWriting)
 	  hostVectorNeedsUpdate=true;
 	return property_ptr<T>(thrust::raw_pointer_cast(deviceVector.data()),
-			       &this->isBeingWritten, &this->isBeingRead, size());
+			       &this->isBeingWritten, &this->isBeingRead, size(), dev);
       case access::location::managed:
 	  if(!isManaged){
 	    throw std::runtime_error("[Property] Current system does not accept Managed memory requests.");
@@ -225,7 +231,7 @@ namespace uammd{
 	  if(sys->getSystemParameters().cuda_arch < 600)
 	    CudaSafeCall(cudaDeviceSynchronize());
 	  return property_ptr<T>(thrust::raw_pointer_cast(managedVector.data()),
-				 &this->isBeingWritten, &this->isBeingRead, size());
+				 &this->isBeingWritten, &this->isBeingRead, size(), dev);
 
       default:
 	throw std::runtime_error("[Property] Invalid location requested");
@@ -254,6 +260,7 @@ namespace uammd{
       if(requestedForReading)
 	this->isBeingRead = true;
     }
+
     void updateHostData(){
       if(hostVector.size()!= N){
 	sys->log<System::DEBUG1>("[Property] Resizing host version of " + name + " to " + std::to_string(N)+ " elements");
