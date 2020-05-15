@@ -4,7 +4,7 @@
 
 #ifndef TRANSVERSERUTILS_CUH
 #define TRANSVERSERUTILS_CUH
-
+#include"global/defines.h"
 #include"utils/cxx_utils.h"
 namespace uammd{
   //Defines the most simple and general posible transverser that does nothing.

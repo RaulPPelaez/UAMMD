@@ -24,8 +24,11 @@
 #ifndef TABULATEDFUNCTION_CUH
 #define TABULATEDFUNCTION_CUH
 
+#include "cub/iterator/cache_modified_input_iterator.cuh"
+#include "cub/thread/thread_load.cuh"
 #include"global/defines.h"
 #include"utils/debugTools.h"
+#include <vector>
 
 namespace uammd{
 
