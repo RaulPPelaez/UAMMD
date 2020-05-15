@@ -305,17 +305,10 @@ namespace uammd{
     PROPERTY_LOOP(INIT_PROPERTIES)
   {
     sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);
-
     id.resize(numberParticles);
     CudaCheckError();
-
     auto id_prop = id.data(access::location::gpu, access::mode::write);
-
-    cub::CountingInputIterator<int> ci(0);
-    thrust::copy(thrust::cuda::par,
-		 ci, ci + numberParticles,
-		 id_prop.begin());
-
+    thrust::sequence(thrust::cuda::par, id_prop.begin(), id_prop.end(), 0);
     particle_sorter = std::make_shared<ParticleSorter>(sys);
   }
 
