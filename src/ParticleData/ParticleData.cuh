@@ -309,7 +309,7 @@ namespace uammd{
     CudaCheckError();
     auto id_prop = id.data(access::location::gpu, access::mode::write);
     thrust::sequence(thrust::cuda::par, id_prop.begin(), id_prop.end(), 0);
-    particle_sorter = std::make_shared<ParticleSorter>(sys);
+    particle_sorter = std::make_shared<ParticleSorter>();
   }
 
   //Sort the particles to improve a certain kind of access pattern.

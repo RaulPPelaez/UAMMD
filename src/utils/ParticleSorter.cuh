@@ -29,12 +29,14 @@ REFERENCES:
 #ifndef PARTICLESORTER_CUH
 #define PARTICLESORTER_CUH
 
+#include "saruprng.cuh"
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
 #include"System/System.h"
 #include"utils/debugTools.h"
 #include"third_party/type_names.h"
 #include<third_party/cub/cub.cuh>
+#include<thrust/device_vector.h>
 #include<bits/stdc++.h>
 namespace uammd{
 
@@ -75,7 +77,6 @@ namespace uammd{
 	const int3 cell = grid.getCell(pos);
 	return hash(cell);
       }
-
     };
 
     int clz(uint n){
@@ -111,9 +112,6 @@ namespace uammd{
 
   class ParticleSorter{
   public:
-    ParticleSorter() = delete;
-    ParticleSorter(std::shared_ptr<System> sys):sys(sys){};
-
     template<class hashType>
     void sortByKey(cub::DoubleBuffer<int> &index,
 		   cub::DoubleBuffer<hashType> &hash,
@@ -128,7 +126,7 @@ namespace uammd{
 						     0, end_bit,
 						     st));
       }
-      auto alloc = sys->getTemporaryDeviceAllocator<char>();
+      auto alloc = System::getTemporaryDeviceAllocator<char>();
       std::shared_ptr<char> d_temp_storage(alloc.allocate(cub_temp_storage_bytes),
 					   [=](char* ptr){ alloc.deallocate(ptr);});
       void* d_temp_storage_ptr = d_temp_storage.get();
@@ -155,16 +153,16 @@ namespace uammd{
     void updateOrderWithCustomHash(HashIterator &hasher,
 				   uint N, uint maxHash = std::numeric_limits<uint>::max(),
 				   cudaStream_t st = 0){
-      sys->log<System::DEBUG1>("[ParticleSorter] Updating with custom hash iterator: %s",
+      System::log<System::DEBUG1>("[ParticleSorter] Updating with custom hash iterator: %s",
 			       type_name<HashIterator>().c_str());
-      sys->log<System::DEBUG1>("[ParticleSorter] Assigning hash to %d elements", N);
-      sys->log<System::DEBUG2>("[ParticleSorter] Maximum hash 0x%x ( dec: %u ) last bit: %d",
+      System::log<System::DEBUG1>("[ParticleSorter] Assigning hash to %d elements", N);
+      System::log<System::DEBUG2>("[ParticleSorter] Maximum hash 0x%x ( dec: %u ) last bit: %d",
 			       maxHash, maxHash, 32-Sorter::clz(maxHash) );
       try{
 	tryToUpdateOrderWithCustomHash(hasher, N, maxHash, st);
       }
       catch(...){
-	sys->log<System::ERROR>("ParticleSorter raised an exception in updateOrderWithCustomHash");
+	System::log<System::ERROR>("ParticleSorter raised an exception in updateOrderWithCustomHash");
 	throw;
       }
     }
@@ -183,7 +181,7 @@ namespace uammd{
 	tryToUpdateOrderById(id, N, st);
       }
       catch(...){
-	sys->log<System::ERROR>("Exception raised in ParticleSorter::updateOrderById");
+	System::log<System::ERROR>("Exception raised in ParticleSorter::updateOrderById");
 	throw;
       }
     }
@@ -206,7 +204,7 @@ namespace uammd{
 	return tryToGetSortedIndexArray(N);
       }
       catch(...){
-	sys->log<System::ERROR>("Exception raised in ParticleSorter::getSortedIndexArray");
+	System::log<System::ERROR>("Exception raised in ParticleSorter::getSortedIndexArray");
 	throw;
       }
     }
@@ -220,7 +218,7 @@ namespace uammd{
 	return tryToGetIndexArrayById(id, N, st);
       }
       catch(...){
-	sys->log<System::ERROR>("Exception raised in ParticleSorter::getIndexArrayById");
+	System::log<System::ERROR>("Exception raised in ParticleSorter::getIndexArrayById");
 	throw;
       }
     }
@@ -235,8 +233,6 @@ namespace uammd{
     thrust::device_vector<int>  original_index;
     thrust::device_vector<int>  index, index_alt;
     thrust::device_vector<uint> hash, hash_alt;
-
-    std::shared_ptr<System> sys;
 
     void tryToUpdateOrderById(int *id, int N, cudaStream_t st){
       original_index.resize(N);
