@@ -232,6 +232,7 @@ namespace uammd{
       hydrodynamicRadius(par.hydrodynamicRadius),
       dt(par.dt),
       temperature(par.temperature),
+      viscosity(par.viscosity),
       box(par.box), grid(box, int3()),
       psi(par.psi){
 
@@ -253,7 +254,7 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
 
       /* M = Mr + Mw */
-      sys->log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", 1.0/(6*M_PI*par.viscosity*par.hydrodynamicRadius)*(1-2.837297*par.hydrodynamicRadius/box.boxSize.x));
+      sys->log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", this->getSelfMobility());
 
       const double pi = M_PI;
       const double a = par.hydrodynamicRadius;
@@ -269,16 +270,15 @@ namespace uammd{
       }
 
       /*Initialize the neighbour list */
-      this->cl = std::make_shared<CellList>(pd, pg, sys);
+      this->cl = std::make_shared<NeighbourList>(pd, pg, sys);
 
       /*Initialize the near RPY textures*/
       {
 	RPYPSE_near rpy(par.hydrodynamicRadius, psi, (6*M_PI*a*par.viscosity), rcut);
-
 	real textureTolerance = a*par.tolerance; //minimum distance described
+	constexpr int maximumTextureElements = 2e6;
 	int nPointsTable = int(rcut/textureTolerance + 0.5);
-
-	nPointsTable = std::max(4096, nPointsTable);
+	nPointsTable = std::min(maximumTextureElements, std::max(4096, nPointsTable));
 	sys->log<System::MESSAGE>("[BDHI::PSE] Number of real RPY texture points: %d", nPointsTable);
 	tableDataRPY.resize(nPointsTable+1);
 	RPY_near = std::make_shared<TabulatedFunction<real2>>(thrust::raw_pointer_cast(tableDataRPY.data()),
@@ -292,7 +292,6 @@ namespace uammd{
       const real ew = par.tolerance; /*Long range error tolerance*/
       /*Maximum wave number for the far calculation*/
       kcut = 2*psi*sqrt(-log(ew));
-
       /*Corresponding real space grid size*/
       const double hgrid = 2*pi/kcut;
       /*Create a grid with cellDim cells*/
@@ -659,7 +658,6 @@ namespace uammd{
 	}
 	return res;
       }
-
 
       /*Spreads the 3D quantity v (i.e the force) to a regular grid given by utils
 	For that it uses a Peskin Gaussian kernel of the form f(r) = prefactor·exp(-tau·r^2), see [2].
@@ -1125,11 +1123,11 @@ namespace uammd{
 	/*Dotctor uses the same transverser as in Mr·F*/
 	typedef typename PSE_ns::RPYNearTransverser<real3> myTransverser;
 	myTransverser Mv_tr;
-	shared_ptr<CellList> cl;
+	shared_ptr<PSE::NeighbourList> cl;
 	int numberParticles;
 	cudaStream_t st;
 
-	Dotctor(myTransverser Mv_tr, shared_ptr<CellList> cl, int numberParticles, cudaStream_t st):
+	Dotctor(myTransverser Mv_tr, shared_ptr<PSE::NeighbourList> cl, int numberParticles, cudaStream_t st):
 	  Mv_tr(Mv_tr), cl(cl), numberParticles(numberParticles), st(st){ }
 
 	inline void operator()(real3* Mv, real3 *v){

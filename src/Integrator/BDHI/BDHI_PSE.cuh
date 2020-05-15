@@ -63,7 +63,8 @@ See BDHI_PSE.cu for more info.
 #include "utils/utils.h"
 #include"misc/TabulatedFunction.cuh"
 #include "global/defines.h"
-#include"Interactor/NeighbourList/CellList.cuh"
+#include "Interactor/NeighbourList/CellList.cuh"
+#include"Interactor/NeighbourList/VerletList.cuh"
 #include"misc/LanczosAlgorithm.cuh"
 #include<cufft.h>
 #include<thread>
@@ -115,9 +116,20 @@ namespace uammd{
 	return hydrodynamicRadius;
       }
       real getSelfMobility(){
-	return M0;
+	//O(a^8) accuracy. See Hashimoto 1959.
+	//With a Gaussian this expression has a minimum deviation from measuraments of 7e-7*rh at L=64*rh.
+	//The translational invariance of the hydrodynamic radius however decreases arbitrarily with the tolerance.
+	//Seems that this deviation decreases with L, so probably is due to the correction below missing something.
+	long double rh = this->getHydrodynamicRadius();
+	long double L = box.boxSize.x;
+	long double a = rh/L;
+	long double a2= a*a; long double a3 = a2*a;
+	long double c = 2.83729747948061947666591710460773907l;
+	long double b = 0.19457l;
+	long double a6pref = 16.0l*M_PIl*M_PIl/45.0l + 630.0L*b*b;
+	return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-c*a+(4.0l/3.0l)*M_PIl*a3-a6pref*a3*a3);
       }
-
+      using NeighbourList = VerletList;
     private:
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
@@ -129,6 +141,7 @@ namespace uammd{
       real hydrodynamicRadius;
 
       real temperature;
+      real viscosity;
       real dt;
       real M0;
       real psi; /*Splitting factor*/
@@ -142,7 +155,7 @@ namespace uammd{
       real rcut;
       real lanczosTolerance;
       curandGenerator_t curng;
-      shared_ptr<CellList> cl;
+      shared_ptr<NeighbourList> cl;
       shared_ptr<LanczosAlgorithm> lanczos;
 
       /****Far (wave space) part) ******/
