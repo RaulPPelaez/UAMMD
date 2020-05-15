@@ -20,16 +20,18 @@ namespace uammd{
     struct DefaultDissipation{
       real gamma;
       __device__ __host__ DefaultDissipation():DefaultDissipation(1.0){}
+
       __device__ __host__ DefaultDissipation(real gamma):gamma(gamma){}
+
       template<class ...T> __device__ __host__ real dissipativeStrength(T...) const{
 	return gamma;
       }
-
 
       template<class T>
       inline __device__ __host__ DefaultDissipation operator=(T gamma){return DefaultDissipation(gamma);}
 
     };
+
     template<class DissipativeStrength = DefaultDissipation>
     class DPD_impl: public ParameterUpdatable{
     protected:
@@ -55,11 +57,9 @@ namespace uammd{
 	sys->log<System::MESSAGE>("[Potential::DPD] Created");
 	step = 0;
 	sigma = sqrt(2.0*temperature)/sqrt(dt);
-
 	sys->log<System::MESSAGE>("[Potential::DPD] Temperature: %f", temperature);
 	sys->log<System::MESSAGE>("[Potential::DPD] Cut off: %f", rcut);
 	sys->log<System::MESSAGE>("[Potential::DPD] aij: %f", A);
-	//sys->log<System::MESSAGE>("[Potential::DPD] sigma: %f", sigma);
 	printGamma();
       }
       void printGamma();
@@ -110,6 +110,7 @@ namespace uammd{
 	  invrcut(1.0/rcut), gamma(gamma), sigma(sigma), A(A){}
 
 	using returnInfo = real3;
+
 	struct Info{
 	  real3 vel;
 	  int id;
@@ -117,69 +118,61 @@ namespace uammd{
 
 	inline __device__ returnInfo zero(){ return make_real3(0);}
 
-	inline __device__ returnInfo compute(const real4 &pi, const real4 &pj,
-					     const Info &infoi, const Info &infoj){
+	inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, const Info &infoi, const Info &infoj){
 	  real3 rij = box.apply_pbc(make_real3(pi) - make_real3(pj));
 	  real3 vij = make_real3(infoi.vel) - make_real3(infoj.vel);
-
 	  //The random force must be such as Frij = Frji, we achieve this by seeding the RNG the same for pairs ij and ji
 	  int i = infoi.id;
 	  int j = infoj.id;
 	  if(i>j) thrust::swap(i,j);
 	  const int ij = i + N*j;
 	  Saru rng(ij, seed, step);
-
-
 	  const real rmod = sqrt(dot(rij,rij));
-
 	  //There is an indetermination at r=0
 	  if(rmod == real(0)) return make_real3(0);
-
 	  const real invrmod = real(1.0)/rmod;
 	  //The force is 0 beyond rcut
 	  if(invrmod<=invrcut) return make_real3(0);
-
 	  const real wr = real(1.0) - rmod*invrcut; //This weight function is arbitrary as long as wd = wr*wr
-
 	  const real Fc = A*wr*invrmod;
-
 	  const real wd = wr*wr; //Wd must be such as wd = wr^2 to ensure fluctuation dissipation balance
 	  const real g = gamma.dissipativeStrength(i, j, pi, pj, infoi.vel, infoj.vel);
 	  const real Fd = -g*wd*invrmod*invrmod*dot(rij, vij);
-
 	  const real Fr = rng.gf(real(0.0), sigma*sqrt(g)*wr*invrmod).x;
-
 	  return (Fc+Fd+Fr)*rij;
 	}
 
 	inline __device__ Info getInfo(int pi){return  {vel[pi], pi};}
 
 	inline __device__ void accumulate(returnInfo &total, const returnInfo &current){total += current;}
+
 	inline __device__ void set(uint pi, const returnInfo &total){ force[pi] += make_real4(total);}
 
       };
 
-
       ForceTransverser getForceTransverser(Box box, shared_ptr<ParticleData> pd){
-
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
 	auto vel = pd->getVel(access::location::gpu, access::mode::read);
 	auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
-
 	auto seed = sys->rng().next();
 	step++;
-
 	int N = pd->getNumParticles();
-
 	return ForceTransverser(pos.raw(), vel.raw(), force.raw(), seed, step, box, N, rcut, gamma, sigma, A);
       }
       //Notice that no getEnergyTransverser is present, this is not a problem as modules using this potential will fall back to a BasicNullTransverser when the method getEnergyTransverser is not found and the energy will not be computed altogether.
+
+      BasicNullTransverser getForceEnergyTransverser(Box box, shared_ptr<ParticleData> pd){
+	sys->log<System::CRITICAL>("[DPD] No way of measuring energy in DPD");
+	return BasicNullTransverser();
+      }
+
     };
 
     template<>
     void DPD_impl<DefaultDissipation>::printGamma(){
       sys->log<System::MESSAGE>("[Potential::DPD] gamma: %f", gamma.gamma);
     }
+
     template<class T>
     void DPD_impl<T>::printGamma(){
       sys->log<System::MESSAGE>("[Potential::DPD] Using %s for dissipation", type_name<T>().c_str());

@@ -10,18 +10,16 @@
  */
 #include"uammd.cuh"
 #include"Interactor/NeighbourList/CellList.cuh"
+#include"Interactor/NeighbourList/VerletList.cuh"
 #include"utils/InputFile.h"
 #include"utils/InitialConditions.cuh"
 #include"Interactor/Interactor.cuh"
 #include"Integrator/VerletNVT.cuh"
-
 #include<fstream>
 
 using namespace uammd;
-using std::cout;
 using std::endl;
 using std::make_shared;
-
 
 real3 boxSize;
 real dt;
@@ -37,162 +35,123 @@ __device__ real lj(real r2){
   return fmod;
 }
 
-
 //A new way of using a neighbour list
 template<class NeighbourContainer>
 __global__ void processNeighbours(NeighbourContainer ni,// Provides iterator with neighbours of a particle
-			const real4* sortPos, //Positions sorted by the neighbour list
-			const int* groupIndex,//Transformation between NL internal index and particle group index
 			int numberParticles,
 			Box box,
 			real4* force //Forces in group indexing
 			){
   int i = blockIdx.x*blockDim.x + threadIdx.x;
   if(i >= numberParticles) return;
-
   //Set ni to provide iterators for particle i
   ni.set(i);
-
-  const real3 pi = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(sortPos + i));
+  const real3 pi = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + i));
   real3 f = real3();
-
   //for(auto neigh: ni){ //This is equivalent to the while loop, although a tad slower
   auto it = ni.begin(); //Iterator to the first neighbour of particle i
   //Note that ni.end() is not a pointer to the last neighbour, it just represents "no more neighbours" and
   // should not be dereferenced
   while(it){ //it will cast to false when there are no more neighbours
     auto neigh = *it++; //The iterator can only be advanced and dereferenced
-
+    //int j = neigh.getGroupIndex();
     const real3 pj = make_real3(neigh.getPos());
-
     const real3 rij = box.apply_pbc(pj-pi);
     const real r2 = dot(rij, rij);
-
     if(r2>0) f += lj(r2)*rij;
   }
-
-  force[groupIndex[i]] += make_real4(f);
+  force[ni.getGroupIndexes()[i]] += make_real4(f);
 }
-
 
 //A small interactor that computes LJ force using a CellList
 class myInteractor: public Interactor{
-  std::shared_ptr<CellList> cl;
+  //Uncomment to select a different neighbour list strategy
+  using NeighbourList = VerletList;
+  //using NeighbourList = CellList;
+  std::shared_ptr<NeighbourList> cl;
 public:
   myInteractor(std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys):
     Interactor(pd, sys, "Custom"){
-    cl = make_shared<CellList>(pd, sys);
+    cl = make_shared<NeighbourList>(pd, sys);
   }
+
   void sumForce(cudaStream_t st) override{
     Box box(boxSize);
-    cl->updateNeighbourList(box, rcut, st);
+    cl->update(box, rcut, st);
     //NeighbourContainer can provide forward iterators with the neighbours of each particle
     //The drawback of it being a forward iterator is that it can only be advanced,
     //once you have asked for the next neighbour there is no going back without starting from the first.
     //With it=ni.begin() you can only do it++, etc, there is no operator[] nor it--
     auto ni = cl->getNeighbourContainer();
-
-    auto sortPos = cl->getPositionIterator();
-    auto groupIndex = cl->getGroupIndexIterator();
     auto force = pd->getForce(access::location::gpu, access::mode::write);
-
-    processNeighbours<<<numberParticles/128+1, 128, 0, st>>>(ni, sortPos, groupIndex,
-							     numberParticles, box,
-							     force.raw());
-
+    processNeighbours<<<numberParticles/128+1, 128, 0, st>>>(ni, numberParticles, box, force.raw());
   }
 };
 
 void readParameters(std::shared_ptr<System> sys, std::string file);
-int main(int argc, char *argv[]){
 
-  //Initialize UAMMD
+int main(int argc, char *argv[]){
   auto sys = std::make_shared<System>(argc, argv);
   readParameters(sys, "data.main.neighbourIterator");
   auto pd = std::make_shared<ParticleData>(numberParticles, sys);
-
   Box box(boxSize);
   { //Initialize positions
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     auto initial =  initLattice(box.boxSize, numberParticles, fcc);
-
-    std::transform(initial.begin(), initial.end(),
-		   pos.begin(),
-		   [&](real4 p){
-		     p.w = 0;
-		     return p;
-		   });
+    std::transform(initial.begin(), initial.end(), pos.begin(), [&](real4 p){p.w = 0;return p;});
   }
-
   using NVT = VerletNVT::GronbechJensen;
   NVT::Parameters par;
   par.temperature = temperature;
   par.dt = dt;
   par.viscosity = viscosity;
   auto verlet = make_shared<NVT>(pd, sys, par);
-
-  {
-    auto inter = std::make_shared<myInteractor>(pd, sys);
-    verlet->addInteractor(inter);
-  }
-
-
-
-
+  auto inter = std::make_shared<myInteractor>(pd, sys);
+  verlet->addInteractor(inter);
   std::ofstream out(outputFile);
   Timer tim;
   tim.tic();
-  //Run the simulation
   forj(0, numberSteps){
     verlet->forwardTime();
-    cudaDeviceSynchronize();
-
-    if(printSteps > 0 and j%printSteps==1)
-    {
+    if(printSteps > 0 and j%printSteps==0){
       sys->log<System::DEBUG1>("[System] Writing to disk...");
-
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       out<<"#Lx="<<0.5*box.boxSize.x<<";Ly="<<0.5*box.boxSize.y<<";Lz="<<0.5*box.boxSize.z<<";"<<endl;
-
       fori(0, numberParticles){
 	real4 pc = pos[sortedIndex[i]];
 	real3 p = box.apply_pbc(make_real3(pc));
 	out<<p<<" "<<0.5<<" "<<0<<"\n";
       }
-
     }
-    if(j%500 == 0)  pd->sortParticles();
+    if(j%500 == 0){
+      pd->sortParticles();
+    }
   }
-
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", numberSteps/totalTime);
   sys->finish();
-
   return 0;
 }
 
+void generateDefaultParameters(std::string file){
+  std::ofstream default_options(file);
+  default_options<<"boxSize 32 32 32"<<std::endl;
+  default_options<<"numberParticles 16384"<<std::endl;
+  default_options<<"outputFile /dev/stdout"<<std::endl;
+  default_options<<"rcut 2.5"<<std::endl;
+  default_options<<"dt 0.01"<<std::endl;
+  default_options<<"numberSteps 500"<<std::endl;
+  default_options<<"printSteps -1"<<std::endl;
+  default_options<<"temperature 1.0"<<std::endl;
+  default_options<<"viscosity 1"<<std::endl;
+}
+
 void readParameters(std::shared_ptr<System> sys, std::string file){
-
-  {
-    if(!std::ifstream(file).good()){
-      std::ofstream default_options(file);
-      default_options<<"boxSize 32 32 32"<<std::endl;
-      default_options<<"numberParticles 16384"<<std::endl;
-      default_options<<"outputFile /dev/stdout"<<std::endl;
-      default_options<<"rcut 2.5"<<std::endl;
-      default_options<<"dt 0.01"<<std::endl;
-      default_options<<"numberSteps 500"<<std::endl;
-      default_options<<"printSteps -1"<<std::endl;
-      default_options<<"temperature 1.0"<<std::endl;
-      default_options<<"viscosity 1"<<std::endl;
-
-      //default_options<<"posFile init.pos"<<std::endl;
-    }
+  if(!std::ifstream(file).good()){
+    generateDefaultParameters(file);
   }
-
   InputFile in(file, sys);
-
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("numberParticles", InputFile::Required)>>numberParticles;
   in.getOption("outputFile", InputFile::Required)>>outputFile;
@@ -202,5 +161,4 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
   in.getOption("dt", InputFile::Required)>>dt;
   in.getOption("temperature", InputFile::Required)>>temperature;
   in.getOption("viscosity", InputFile::Required)>>viscosity;
-
 }

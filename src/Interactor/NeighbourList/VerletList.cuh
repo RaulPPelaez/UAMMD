@@ -1,251 +1,173 @@
-/*Raul P. Pelaez 2017. Verlet List implementation
-  A neighbour list can compute and provide for each particle a list of particle indices that are closer than a certain distance to it.
+/*Raul P. Pelaez 2020. Verlet List UAMMD interface
+  A NeighbourList can compute and provide for each particle a list of particle indices that are closer than a certain distance to it.
+
+  There are three ways to interact with NeighbourList:
+
+  1. Providing a Transverser to it
+  2. Asking for a NeighbourContainer from it
+  3. Any additional mechanism own to the particular instance (a.i. you can get the cell list binning structure with CellList)
+
+  Methods 1. and 2. are tipically the fastest ones and ensure the code will work for any UAMMD neighbour list.
+
+  See usage for instructions on how to use each method.
 
   All neighbour list must be capable of:
 
   -Handling particle groups.
-  -Provide an iterator with a list of neighbour particles for each particle
-  -Provide an iterator with the number of neighbours of each particle.
+  -Provide an iterator with a list of neighbour particles for each particle*
   -Provide a "transverse" method that takes a Transverser and goes through every pair of particles with it (See NBodyForces.cuh or RadialPotential.cuh)
+  -Provide a NeighbourContainer able to provide, for each particle, a forward iterator with its neighbours.*
+
+  *Note that this does not imply that a neighbour list is constructed, just that the iterator is able to provide the neighbours somehow "as is".
 
 
+USAGE:
+
+ //Create a VerletList:
+ auto nl = make_shared<VerletList>(pd, pg, sys);
+ //Update a list
+ //If you pass a grid, the cellSize should be >= cutoff
+ nl->update([A box or a grid], cutOff);
+
+ //THE DIFFERENT INTERFACE METHODS
+
+ //Traverse the list using the internal CellList mechanism(Method 1)
+ nl->transverseList([A transverser],cudaStream);
+
+ //Get a NeighbourContainer (Method 2.). This is equivalent to Method 1 (see transverseList kernel), but instead of having to provide a Transverser you can use this structure to get iterators to the neighbours of each particle (as the aforementioned kernel does) and process them manually. This allows for more versatility.
+ //See examples/NeighbourListIterator.cu for an example
+ auto nc = cl->getNeighbourContainer();
+
+ //Get a Verlet list to use manually, which provides a spatial binning and a list with the bin of each particle (Method 3.).
+ auto verlet_list_data = cl->getVerletList();
+
+For using the Verlet list manually using getVerletList:
   The list for a certain particle i starts at particleOffset[i], after numberNeighbours[i], the neighbour list for particle i contains undefined data. i is the index of a particle referred to its group (particle id if the group contains all particles).
 
-
-  VerletList uses CellList to construct a verlet list with a certain support increase beyond the cut off with the hope of having to construct the list only every few steps.
-  Seems to work best for diluted systems. If the system is dense CellList works best as of now.
+See PairForces.cu or examples/NeighbourListIterator.cu for examples on how to use a NL.
 
 
-Usage:
-
-   See PairForces.cu for a simple example on how to use a NL.
-   Typically transverseList will do a much better job at using the list than asking for it and manually transversing it. But it could be useful if the list is to be used many times per step.
-
-
-TODO:
-100- Make verletRadiusMultiplier self optimized somehow.
- */
+*/
 #ifndef VERLETLIST_CUH
 #define VERLETLIST_CUH
-
+#include"System/System.h"
 #include"ParticleData/ParticleData.cuh"
 #include"ParticleData/ParticleGroup.cuh"
-#include"utils/ParticleSorter.cuh"
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
-#include"utils/cxx_utils.h"
 #include"utils/TransverserUtils.cuh"
-#include"System/System.h"
 #include<thrust/device_vector.h>
-#include<thrust/host_vector.h>
-#include"CellList.cuh"
-
-#include<limits>
-
+#include"VerletList/VerletListBase.cuh"
+#include"VerletList/NeighbourContainer.cuh"
+#include"Interactor/NeighbourList/common.cuh"
 namespace uammd{
-  namespace VerletList_ns{
 
-    /*Store current positions in lastPos, in id order*/
-    template<class GroupIterator>
-    __global__ void updateLastPos(real4 *pos,
-				  real4 *lastPos,
-				  GroupIterator groupIndexes,
-				  int numberParticles){
-
-      int id = blockIdx.x*blockDim.x + threadIdx.x;
-      if(id>=numberParticles) return;
-      int gid = groupIndexes[id];
-      lastPos[id] = pos[gid];
-    }
-
-
-    /*Check if a particle has moved farther than maxDist since last list rebuild*/
-    template<class GroupIterator>
-    __global__ void checkLastPos(real4 *pos,
-				 real4 *lastPos,
-				 GroupIterator groupIndexes,
-				 real maxDist,
-				 uint* updateFlag,
-				 Box box,
-				 int numberParticles){
-      int id = blockIdx.x*blockDim.x + threadIdx.x;
-      if(id>=numberParticles) return;
-
-
-      int gid = groupIndexes[id];
-      real3 currentPos = make_real3(pos[gid]);
-      real3 prevPos = make_real3(lastPos[id]);
-
-      real3 rij = box.apply_pbc(currentPos-prevPos);
-      if(dot(rij, rij)>=(maxDist*maxDist)){
-	atomicAdd(updateFlag, 1u);
-      }
-    }
-
-  }
   class VerletList{
   protected:
     shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
     shared_ptr<System> sys;
-
-
-    shared_ptr<CellList> cl;
-
-    real verletRadiusMultiplier;
-    real currentCutOff;
+    VerletListBase nl;
+    bool forceNextUpdate = true;
+    connection posWriteConnection, reorderConnection;
     Box currentBox;
+    real currentCutOff;
 
-    bool force_next_update = true;
-
-    connection reorderConnection;
-
-    thrust::device_vector<real4> lastPos;
-    uint *updateFlagGPU;
   public:
 
     VerletList(shared_ptr<ParticleData> pd,
 	       shared_ptr<System> sys):
-      VerletList(pd, std::make_shared<ParticleGroup>(pd, sys), sys){ }
+      VerletList(pd, std::make_shared<ParticleGroup>(pd, sys), sys){}
 
     VerletList(shared_ptr<ParticleData> pd,
 	     shared_ptr<ParticleGroup> pg,
 	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys){
       sys->log<System::MESSAGE>("[VerletList] Created");
-
-      cl = std::make_shared<CellList>(pd, pg, sys);
-      reorderConnection = pd->getReorderSignal()->connect([this](){this->handle_reorder();});
-      CudaSafeCall(cudaMalloc(&updateFlagGPU, sizeof(uint)));
-      uint zero = 0;
-      CudaSafeCall(cudaMemcpy(updateFlagGPU, &zero, sizeof(uint), cudaMemcpyHostToDevice));
-      verletRadiusMultiplier = 1.1;
+      posWriteConnection = pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});
+      reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});
       CudaCheckError();
     }
+
     ~VerletList(){
       sys->log<System::DEBUG>("[VerletList] Destroyed");
+      posWriteConnection.disconnect();
       reorderConnection.disconnect();
-      CudaSafeCall(cudaFree(updateFlagGPU));
-      CudaCheckError();
     }
 
-    //Update the verlet list if necessary and return it
-    //NeighbourListData::particleStride will provide particle indexes inside the group, to get particle id (aka index in the global array) use pg->getIndexIterator();
-    CellList::NeighbourListData getNeighbourList(cudaStream_t st = 0){
-      return cl->getNeighbourList(st);
+    void update(Box box, real cutOff, cudaStream_t st = 0){
+      if(needsRebuild(box, cutOff)){
+	sys->log<System::DEBUG1>("[VerletList] Updating verlet list.");
+	pd->hintSortByHash(box, make_real3(cutOff*0.5));
+	currentBox = box;
+	currentCutOff = cutOff;
+	auto pos = pd->getPos(access::location::gpu, access::mode::read);
+	auto posIter = pg->getPropertyInputIterator(pos.begin(), access::location::gpu);
+	int numberParticles = pg->getNumberParticles();
+	nl.update(posIter, numberParticles, box, cutOff, st);
+      }
+    }
+
+    void update(Grid in_grid, real3 cutOff, cudaStream_t st = 0){
+      update(in_grid.box, make_real3(cutOff), st);
+    }
+
+    void update(Box box, real3 cutOff, cudaStream_t st = 0){
+      if(cutOff.x != cutOff.y or cutOff.x != cutOff.z){
+	sys->log<System::ERROR>("[VerletList] Cannot work with a different cut off in each direction");
+	throw std::runtime_error("[VerletList] Invalid argument");
+      }
+      real rcut = cutOff.x;
+      update(box, rcut, st);
     }
 
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
-      sys->log<System::DEBUG2>("[VerletList] Transversing Verlet list with %s", type_name<Transverser>().c_str());
-      cl->transverseListWithNeighbourList(tr, st);
+      sys->log<System::DEBUG2>("[VerletList] Transversing Neighbour List with %s", type_name<Transverser>().c_str());
+      const int numberParticles = pg->getNumberParticles();
+      int Nthreads=128;
+      int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+      auto globalIndex = pg->getIndexIterator(access::location::gpu);
+      size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(tr);
+      NeighbourList_ns::transverseWithNeighbourContainer<<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
+									       globalIndex,
+									       this->getNeighbourContainer(),
+									       numberParticles);
+      CudaCheckError();
+    }
+
+    VerletListBase::VerletListData getVerletList(){
+      return nl.getVerletList();
+    }
+
+    VerletListBase_ns::NeighbourContainer getNeighbourContainer(){
+      auto listData = this->getVerletList();
+      return VerletListBase_ns::NeighbourContainer(listData);
     }
 
   private:
-    void updateLastPos(cudaStream_t st = 0){
-
-      int numberParticles = pg->getNumberParticles();
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto groupIndexesIterator  = pg->getIndexIterator(access::location::gpu);
-
-      try{
-	lastPos.resize(numberParticles);
-      }
-      catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[VerletList] Thrust could not resize lastPos with error: %s", e.what());
-      }
-
-      VerletList_ns::updateLastPos<<<numberParticles/128+1, 128, 0, st>>>(pos.raw(),
-									  thrust::raw_pointer_cast(lastPos.data()),
-									  groupIndexesIterator,
-									  numberParticles);
-      CudaCheckError();
-
-    }
-  public:
-    bool needsRebuild(Box box, real cutOff, cudaStream_t st = 0){
-      CudaCheckError();
-      sys->log<System::DEBUG2>("[VerletList] Checking for rebuild");
-      pd->hintSortByHash(box, make_real3(cutOff*verletRadiusMultiplier));
-
-      if(force_next_update){
-	force_next_update = false;
-	currentCutOff = cutOff;
-	currentBox = box;
-	sys->log<System::DEBUG3>("[VerletList] Forced list rebuild");
-	this->updateLastPos();
-	return true;
-      }
-
-      if(cutOff != currentCutOff){
-	sys->log<System::DEBUG3>("[VerletList] cutOff changed from %e to %e. Rebuilding list.",
-				 currentCutOff, cutOff);
-	currentCutOff = cutOff;
-	currentBox = box;
-	this->updateLastPos();
-	return true;
-      }
-      if(box.boxSize.x != currentBox.boxSize.x or
-	 box.boxSize.y != currentBox.boxSize.y or
-	 box.boxSize.z != currentBox.boxSize.z){
-	sys->log<System::DEBUG3>("[VerletList] Box size changed, rebuilding list.");
-	currentBox = box;
-	this->updateLastPos();
-	return true;
-      }
-
-
-      int numberParticles = pg->getNumberParticles();
-      if(lastPos.size() != numberParticles){
-	sys->log<System::DEBUG3>("[VerletList] Number particles changed, forcing rebuild");
-	this->updateLastPos();
-	return true;
-      }
-      real thresholdDistance = (verletRadiusMultiplier*currentCutOff-currentCutOff)/2.0;
-      {
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	auto groupIndexesIterator  = pg->getIndexIterator(access::location::gpu);
-	sys->log<System::DEBUG3>("[VerletList] lastPos size: %d", lastPos.size());
-
-	VerletList_ns::checkLastPos<<<numberParticles/128+1, 128, 0, st>>>(pos.raw(),
-									   thrust::raw_pointer_cast(lastPos.data()),
-									   groupIndexesIterator,
-									   thresholdDistance,
-									   updateFlagGPU,
-									   currentBox,
-									   numberParticles);
-      }
-      CudaCheckError();
-      int updateFlag=0;
-      CudaSafeCall(cudaMemcpy(&updateFlag, updateFlagGPU, sizeof(uint), cudaMemcpyDeviceToHost));
-      sys->log<System::DEBUG3>("[VerletList] updateFlag: %d", updateFlag);
-      if(updateFlag>0){
-	int zero = 0;
-	CudaSafeCall(cudaMemcpy(updateFlagGPU, &zero, sizeof(uint), cudaMemcpyHostToDevice));
-	sys->log<System::DEBUG3>("[VerletList] %d particles moved beyond the threshold (%e), forcing rebuild.",
-				 updateFlag, thresholdDistance);
-	this->updateLastPos();
-	return true;
-      }
-      else{
-	sys->log<System::DEBUG3>("[VerletList] No need for a rebuild");
-	return false;
-      }
+    void handlePosWriteRequested(){
+      sys->log<System::DEBUG1>("[VerletList] Issuing a list update after positions were written to.");
+      forceNextUpdate = true;
     }
 
-    void updateNeighbourList(Box box, real cutOff, cudaStream_t st = 0){
-      if(this->needsRebuild(box, cutOff, st) == false) return;
-      sys->log<System::DEBUG3>("[VerletList] Updating list");
-      cl->updateNeighbourList(currentBox, currentCutOff*verletRadiusMultiplier, st);
+    void handleReorder(){
+      sys->log<System::DEBUG1>("[VerletList] Issuing a list update after a reorder.");
+      forceNextUpdate = true;
+      nl.forceNextUpdate();
     }
-  protected:
-    void handle_reorder(){
-      sys->log<System::DEBUG3>("[VerletList] Particles sorted, forcing next rebuild.");
-      force_next_update = true;
+
+    bool needsRebuild(Box box, real cutOff){
+      if(forceNextUpdate){
+	forceNextUpdate = false;
+	return true;
+      }
+      if(box != currentBox) return true;
+      if(cutOff != currentCutOff) return true;
+      return false;
     }
+
   };
-
-
-  }
+}
 #endif
 
 

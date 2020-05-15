@@ -202,7 +202,7 @@ namespace uammd{
 
     //Update neighbour list. It is smart enough to do it only when it is necessary,
     // so do not fear calling it several times.
-    nl->updateNeighbourList(box, rcut, st);
+    nl->update(box, rcut, st);
 
     sys->log<System::DEBUG3>("[SPH] Computing density");
 

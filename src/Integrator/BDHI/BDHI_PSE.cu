@@ -494,7 +494,7 @@ namespace uammd{
       fillWithGPU<<<Nblocks, Nthreads>>>(Mv, make_real3(0.0), numberParticles);
 
       /*Update the list if needed*/
-      cl->updateNeighbourList(box, rcut, st);
+      cl->update(box, rcut, st);
 
       Mdot_near<vtype>(Mv, v, st);
       //Mdot_farThread = std::thread(&PSE::Mdot_far<vtype>, this, Mv, v, stream2);
@@ -608,7 +608,7 @@ namespace uammd{
 					   *RPY_near,
 					   rcut, box);
       /*Transvese using tr*/
-      cl->transverseListWithNeighbourList(tr, st);
+      cl->transverseList(tr, st);
 
     }
 
@@ -1141,7 +1141,7 @@ namespace uammd{
 	  int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
 	  fillWithGPU<<<Nblocks, Nthreads, 0 ,st>>>(Mv, make_real3(0), numberParticles);
 	  /*Perform the dot product*/
-	  cl->transverseListWithNeighbourList(Mv_tr, st);
+	  cl->transverseList(Mv_tr, st);
 
 	}
       };

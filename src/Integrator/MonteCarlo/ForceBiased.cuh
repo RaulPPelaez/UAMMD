@@ -49,29 +49,29 @@ REFERENCES:
 namespace uammd{
   namespace MC{
     namespace forcebiased_ns{
-      
+
       struct EulerMaruyama{
 	real h, noiseAmp;
 	uint seed, step;
 	EulerMaruyama(uint seed, uint step, real h, real beta):seed(seed), step(step), h(h){
 	  noiseAmp = sqrt(2.0*h/beta);
 	}
-	
+
 	__device__ real4 operator()(real4 pos, thrust::tuple<real4, int> forceAndIndex){
 	  int i = thrust::get<1>(forceAndIndex);
 	  real3 force = make_real3(thrust::get<0>(forceAndIndex));
 	  Saru saru(seed, step, i);
-	  real3 noise = make_real3(saru.gf(0, 1), saru.gf(0, 1).x);	  
+	  real3 noise = make_real3(saru.gf(0, 1), saru.gf(0, 1).x);
 	  return pos + make_real4(force*h + noiseAmp*noise);
 	}
-	
+
       };
 
       //From eq. 2.4 in [1]
       struct TransitionKernel{
 	real h;
 	TransitionKernel(real h):h(h){}
-	
+
 	__device__ real operator()(thrust::tuple<real4, real4 , real4> XYForceX){
 	  real3 X = make_real3(thrust::get<0>(XYForceX));
 	  real3 Y = make_real3(thrust::get<1>(XYForceX));
@@ -80,7 +80,7 @@ namespace uammd{
 	  return dot(element, element);
 	}
       };
-      
+
       class Optimize{
 	int naccept;
 	int ntry;
@@ -88,12 +88,12 @@ namespace uammd{
 	real jumpSize;
 	real currentAcceptanceRatio = 0;
 	const real targetRatio = 0.9;
-    
+
 	void adjustStepSize(){
 	  constexpr float updateRateIncrease = 1.02;
 	  constexpr float updateRateDecrease = 0.9;
 	  constexpr float minimumJumpSize = 1e-8;
-	  constexpr float maximumJumpSize = 2;	 
+	  constexpr float maximumJumpSize = 2;
 	  const float ratio = naccept/(float)ntry;
 	  if(ratio > targetRatio and jumpSize < maximumJumpSize){
 	    jumpSize*=updateRateIncrease;
@@ -104,9 +104,9 @@ namespace uammd{
 	  ntry = naccept = 0;
 	  currentAcceptanceRatio = ratio;
 	}
-    
+
       public:
-    
+
 	Optimize(real targetAcceptanceRatio, real initialStepSize = 1):
 	  targetRatio(targetAcceptanceRatio){
 	  naccept = 0;
@@ -114,7 +114,7 @@ namespace uammd{
 	  ncontrol = 1000;
 	  jumpSize = initialStepSize;
 	}
-    
+
 	void registerAccept(){
 	  naccept++;
 	  ntry++;
@@ -122,14 +122,14 @@ namespace uammd{
 	    adjustStepSize();
 	  }
 	}
-    
+
 	void registerReject(){
 	  ntry++;
 	  if(ntry%ncontrol == 0){
 	    adjustStepSize();
 	  }
 	}
-    
+
 	real getStepSize(){
 	  return jumpSize;
 	}
@@ -137,11 +137,11 @@ namespace uammd{
 	real getCurrentAcceptanceRatio(){
 	  return currentAcceptanceRatio;
 	}
-    
+
       };
 
     }
-    
+
     class ForceBiased: public Integrator{
       template<class T> using gpu_container = thrust::device_vector<T>;
       cudaStream_t st;
@@ -157,7 +157,7 @@ namespace uammd{
 	real stepSize = 0.1; //Initial step length (will be optimized according to the target acceptance ratio)
 	real acceptanceRatio = 0.5; //Desired acceptance ratio
       };
-      
+
       ForceBiased(shared_ptr<ParticleData> pd,
 		  shared_ptr<ParticleGroup> pg,
 		  shared_ptr<System> sys,
@@ -168,7 +168,7 @@ namespace uammd{
 	sys->log<System::MESSAGE>("[MC::ForceBiased] Initialized");
 	sys->log<System::MESSAGE>("[MC::ForceBiased] Temperature: %g", 1.0/beta);
 	sys->log<System::MESSAGE>("[MC::ForceBiased] Target acceptance ratio: %g", par.acceptanceRatio);
-	sys->log<System::MESSAGE>("[MC::ForceBiased] Initial step size: %g", par.stepSize);	
+	sys->log<System::MESSAGE>("[MC::ForceBiased] Initial step size: %g", par.stepSize);
 	if(beta < 0 or par.stepSize <=0 or par.acceptanceRatio<=0){
 	  sys->log<System::ERROR>("[MC::ForceBiased] ERROR: parameters beta, stepSize and acceptanceRatio must be >=0");
 	  throw std::runtime_error("Invalid parameter");
@@ -180,7 +180,7 @@ namespace uammd{
       ~ForceBiased(){
 	cudaStreamDestroy(st);
       }
-      
+
       real getCurrentEnergy(){
 	return currentEnergy;
       }
@@ -208,7 +208,7 @@ namespace uammd{
 
     private:
 
-      bool tryNewStep(){	
+      bool tryNewStep(){
 	step++;
 	proposeNewStep();
 	if(isNewConfigurationAccepted()){
@@ -246,13 +246,13 @@ namespace uammd{
 	CudaCheckError();
 	return acceptNewConfiguration;
       }
-      
+
       void storeCurrentConfiguration(){
 	storePositions();
 	storeForces();
 	storeEnergy();
       }
-      
+
       void restoreStoredConfiguration(){
 	auto pos = pd->getPos(access::location::gpu, access::mode::write);
 	thrust::copy(thrust::cuda::par.on(st), storedPos.begin(), storedPos.end(), pos.begin());
@@ -264,19 +264,19 @@ namespace uammd{
       void storePositions(){
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
 	storedPos.resize(pg->getNumberParticles());
-	thrust::copy(thrust::cuda::par.on(st), pos.begin(), pos.end(), storedPos.begin());	
+	thrust::copy(thrust::cuda::par.on(st), pos.begin(), pos.end(), storedPos.begin());
       }
-      
+
       void storeForces(){
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
 	storedForce.resize(pg->getNumberParticles());
-	thrust::copy(thrust::cuda::par.on(st), force.begin(), force.end(), storedForce.begin());	
+	thrust::copy(thrust::cuda::par.on(st), force.begin(), force.end(), storedForce.begin());
       }
 
       void storeEnergy(){
 	storedEnergy = getCurrentEnergy();
       }
-      
+
       void proposeNewStep(){
 	sys->log<System::DEBUG2>("[ForceBiased] Propose next move");
 	real stepSize = optimizeStepSize.getStepSize();
@@ -306,7 +306,7 @@ namespace uammd{
 	CudaCheckError();
 	return expDenominator/(4.0*stepSize);
       }
-      
+
       void resetForceAndEnergy(){
 	auto force = pd->getForce(access::location::gpu, access::mode::write);
 	auto energy = pd->getEnergy(access::location::gpu, access::mode::write);
@@ -319,7 +319,7 @@ namespace uammd{
       real updateForceEnergyEstimation(){
 	sys->log<System::DEBUG2>("[MC::ForceBiased] Computing current force and energy");
 	resetForceAndEnergy();
-	for(auto &i: interactors){	  
+	for(auto &i: interactors){
 	  currentEnergy += i->sumForceEnergy(st);
 	}
 	auto energy = pd->getEnergy(access::location::gpu, access::mode::read);
@@ -332,7 +332,7 @@ namespace uammd{
 	CudaCheckError();
 	return currentEnergy;
       }
-      
+
     };
   }
 

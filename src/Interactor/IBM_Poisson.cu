@@ -241,7 +241,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[Poisson] Near field force computation");
       if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
 
-      nl->updateNeighbourList(box, nearFieldCutOff, st);
+      nl->update(box, nearFieldCutOff, st);
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
       {
@@ -265,7 +265,7 @@ namespace uammd{
       sys->log<System::WARNING>("[Poisson] Not subtracting adding phi(0,0,0)");
       if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
 
-      nl->updateNeighbourList(box, nearFieldCutOff, st);
+      nl->update(box, nearFieldCutOff, st);
       auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
       {

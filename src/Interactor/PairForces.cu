@@ -53,7 +53,7 @@ namespace uammd{
       if(!nl){
 	nl = std::make_shared<NL>(pd, pg, sys);
       }
-      nl->updateNeighbourList(box, rcut, st);
+      nl->update(box, rcut, st);
       sys->log<System::DEBUG2>("[PairForces] Transversing neighbour list");
       nl->transverseList(tr, st);
     }

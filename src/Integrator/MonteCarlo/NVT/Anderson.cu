@@ -138,7 +138,7 @@ namespace uammd {
       }
 
       //Energy vector is computed
-      cl->updateNeighbourList(grid, currentCutOff);
+      cl->update(grid, currentCutOff);
       auto et = pot->getEnergyTransverser(grid.box, pd);
       cl->transverseList(et, st);
       cudaStreamSynchronize(st);
@@ -356,7 +356,7 @@ namespace uammd {
       //Update the cell list
       sys->log<System::DEBUG2>("[MC_NVT::Anderson] Grid size: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
       sys->log<System::DEBUG2>("[MC_NVT::Anderson] Cut off: %e", currentCutOff.x);
-      cl->updateNeighbourList(this->grid, this->currentCutOff);
+      cl->update(this->grid, this->currentCutOff);
 
       //Save the sorted positions from the cell list so they can be modified
       sortPos.resize(numberParticles);

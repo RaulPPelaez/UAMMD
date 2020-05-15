@@ -191,6 +191,7 @@ namespace uammd{
       }
 
     };
+
     class Delta{
       const uint* keys;
       const int size;
@@ -226,7 +227,6 @@ namespace uammd{
 	  }
 	}
       }
-
       return flag;
     }
 
@@ -827,7 +827,7 @@ namespace uammd{
 
     }
 
-    void updateNeighbourList(Box box, real cutOff = 0, cudaStream_t st = 0){
+    void update(Box box, real cutOff = 0, cudaStream_t st = 0){
       if(this->needsRebuild(box) == false) return;
       sys->log<System::DEBUG2>("[LBVHList] Updating list");
       currentBox = box;
@@ -888,7 +888,7 @@ namespace uammd{
     };
     LBVHListData getLBVHList(){
       sys->log<System::DEBUG2>("[LBVHList] List requested");
-      this->updateNeighbourList(currentBox, 0);
+      this->update(currentBox, 0);
       LBVHListData cl;
       cl.aabbs = thrust::raw_pointer_cast(aabbs.data());
       cl.sortPos =  thrust::raw_pointer_cast(sortPos.data());
@@ -900,8 +900,6 @@ namespace uammd{
       //cl.cutOffPerType = thrust::raw_pointer_cast(cutOffPerType.data());
       return cl;
     }
-
-
 
 #if 0 //This code is just dectivated for now, it is twice as slow than transverseLBVHList and I do not know how to
     // communicate cut offs per type yet.
