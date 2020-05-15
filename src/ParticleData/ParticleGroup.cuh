@@ -304,6 +304,19 @@ namespace uammd{
       return this->make_access_iterator<modifier>(property, loc);
     }
 
+    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT, class PropertyIterator>
+    accessIterator<typename PropertyIterator::Iterator, modifier> getPropertyInputIterator(const PropertyIterator & property){
+      using T = typename PropertyIterator::value_type;
+      static_assert(std::is_same<PropertyIterator, typename Property<T>::iterator>::value,
+		    "You must specify a location or call this function with a Property::iterator argument");
+      auto loc = property.location();
+      if(loc == access::location::managed){
+	loc = access::location::cpu;
+      }
+      return this->make_access_iterator<modifier>(property.raw(), loc);
+    }
+
+
     int getNumberParticles(){
       return this->numberParticles;
     }
