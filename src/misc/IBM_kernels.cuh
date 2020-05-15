@@ -43,7 +43,7 @@ namespace uammd{
 	real factor = std::min(amin + x*(amax-amin), amax);
 
 
-	real sigma = h.x*factor/sqrt(M_PIl);
+	real sigma = h.x*factor;
 	this->prefactor = pow(2*M_PI*sigma*sigma, -1.5);
 	this->tau  = -0.5/(sigma*sigma);
 	this->support = int(2*(sqrt(1.0/tau*log(0.9*tolerance)/(h.x*h.x) + 0.5))+0.5);
