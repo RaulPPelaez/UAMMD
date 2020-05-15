@@ -97,19 +97,19 @@ namespace uammd{
     }
 
     inline __host__ __device__ int getNumberCells() const{ return cellDim.x*cellDim.y*cellDim.z;}
-    
+
     inline __host__ __device__ real getCellVolume(int3 cell) const{ return getCellVolume();}
-    
+
     inline __host__ __device__ real getCellVolume() const{ return cellVolume;}
-    
+
     inline __host__ __device__ real3 getCellSize(int3 cell) const{return getCellSize();}
-    
+
     inline __host__ __device__ real3 getCellSize() const{return cellSize;}
 
     inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell) const{
       return box.apply_pbc(pos + box.boxSize*real(0.5) - cellSize*(make_real3(cell)+real(0.5)));
     }
-    
+
     inline __host__ __device__ real3 distanceToCellUpperLeftCorner(real3 pos, int3 cell) const{
       return box.apply_pbc(pos + box.boxSize*real(0.5) - cellSize*make_real3(cell));
     }

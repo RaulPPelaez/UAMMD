@@ -71,9 +71,9 @@ namespace uammd{
       static constexpr bool value = std::is_same<decltype(test<T>(0)),one>::value; \
     };									\
 
-    template< bool B, class T = void > using enable_if_t = typename std::enable_if<B,T>::type;    
+    template< bool B, class T = void > using enable_if_t = typename std::enable_if<B,T>::type;
     template< bool B, class T, class F > using conditional_t = typename std::conditional<B,T,F>::type;
-    
+
     template<class...> struct disjunction : std::false_type {};
     template<class B1> struct disjunction<B1> : B1 {};
     template<class B1, class... Bn> struct disjunction<B1, Bn...> : conditional_t<bool(B1::value), B1, disjunction<Bn...>>{};

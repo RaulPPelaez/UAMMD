@@ -26,16 +26,16 @@ int in_numberParticles;
 class miniInteractor: public Interactor{
 public:
   using Interactor::Interactor;
-  
+
   real2 F = real2();
-  
+
   void sumForce(cudaStream_t st) override{
     auto force = pd->getForce(access::location::cpu, access::mode::write);
     force[0] = make_real4(F.x, F.y,0,0);
     if(pg->getNumberParticles() > 1)
       force[1] = make_real4(-F.x,-F.y, 0,0);
   }
-  
+
   real sumEnergy() override{return 0;}
 };
 
@@ -52,7 +52,7 @@ void selfMobilityTest(shared_ptr<System> sys, int dir){
   par.hydrodynamicRadius = hydrodynamicRadius;
   par.cells = cells;
   par.box = box;
-  auto bdhi = make_shared<Scheme>(pd, pg, sys, par); 
+  auto bdhi = make_shared<Scheme>(pd, pg, sys, par);
   auto inter= make_shared<miniInteractor>(pd, sys, "puller");
   if(dir==0)
     inter->F.x = F;
@@ -81,7 +81,7 @@ void selfMobilityTest(shared_ptr<System> sys, int dir){
     M += dx/(dt*F);
   }
   std::ofstream out(outFile);
-  out.precision(sizeof(real)*2); 
+  out.precision(sizeof(real)*2);
   out<<(M/double(ntest))<<std::endl;
 }
 
@@ -98,7 +98,7 @@ void selfDiffusionTest(shared_ptr<System> sys){
   par.hydrodynamicRadius = hydrodynamicRadius;
   par.cells = cells;
   par.box = box;
-  auto bdhi = make_shared<Scheme>(pd, pg, sys, par);  
+  auto bdhi = make_shared<Scheme>(pd, pg, sys, par);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     fori(0, N){
@@ -141,16 +141,16 @@ void runSelfDiffusionTest(shared_ptr<System> sys){
 }
 
 void readParameters(shared_ptr<System> sys);
-int main(int argc, char *argv[]){    
+int main(int argc, char *argv[]){
   auto sys = make_shared<System>(argc, argv);
   readParameters(sys);
   if(testSelection.compare("selfMobility") == 0){
     runSelfMobilityTest(sys);
   }
-  else if(testSelection.compare("selfDiffusion") == 0){    
+  else if(testSelection.compare("selfDiffusion") == 0){
     runSelfDiffusionTest(sys);
-  }    
-  sys->finish(); 
+  }
+  sys->finish();
   return 0;
 }
 
@@ -166,7 +166,7 @@ void readParameters(shared_ptr<System> sys){
   in.getOption("viscosity", InputFile::Required)>>viscosity;
   in.getOption("temperature", InputFile::Required)>>temperature;
   in.getOption("hydrodynamicRadius", InputFile::Required)>>hydrodynamicRadius;
-  in.getOption("output", InputFile::Optional)>>outFile;  
+  in.getOption("output", InputFile::Optional)>>outFile;
   in.getOption("tolerance", InputFile::Optional)>>tolerance;
   in.getOption("scheme", InputFile::Required)>>scheme;
   in.getOption("test", InputFile::Required)>>testSelection;

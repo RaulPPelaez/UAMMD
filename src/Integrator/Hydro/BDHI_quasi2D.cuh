@@ -90,9 +90,9 @@ namespace uammd{
 	static inline __host__ __device__ real getGaussianVariance(real a){
 	  return pow(a*0.66556976637237890625, 2);
 	}
-	 
+
 	static constexpr inline bool hasThermalDrift(){ return false;}
-	
+
 	inline __device__ real2 operator()(real k2, real a){
 	  const real fk = 0;
 	  const real gk = real(1.0)/(k2*k2);
@@ -102,16 +102,16 @@ namespace uammd{
       //See eq. 20 and beyond in [1]
       struct Quasi2D{
 	static constexpr inline bool hasThermalDrift(){ return true;}
-	
+
 	static inline __host__ __device__ real getGaussianVariance(real a){
 	  return pow(a/sqrt(M_PI), 2);
 	}
-	
+
 	inline __device__ real2 operator()(real k2, real a){
 	  const real k = sqrt(k2);
 	  const real invk3 = real(1.0)/(k2*k);
 	  constexpr real inv_sqrtpi = 0.564189583547756; //1/sqrt(pi)
-	  const real kp = k*a*inv_sqrtpi;	  	  
+	  const real kp = k*a*inv_sqrtpi;
 	  const real fk = real(0.5)*invk3*(erfc(kp)*(real(0.5)+kp*kp)*exp(kp*kp) - kp*inv_sqrtpi);
 	  const real gk = real(0.5)*invk3*erfc(kp)*exp(kp*kp);
 	  return {fk, gk};
@@ -184,7 +184,7 @@ namespace uammd{
       real viscosity;
       real hydrodynamicRadius;
       real tolerance;
-      
+
       std::shared_ptr<Kernel> ibmKernel;
       std::shared_ptr<KernelThermalDrift> ibmKernelThermalDrift;
       std::shared_ptr<HydroKernel> hydroKernel;
@@ -203,7 +203,7 @@ namespace uammd{
       gpu_container<real2> particleVels;
 
       cudaStream_t st, st2;
-      
+
       void checkInputParametersValidity(Parameters par);
       void initializeGrid(Parameters par);
       void initializeInterpolationKernel(Parameters par);

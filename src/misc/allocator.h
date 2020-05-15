@@ -59,8 +59,8 @@ namespace uammd{
     virtual void do_deallocate(pointer p, std::size_t bytes, std::size_t alignment) override{
       thrust::cuda::pointer<void> void_ptr(p);
       thrust::cuda::free(void_ptr);
-    }    
-    
+    }
+
   };
 
   //A managed memory resource

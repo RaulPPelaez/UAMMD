@@ -24,7 +24,7 @@ namespace uammd{
     generateBondList(bondProcessor);
     bondProcessor.checkDuplicatedBonds();
   }
-      
+
   template<class BondType>
   TorsionalBondedForces<BondType>::BondProcessor TorsionalBondedForces<BondType>::readBondFile(std::string bondFile){
     int numberParticles = pg->getNumberParticles();
@@ -45,10 +45,10 @@ namespace uammd{
         bondProcessor.registerBond(bond);
       }
     }
-    sys->log<System::MESSAGE>("[TorsionalBondedForces] Detected: %d bonds", nbonds);    
+    sys->log<System::MESSAGE>("[TorsionalBondedForces] Detected: %d bonds", nbonds);
     return std::move(bondProcessor);
   }
-    
+
   template<class BondType>
   void TorsionalBondedForces<BondType>::generateBondList(const BondProcessor &bondProcessor){
     auto h_particlesWithBonds = bondProcessor.getParticlesWithBonds();
@@ -77,7 +77,7 @@ namespace uammd{
     this->bondEnd = h_bondEnd;
     this->particlesWithBonds = h_particlesWithBonds;
   }
-  
+
   namespace Bonded_ns{
     template<class Bond, class BondType>
     __global__ void computeTorsionalBondedForce(real4* __restrict__ force,
@@ -123,7 +123,7 @@ namespace uammd{
       }
     }
   }
-     
+
   template<class BondType>
   void TorsionalBondedForces<BondType>::sumForce(cudaStream_t st){
     if(nbonds>0){
@@ -148,7 +148,7 @@ namespace uammd{
 
   }
 
-  
+
   namespace Bonded_ns{
     template<class Bond, class BondType>
     __global__ void computeTorsionalBondedEnergy(real* __restrict__ energy,
@@ -193,7 +193,7 @@ namespace uammd{
 	energy[index] += ft;
       }
     }
-    
+
   }
 
   template<class BondType>

@@ -23,7 +23,7 @@ namespace uammd{
 	float2, float3, float4,
 	double2, double3, double4,
 	int2, int3, int4,
-	uint2, uint3, uint4	
+	uint2, uint3, uint4
 	>();
     };
   }

@@ -52,7 +52,7 @@ namespace uammd{
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
     }
-      
+
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::checkInputParametersValidity(Parameters par){
       if(par.box.boxSize.x == real(0.0) && par.box.boxSize.y == real(0.0)){
@@ -104,7 +104,7 @@ namespace uammd{
 	throw;
       }
     }
-    
+
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::initCuFFT(){
       CufftSafeCall(cufftCreate(&cufft_plan_forward));
@@ -162,7 +162,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] Temperature: %g", temperature);
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] Viscosity: %g", viscosity);
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] dt: %g", dt);
-      sys->log<System::MESSAGE>("[BDHI::BDHI2D] hydrodynamic radius: %g", hydrodynamicRadius);      
+      sys->log<System::MESSAGE>("[BDHI::BDHI2D] hydrodynamic radius: %g", hydrodynamicRadius);
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] Using interpolation kernel: %s",
 				type_name_without_namespace<Kernel>().c_str());
       sys->log<System::MESSAGE>("[BDHI::BDHI2D] Using hydrodynamic kernel: %s",
@@ -207,7 +207,7 @@ namespace uammd{
       auto force = pd->getForce(access::location::gpu, access::mode::write);
       thrust::fill(thrust::cuda::par.on(st2), force.begin(), force.end(), real4());
     }
-    
+
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::spreadParticles(){
       spreadThermalDrift();
@@ -215,14 +215,14 @@ namespace uammd{
       CudaSafeCall(cudaStreamSynchronize(st));
       CudaCheckError();
     }
-    
+
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::spreadThermalDrift(){
       if(hydroKernel->hasThermalDrift() and temperature > 0){
 	sys->log<System::DEBUG2>("[BDHI::BDHI2D] Spreading thermal drift");
 	const int numberParticles = pg->getNumberParticles();
 	const auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVelsFourier.data());     	
+	real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVelsFourier.data());
 	const real variance = hydroKernel->getGaussianVariance(hydrodynamicRadius);
 	const auto tr = thrust::make_constant_iterator<real>(temperature/variance);
 	const auto n = grid.cellDim;
@@ -237,7 +237,7 @@ namespace uammd{
 	template<class vtype> inline __device__ real2 operator()(vtype q){ return make_real2(q);}
       };
     }
-    
+
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::spreadParticleForces(){
       if(interactors.size()>0){
@@ -292,7 +292,7 @@ namespace uammd{
 	 	  (cell.y - cellDim.y*(cell.y >= (cellDim.y/2+1)))*pi2invL.y};
 	return k;
       }
-      
+
       //Performs the product G_k*factor_k, given f_k and g_k, see Algorithm 1.3 in [1]
       inline __device__ cufftComplex2 projectFourier(real2 k, cufftComplex2 factor,
 						     real fk, real gk){
@@ -369,12 +369,12 @@ namespace uammd{
 	const bool isNyquist = (isXnyquist and ik.y == 0) or
 	  (isYnyquist and ik.x == 0) or
 	  (isXnyquist and isYnyquist );
-	cufftComplex2 noise;	
+	cufftComplex2 noise;
 	{
 	  Saru saru(id, step, seed);
 	  const real complex_gaussian_sc = real(0.707106781186547)*prefactor; //1/sqrt(2)
 	  noise.x = make_real2(saru.gf(0, complex_gaussian_sc));
-	  noise.y = make_real2(saru.gf(0, complex_gaussian_sc));	  
+	  noise.y = make_real2(saru.gf(0, complex_gaussian_sc));
 	  if(isNyquist){
 	    noise.x.x *= real(1.41421356237310);
 	    noise.y.x *= real(1.41421356237310);
@@ -409,15 +409,15 @@ namespace uammd{
       }
 
     }
-    
+
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::applyGreenFunctionConvolutionFourier(){
       bool isGridDataNonZero = interactors.size() > 0 or (hydroKernel->hasThermalDrift() and temperature > 0);
       if(isGridDataNonZero){
 	auto d_gridVels = (cufftComplex2*)thrust::raw_pointer_cast(gridVelsFourier.data());
 	const int nthreads = 128;
-	const int nblocks = ((grid.cellDim.x/2+1)*grid.cellDim.y)/128+1;	
-	BDHI2D_ns::forceFourier2Vel<<<nblocks, nthreads, 0, st>>>(d_gridVels, 
+	const int nblocks = ((grid.cellDim.x/2+1)*grid.cellDim.y)/128+1;
+	BDHI2D_ns::forceFourier2Vel<<<nblocks, nthreads, 0, st>>>(d_gridVels,
 								  d_gridVels,
 								  viscosity,
 								  grid,
@@ -425,7 +425,7 @@ namespace uammd{
 								  hydrodynamicRadius);
       }
     }
-    
+
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::addStochastichTermFourier(){
       /*Add if T>0 -> 1/√σ·√B·dWw */
@@ -454,7 +454,7 @@ namespace uammd{
       if(isGridDataNonZero){
 	sys->log<System::DEBUG2>("[BDHI::BDHI2D] Going back to real space");
 	CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
-	auto d_gridVels = thrust::raw_pointer_cast(gridVelsFourier.data());	    
+	auto d_gridVels = thrust::raw_pointer_cast(gridVelsFourier.data());
 	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, (cufftComplex*)d_gridVels, (cufftReal*)d_gridVels));
       }
     }
@@ -477,11 +477,11 @@ namespace uammd{
 	real dt;
       public:
 	euler_functor(real _dt) : dt(_dt) {}
-		
+
         __host__ __device__ real4 operator()(real2 vel, real4 pos) const {
 	  return pos + make_real4(vel*dt);
         }
-	
+
       };
     }
 
@@ -503,7 +503,7 @@ namespace uammd{
       }
       CudaCheckError();
     }
-    
+
     template<class HydroKernel>
     BDHI2D<HydroKernel>::~BDHI2D(){
       try{
@@ -515,7 +515,7 @@ namespace uammd{
 	CudaSafeCall(cudaStreamDestroy(st2));
       }
       catch(...){
-	sys->log<System::ERROR>("[BDHI::BDHI2D] Exception raised in BDHI2D destructor, silencing...");      
+	sys->log<System::ERROR>("[BDHI::BDHI2D] Exception raised in BDHI2D destructor, silencing...");
       }
     }
 

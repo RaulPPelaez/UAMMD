@@ -24,7 +24,7 @@ namespace uammd{
     generateBondList(bondProcessor);
     bondProcessor.checkDuplicatedBonds();
   }
-      
+
   template<class BondType>
   AngularBondedForces<BondType>::BondProcessor AngularBondedForces<BondType>::readBondFile(std::string bondFile){
     int numberParticles = pg->getNumberParticles();
@@ -45,10 +45,10 @@ namespace uammd{
         bondProcessor.registerBond(bond);
       }
     }
-    sys->log<System::MESSAGE>("[AngularBondedForces] Detected: %d bonds", nbonds);    
+    sys->log<System::MESSAGE>("[AngularBondedForces] Detected: %d bonds", nbonds);
     return std::move(bondProcessor);
   }
-    
+
   template<class BondType>
   void AngularBondedForces<BondType>::generateBondList(const BondProcessor &bondProcessor){
     auto h_particlesWithBonds = bondProcessor.getParticlesWithBonds();
@@ -77,7 +77,7 @@ namespace uammd{
     this->bondEnd = h_bondEnd;
     this->particlesWithBonds = h_particlesWithBonds;
   }
-  
+
   namespace Bonded_ns{
     template<class Bond, class BondType>
     __global__ void computeAngularBondedForce(real4* __restrict__ force,
@@ -121,7 +121,7 @@ namespace uammd{
       }
     }
   }
-  
+
   template<class BondType>
   void AngularBondedForces<BondType>::sumForce(cudaStream_t st){
     if(nbonds>0){
@@ -146,7 +146,7 @@ namespace uammd{
 
   }
 
-  
+
   namespace Bonded_ns{
     template<class Bond, class BondType>
     __global__ void computeAngularBondedEnergy(real* __restrict__ energy,
@@ -190,7 +190,7 @@ namespace uammd{
       }
     }
   }
-  
+
   template<class BondType>
   real AngularBondedForces<BondType>::sumEnergy(){
     if(nbonds>0){

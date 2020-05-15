@@ -46,19 +46,19 @@ namespace uammd{
   namespace TorsionalBondedForces_ns{
     struct TorsionalBond{
     private:
-      
+
       __device__ real3 cross(real3 a, real3 b){
 	return make_real3(a.y*b.z - a.z*b.y, (-a.x*b.z + a.z*b.x), a.x*b.y - a.y*b.x);
       }
-      
+
     public:
       Box box;
       TorsionalBond(Box box): box(box){}
-      
+
       struct BondInfo{
 	real phi0, k;
       };
-      
+
       inline __device__ real3 force(int j, int k, int m, int n,
 				    int bond_index,
 				    const real3 &posj,
@@ -92,9 +92,9 @@ namespace uammd{
 	  if(bond_index == j){
 	    return real(-1.0)*fj;
 	  }
-	  const real3 v2 = (njkm - cosphi*nkmn)*invnn;	   
+	  const real3 v2 = (njkm - cosphi*nkmn)*invnn;
 	  const real3 fk = Fmod*cross(v2, rmn);
-	  const real3 fm = Fmod*cross(v1, rjk);	   
+	  const real3 fm = Fmod*cross(v1, rjk);
 	  if(bond_index == k){
 	    return fm + fj - fk;
 	  }
@@ -108,7 +108,7 @@ namespace uammd{
 	}
         return real3();
       }
-      
+
       inline __device__ real energy(int j, int k, int m, int n,
 				    int bond_index,
 				    const real3 &posj,
@@ -118,41 +118,41 @@ namespace uammd{
 				    const BondInfo &bond_info){
 	return 0;
       }
-      
+
       static BondInfo readBond(std::istream &in){
 	BondInfo bi;
 	in>>bi.k>>bi.phi0;
 	return bi;
       }
 
-    };    
+    };
   }
 
   namespace TorsionalBondedForces_ns{
-      
+
     template<class Bond>
     class BondProcessor{
       int numberParticles;
       std::vector<std::vector<int>> isInBonds;
       std::vector<Bond> bondList;
       std::set<int> particlesWithBonds;
-      
+
       void registerParticleInBond(int particleIndex, int b){
 	isInBonds[particleIndex].push_back(b);
 	particlesWithBonds.insert(particleIndex);
 
       }
     public:
-      
+
       BondProcessor(int numberParticles):
       numberParticles(numberParticles),
 	isInBonds(numberParticles){
       }
-      
+
       void hintNumberBonds(int nbonds){
 	bondList.reserve(nbonds);
       }
-      
+
       void registerBond(Bond b){
 	int bondIndex = bondList.size();
 	bondList.push_back(b);
@@ -161,7 +161,7 @@ namespace uammd{
 	registerParticleInBond(b.k, bondIndex);
 	registerParticleInBond(b.l, bondIndex);
       }
-      
+
       std::vector<int> getParticlesWithBonds() const{
 	std::vector<int> pwb;
 	pwb.assign(particlesWithBonds.begin(), particlesWithBonds.end());
@@ -174,14 +174,14 @@ namespace uammd{
 	fori(0, blst.size()){
 	  blst[i] = bondList[isInBonds[index][i]];
 	}
-	return std::move(blst);	
+	return std::move(blst);
       }
 
       void  checkDuplicatedBonds(){
 	//TODO
       }
     };
-    
+
     class BondReader{
       std::ifstream in;
       int nbonds = 0;
@@ -190,13 +190,13 @@ namespace uammd{
 	if(!in){
 	  throw std::runtime_error("[BondReader] File " + bondFile + " cannot be opened.");
 	}
-	in>>nbonds;	    
+	in>>nbonds;
       }
-      
+
       int getNumberBonds(){
 	return nbonds;
       }
-      
+
       template<class Bond, class BondType>
       Bond readNextBond(){
 	int i, j, k, l;
@@ -211,21 +211,21 @@ namespace uammd{
 	bond.bond_info = BondType::readBond(in);
 	return bond;
       }
-      
+
     };
-      
+
   }
 
 
   template<class BondType>
   class TorsionalBondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
   public:
-    
+
     struct __align__(16) Bond{
       int i,j,k,l;
       typename BondType::BondInfo bond_info;
     };
-    
+
     struct Parameters{
       std::string readFile;
     };
@@ -234,7 +234,7 @@ namespace uammd{
 				   shared_ptr<System> sys,
 				   Parameters par,
 				   std::shared_ptr<BondType> bondType = std::make_shared<BondType>());
-    
+
     ~TorsionalBondedForces() = default;
 
     void sumForce(cudaStream_t st) override;
@@ -244,16 +244,16 @@ namespace uammd{
     static constexpr int numberParticlesPerBond = 4;
     using BondProcessor = TorsionalBondedForces_ns::BondProcessor<Bond>;
     using BondReader = TorsionalBondedForces_ns::BondReader;
-    
+
     BondProcessor readBondFile(std::string bondFile);
     void generateBondList(const BondProcessor &bondProcessor);
-    
+
     int nbonds;
     thrust::device_vector<Bond> bondList;   //[All bonds involving the first particle with bonds, involving the second...] each bonds stores the id of the three particles in the bond. The id of the first/second... particle  with bonds is particlesWithBonds[i]
     thrust::device_vector<int> bondStart, bondEnd; //bondStart[i], Where the list of bonds of particle with bond number i start (the id of particle i is particlesWithBonds[i].
     thrust::device_vector<int> particlesWithBonds; //List of particle ids with at least one bond
     int TPP; //Threads per particle
-    
+
     std::shared_ptr<BondType> bondType;
   };
 

@@ -401,17 +401,12 @@ namespace uammd{
   //This is trivial with  pd->getIdOrderedIndices()!
   //Handle a reordering of the particles (which invalids the previous relation between IDs and indices)
   void ParticleGroup::computeIndexList(bool forceUpdate){
-
     if(numberParticles==0) return;
     if(this->needsIndexListUpdate || forceUpdate){//Update only if needed
       sys->log<System::DEBUG>("[ParticleGroup] Updating group %s after last particle sorting", name.c_str());
-
-
       const int *id2index = pd->getIdOrderedIndices(access::location::gpu);
-
       int Nthreads=(numberParticles>=512)?512:numberParticles;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
       int *myParticlesIndicesGPU_ptr = thrust::raw_pointer_cast(myParticlesIndicesGPU.data());
       int *myParticlesIdsGPU_ptr = thrust::raw_pointer_cast(myParticlesIdsGPU.data());
       ParticleGroup_ns::updateGroupIndices<<<Nblocks, Nthreads>>>(id2index,

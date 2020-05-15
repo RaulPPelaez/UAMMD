@@ -112,7 +112,7 @@ namespace uammd{
       }
       log<System::MESSAGE>("[System] CUDA initialized");
     }
-    
+
     void storeComputeCapability(){
       cudaDeviceProp deviceProp;
       CudaSafeCall(cudaGetDeviceProperties(&deviceProp, sysPar.device));
@@ -149,7 +149,7 @@ namespace uammd{
       this->initializeCUDA();
       if(options.device<0){
 	CudaSafeCall(cudaGetDevice(&(sysPar.device)));
-      }	
+      }
       if(options.cuda_printf_limit > 0){
 	CudaSafeCall(cudaDeviceSetLimit(cudaLimitPrintfFifoSize,
 					options.cuda_printf_limit));

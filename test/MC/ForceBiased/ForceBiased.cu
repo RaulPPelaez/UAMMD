@@ -5,7 +5,7 @@
 forwarded using Brownian Dynamics, Langevin dynamics or a Force Biased Monte
 Carlo algorithm.
 
-Particles start in a simple cubic lattice. The code outputs the positions of all particles and the total system's internal and kinectic energy. 
+Particles start in a simple cubic lattice. The code outputs the positions of all particles and the total system's internal and kinectic energy.
 
   Requires a data.main with the parameters (see the readParameters function).
 
@@ -71,7 +71,7 @@ struct SoftPotentialFunctor{
     params.U0 = in_par.U0;
     return params;
   }
-  
+
 };
 
 using SoftPotential = Potential::Radial<SoftPotentialFunctor>;
@@ -116,14 +116,14 @@ template<class NVT> void runSimulation(UAMMD sim, std::shared_ptr<NVT> mc);
 
 int main(int argc, char *argv[]){
   auto sim = initialize(argc, argv);
-  std::shared_ptr<Integrator> mc; 
+  std::shared_ptr<Integrator> mc;
   mc = createIntegrator(sim);
   mc->addInteractor(createShortRangeInteractor(sim));
   Timer tim; tim.tic();
   runSimulation(sim, mc);
   auto totalTime = tim.toc();
   sim.sys->log<System::MESSAGE>("mean FPS: %.2f", sim.parameters.numberSteps/totalTime);
-  sim.sys->finish();  
+  sim.sys->finish();
   return 0;
 }
 
@@ -137,9 +137,9 @@ void initializePositions(UAMMD sim){
 
 UAMMD initialize(int argc, char* argv[]){
   UAMMD sim;
-  sim.sys = std::make_shared<System>(argc, argv); 
+  sim.sys = std::make_shared<System>(argc, argv);
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
-  sim.sys->rng().setSeed(seed);  
+  sim.sys->rng().setSeed(seed);
   sim.parameters = readParameters("data.main", sim.sys);
   sim.pd = std::make_shared<ParticleData>(sim.parameters.numberParticles, sim.sys);
   initializePositions(sim);
@@ -232,7 +232,7 @@ std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim){
   else{
     System::log<System::CRITICAL>("Unrecognized potential. Use LJ or soft");
     return nullptr;
-  } 
+  }
 }
 
 
@@ -265,7 +265,7 @@ public:
     eout.precision(2*sizeof(uammd::real));
     out.precision(2*sizeof(uammd::real));
   }
-  
+
   void writeCurrent(){
     sim.sys->log<System::DEBUG1>("[System] Writing to disk...");
     auto par = sim.parameters;
@@ -293,11 +293,11 @@ void runSimulation(UAMMD sim, std::shared_ptr<NVT> mc){
     mc->forwardTime();
   }
   forj(0, par.numberSteps){
-    mc->forwardTime();    
+    mc->forwardTime();
     if(par.printSteps > 0 and j%par.printSteps==0){
       write.writeCurrent();
     }
-  } 
+  }
 }
 
 Parameters readParameters(std::string datamain, shared_ptr<System> sys){
@@ -328,6 +328,6 @@ Parameters readParameters(std::string datamain, shared_ptr<System> sys){
   if(par.integrator.compare("forcebiased") == 0){
     in.getOption("acceptanceRatio", InputFile::Required)>>par.acceptanceRatio;
   }
-  
+
   return par;
 }

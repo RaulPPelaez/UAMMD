@@ -139,7 +139,6 @@ namespace uammd{
       Box hash_box = Box(make_real3(128));
       real3 hash_cutOff = make_real3(10.0);
       bool orderByType = false;
-
     };
 
   private:

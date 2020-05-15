@@ -48,11 +48,11 @@ namespace uammd{
       template<class Kernel, bool def = has_getSupport<Kernel>::value> int3 getSupport(Kernel &kernel, int3 cell);
 
       template<class Kernel, bool def = has_getSupport<Kernel>::value> struct GetSupport;
-      
+
       template<class Kernel> struct GetSupport<Kernel, true>{
 	static __device__ int3 get(Kernel &kernel, int3 cell){return kernel.getSupport(cell);}
       };
-      
+
       template<class Kernel> struct GetSupport<Kernel, false>{
 	static __device__ int3 get(Kernel &kernel, int3 cell){return make_int3(kernel.support);}
       };
@@ -91,7 +91,7 @@ namespace uammd{
       if(tid==0){
 	pi = make_real3(pos[id]);
 	vi = particleQuantity[id];
-	celli = grid.getCell(pi);	
+	celli = grid.getCell(pi);
 	support = detail::GetSupport<Kernel>::get(kernel, celli);
 	P = (support/2);
 	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
@@ -138,7 +138,7 @@ namespace uammd{
       class GridQuantityIterator,
       class Index3D,
       class QuadratureWeights>
-    __global__ void grid2ParticlesDTPP(const ParticlePosIterator pos, 
+    __global__ void grid2ParticlesDTPP(const ParticlePosIterator pos,
 				       ParticleQuantityOutputIterator particleQuantity,
 				       const GridQuantityIterator gridQuantity,
 				       int numberParticles,

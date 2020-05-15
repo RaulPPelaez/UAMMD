@@ -48,8 +48,8 @@ namespace uammd{
 	E = 1.0l/(4.0l*M_PIl*epsilon*r)*(erf(r/(2.0l*gw))- erf(r/sqrt(4.0l*gw*gw+1/(split*split))));
       }
       nearFieldCutOff = std::min(r, box.boxSize.x/1.999l);
-    }	
-    
+    }
+
     sys->log<System::MESSAGE>("[Poisson] tolerance: %g", par.tolerance);
     sys->log<System::MESSAGE>("[Poisson] support: %d", kernel->support);
     sys->log<System::MESSAGE>("[Poisson] epsilon: %g", epsilon);
@@ -131,7 +131,7 @@ namespace uammd{
 
     struct NearFieldEnergyTransverser{
       using returnInfo = real;
-      
+
       NearFieldEnergyTransverser(real* energy_ptr, real* charge,
 			   real ep, real sp, real gw, Box box):
 	energy_ptr(energy_ptr), charge(charge),
@@ -139,7 +139,7 @@ namespace uammd{
 
       inline __device__ returnInfo zero() const{ return 0.0f;}
       inline __device__ real getInfo(int pi) const{ return charge[pi];}
-      
+
       inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
 	real E = 0;
 	real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
@@ -170,7 +170,7 @@ namespace uammd{
 
     struct NearFieldForceTransverser{
       using returnInfo = real3;
-      
+
       NearFieldForceTransverser(real4* force_ptr, real* charge,
 				 real ep, real sp, real gw, Box box):
 	force_ptr(force_ptr), charge(charge),
@@ -178,7 +178,7 @@ namespace uammd{
 
       inline __device__ returnInfo zero() const{ return returnInfo();}
       inline __device__ real getInfo(int pi) const{ return charge[pi];}
-      
+
       inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
 
 	real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
@@ -191,7 +191,7 @@ namespace uammd{
 	if(r2>gw*gw*gw*gw){
 	  real invrterm = exp(-0.25*r2/newgw2)/sqrt(M_PI*newgw2) - exp(-0.25*r2/gw2)/sqrt(M_PI*gw2);
 	  real invr2term = erf(0.5*r/newgw) - erf(0.5*r/gw);
-	  
+
 	  fmod += 1/(4*M_PI)*( invrterm/r - invr2term/r2);
 	}
 	else if (r2>0){
@@ -236,7 +236,7 @@ namespace uammd{
     sys->log<System::DEBUG2>("[Poisson] Sum Force");
 
     farField(st);
-    
+
     if(split>0){
       sys->log<System::DEBUG2>("[Poisson] Near field force computation");
       if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);

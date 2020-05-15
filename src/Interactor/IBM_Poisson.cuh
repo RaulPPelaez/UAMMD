@@ -54,7 +54,7 @@ namespace uammd{
     using cufftReal = cufftReal_t<real>;
 
     using NeighbourList = CellList;
-    
+
     struct Parameters{
       real upsampling = -1.0;
       int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
@@ -77,7 +77,7 @@ namespace uammd{
   private:
     shared_ptr<IBM<Kernel>> ibm;
     shared_ptr<NeighbourList> nl;
-    
+
     cufftHandle cufft_plan_forward, cufft_plan_inverse;
 
     template<class T>

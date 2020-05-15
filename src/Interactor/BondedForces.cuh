@@ -162,11 +162,11 @@ namespace uammd{
 			  Parameters par,
 			  std::shared_ptr<BondType> bondForce = std::make_shared<BondType>());
     ~BondedForces();
-    
+
     void callComputeBondedForces(cudaStream_t st);
-    
+
     void sumForce(cudaStream_t st = 0) override;
-    
+
     real sumEnergy() override;
     //real sumVirial() override;
 
