@@ -113,7 +113,7 @@ namespace uammd{
       }
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto posGroupIterator = pg->getPropertyInputIterator(pos);
+      auto posGroupIterator = pg->getPropertyIterator(pos);
       cl.update(posGroupIterator, numberParticles, in_grid, st);
     }
 

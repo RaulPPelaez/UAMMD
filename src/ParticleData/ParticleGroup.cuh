@@ -39,7 +39,7 @@ You can request the current indices of the particles in a group with:
 //This allows to iterate over the particles in a group without worrying about groups, particle sorting, etc...
 
   auto pos = pd->getPos(access::location::gpu, access::mode::read);
-  auto posIter = pg->getPropertyInputIterator<cub::LOAD_LDG>(pos.raw(), access::location::gpu); //or cpu
+  auto posIter = pg->getPropertyIterator<cub::LOAD_LDG>(pos.begin());
 
 */
 
@@ -221,26 +221,8 @@ namespace uammd{
       }
     }
 
-    //Access the index array only if it is not a nullptr (AKA if the group does not contain all particles)
-    struct IndexAccess{
-      IndexAccess(const int * indices):indices(indices){}
-      inline __host__ __device__ int operator()(const int &i) const{
-	if(!indices) return i;
-	else return indices[i];
-      }
-    private:
-      const int * indices;
-    };
-
-    //Transform sequential indexing to indices of particle sin group
-    using IndexIterator = cub::TransformInputIterator<int, IndexAccess, cub::CountingInputIterator<int>>;
-
-    static IndexIterator make_index_iterator(const int *indices){
-      return IndexIterator(cub::CountingInputIterator<int>(0), IndexAccess(indices));
-    }
-
     //Get a raw memory pointer to the index list if it exists
-    inline const int * getIndicesRawPtr(access::location loc){
+    const int * getIndicesRawPtr(access::location loc){
       if(this->allParticlesInGroup || numberParticles == 0 ) return nullptr;
       this->computeIndexList();
       int *ptr;
@@ -261,61 +243,57 @@ namespace uammd{
       return ptr;
     }
 
-    //Get an iterator with the indices of particles in this group
-    inline IndexIterator getIndexIterator(access::location loc){
-      auto ptr = getIndicesRawPtr(loc);
-      return make_index_iterator(ptr);
-    }
+    //Access the index array only if it is not a nullptr (AKA if the group does not contain all particles)
+    struct IndexAccess{
+      IndexAccess(const int * indices):indices(indices){}
 
-    //Simply reads an iterator, optionally a cub cache mode can be selected
-    template<class Iterator, cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
-    struct TransformIndex{
-      TransformIndex(const Iterator &it):it(it){}
-      using value_type =  typename std::iterator_traits<Iterator>::value_type;
-      inline __host__ __device__ value_type operator()(const int &i) const{
-	return it[i];
+      inline __host__ __device__ int operator()(int i) const{
+	return indices?indices[i]:i;
       }
+
     private:
-      cub::CacheModifiedInputIterator<modifier, value_type> it;
+      const int * indices;
     };
 
-    //Reads an iterator transforming sequential indexing to indices of the particles in the group
-    template<class Iterator,
-	     cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
-    using accessIterator = cub::TransformInputIterator<typename std::iterator_traits<Iterator>::value_type,
-						       TransformIndex<Iterator, modifier>,
-						       IndexIterator>;
+    using IndexIterator = thrust::transform_iterator<IndexAccess, thrust::counting_iterator<int>>;
+
+    template<class Iterator>
+    using accessIterator = thrust::permutation_iterator<Iterator, IndexIterator>;
+
+    //Get an iterator with the indices of particles in this group
+    IndexIterator getIndexIterator(access::location loc){
+      return IndexIterator(thrust::make_counting_iterator<int>(0), IndexAccess(this->getIndicesRawPtr(loc)));
+    }
+
   private:
-    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT, class Iterator>
-    accessIterator<Iterator, modifier> make_access_iterator(const Iterator &it, access::location loc){
-      return accessIterator<Iterator, modifier>(this->getIndexIterator(loc),
-						TransformIndex<Iterator, modifier>(it));
+
+    template<class Iterator>
+    accessIterator<Iterator> make_permutation_iterator(Iterator it, access::location loc){
+      return accessIterator<Iterator>(it, getIndexIterator(loc));
     }
 
   public:
 
     //Returns an iterator that will have size pg->getNumberParticles() and will iterate over the
     // particles in the group.
-    //For example, If a group contains only the particle with id=10, passing pd->getPos(...).raw() to this function
+    //For example, If a group contains only the particle with id=10, passing pd->getPos(...).begin() to this function
     // will return an iterator so that iterator[0] = pos[10]; and it will take into account any possible reordering of the pos array.
-    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT, class Iterator>
-    accessIterator<Iterator, modifier> getPropertyInputIterator(const Iterator & property,
-								access::location loc){
-      return this->make_access_iterator<modifier>(property, loc);
+    template<class Iterator>
+    accessIterator<Iterator> getPropertyIterator(Iterator property, access::location loc){
+      return this->make_permutation_iterator(property, loc);
     }
 
-    template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT, class PropertyIterator>
-    accessIterator<typename PropertyIterator::Iterator, modifier> getPropertyInputIterator(const PropertyIterator & property){
-      using T = typename PropertyIterator::value_type;
-      static_assert(std::is_same<PropertyIterator, typename Property<T>::iterator>::value,
-		    "You must specify a location or call this function with a Property::iterator argument");
+    template<class Iterator>
+    accessIterator<typename Iterator::Iterator> getPropertyIterator(Iterator property){
+      // using value_type = typename std::iterator_traits<Iterator>::element_type;
+      // static_assert(std::is_same<Iterator, typename Property<value_type>::iterator>::value,
+      // 	       "You must specify a location or call this function with a Property::iterator argument");
       auto loc = property.location();
       if(loc == access::location::managed){
 	loc = access::location::cpu;
       }
-      return this->make_access_iterator<modifier>(property.raw(), loc);
+      return this->getPropertyIterator(property.raw(), loc);
     }
-
 
     int getNumberParticles(){
       return this->numberParticles;

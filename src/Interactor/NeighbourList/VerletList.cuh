@@ -101,7 +101,7 @@ namespace uammd{
 	currentBox = box;
 	currentCutOff = cutOff;
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	auto posIter = pg->getPropertyInputIterator(pos.begin(), access::location::gpu);
+	auto posIter = pg->getPropertyIterator(pos);
 	int numberParticles = pg->getNumberParticles();
 	nl.update(posIter, numberParticles, box, cutOff, st);
       }

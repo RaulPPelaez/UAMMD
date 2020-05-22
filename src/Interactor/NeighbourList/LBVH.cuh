@@ -661,7 +661,7 @@ namespace uammd{
     int countParticleTypes(cudaStream_t st){
       auto alloc = sys->getTemporaryDeviceAllocator<char>();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto groupPos = pg->getPropertyInputIterator(pos.begin(), access::location::gpu);
+      auto groupPos = pg->getPropertyIterator(pos.begin(), access::location::gpu);
       int numberParticles = pg->getNumberParticles();
       auto maxElement = thrust::max_element(thrust::cuda::par(alloc).on(st),
 					    groupPos, groupPos + numberParticles,
