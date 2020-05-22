@@ -47,12 +47,12 @@ You can request the current indices of the particles in a group with:
 #define PARTICLEGROUP_CUH
 
 #include"System/System.h"
-#include"ParticleData/ParticleData.cuh"
+#include"ParticleData.cuh"
 #include<thrust/device_vector.h>
 #include<vector>
 #include<third_party/cub/cub.cuh>
 #include"third_party/type_names.h"
-
+#include<memory>
 namespace uammd{
   /*Small structs that encode different ways of selecting a certain set of particles,
     i.e by type, spatial location, ID...
@@ -64,7 +64,7 @@ namespace uammd{
     class All{
     public:
       All(){}
-      static constexpr bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
+      static constexpr bool isSelected(int particleIndex, std::shared_ptr<ParticleData> &pd){
 	return true;
       }
     };
@@ -72,7 +72,7 @@ namespace uammd{
     class None{
     public:
       None(){}
-      static constexpr bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
+      static constexpr bool isSelected(int particleIndex, std::shared_ptr<ParticleData> &pd){
 	return false;
       }
     };
@@ -86,7 +86,7 @@ namespace uammd{
 	lastID(last){
       }
 
-      bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
+      bool isSelected(int particleIndex, std::shared_ptr<ParticleData> &pd){
 	int particleID = (pd->getId(access::cpu, access::read).raw())[particleIndex];
 	return particleID>=firstID && particleID<=lastID;
       }
@@ -104,7 +104,7 @@ namespace uammd{
 	simulationBox(simulationBox){
 
       }
-      bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
+      bool isSelected(int particleIndex, std::shared_ptr<ParticleData> &pd){
 	real3 pos = make_real3(pd->getPos(access::cpu, access::read).raw()[particleIndex]);
 	pos = simulationBox.apply_pbc(pos);
 	pos += origin;
@@ -121,7 +121,7 @@ namespace uammd{
 
       Type(std::vector<int> typesToSelect): typesToSelect(typesToSelect){
       }
-      bool isSelected(int particleIndex, shared_ptr<ParticleData> &pd){
+      bool isSelected(int particleIndex, std::shared_ptr<ParticleData> &pd){
 	int type_i = int(pd->getPos(access::cpu, access::read).raw()[particleIndex].w);
 	for(auto type: typesToSelect){
 	  if(type_i==type) return true;
@@ -162,8 +162,8 @@ namespace uammd{
     // Asking for the raw memory is a risky bussiness, as this array may not even exists (i.e if all particles in the system are in the group, it might decide to not create it, as it would be unnecessary). In this case, you will get a nullptr.
 
   class ParticleGroup{
-    shared_ptr<ParticleData> pd;
-    shared_ptr<System> sys;
+    std::shared_ptr<ParticleData> pd;
+    std::shared_ptr<System> sys;
     cudaStream_t st = 0;
     //A list of the particle indices and ids of the group (updated to current order)
     thrust::device_vector<int> myParticlesIndicesGPU, myParticlesIdsGPU;
@@ -183,17 +183,17 @@ namespace uammd{
 
   public:
     /*Defaults to all particles in group*/
-    ParticleGroup(shared_ptr<ParticleData> pd, shared_ptr<System> sys, std::string name = std::string("noName"));
+    ParticleGroup(std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys, std::string name = std::string("noName"));
 
     /*Create the group from a selector*/
     template<class ParticleSelector>
     ParticleGroup(ParticleSelector selector,
-		  shared_ptr<ParticleData> pd, shared_ptr<System> sys, std::string name = std::string("noName"));
+		  std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys, std::string name = std::string("noName"));
 
     /*Create the group from a list of particle IDs*/
     template<class InputIterator>
     ParticleGroup(InputIterator begin, InputIterator end,
-		  shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+		  std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
 		  std::string name = std::string("noName"));
 
     ~ParticleGroup(){
@@ -324,11 +324,9 @@ namespace uammd{
     std::string getName(){ return this->name;}
   };
 
-
-
   template<class ParticleSelector>
   ParticleGroup::ParticleGroup(ParticleSelector selector,
-			       shared_ptr<ParticleData> pd, shared_ptr<System> sys, std::string name):
+			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys, std::string name):
     pd(pd), sys(sys), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created with selector %s",
 			      name.c_str(), type_name<ParticleSelector>().c_str());
@@ -354,7 +352,7 @@ namespace uammd{
   //Specialization of a particle group with an All selector
   template<>
   ParticleGroup::ParticleGroup(particle_selector::All selector,
-			       shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
 			       std::string name):
   pd(pd), sys(sys), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created with All selector",name.c_str());
@@ -368,7 +366,7 @@ namespace uammd{
   //Specialization of an empty particle group
   template<>
   ParticleGroup::ParticleGroup(particle_selector::None selector,
-			       shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
 			       std::string name):
   pd(pd), sys(sys), name(name){
     this->allParticlesInGroup = false;
@@ -381,7 +379,7 @@ namespace uammd{
   //Constructor of ParticleGroup when an ID list is provided
   template<class InputIterator>
   ParticleGroup::ParticleGroup(InputIterator begin, InputIterator end,
-			       shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
 			       std::string name):
     pd(pd), sys(sys), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created from ID list.", name.c_str());
@@ -406,7 +404,7 @@ namespace uammd{
 
 
   //If no selector is provided, All is assumed
-  ParticleGroup::ParticleGroup(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+  ParticleGroup::ParticleGroup(std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
 			       std::string name):
     ParticleGroup(particle_selector::All(), pd, sys, name){}
 
