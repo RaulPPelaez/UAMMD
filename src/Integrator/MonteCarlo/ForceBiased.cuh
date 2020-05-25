@@ -196,17 +196,31 @@ namespace uammd{
       void forwardTime(){
         sys->log<System::DEBUG1>("[ForceBiased] Starting step %d", step);
 	if(step==0){
-	  sys->log<System::DEBUG1>("[ForceBiased] First step");
-	  storePositions();
-	  updateForceEnergyEstimation();
-	  storeForces();
-	  storeEnergy();
+	  firstStep();
 	}
+	updateInteractors();
 	while(!tryNewStep()){}
 	CudaCheckError();
       }
 
     private:
+
+      void updateInteractors(){
+	if(step==0){
+	  for(auto forceComp: interactors){
+	    forceComp->updateTemperature(1.0/beta);
+	  }
+	}
+      }
+
+      void firstStep(){
+	sys->log<System::DEBUG1>("[ForceBiased] First step");
+	storePositions();
+	updateForceEnergyEstimation();
+	storeForces();
+	storeEnergy();
+	CudaCheckError();
+      }
 
       bool tryNewStep(){
 	step++;
@@ -221,6 +235,7 @@ namespace uammd{
 	  optimizeStepSize.registerReject();
 	  return false;
 	}
+	CudaCheckError();
       }
 
       bool isNewConfigurationAccepted(){
