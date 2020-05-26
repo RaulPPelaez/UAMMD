@@ -2,8 +2,8 @@
 
 #Computes the potential for several box sizes and extrapolates to L->inf
 tolerance=1e-7
-gw=0.001;
-split=0.1
+gw=1.0;
+split=0
 
 rmin=2
 rmax=24
@@ -20,19 +20,19 @@ do
     for l in $(seq $lmin $dl $lmax);
     do
 	./poisson $l $r $tolerance $gw $split 2> log |
-	    awk '{print $7}' |
+	    awk '{printf "%.14g\n", sqrt($7*$7)}' |
 	    tr '\n' ' ' |
 	    awk '{print '$l', '$r', $0}';
-	
+
     done > field.r$r ;
-    a=$(gnuplot -e 'f(x) = a+b/x+b/x**2+c/x**3+d/x**4+e/x**5; 
-	 fit f(x) "field.r'$r'" u 1:3 via a,b,c,d,e;
+    a=$(gnuplot -e 'f(x) = a+b/x+b/x**2+c/x**3 + d/x**4 + e/x**5;
 	 set fit quiet;
+	 fit f(x) "field.r'$r'" u 1:3 via a,b,c,d,e;
 	 gw = '$gw';
 	 r = '$r';
-	 theo = -(exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2));
-	 deviation = abs(1.0-a/theo);
-	 set print "-"; print("%.15g", deviation);');
+	 theo = exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
+	 deviation = abs(1.0-abs(a/theo));
+	 set print "-"; print(sprintf("%.15g %.15g %.15g", deviation, a, theo));');
     echo $r $a
 
 done > $outfile

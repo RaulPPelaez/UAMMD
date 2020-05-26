@@ -1,19 +1,13 @@
-/*Raul P. Pelaez 2019. Spectral Poisson solver
+/*Raul P. Pelaez 2019-2020. Spectral Poisson solver with Ewald splitting.
  */
-
 #ifndef IBM_POISSON_CUH
 #define IBM_POISSON_CUH
-
 #include"Interactor/Interactor.cuh"
-
 #include"Interactor/NeighbourList/CellList.cuh"
-
 #include "misc/IBM.cuh"
 #include "utils/utils.h"
 #include "global/defines.h"
-
 #include"utils/Grid.cuh"
-
 #include"utils/cufftPrecisionAgnostic.h"
 #include"utils/cufftComplex3.cuh"
 #include"utils/cufftComplex4.cuh"
@@ -24,25 +18,21 @@ namespace uammd{
     struct Gaussian{
       int support;
       Gaussian(real tolerance, real width, real h){
-
 	this-> prefactor = pow(2*M_PI*width*width, -1.5);
 	this-> tau = -1.0/(2.0*width*width);
-
 	real rmax = sqrt(log(tolerance*sqrt(2*M_PI*width*width))/tau);
 	support = std::max(3, int(2*rmax/h+0.5));
       }
 
       inline __device__ real delta(real3 rvec, real3 h) const{
 	const real r2 = dot(rvec, rvec);
-	//if(r2>sup*sup*h.x*h.x) return 0;
 	return prefactor*exp(tau*r2);
       }
-  private:
-    real prefactor;
-    real tau;
-  };
-
-}
+    private:
+      real prefactor;
+      real tau;
+    };
+  }
 
   class Poisson: public Interactor{
   public:
@@ -65,6 +55,7 @@ namespace uammd{
       int support = -1;
       real split = -1;
     };
+
     Poisson(shared_ptr<ParticleData> pd,
 	    shared_ptr<ParticleGroup> pg,
 	    shared_ptr<System> sys,
@@ -72,10 +63,11 @@ namespace uammd{
     ~Poisson();
 
     void sumForce(cudaStream_t st) override;
+
     real sumEnergy() override;
 
   private:
-    shared_ptr<IBM<Kernel>> ibm;
+    shared_ptr<Kernel> kernel;
     shared_ptr<NeighbourList> nl;
 
     cufftHandle cufft_plan_forward, cufft_plan_inverse;
@@ -86,8 +78,9 @@ namespace uammd{
 
     managed_vector<char> cufftWorkArea;
     managed_vector<real> gridCharges;
-    managed_vector<cufftComplex4> gridForceEnergy;
-    //managed_vector<cufftComplex> gridEnergies;
+    managed_vector<cufftComplex4> gridFieldPotential;
+    managed_vector<real> potentialAtCharges;
+    managed_vector<real> originPotential;
 
     cudaStream_t st;
 
@@ -100,6 +93,9 @@ namespace uammd{
     void inverseTransform();
     void interpolateFields();
 
+    real measurePotentialAtOrigin();
+    real measurePotentialAtOriginFarField();
+    real measurePotentialAtOriginNearField();
     Box box;
     Grid grid; /*Wave space Grid parameters*/
 
@@ -107,6 +103,7 @@ namespace uammd{
     real split;
     real gw;
     real nearFieldCutOff;
+    real tolerance;
   };
 
 }
