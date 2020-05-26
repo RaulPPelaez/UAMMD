@@ -43,6 +43,7 @@ See examples/BD.cu for an example
 References:
 
 [1] Temporal Integrators for Fluctuating Hydrodynamics. Delong et. al. (2013) Phys. Rev. E 87, 033302.
+[2] Brownian dynamics of confined suspensions of active microrollers. Balboa et. al. (2017) J. Chem. Phys. 146; https://doi.org/10.1063/1.4979494
 */
 #ifndef BROWNIANDYNAMICSINTEGRATOR_CUH
 #define BROWNIANDYNAMICSINTEGRATOR_CUH
@@ -61,30 +62,30 @@ namespace uammd{
       bool is2D = false;
     };
 
-    class EulerMaruyama: public Integrator{
+
+    class BaseBrownianIntegrator: public Integrator{
     public:
       using Parameters = BD::Parameters;
 
-      EulerMaruyama(shared_ptr<ParticleData> pd,
+      BaseBrownianIntegrator(shared_ptr<ParticleData> pd,
 		    shared_ptr<ParticleGroup> pg,
 		    shared_ptr<System> sys,
 		    Parameters par);
 
-      EulerMaruyama(shared_ptr<ParticleData> pd,
-		    shared_ptr<System> sys,
-		    Parameters par):
-	EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+      BaseBrownianIntegrator(shared_ptr<ParticleData> pd,
+			     shared_ptr<System> sys,
+			     Parameters par):
+	BaseBrownianIntegrator(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
 
-      ~EulerMaruyama();
+      ~BaseBrownianIntegrator();
 
-      void forwardTime() override;
+      virtual void forwardTime() = 0;
 
     protected:
       real3 Kx, Ky, Kz; //shear matrix
       real selfMobility;
       real hydrodynamicRadius = real(-1.0);
       real temperature = real(0.0);
-      real sqrt2MTdt;
       real dt;
       bool is2D;
       cudaStream_t st;
@@ -93,49 +94,76 @@ namespace uammd{
 
       void updateInteractors();
       void resetForces();
+      void computeCurrentForces();
       real* getParticleRadiusIfAvailable();
+    };
+
+
+    class EulerMaruyama: public BaseBrownianIntegrator{
+    public:
+      EulerMaruyama(shared_ptr<ParticleData> pd,
+		    shared_ptr<ParticleGroup> pg,
+		    shared_ptr<System> sys,
+		    Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Initialized");
+      }
+
+      EulerMaruyama(shared_ptr<ParticleData> pd,
+		    shared_ptr<System> sys,
+		    Parameters par):
+	EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+
+      void forwardTime() override;
+
+    protected:
       void updatePositions();
     };
 
     //Implements the algorithm in [1]
-    class MidPoint: public Integrator{
+    class MidPoint: public BaseBrownianIntegrator{
     public:
-      using Parameters = BD::Parameters;
-
       MidPoint(shared_ptr<ParticleData> pd,
-	      shared_ptr<ParticleGroup> pg,
-	      shared_ptr<System> sys,
-	      Parameters par);
+	       shared_ptr<ParticleGroup> pg,
+	       shared_ptr<System> sys,
+	       Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+	sys->log<System::MESSAGE>("[BD::MidPoint] Initialized");
+      }
 
       MidPoint(shared_ptr<ParticleData> pd,
 	      shared_ptr<System> sys,
 	      Parameters par):
 	MidPoint(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
 
-      ~MidPoint();
-
       void forwardTime() override;
 
     protected:
-      real3 Kx, Ky, Kz;
-      real selfMobility;
-      real hydrodynamicRadius = real(-1.0);
-      real temperature = real(0.0);
-      real sqrtDdt;
-      real dt;
-      bool is2D;
-      cudaStream_t st;
-      int steps;
-      uint seed;
-      thrust::device_vector<real3> initialPositions;
-      void updateInteractors();
-      void resetForces();
-      void computeCurrentForces();
-      real* getParticleRadiusIfAvailable();
+      thrust::device_vector<real4> initialPositions;
       void updatePositionsFirstStep();
       void updatePositionsSecondStep();
       template<int step> void updatePositions();
+    };
 
+    //Implements the algorithm in eq. 45 of [2]
+    class AdamsBashforth: public BaseBrownianIntegrator{
+    public:
+      AdamsBashforth(shared_ptr<ParticleData> pd,
+	       shared_ptr<ParticleGroup> pg,
+	       shared_ptr<System> sys,
+	       Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+	sys->log<System::MESSAGE>("[BD::AdamsBashforth] Initialized");
+      }
+
+      AdamsBashforth(shared_ptr<ParticleData> pd,
+	      shared_ptr<System> sys,
+	      Parameters par):
+	AdamsBashforth(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+
+      void forwardTime() override;
+
+    private:
+      thrust::device_vector<real4> previousForces;
+      void storeCurrentForces();
+      void updatePositions();
     };
 
   }
