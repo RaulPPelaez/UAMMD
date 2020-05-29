@@ -12,6 +12,7 @@
 #include"utils/cufftComplex3.cuh"
 #include"utils/cufftComplex4.cuh"
 #include"third_party/managed_allocator.h"
+#include"misc/TabulatedFunction.cuh"
 
 namespace uammd{
   namespace Poisson_ns{
@@ -82,11 +83,14 @@ namespace uammd{
     managed_vector<real> potentialAtCharges;
     managed_vector<real> originPotential;
 
+    TabulatedFunction<real> nearFieldGreensFunction;
+    managed_vector<real> nearFieldGreensFunctionTable;
     cudaStream_t st;
 
     void initCuFFT();
 
     void farField(cudaStream_t st);
+    void resetGridData();
     void spreadCharges();
     void forwardTransformCharge();
     void convolveFourier();

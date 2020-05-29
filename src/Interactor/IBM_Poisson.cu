@@ -1,10 +1,56 @@
 /*Raul P. Pelaez 2019-2020. Spectral Poisson solver with Ewald splitting.
+TODO:
+100- Heuristics for selecting cut offs with tolerance need reevaluation
  */
 
 #include"IBM_Poisson.cuh"
 #include"utils/cufftDebug.h"
 #include <thrust/iterator/zip_iterator.h>
 namespace uammd{
+
+  namespace Poisson_ns{
+
+    __host__ __device__ real greensFunction(real r2, real gw, real split, real epsilon){
+      double G = 0;
+      if(r2>gw*gw*gw*gw){
+	double r = sqrt(r2);
+	G = (1.0/(4.0*M_PI*epsilon*r)*(erf(r/(2*gw)) - erf(r/sqrt(4*gw*gw+1/(split*split)))));
+      }
+      else{
+	const double pi32 = pow(M_PI,1.5);
+	const double gw2 = gw*gw;
+	const double invsp2 = 1.0/(split*split);
+	const double selfterm = 1.0/(4*pi32*gw) - 1.0/(2*pi32*sqrt(4*gw2+invsp2));
+	const double r2term = 1.0/(6.0*pi32*pow(4.0*gw2 + invsp2, 1.5)) - 1.0/(48.0*pi32*gw2*gw);
+	const double r4term = 1.0/(640.0*pi32*gw2*gw2*gw) - 1.0/(20.0*pi32*pow(4*gw2+invsp2,2.5));
+	G = 1.0/epsilon*(selfterm+r2*r2term + r2*r2*r4term);
+      }
+      return G;
+    }
+
+    __device__ __host__ real greensFunctionField(real r, real gw, real split, real epsilon){
+      double r2 = r*r;
+      double gw2 = gw*gw;
+      double newgw = sqrt(gw2+1/(4.0*split*split));
+      double newgw2 = newgw*newgw;
+      double fmod = 0;
+      if(r2>gw*gw*gw*gw){
+	double invrterm = exp(-0.25*r2/newgw2)/sqrt(M_PI*newgw2) - exp(-0.25*r2/gw2)/sqrt(M_PI*gw2);
+	double invr2term = erf(0.5*r/newgw) - erf(0.5*r/gw);
+
+	fmod += 1/(4*M_PI)*( invrterm/r - invr2term/r2);
+      }
+      else if (r2>0){
+	const double pi32 = pow(M_PI, 1.5);
+	double rterm = 1/(24*pi32)*(1.0/(gw2*gw) - 1/(newgw2*newgw));
+	double r3term = 1/(160*pi32)*(1.0/(newgw2*newgw2*newgw) - 1.0/(gw2*gw2*gw));
+	fmod += r*rterm+r2*r*r3term;
+      }
+      return fmod/epsilon;
+    }
+
+
+  }
 
   Poisson::Poisson(shared_ptr<ParticleData> pd,
 		   shared_ptr<ParticleGroup> pg,
@@ -31,15 +77,23 @@ namespace uammd{
     sys->log<System::MESSAGE>("[Poisson] Selected h: %g", h);
     int ncells = grid.getNumberCells();
     this->kernel = std::make_shared<Kernel>(par.tolerance, farFieldGaussianWidth, h);
+    if(kernel->support > grid.cellDim.x/2-1){
+      sys->log<System::ERROR>("[Poisson] Kernel support is too large for this configuration, try increasing splitting parameter or decrasing tolerance");
+      throw std::invalid_argument("[Poisson] Kernel support is too large");
+    }
     kernel->support = std::min(kernel->support, grid.cellDim.x/2-2);
     if(split>0){
       long double E=1;
       long double r = farFieldGaussianWidth;
       while(abs(E)>par.tolerance){
 	r+=0.001l;
-	E = 1.0l/(4.0l*M_PIl*epsilon*r)*(erf(r/(2.0l*gw))- erf(r/sqrt(4.0l*gw*gw+1/(split*split))));
+	E = Poisson_ns::greensFunction(r*r, gw, split, epsilon);
       }
-      nearFieldCutOff = std::min(r, box.boxSize.x/1.999l);
+      nearFieldCutOff = r;
+      if(nearFieldCutOff > box.boxSize.x/2.0){
+	sys->log<System::ERROR>("[Poisson] Near field cut off is too large, increase splitting parameter.");
+	throw std::invalid_argument("[Poisson] Near field cut off is too large");
+      }
     }
     sys->log<System::MESSAGE>("[Poisson] tolerance: %g", par.tolerance);
     sys->log<System::MESSAGE>("[Poisson] support: %d", kernel->support);
@@ -55,8 +109,19 @@ namespace uammd{
       sys->log<System::MESSAGE>("[Poisson] Near field cut off: %g", nearFieldCutOff);
     }
     CudaSafeCall(cudaStreamCreate(&st));
-    CudaCheckError();
     initCuFFT();
+    if(split){
+      //TODO: I need a better heuristic to select the table size
+      int Ntable = std::max(4096, std::min(1<<16, int(nearFieldCutOff/(gw*tolerance*1e3))));
+      sys->log<System::MESSAGE>("[Poisson] Elements in near field table: %d", Ntable);
+      nearFieldGreensFunctionTable.resize(Ntable);
+      real* ptr = thrust::raw_pointer_cast(nearFieldGreensFunctionTable.data());
+      nearFieldGreensFunction = TabulatedFunction<real>(ptr, Ntable, 0, nearFieldCutOff,
+					[=](real r){
+					  return Poisson_ns::greensFunctionField(r, gw, split, epsilon);
+					});
+    }
+    CudaCheckError();
   }
 
   Poisson::~Poisson(){
@@ -98,36 +163,22 @@ namespace uammd{
 			    printUtils::prettySize(cufftWorkSize).c_str(),
 			    printUtils::prettySize(free_mem).c_str(),
 			    printUtils::prettySize(total_mem).c_str());
-    if(free_mem<cufftWorkSize){
-      sys->log<System::CRITICAL>("[BDHI::Poisson] Not enough memory in device to allocate cuFFT free %s, needed: %s!!",
+    try{
+      cufftWorkArea.resize(cufftWorkSize);
+    }
+    catch(...){
+      sys->log<System::ERROR>("[BDHI::Poisson] Not enough memory in device to allocate cuFFT free %s, needed: %s!!",
 				 printUtils::prettySize(free_mem).c_str(),
 				 printUtils::prettySize(cufftWorkSize).c_str());
+      throw std::bad_alloc();
     }
-    cufftWorkArea.resize(cufftWorkSize);
+
     auto d_cufftWorkArea = thrust::raw_pointer_cast(cufftWorkArea.data());
     CufftSafeCall(cufftSetWorkArea(cufft_plan_forward, (void*)d_cufftWorkArea));
     CufftSafeCall(cufftSetWorkArea(cufft_plan_inverse, (void*)d_cufftWorkArea));
   }
 
   namespace Poisson_ns{
-
-    __device__ real greensFunction(real r2, real gw, real split, real epsilon){
-      real G = 0;
-      if(r2>gw*gw*gw*gw){
-	real r = sqrt(r2);
-	G = (1.0/(4.0*M_PI*epsilon*r)*(erf(r/(2*gw)) - erf(r/sqrt(4*gw*gw+1/(split*split)))));
-      }
-      else{
-	const real pi32 = pow(M_PI,1.5);
-	const real gw2 = gw*gw;
-	const real invsp2 = 1.0/(split*split);
-	const real selfterm = 1.0/(4*pi32*gw) - 1.0/(2*pi32*sqrt(4*gw2+invsp2));
-	const real r2term = 1.0/(6.0*pi32*pow(4.0*gw2 + invsp2, 1.5)) - 1.0/(48.0*pi32*gw2*gw);
-	const real r4term = 1.0/(640.0*pi32*gw2*gw2*gw) - 1.0/(20.0*pi32*pow(4*gw2+invsp2,2.5));
-	G = 1.0/epsilon*(selfterm+r2*r2term + r2*r2*r4term);
-      }
-      return G;
-    }
 
     struct NearFieldEnergyTransverser{
       using returnInfo = real;
@@ -159,51 +210,42 @@ namespace uammd{
     struct NearFieldForceTransverser{
       using returnInfo = real3;
 
-      NearFieldForceTransverser(real4* force_ptr, real* charge,
-				real ep, real sp, real gw, Box box):
-	force_ptr(force_ptr), charge(charge),
-	epsilon(ep), split(sp), gw(gw), box(box){}
+      NearFieldForceTransverser(real4* force_ptr, real* charge, TabulatedFunction<real> gff, Box box):
+	 force_ptr(force_ptr), greensFunctionField(gff), charge(charge), box(box){}
 
       inline __device__ returnInfo zero() const{ return returnInfo();}
 
       inline __device__ real getInfo(int pi) const{ return charge[pi];}
 
       inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
-
 	real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
 	real r2 = dot(rij, rij);
 	real r = sqrt(r2);
-	real gw2 = gw*gw;
-	real newgw = sqrt(gw2+1/(4.0*split*split));
-	real newgw2 = newgw*newgw;
-	real fmod = 0;
-	if(r2>gw*gw*gw*gw){
-	  real invrterm = exp(-0.25*r2/newgw2)/sqrt(M_PI*newgw2) - exp(-0.25*r2/gw2)/sqrt(M_PI*gw2);
-	  real invr2term = erf(0.5*r/newgw) - erf(0.5*r/gw);
-
-	  fmod += 1/(4*M_PI)*( invrterm/r - invr2term/r2);
-	}
-	else if (r2>0){
-	  const real pi32 = pow(M_PI, 1.5);
-	  real rterm = 1/(24*pi32)*(1.0/(gw2*gw) - 1/(newgw2*newgw));
-	  real r3term = 1/(160*pi32)*(1.0/(newgw2*newgw2*newgw) - 1.0/(gw2*gw2*gw));
-	  fmod += r*rterm+r2*r*r3term;
-	}
-	if(r2>0) return chargei*chargej/epsilon*fmod*rij/r;
-	else return real3();
+	real fmod = -chargei*chargej*greensFunctionField(r);
+	return (r2>0)?(fmod*rij/r):real3();
       }
       inline __device__ void accumulate(returnInfo &total, const returnInfo &current) const {total += current;}
       inline __device__ void set(uint pi, const returnInfo &total) const {force_ptr[pi] += make_real4(total);}
     private:
+      TabulatedFunction<real> greensFunctionField;
       real4* force_ptr;
       real* charge;
-      real epsilon, split, gw;
       Box box;
     };
 
   }
 
   void Poisson::farField(cudaStream_t st){
+    sys->log<System::DEBUG2>("[Poisson] Far field computation");
+    resetGridData();
+    spreadCharges();
+    forwardTransformCharge();
+    convolveFourier();
+    inverseTransform();
+    interpolateFields();
+  }
+
+  void Poisson::resetGridData(){
     try{
       int ncells = grid.cellDim.y*grid.cellDim.z*(grid.cellDim.x/2+1);
       gridCharges.resize(2*ncells);
@@ -213,14 +255,9 @@ namespace uammd{
 		   std::iterator_traits<decltype(gridCharges.begin())>::value_type());
     }
     catch(thrust::system_error &e){
-      sys->log<System::CRITICAL>("[Poisson] Thrust could not reset grid data with error &s", e.what());
+      sys->log<System::ERROR>("[Poisson] Thrust could not reset grid data with error &s", e.what());
+      throw;
     }
-    sys->log<System::DEBUG2>("[Poisson] Far field computation");
-    spreadCharges();
-    forwardTransformCharge();
-    convolveFourier();
-    inverseTransform();
-    interpolateFields();
   }
 
   void Poisson::sumForce(cudaStream_t st){
@@ -232,7 +269,7 @@ namespace uammd{
       nl->update(box, nearFieldCutOff, st);
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
-      auto tr = Poisson_ns::NearFieldForceTransverser(force.begin(), charge.begin(), epsilon, split, gw, box);
+      auto tr = Poisson_ns::NearFieldForceTransverser(force.begin(), charge.begin(), nearFieldGreensFunction, box);
       nl->transverseList(tr, st);
     }
   }
@@ -316,17 +353,17 @@ namespace uammd{
       if(cell.y>=grid.cellDim.y) return;
       if(cell.z>=grid.cellDim.z) return;
       const real3 k = cellToWaveNumber(cell, grid.cellDim, grid.box.boxSize);
-      const real k2 = dot(k,k);
+      const real k2 = dot(k, k);
       if(k2 == 0){
 	gridFieldPotential[0] = cufftComplex4();
 	return;
       }
-      const real B = real(1.0)/(k2*epsilon*grid.getNumberCells());
       const int i_icell = cell.x + (cell.y + cell.z*grid.cellDim.y)*(grid.cellDim.x/2+1);
-      const cufftComplex fk = gridCharges[i_icell];
       cufftComplex4 fieldPotential = cufftComplex4();
       bool nyquist = isNyquist(cell, grid.cellDim);
       if(not nyquist){
+	const cufftComplex fk = gridCharges[i_icell];
+	const real B = real(1.0)/(k2*epsilon*grid.getNumberCells());
 	fieldPotential.x.x = k.x*fk.y*B; fieldPotential.x.y = -k.x*fk.x*B;
 	fieldPotential.y.x = k.y*fk.y*B; fieldPotential.y.y = -k.y*fk.x*B;
 	fieldPotential.z.x = k.z*fk.y*B; fieldPotential.z.y = -k.z*fk.x*B;
