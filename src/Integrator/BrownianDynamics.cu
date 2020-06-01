@@ -146,10 +146,7 @@ namespace uammd{
       steps++;
       sys->log<System::DEBUG1>("[BD::EulerMaruyama] Performing integration step %d", steps);
       updateInteractors();
-      resetForces();
-      for(auto forceComp: interactors){
-	forceComp->sumForce(st);
-      }
+      computeCurrentForces();
       updatePositions();
     }
 
