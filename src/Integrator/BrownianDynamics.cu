@@ -354,6 +354,81 @@ namespace uammd{
     }
 
 
+    namespace Leimkuhler_ns{
+
+      __device__ real3 genNoise(int i, uint stepNum, uint seed){
+	Saru rng(i, stepNum, seed);
+	return make_real3(rng.gf(0, 1), rng.gf(0, 1).x);
+      }
+
+      __global__ void integrateGPU(real4* pos,
+				   ParticleGroup::IndexIterator indexIterator,
+				   const int* originalIndex,
+				   const real4* force,
+				   real3 Kx, real3 Ky, real3 Kz,
+				   real selfMobility,
+				   real* radius,
+				   real dt,
+				   bool is2D,
+				   real temperature,
+				   int N,
+				   uint stepNum, uint seed){
+	uint id = blockIdx.x*blockDim.x+threadIdx.x;
+	if(id>=N) return;
+	int i = indexIterator[id];
+	real3 R = make_real3(pos[i]);
+	real3 F = make_real3(force[i]);
+	real3 KR = make_real3(dot(Kx, R), dot(Ky, R), dot(Kz, R));
+	real M = selfMobility*(radius?(real(1.0)/radius[i]):real(1.0));
+	R += dt*( KR + M*F );
+	if(temperature > 0){
+	  int ori = originalIndex[i];
+	  real B = sqrt(real(0.5)*temperature/0.9*selfMobility*dt);
+	  real3 dW = genNoise(ori, stepNum, seed) + genNoise(ori, stepNum-1, seed);
+	  R += B*dW;
+	}
+	pos[i].x = R.x;
+	pos[i].y = R.y;
+	if(!is2D)
+	  pos[i].z = R.z;
+      }
+
+    }
+
+    void Leimkuhler::forwardTime(){
+      steps++;
+      sys->log<System::DEBUG1>("[BD::Leimkuhler] Performing integration step %d", steps);
+      updateInteractors();
+      computeCurrentForces();
+      updatePositions();
+    }
+
+    void Leimkuhler::updatePositions(){
+      int numberParticles = pg->getNumberParticles();
+      int BLOCKSIZE = 128;
+      uint Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
+      uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
+      real * d_radius = getParticleRadiusIfAvailable();
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      auto force = pd->getForce(access::location::gpu, access::mode::read);
+      auto originalIndex = pd->getIdOrderedIndices(access::location::gpu);
+      Leimkuhler_ns::integrateGPU<<<Nblocks, Nthreads, 0, st>>>(pos.raw(),
+								groupIterator,
+								originalIndex,
+								force.raw(),
+								Kx, Ky, Kz,
+								selfMobility,
+								d_radius,
+								dt,
+								is2D,
+								temperature,
+								numberParticles,
+								steps, seed);
+
+    }
+
+
 
   }
 }

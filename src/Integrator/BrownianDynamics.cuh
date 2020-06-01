@@ -166,6 +166,29 @@ namespace uammd{
       void updatePositions();
     };
 
+    
+    //Implements the algorithm in eq. 45 of [2]
+    class Leimkuhler: public BaseBrownianIntegrator{
+    public:
+      Leimkuhler(shared_ptr<ParticleData> pd,
+		     shared_ptr<ParticleGroup> pg,
+		     shared_ptr<System> sys,
+		     Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+	sys->log<System::MESSAGE>("[BD::Leimkuhler] Initialized");
+      }
+
+      Leimkuhler(shared_ptr<ParticleData> pd,
+		     shared_ptr<System> sys,
+		     Parameters par):
+	Leimkuhler(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+
+      void forwardTime() override;
+
+    private:
+      void updatePositions();
+    };
+
+    
   }
 }
 
