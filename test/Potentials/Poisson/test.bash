@@ -2,15 +2,15 @@
 
 #Computes the potential for several box sizes and extrapolates to L->inf
 tolerance=1e-7
-gw=1.0;
-split=0
+gw=0.001;
+split=0.1
 
 rmin=2
 rmax=24
 dr=4
 
 lmin=64
-lmax=350
+lmax=304
 dl=16
 
 make poisson
@@ -30,9 +30,10 @@ do
 	 fit f(x) "field.r'$r'" u 1:3 via a,b,c,d,e;
 	 gw = '$gw';
 	 r = '$r';
-	 theo = exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
-	 deviation = abs(1.0-abs(a/theo));
-	 set print "-"; print(sprintf("%.15g %.15g %.15g", deviation, a, theo));');
+	 theoField = exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
+	 theoPot = 1/(4*gw*pi**1.5) - erf(r/(2.0*gw))/(4*pi*r);
+	 deviation = abs(1.0-abs(a/theoField));
+	 set print "-"; print(sprintf("%.15g %.15g %.15g", deviation, a, theoField));');
     echo $r $a
 
 done > $outfile
