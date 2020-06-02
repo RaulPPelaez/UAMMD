@@ -1,6 +1,7 @@
 /*Raul P. Pelaez 2019-2020. Spectral Poisson solver with Ewald splitting.
 TODO:
 100- Heuristics for selecting cut offs with tolerance need reevaluation
+50- In place C2R cufft does not work. I believe cufft just does not allow it, but I am not sure.
  */
 
 #include"IBM_Poisson.cuh"
@@ -49,7 +50,10 @@ namespace uammd{
       return fmod/epsilon;
     }
 
-
+    template<class T> std::shared_ptr<T> allocateTemporaryArray(size_t numberElements){
+      auto alloc = System::getTemporaryDeviceAllocator<T>();
+      return std::shared_ptr<T>(alloc.allocate(numberElements), [=](T* ptr){ alloc.deallocate(ptr);});
+    }
   }
 
   Poisson::Poisson(shared_ptr<ParticleData> pd,
@@ -120,6 +124,13 @@ namespace uammd{
 					[=](real r){
 					  return Poisson_ns::greensFunctionField(r, gw, split, epsilon);
 					});
+      nearFieldPotentialGreensFunctionTable.resize(Ntable);
+      ptr = thrust::raw_pointer_cast(nearFieldPotentialGreensFunctionTable.data());
+      nearFieldPotentialGreensFunction = TabulatedFunction<real>(ptr, Ntable, 0, nearFieldCutOff*nearFieldCutOff,
+					[=](real r2){
+					  return Poisson_ns::greensFunction(r2, gw, split, epsilon);
+					});
+
     }
     CudaCheckError();
   }
@@ -183,27 +194,26 @@ namespace uammd{
     struct NearFieldEnergyTransverser{
       using returnInfo = real;
 
-      NearFieldEnergyTransverser(real* potential_ptr, real* charge,
-				 real ep, real sp, real gw, Box box):
-	potential_ptr(potential_ptr), charge(charge),
-	epsilon(ep), split(sp), gw(gw), box(box){}
+      NearFieldEnergyTransverser(real* energy_ptr, real* charge, TabulatedFunction<real> gf, Box box):
+	energy_ptr(energy_ptr), charge(charge), greensFunction(gf), box(box){}
 
-      inline __device__ returnInfo zero() const{ return 0.0f;}
+      inline __device__ returnInfo zero() const{ return 0;}
+
       inline __device__ real getInfo(int pi) const{ return charge[pi];}
 
       inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
 	real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
 	real r2 = dot(rij, rij);
-	return chargej*greensFunction(r2, gw, split, epsilon);
+	return chargei*chargej*greensFunction(r2);
       }
 
       inline __device__ void accumulate(returnInfo &total, const returnInfo &current) const {total += current;}
 
-      inline __device__ void set(uint pi, const returnInfo &total) const {potential_ptr[pi] += total;}
+      inline __device__ void set(uint pi, const returnInfo &total) const {energy_ptr[pi] += total;}
     private:
-      real* potential_ptr;
+      real* energy_ptr;
       real* charge;
-      real epsilon, split, gw;
+      TabulatedFunction<real> greensFunction;
       Box box;
     };
 
@@ -237,32 +247,20 @@ namespace uammd{
 
   void Poisson::farField(cudaStream_t st){
     sys->log<System::DEBUG2>("[Poisson] Far field computation");
-    resetGridData();
-    spreadCharges();
-    forwardTransformCharge();
-    convolveFourier();
-    inverseTransform();
-    interpolateFields();
+    int3 n = grid.cellDim;
+    auto gridCharges = Poisson_ns::allocateTemporaryArray<real>(2*(n.x/2+1)*n.y*n.z);
+    auto  gridFieldPotentialFourier = Poisson_ns::allocateTemporaryArray<cufftComplex4>((n.x/2+1)*n.y*n.z);
+    thrust::fill(thrust::cuda::par.on(st), gridCharges.get(), gridCharges.get() + 2*(n.x/2+1)*n.y*n.z, 0);
+    spreadCharges(gridCharges.get());
+    forwardTransformCharge(gridCharges.get(), (cufftComplex*) gridCharges.get());
+    convolveFourier((cufftComplex*) gridCharges.get(), gridFieldPotentialFourier.get());
+    gridCharges.reset();
+    auto gridFieldPotential = Poisson_ns::allocateTemporaryArray<real4>(2*(n.x/2+1)*n.y*n.z);
+    inverseTransform(gridFieldPotentialFourier.get(), gridFieldPotential.get());
+    interpolateFields(gridFieldPotential.get());
   }
 
-  void Poisson::resetGridData(){
-    try{
-      int ncells = grid.cellDim.y*grid.cellDim.z*(grid.cellDim.x/2+1);
-      gridCharges.resize(2*ncells);
-      gridFieldPotential.resize(ncells);
-      thrust::fill(thrust::cuda::par.on(st),
-		   gridCharges.begin(), gridCharges.end(),
-		   std::iterator_traits<decltype(gridCharges.begin())>::value_type());
-    }
-    catch(thrust::system_error &e){
-      sys->log<System::ERROR>("[Poisson] Thrust could not reset grid data with error &s", e.what());
-      throw;
-    }
-  }
-
-  void Poisson::sumForce(cudaStream_t st){
-    sys->log<System::DEBUG2>("[Poisson] Sum Force");
-    farField(st);
+  void Poisson::nearFieldForce(cudaStream_t st){
     if(split>0){
       sys->log<System::DEBUG2>("[Poisson] Near field force computation");
       if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
@@ -274,47 +272,36 @@ namespace uammd{
     }
   }
 
-  namespace Poisson_ns{
-    struct Potential2Energy{
-      real originPotential;
-      Potential2Energy(real originPotential): originPotential(originPotential){}
+  void Poisson::sumForce(cudaStream_t st){
+    sys->log<System::DEBUG2>("[Poisson] Sum Force");
+    farField(st);
+    nearFieldForce(st);
+  }
 
-      __device__ real operator()(thrust::tuple<real,real> chargeAndPotential){
-	real q = thrust::get<0>(chargeAndPotential);
-	real phi = thrust::get<1>(chargeAndPotential) - originPotential;
-	return q*phi;
-      }
-    };
+  void Poisson::nearFieldEnergy(cudaStream_t st){
+    if(split>0){
+      int numberParticles = pg->getNumberParticles();
+      sys->log<System::DEBUG2>("[Poisson] Near field energy computation");
+      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
+      nl->update(box, nearFieldCutOff, st);
+      auto charge = pd->getCharge(access::location::gpu, access::mode::read);
+      auto energy = pd->getEnergy(access::location::gpu, access::mode::read);
+      auto tr = Poisson_ns::NearFieldEnergyTransverser(energy.begin(), charge.begin(), nearFieldPotentialGreensFunction, box);
+      nl->transverseList(tr, st);
+    }
   }
 
   real Poisson::sumEnergy(){
     sys->log<System::DEBUG2>("[Poisson] Sum Energy");
     cudaStream_t st = 0;
     farField(st);
-    int numberParticles = pg->getNumberParticles();
-    if(split>0){
-      sys->log<System::DEBUG2>("[Poisson] Near field energy computation");
-      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
-      nl->update(box, nearFieldCutOff, st);
-      auto potential = thrust::raw_pointer_cast(potentialAtCharges.data());
-      auto charge = pd->getCharge(access::location::gpu, access::mode::read);
-      auto tr = Poisson_ns::NearFieldEnergyTransverser(potential, charge.begin(), epsilon, split, gw, box);
-      nl->transverseList(tr, st);
-    }
-    auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
-    auto charge = pd->getCharge(access::location::gpu, access::mode::read);
-    real originPotential = measurePotentialAtOrigin();
-    auto chargeAndPotential = thrust::make_zip_iterator(thrust::make_tuple(charge.begin(), potentialAtCharges.begin()));
-    thrust::transform(thrust::cuda::par.on(st),
-		      chargeAndPotential, chargeAndPotential + numberParticles, energy.begin(),
-		      Poisson_ns::Potential2Energy(originPotential));
+    nearFieldEnergy(st);
     return 0;
   }
 
   namespace Poisson_ns{
-    using cufftComplex3 = Poisson::cufftComplex3;
-    using cufftComplex4 = Poisson::cufftComplex4;
-    using cufftComplex = Poisson::cufftComplex;
+    using cufftComplex4 = cufftComplex4_t<real>;//Poisson::cufftComplex4;
+    using cufftComplex = cufftComplex_t<real>;//Poisson::cufftComplex;
 
     template<class vec3>
     inline __device__ vec3 cellToWaveNumber(const int3 &cell, const int3 &cellDim, const vec3 &L){
@@ -354,19 +341,19 @@ namespace uammd{
       if(cell.z>=grid.cellDim.z) return;
       const real3 k = cellToWaveNumber(cell, grid.cellDim, grid.box.boxSize);
       const real k2 = dot(k, k);
-      if(k2 == 0){
+      if(cell.x == 0 and cell.y == 0 and cell.z == 0){
 	gridFieldPotential[0] = cufftComplex4();
 	return;
       }
       const int i_icell = cell.x + (cell.y + cell.z*grid.cellDim.y)*(grid.cellDim.x/2+1);
       cufftComplex4 fieldPotential = cufftComplex4();
-      bool nyquist = isNyquist(cell, grid.cellDim);
+      const bool nyquist = isNyquist(cell, grid.cellDim);
       if(not nyquist){
 	const cufftComplex fk = gridCharges[i_icell];
 	const real B = real(1.0)/(k2*epsilon*grid.getNumberCells());
-	fieldPotential.x.x = k.x*fk.y*B; fieldPotential.x.y = -k.x*fk.x*B;
-	fieldPotential.y.x = k.y*fk.y*B; fieldPotential.y.y = -k.y*fk.x*B;
-	fieldPotential.z.x = k.z*fk.y*B; fieldPotential.z.y = -k.z*fk.x*B;
+       	fieldPotential.x.x = k.x*fk.y*B; fieldPotential.x.y = -k.x*fk.x*B;
+       	fieldPotential.y.x = k.y*fk.y*B; fieldPotential.y.y = -k.y*fk.x*B;
+       	fieldPotential.z.x = k.z*fk.y*B; fieldPotential.z.y = -k.z*fk.x*B;
 	fieldPotential.w = fk*B;
       }
       gridFieldPotential[i_icell] = fieldPotential;
@@ -374,48 +361,28 @@ namespace uammd{
 
   }
 
-  void Poisson::spreadCharges(){
+  void Poisson::spreadCharges(real* gridCharges){
     sys->log<System::DEBUG2>("[Poisson] Spreading charges");
     int numberParticles = pg->getNumberParticles();
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     auto charges = pd->getCharge(access::location::gpu, access::mode::read);
-    real* d_gridCharges = (real*)thrust::raw_pointer_cast(gridCharges.data());
     int3 n = grid.cellDim;
     IBM<Kernel> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-    ibm.spread(pos.begin(), charges.begin(), d_gridCharges, numberParticles, st);
+    ibm.spread(pos.begin(), charges.begin(), gridCharges, numberParticles, st);
     CudaCheckError();
   }
 
-  void Poisson::forwardTransformCharge(){
+  void Poisson::forwardTransformCharge(real *gridCharges, cufftComplex* gridChargesFourier){
     CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
-    auto d_gridCharges = thrust::raw_pointer_cast(gridCharges.data());
-    auto d_gridChargesFourier = thrust::raw_pointer_cast(gridCharges.data());
     sys->log<System::DEBUG2>("[Poisson] Taking grid to wave space");
-    auto cufftStatus = cufftExecReal2Complex<real>(cufft_plan_forward, (cufftReal*)d_gridCharges, (cufftComplex*)d_gridChargesFourier);
+    auto cufftStatus = cufftExecReal2Complex<real>(cufft_plan_forward, gridCharges, gridChargesFourier);
     if(cufftStatus != CUFFT_SUCCESS){
       sys->log<System::ERROR>("[Poisson] Error in forward CUFFT");
       throw std::runtime_error("CUFFT Error");
     }
   }
 
-  void Poisson::inverseTransform(){
-    sys->log<System::DEBUG2>("[Poisson] Force to real space");
-    CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
-    auto d_gridFieldPotential = thrust::raw_pointer_cast(gridFieldPotential.data());
-    auto d_gridFieldPotentialFourier = thrust::raw_pointer_cast(gridFieldPotential.data());
-    auto cufftStatus = cufftExecComplex2Real<real>(cufft_plan_inverse,
-						   (cufftComplex*)d_gridFieldPotentialFourier,
-						   (cufftReal*)d_gridFieldPotential);
-    if(cufftStatus != CUFFT_SUCCESS){
-      sys->log<System::ERROR>("[Poisson] Error in inverse CUFFT");
-      throw std::runtime_error("CUFFT Error");
-    }
-    CudaCheckError();
-  }
-
-  void Poisson::convolveFourier(){
-    auto d_gridChargesFourier = thrust::raw_pointer_cast(gridCharges.data());
-    cufftComplex4* d_gridFieldPotentialFourier = thrust::raw_pointer_cast(gridFieldPotential.data());
+  void Poisson::convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier){
     sys->log<System::DEBUG2>("[Poisson] Wave space convolution");
     dim3 NthreadsCells = dim3(8,8,8);
     dim3 NblocksCells;
@@ -424,115 +391,60 @@ namespace uammd{
     NblocksCells.y= grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
     NblocksCells.z= grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
     Poisson_ns::chargeFourier2FieldAndPotential<<<NblocksCells, NthreadsCells, 0, st>>>
-      ((cufftComplex*) d_gridChargesFourier,
-       d_gridFieldPotentialFourier,
-       epsilon,
-       grid);
+      (gridChargesFourier, gridFieldPotentialFourier, epsilon, grid);
+    CudaCheckError();
+  }
+
+  void Poisson::inverseTransform(cufftComplex4* gridFieldPotentialFourier, real4* gridFieldPotential){
+    sys->log<System::DEBUG2>("[Poisson] Force to real space");
+    CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
+    auto cufftStatus = cufftExecComplex2Real<real>(cufft_plan_inverse,
+     						   (cufftComplex*)gridFieldPotentialFourier,
+     						   (cufftReal*)gridFieldPotential);
+    if(cufftStatus != CUFFT_SUCCESS){
+      sys->log<System::ERROR>("[Poisson] Error in inverse CUFFT");
+      throw std::runtime_error("CUFFT Error");
+    }
     CudaCheckError();
   }
 
   namespace Poisson_ns{
 
-    struct toReal4{
-      __device__ real4 operator()(real3 a){
-	return make_real4(a);
-      }
-    };
-
     struct UnZip2Real4{
 
       real4* force;
-      real* potential;
+      real* energy;
       real* charges;
       int i;
 
-      UnZip2Real4(real* charges, real4* f, real* phi):charges(charges),force(f), potential(phi), i(-1){}
+      UnZip2Real4(real* charges, real4* f, real* e):charges(charges),force(f), energy(e), i(-1){}
+
       __device__ UnZip2Real4 operator()(int ai){
 	this->i = ai;
 	return *this;
       }
 
-      __device__ void operator += (real4 fande){
+      __device__ void operator += (real4 fande) const{
 	if(force) force[i] += charges[i]*make_real4(fande.x, fande.y, fande.z, 0);
-	if(potential) potential[i] = fande.w;
+	if(energy) energy[i] += charges[i]*fande.w;
       }
 
     };
 
   }
 
-  void Poisson::interpolateFields(){
+  void Poisson::interpolateFields(real4* gridFieldPotential){
     sys->log<System::DEBUG2>("[Poisson] Interpolating forces and energies");
     int numberParticles = pg->getNumberParticles();
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     auto charge = pd->getCharge(access::location::gpu, access::mode::read);
     auto forces = pd->getForce(access::location::gpu, access::mode::readwrite);
-    potentialAtCharges.resize(numberParticles);
-    auto potential = thrust::raw_pointer_cast(potentialAtCharges.data());
-    auto d_gridFieldPotential = (real4*)thrust::raw_pointer_cast(gridFieldPotential.data());
-    auto gridData2ForceAndPotential = Poisson_ns::UnZip2Real4(charge.begin(), forces.begin(), potential);
-    auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), gridData2ForceAndPotential);
+    auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
+    auto gridData2ForceAndEnergy = Poisson_ns::UnZip2Real4(charge.begin(), forces.begin(), energy.begin());
+    auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), gridData2ForceAndEnergy);
     int3 n = grid.cellDim;
     IBM<Kernel> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-    ibm.gather(pos.begin(), f_tr, d_gridFieldPotential, numberParticles, st);
-  }
-
-  real Poisson::measurePotentialAtOrigin(){
-    auto phiFar = measurePotentialAtOriginFarField();
-    auto phiNear = measurePotentialAtOriginNearField();
-    return phiFar + phiNear;
-  }
-
-  real Poisson::measurePotentialAtOriginFarField(){
-    real4* d_gridFieldPotential = (real4*)thrust::raw_pointer_cast(gridFieldPotential.data());
-    originPotential.resize(1);
-    originPotential[0] = 0;
-    auto originPotential_ptr = thrust::raw_pointer_cast(originPotential.data());
-    auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0),
-						Poisson_ns::UnZip2Real4(nullptr, nullptr, originPotential_ptr));
-    auto originPos = thrust::make_constant_iterator<real4>(real4());
-    real h = grid.cellSize.x;
-    auto kernel = std::make_shared<Kernel>(tolerance, 1.0/(2.0*split), h);
-    IBM<Kernel> ibmOrigin(sys, kernel, grid);
-    ibmOrigin.gather(originPos, f_tr, d_gridFieldPotential, 1, st);
-    real phifar = originPotential[0];
-    return phifar;
-  }
-
-  namespace Poisson_ns{
-
-    struct PotentialAtOrigin{
-      real3 origin;
-      Box box;
-      real gw, split, epsilon;
-      PotentialAtOrigin(Box box, real3 origin, real gw, real split, real epsilon):box(box), origin(origin){}
-
-      __device__ real operator()(thrust::tuple<real4, real> posCharge){
-	real3 pos = make_real3(thrust::get<0>(posCharge));
-	real3 rij = box.apply_pbc(pos - origin);
-	real r2 =  dot(rij, rij);
-	real q = thrust::get<1>(posCharge);
-	real phi = q*greensFunction(r2, gw, split, epsilon);
-	return phi;
-      }
-
-    };
-
-  }
-
-  real Poisson::measurePotentialAtOriginNearField(){
-    real phiNear = 0;
-    if(split){
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto charge = pd->getCharge(access::location::gpu, access::mode::read);
-      auto posCharge = thrust::make_zip_iterator(thrust::make_tuple(pos.begin(), charge.begin()));
-      int numberParticles = pg->getNumberParticles();
-      phiNear = thrust::transform_reduce(thrust::cuda::par,
-					 posCharge, posCharge + numberParticles,
-					 Poisson_ns::PotentialAtOrigin(grid.box, real3(), gw/sqrt(2), split, epsilon),
-					 0, thrust::plus<real>());
-    }
-    return phiNear;
+    ibm.gather(pos.begin(), f_tr, gridFieldPotential, numberParticles, st);
   }
 
 

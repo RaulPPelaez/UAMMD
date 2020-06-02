@@ -40,7 +40,6 @@ namespace uammd{
     using Kernel = Poisson_ns::Gaussian;
     using cufftComplex3 = cufftComplex3_t<real>;
     using cufftComplex4 = cufftComplex4_t<real>;
-
     using cufftComplex = cufftComplex_t<real>;
     using cufftReal = cufftReal_t<real>;
 
@@ -67,41 +66,47 @@ namespace uammd{
 
     real sumEnergy() override;
 
+    real sumForceEnergy(cudaStream_t st) override{
+      sys->log<System::DEBUG2>("[Poisson] Sum Force and Energy");
+      farField(st);
+      nearFieldForce(st);
+      nearFieldEnergy(st);
+      return 0;
+    }
+
   private:
     shared_ptr<Kernel> kernel;
     shared_ptr<NeighbourList> nl;
 
     cufftHandle cufft_plan_forward, cufft_plan_inverse;
 
-    template<class T>
-    using managed_vector = thrust::device_vector<T>;
+    template<class T> using managed_vector = thrust::device_vector<T>;
+    template<class T> using temporal_vector = thrust::device_vector<T, System::allocator_thrust<T>>;
     //using managed_vector = thrust::device_vector<T, managed_allocator<T>>;
 
     managed_vector<char> cufftWorkArea;
-    managed_vector<real> gridCharges;
-    managed_vector<cufftComplex4> gridFieldPotential;
-    managed_vector<real> potentialAtCharges;
-    managed_vector<real> originPotential;
-
     TabulatedFunction<real> nearFieldGreensFunction;
     managed_vector<real> nearFieldGreensFunctionTable;
+
+    TabulatedFunction<real> nearFieldPotentialGreensFunction;
+    managed_vector<real> nearFieldPotentialGreensFunctionTable;
+
     cudaStream_t st;
 
     void initCuFFT();
 
     void farField(cudaStream_t st);
-    void resetGridData();
-    void spreadCharges();
-    void forwardTransformCharge();
-    void convolveFourier();
-    void inverseTransform();
-    void interpolateFields();
+    void nearFieldForce(cudaStream_t st);
+    void nearFieldEnergy(cudaStream_t st);
 
-    real measurePotentialAtOrigin();
-    real measurePotentialAtOriginFarField();
-    real measurePotentialAtOriginNearField();
+    void spreadCharges(real* gridCharges);
+    void forwardTransformCharge(real* gridCharges, cufftComplex* gridChargesFourier);
+    void convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier);
+    void inverseTransform(cufftComplex4* gridFieldPotentialFourier, real4* gridFieldPotential);
+    void interpolateFields(real4* gridFieldPotential);
+
     Box box;
-    Grid grid; /*Wave space Grid parameters*/
+    Grid grid;
 
     real epsilon;
     real split;
