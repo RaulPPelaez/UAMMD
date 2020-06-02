@@ -51,7 +51,7 @@ namespace uammd{
     using device_temporary_memory_resource = uammd::pool_memory_resource_adaptor<resource>;
     template<class T>
     using allocator_thrust = uammd::polymorphic_allocator<T, device_temporary_memory_resource,
-							  thrust::device_ptr<T>>;
+							  thrust::cuda::pointer<T>>;
     template<class T>
     using allocator = uammd::polymorphic_allocator<T , device_temporary_memory_resource>;
 

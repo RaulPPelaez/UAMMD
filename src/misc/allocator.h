@@ -10,7 +10,7 @@
 namespace uammd{
 
   namespace detail{
-    template<class T> using cuda_ptr = thrust::device_ptr<T>;
+    template<class T> using cuda_ptr = thrust::cuda::pointer<T>;
     template<class T>
     class memory_resource{
     public:
