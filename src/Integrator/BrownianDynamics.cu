@@ -383,7 +383,7 @@ namespace uammd{
 	R += dt*( KR + M*F );
 	if(temperature > 0){
 	  int ori = originalIndex[i];
-	  real B = sqrt(real(0.5)*temperature/0.9*selfMobility*dt);
+	  real B = sqrt(real(0.5)*temperature*selfMobility*dt);
 	  real3 dW = genNoise(ori, stepNum, seed) + genNoise(ori, stepNum-1, seed);
 	  R += B*dW;
 	}
