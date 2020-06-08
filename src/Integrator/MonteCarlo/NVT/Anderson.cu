@@ -443,8 +443,8 @@ namespace uammd {
 
 	  const int icellj = grid.getCellIndex(cellj);
 
-	  const int firstParticle = cellStart[icellj];
-	  if(firstParticle < VALID_CELL) continue;
+	  const int firstParticle = int(cellStart[icellj]) - int(VALID_CELL);
+	  if(firstParticle < 0) continue;
 	  //Continue only if there are particles in this cell
 	  //Index of the last particle in the cell's list
 	  const int lastParticle = cellEnd[icellj];
@@ -506,8 +506,8 @@ namespace uammd {
 
 	const int icell = grid.getCellIndex(celli);
 
-	const int firstParticle = cellStart[icell];
-	if(firstParticle < VALID_CELL) return;
+	const int firstParticle = cellStart[icell] - int(VALID_CELL);
+	if(firstParticle < 0) return;
 
 	const int nincell  = cellEnd[icell] - firstParticle;
 
