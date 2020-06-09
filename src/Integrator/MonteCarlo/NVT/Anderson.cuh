@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2018. Adapted from Pablo Ibañez Freire's MonteCarlo Anderson code.
+/*Raul P. Pelaez 2018-2020. Adapted from Pablo Ibañez Freire's MonteCarlo Anderson code.
 
   This module implements Anderson's Monte Carlo NVT GPU algorithm [1].
   The algorithm is presented for hard spheres in two dimensions, but suggests it should be valid for any interparticle potential or dimensionality.
@@ -30,66 +30,68 @@ References:
 
 #include"uammd.cuh"
 
-#include"Interactor/Potential/Potential.cuh"
-#include"Interactor/Potential/PotentialUtils.cuh"
-#include"Interactor/NeighbourList/CellList.cuh"
-#include"Interactor/ExternalForces.cuh"
+#include"Interactor/NeighbourList/CellList/CellListBase.cuh"
+#include"Integrator/Integrator.cuh"
+#include"utils/Box.cuh"
 
 namespace uammd {
 
   namespace MC_NVT{
-    template<class Pot, class ExternalPot = BasicExternalPotential>
-    class Anderson{
+    template<class Pot>
+    class Anderson: public Integrator{
     public:
       struct Parameters{
 	Box box;                          //Box to work on
-	real kT = -1;	                  //System temperature
-	int attempsPerCell = 10;          //Each cell will attempt attemptsPerCell movements
+	real temperature = -1;	                  //System temperature
+	int triesPerCell = 10;          //Each cell will attempt attemptsPerCell movements
 	real initialJumpSize = 1.0;	  //Starting size of the random position displacement
-	int thermalizationSteps = 1000;	  //Number of thermalization steps
-	real desiredAcceptanceRatio = 0.5;//The parameters will be auto tuned to reach this acceptance ratio
-	real acceptanceRatioRate = 1.2;   //The rate of change in the acceptance ratio each time it is revised
+	real acceptanceRatio = 0.5;//The parameters will be auto tuned to reach this acceptance ratio
 	int tuneSteps = 10;	          //Check the acceptance ratio and tune parameters every this steps during thermalization
-	ullint seed = 0;                  //0 means draw a random number from the system generator
+	int seed = 0;                  //0 means draw a random number from the system generator
       };
-    protected:
 
+      Anderson(shared_ptr<ParticleData> pd,
+	       shared_ptr<ParticleGroup> pg,
+	       shared_ptr<System> sys,
+	       shared_ptr<Pot> pot,
+	       Parameters par);
+
+      ~Anderson(){
+	cudaStreamDestroy(st);
+      }
+
+      void updateSimulationBox(Box box);
+
+      virtual void forwardTime() override;
+
+      virtual real sumEnergy() override;
+
+      real getCurrentStepSize(){
+	return jumpSize;
+      }
+
+      real getCurrentAcceptanceRatio(){
+	return currentAcceptanceRatio;
+      }
+
+    private:
 
       shared_ptr<Pot> pot;
-      shared_ptr<ExternalPot> eP;
-      shared_ptr<CellList> cl;
-
+      shared_ptr<CellListBase> cl;
       Parameters par;
-
-      bool is2D;  //True if box.z = 0
-      int steps; //Number of steps performed since start
-
-      ullint seed;
-
+      bool is2D;
+      int steps;
+      int seed;
       Grid grid;
-      real3 currentCutOff;
-
-      real3 currentOrigin; //Current origin of the checkerboard
-      real maxOriginDisplacement; //Range of the checkerboard origin
-
+      real3 currentOrigin;
+      real maxOriginDisplacement;
       real jumpSize;
-
-      thrust::device_vector<uint> triedChanges;    //Number of attempts per cell
-      thrust::device_vector<uint> acceptedChanges; //Number of accepted steps per cell
-
-      //Temporal storage for GPU/CPU communication
-      thrust::device_vector<char> tmpStorage;
-
-      //Current measure of total number of tries and accepted moves
-      uint totalTries, totalChanges;
-
-      thrust::device_vector<char> cubTempStorage;
-
-      //Positions sorted in the internal CellList order, allow for a faster traversal
+      real currentAcceptanceRatio;
+      thrust::device_vector<uint> triedChanges;
+      thrust::device_vector<uint> acceptedChanges;
       thrust::device_vector<real4> sortPos;
+      int totalTries, totalChanges;
       cudaStream_t st;
-
-      //The different subgrids
       const std::array<int3,8> offset3D{{{0,0,0},
 	                                 {1,0,0},
 	        		         {0,1,0},
@@ -98,39 +100,22 @@ namespace uammd {
 	        		         {1,0,1},
 	        		         {0,1,1},
 	        			 {1,1,1}}};
-      shared_ptr<System> sys;
-      shared_ptr<ParticleData> pd;
-      shared_ptr<ParticleGroup> pg;
-    public:
-
-      Anderson(shared_ptr<ParticleData> pd,
-	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
-	       shared_ptr<Pot> pot,
-	       shared_ptr<ExternalPot> eP,
-	       Parameters par);
-
-      Anderson(shared_ptr<ParticleData> pd,
-	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
-	       shared_ptr<Pot> pot,
-	       Parameters par): Anderson(pd, pg, sys, pot, shared_ptr<ExternalPot>(), par){}
-
-      ~Anderson();
-
-      void updateSimulationBox(Box box);
-      void updateAccRatio();
-
-      real computeInternalEnergy(bool resetEnergy = true);
-      real computeExternalEnergy(bool resetEnergy = true);
-
-      virtual void forwardTime();
-
-      template<bool countTries> void step();
-
-      uint2 getNumberTriesAndNumberAccepted();
+      void updateListWithCurrentOrigin();
+      void updateOrigin();
+      void storeCurrentSortedPositions();
+      void performStep();
+      void updateParticlesInSubgrid(int3 subgrid);
+      void updateGlobalPositions(){
+	int numberParticles = pg->getNumberParticles();
+	auto pos = pd->getPos(access::location::gpu, access::mode::write);
+	auto posGroup = pg->getPropertyIterator(pos);
+	auto clData = cl->getCellList();
+	auto posGroup_tr = thrust::make_permutation_iterator(posGroup, clData.groupIndex);
+	thrust::copy(thrust::cuda::par, sortPos.begin(), sortPos.end(), posGroup_tr);
+      }
+      void updateAcceptanceRatio();
+      void updateJumpSize();
       void resetAcceptanceCounters();
-
     };
 
   }
