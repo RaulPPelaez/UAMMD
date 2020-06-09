@@ -17,27 +17,22 @@
 #include"Integrator/MonteCarlo/NVT/Anderson.cuh"
 #include"utils/InitialConditions.cuh"
 #include<fstream>
-
 using namespace uammd;
 using namespace std;
-
-
+void resetEnergy(std::shared_ptr<ParticleData> pd){
+  auto energy = pd->getEnergy(access::location::gpu, access::mode::write);
+  thrust::fill(thrust::cuda::par,energy.begin(), energy.end(), 0);
+}
 int main(int argc, char *argv[]) {
-
   auto sys = make_shared<System>();
   if(argc<10){
     sys->log<System::CRITICAL>("[System] Not enough input arguments!. Look for argv[ in the source code");
   }
-
     int N = pow(2,atoi(argv[1]));
-
-
     ullint seed = 0xf31337Bada55D00dULL^time(NULL);
     sys->rng().setSeed(seed);
-
     auto pd = make_shared<ParticleData>(N, sys);
     auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-
     Box box(std::stod(argv[2]));
     {
         auto pos = pd->getPos(access::location::cpu, access::mode::write);
@@ -46,11 +41,7 @@ int main(int argc, char *argv[]) {
             pos.raw()[i].w = 0;
 	}
     }
-
-
     ofstream outPos("pos.dat"),outEnergy("energy.dat");
-
-
     using LJ=Potential::LJ;
     auto pot = make_shared<LJ>(sys);
     {
@@ -65,60 +56,40 @@ int main(int argc, char *argv[]) {
     using MC = MC_NVT::Anderson<LJ>;
     MC::Parameters par;
     par.box = box;
-    par.kT = std::stod(argv[5]);
-    par.attempsPerCell = std::atoi(argv[6]);
+    par.temperature = std::stod(argv[5]);
+    par.triesPerCell = std::atoi(argv[6]);
     par.initialJumpSize = std::stod(argv[7]); //0.05
-
-    par.thermalizationSteps = std::stod(argv[8]); //300
-    par.desiredAcceptanceRatio = std::stod(argv[9]); //0.8
-
-    par.acceptanceRatioRate = 1.05;
-    par.tuneSteps = 50;
-
+    par.acceptanceRatio = std::stod(argv[9]); //0.8
+    par.tuneSteps = 10;
     auto mc = make_shared<MC>(pd, pg, sys, pot, par);
-
-
-    //Run the simulation
     sys->log<System::MESSAGE>("RUNNING!!!");
-
     pd->sortParticles();
-
     Timer tim;
     tim.tic();
     int nsteps = std::atoi(argv[3]);
     int printSteps = std::atoi(argv[4]);
-
     forj(0,nsteps) {
-
       mc->forwardTime();
-
-      //Write results
-
-      if(j%printSteps==1 && j>par.thermalizationSteps) {
-
-            sys->log<System::DEBUG>("[System] Writing to disk...");
-
-	    real3 p;
-	    auto pos = pd->getPos(access::location::cpu, access::mode::read);
-
-	    outEnergy << mc->computeInternalEnergy() << endl;
-
-	    outPos<<"#"<<endl;
-	    fori(0,N) {
-                p = make_real3(pos.raw()[i]);
-                int type = pos.raw()[i].w;
-                outPos<<p<<" 0.5 "<<type<<"\n";
-            }
-	    outPos<<flush;
-        }
-
-      if(j%500 == 1){pd->sortParticles();}
-
+      if(j%printSteps==1) {
+	sys->log<System::DEBUG>("[System] Writing to disk...");
+	real3 p;
+	auto pos = pd->getPos(access::location::cpu, access::mode::read);
+	resetEnergy(pd);
+	outEnergy << mc->sumEnergy() <<" "<<mc->getCurrentAcceptanceRatio()<<" "<<mc->getCurrentStepSize()<<std::endl;
+	outPos<<"#"<<endl;
+	fori(0,N) {
+	  p = make_real3(pos[i]);
+	  int type = pos[i].w;
+	  outPos<<p<<" 0.5 "<<type<<"\n";
+	}
+	outPos<<flush;
+      }
+      if(j%500 == 1){
+	pd->sortParticles();
+      }
     }
-
     auto totalTime = tim.toc();
     sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
     sys->finish();
-
     return 0;
 }
