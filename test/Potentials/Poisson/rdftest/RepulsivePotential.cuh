@@ -36,7 +36,21 @@ struct RepulsivePotentialFunctor{
   }
 
   __device__ real energy(real r2, PairParameters params){
-    return 0;
+    if(r2 >= params.cutOff2 or r2 == 0) return 0;
+    const real r = sqrtf(r2);
+    const int p = params.p;
+    const real sigma = params.sigma;
+    const real U0 = params.U0;
+    const real r_m = params.r_m;
+    real rr = r;
+    if(r<r_m){
+      rr = r_m;
+    }
+    real sdivr = sigma/rr;
+    real sdivrp=pow(sdivr,p);
+    real E = real(4.0)*U0*sdivrp*(sdivr - real(1.0)) + U0;
+    if(r<r_m) E += force(r2, params);
+    return E;
   }
 
   static PairParameters processPairParameters(InputPairParameters in_par){
