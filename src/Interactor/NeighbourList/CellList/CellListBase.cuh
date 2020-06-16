@@ -156,7 +156,7 @@ namespace uammd{
   private:
 
     bool isGridValid(Grid in_grid){
-      const bool is2D = in_grid.box.boxSize.z != real(0.0);
+      const bool is2D = in_grid.box.boxSize.z == real(0.0);
       if(in_grid.cellDim.x < 3 or in_grid.cellDim.y < 3 or (in_grid.cellDim.z < 3 and not is2D)){
        	System::log<System::ERROR>("[CellList] I cannot work with less than 3 cells per dimension!");
 	return false;
