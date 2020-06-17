@@ -169,7 +169,7 @@ namespace uammd{
       if(cellStart.size()!= ncells){
 	cellStart.clear();
 	cellStart.resize(ncells);
-	std::fill(cellStart.begin(), cellStart.end(), 0);
+        thrust::fill(thrust::cuda::par, cellStart.begin(), cellStart.end(), 0);
       }
       if(cellEnd.size()!= ncells){
 	cellEnd.clear();
@@ -199,7 +199,7 @@ namespace uammd{
       if(isCounterUninitialized or nextStepOverflows){
 	currentValidCell = numberParticles;
 	currentValidCell_counter = 1;
-	thrust::fill(cellStart.begin(), cellStart.end(), 0);
+	thrust::fill(thrust::cuda::par, cellStart.begin(), cellStart.end(), 0);
 	CudaCheckError();
       }
       else{
