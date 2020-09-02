@@ -94,16 +94,18 @@ namespace uammd{
       static constexpr int noMoreNeighbours = -1;
       //Take currentNeighboutIndex to the start of the next cell and return true, if no more cells remain then return false
       __device__ bool nextcell(){
-	const bool is2D = nl.grid.cellDim.z<=1;
-	if(currentCell >= (is2D?9:27)) return false;
+	const int3 n = nl.grid.cellDim;
+	const int numberNeighbourCells = (n.x>1?3:1)*(n.y>1?3:1)*(n.z>1?3:1);
+	if(currentCell >= numberNeighbourCells) return false;
 	bool isCurrentCellEmpty = true;
 	do{
 	  int3 cellj = celli;
-	  cellj.x += currentCell%3-1;
-	  cellj.y += (currentCell/3)%3-1;
-	  cellj.z =  is2D?0:(celli.z+currentCell/9-1);
+	  cellj.x += n.x==1?0:(currentCell%3-1);
+	  cellj.y += n.y==1?0:((currentCell/(n.x>1?3:1))%3-1);
+	  cellj.z +=  n.z==1?0:(currentCell/((n.x>1?3:1)*(n.y>1?3:1))-1);
 	  cellj = nl.grid.pbc_cell(cellj);
-	  const bool isPeriodicCellInNonPeriodicBox = (!nl.grid.box.isPeriodicX() and abs(cellj.x-celli.x)>1) or
+	  const bool isPeriodicCellInNonPeriodicBox =
+	    (!nl.grid.box.isPeriodicX() and abs(cellj.x-celli.x)>1) or
 	    (!nl.grid.box.isPeriodicY() and abs(cellj.y-celli.y)>1) or
 	    (!nl.grid.box.isPeriodicZ() and abs(cellj.z-celli.z)>1);
 	  if(!isPeriodicCellInNonPeriodicBox){
@@ -114,7 +116,7 @@ namespace uammd{
 	    currentNeighbourIndex = isCurrentCellEmpty?noMoreNeighbours:int(cs-nl.VALID_CELL);
 	  }
 	  currentCell++;
-	  if(currentCell >= (is2D?9:27)) return !isCurrentCellEmpty;
+	  if(currentCell >= numberNeighbourCells) return !isCurrentCellEmpty;
 	}while(isCurrentCellEmpty);
 	return true;
       }

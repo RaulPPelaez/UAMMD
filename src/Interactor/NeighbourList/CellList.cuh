@@ -124,9 +124,10 @@ namespace uammd{
     void update(Box box, real3 cutOff, cudaStream_t st = 0){
       Grid a_grid = Grid(box, cutOff);
       int3 cellDim = a_grid.cellDim;
-      if(cellDim.x < 3) cellDim.x = 3;
-      if(cellDim.y < 3) cellDim.y = 3;
-      if(box.boxSize.z > real(0.0) && cellDim.z < 3) cellDim.z = 3;
+      if(cellDim.x <= 3) cellDim.x = 1;
+      if(cellDim.y <= 3) cellDim.y = 1;
+      if(cellDim.z <= 3) cellDim.z = 1;
+      //if(box.boxSize.z > real(0.0) && cellDim.z < 3) cellDim.z = 3;
       a_grid = Grid(box, cellDim);
       update(a_grid, cutOff, st);
     }
