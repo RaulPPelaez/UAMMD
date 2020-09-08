@@ -46,7 +46,7 @@ namespace uammd{
     sys->log<System::DEBUG3>("[PairForces] Using cutOff: %f", this->rcut);
     bool useNeighbourList = true;
     int3 ncells = make_int3(box.boxSize/rcut);
-    if(ncells.x <=3 || ncells.y <= 3 || (ncells.z <=3 && ncells.z>0) ){
+    if(ncells.x <=3 and ncells.y <= 3 and ncells.z <=3){
       useNeighbourList = false;
     }
     if(useNeighbourList){

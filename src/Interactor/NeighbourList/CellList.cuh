@@ -106,15 +106,14 @@ namespace uammd{
 	sys->log<System::DEBUG1>("[CellList] Updating cell list");
 	currentBox = in_grid.box;
 	currentCutOff = cutOff;
+	int numberParticles = pg->getNumberParticles();
+	auto pos = pd->getPos(access::location::gpu, access::mode::read);
+	auto posGroupIterator = pg->getPropertyIterator(pos);
+	cl.update(posGroupIterator, numberParticles, in_grid, st);
       }
       else{
 	sys->log<System::DEBUG1>("[CellList] Ignoring unnecessary update");
-	return;
       }
-      int numberParticles = pg->getNumberParticles();
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      auto posGroupIterator = pg->getPropertyIterator(pos);
-      cl.update(posGroupIterator, numberParticles, in_grid, st);
     }
 
     void update(Box box, real cutOff, cudaStream_t st = 0){

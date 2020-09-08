@@ -63,7 +63,7 @@ namespace uammd{
       __device__ real4 getPos(){return cub::ThreadLoad<cub::LOAD_LDG>(sortPos+internal_i);}
 
     private:
-      int internal_i;
+      const int internal_i;
       const int* groupIndex;
       const real4* sortPos;
       friend class NeighbourIterator;
@@ -85,24 +85,25 @@ namespace uammd{
       >{
       friend class thrust::iterator_core_access;
       friend class NeighbourContainer;
-      int particleIndex;
+      const int particleIndex;
+      const CellListBase::CellListData nl;
+      const int3 celli;
       int currentNeighbourIndex;
-      CellListBase::CellListData nl;
       int currentCell;
-      int3 celli;
       int lastParticleInCell;
       static constexpr int noMoreNeighbours = -1;
-      //Take currentNeighboutIndex to the start of the next cell and return true, if no more cells remain then return false
+      //Take currentNeighboutIndex to the start of the next non-empty cell and return true, if no more cells remain then return false
       __device__ bool nextcell(){
 	const int3 n = nl.grid.cellDim;
-	const int numberNeighbourCells = (n.x>1?3:1)*(n.y>1?3:1)*(n.z>1?3:1);
+	const int3 nperdim = make_int3((n.x>1?3:1), (n.y>1?3:1), (n.z>1?3:1));
+	const int numberNeighbourCells = nperdim.x*nperdim.y*nperdim.z;
 	if(currentCell >= numberNeighbourCells) return false;
 	bool isCurrentCellEmpty = true;
 	do{
 	  int3 cellj = celli;
-	  cellj.x += n.x==1?0:(currentCell%3-1);
-	  cellj.y += n.y==1?0:((currentCell/(n.x>1?3:1))%3-1);
-	  cellj.z +=  n.z==1?0:(currentCell/((n.x>1?3:1)*(n.y>1?3:1))-1);
+	  if(nperdim.x>1) cellj.x += currentCell%3 - 1;
+	  if(nperdim.y>1) cellj.y += (currentCell/nperdim.x)%3 - 1;
+	  if(nperdim.z>1) cellj.z += currentCell/(nperdim.x*nperdim.y) - 1;
 	  cellj = nl.grid.pbc_cell(cellj);
 	  const bool isPeriodicCellInNonPeriodicBox =
 	    (!nl.grid.box.isPeriodicX() and abs(cellj.x-celli.x)>1) or
@@ -141,14 +142,14 @@ namespace uammd{
 	return other.particleIndex == particleIndex and other.currentNeighbourIndex==currentNeighbourIndex;
       }
 
-      __device__ NeighbourIterator(int i, CellListBase::CellListData nl, bool begin):
+      __device__ NeighbourIterator(int i, const CellListBase::CellListData &nl, bool begin):
 	particleIndex(i),
 	currentNeighbourIndex(noMoreNeighbours-1),
 	nl(nl),
 	currentCell(0),
-	lastParticleInCell(noMoreNeighbours){
+	lastParticleInCell(noMoreNeighbours),
+	celli(begin?nl.grid.getCell(make_real3(cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos + i))):make_int3(0,0,0)){
 	if(begin){
-	  this->celli = nl.grid.getCell(make_real3(cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos+i)));
 	  increment();
 	}
 	else{
@@ -163,7 +164,8 @@ namespace uammd{
 
     struct NeighbourContainer{
       int my_i = -1;
-      CellListBase::CellListData nl;
+      const CellListBase::CellListData nl;
+
       NeighbourContainer(CellListBase::CellListData nl): nl(nl){}
 
       __device__ void set(int i){this->my_i = i;}
