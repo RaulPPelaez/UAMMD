@@ -119,22 +119,18 @@ namespace uammd{
   //Looks for the closest (equal or greater) number of nodes of the form 2^a*3^b*5^c*7^d*11^e
   int3 nextFFTWiseSize3D(int3 size){
     int* cdim = &size.x;
-
     int max_dim = std::max({size.x, size.y, size.z});
-
     int n= 14;
     int n5 = 6; //number higher than this are not reasonable...
     int n7 = 5;
     int n11 = 4;
     auto powint = [](uint64_t base, uint64_t exp){if(exp==0) return uint64_t(1); uint64_t res = base; fori(0,exp-1) res*=base; return res;};
-
     std::vector<uint64_t> tmp(n*n*n5*n7*n11, 0);
     do{
       tmp.resize(n*n*n5*n7*n11, 0);
       fori(0,n)forj(0,n)
 	for(int k=0; k<n5;k++)for(int k7=0; k7<n7; k7++)for(int k11=0; k11<n11; k11++){
 	      if(k11>4 or k7>5 or k>6) continue;
-
 	      uint64_t id = i+n*j+n*n*k+n*n*n5*k7+n*n*n5*n7*k11;
 	      tmp[id] = 0;
 	      //Current fft wise size
