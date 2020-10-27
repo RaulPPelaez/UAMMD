@@ -68,7 +68,7 @@ namespace uammd{
 
     //Given a Dotctor that computes a product M·v ( is handled by Dotctor ), computes Bv = sqrt(M)·v
     template<class Dotctor> //B = sqrt(M)
-    LanczosStatus solve(Dotctor &dot, real *Bv, real* v, int N, real tolerance = 1e-3, cudaStream_t st = 0);
+    LanczosStatus solve(Dotctor &dot, real *Bv, real* v, int N, cudaStream_t st = 0);
 
     LanczosStatus getLastError(){ return errorStatus; }
   private:
@@ -97,12 +97,14 @@ namespace uammd{
     LanczosStatus errorStatus = LanczosStatus::SUCCESS;
 
     shared_ptr<System> sys;
+
+    real tolerance;
   };
 
 
 
   template<class Dotctor>
-  LanczosStatus LanczosAlgorithm::solve(Dotctor &dot, real *Bz, real*z, int N, real tolerance, cudaStream_t st){
+  LanczosStatus LanczosAlgorithm::solve(Dotctor &dot, real *Bz, real*z, int N, cudaStream_t st){
     st = 0;
     sys->log<System::DEBUG1>("[LanczosAlgorithm] Computing sqrt(M)·v");
     //Exit if this instance has become boggus, in which case it should be reinitialized

@@ -33,7 +33,7 @@ namespace uammd{
   LanczosAlgorithm::LanczosAlgorithm(shared_ptr<System> sys, real tolerance):
     sys(sys),
     N(0),
-    max_iter(3), check_convergence_steps(3)
+    max_iter(3), check_convergence_steps(3), tolerance(tolerance)
   {
     sys->log<System::DEBUG1>("[LanczosAlgorithm] Initializing");
 #ifdef SINGLE_PRECISION
