@@ -1,6 +1,8 @@
-/*Raul P. Pelaez 2017. Contains the near, real space, part of the Positively Split Edwald Rotne Prager Yamakawa tensor.
+/*Raul P. Pelaez 2017. Contains the near, real space, part of the Positively
+Split Edwald Rotne Prager Yamakawa tensor.
 
-Calling the operator () with a distance, it will return two values, F and G as in:
+Calling the operator () with a distance, it will return two values, F and G as
+in:
 
 Mobility = Mreal + Mwave
   Mreal(r) = F(r)(I-r^r) + G(r)(r^r)
@@ -14,6 +16,8 @@ References:
            -  http://www.sciencedirect.com/science/article/pii/S0021999111005092
 
  */
+#ifndef BDHI_PSE_RPY_PSE_CUH
+#define BDHI_PSE_RPY_PSE_CUH
 #include"global/defines.h"
 
 namespace uammd{
@@ -53,87 +57,53 @@ namespace uammd{
       }
       double a2mr = 2*rh-r;
       double a2pr = 2*rh+r;
-
-
       double rh2 = rh*rh;
       double rh4 = rh2*rh2;
-
       double psi2 = psi*psi;
       double psi3 = psi2*psi;
       double psi4 = psi2*psi2;
-
       double r3 = r2*r;
       double r4 = r3*r;
-
       double f0, f1, f2, f3, f4 ,f5, f6, f7;
       double g0, g1, g2, g3, g4 ,g5, g6, g7;
-
-
       if(r>2*rh){
 	f0 =(64.0*rh4*psi4 + 96.0*rh2*r2*psi4
 	     - 128.0*rh*r3*psi4 + 36.0*r4*psi4-3.0)/
 	  (128.0*rh*r3*psi4);
-
 	f4 = (3.0-4.0*psi4*a2mr*a2mr*(4.0*rh2+4.0*rh*r+9.0*r2))/
 	  (256.0*rh*r3*psi4);
-
 	f5 = 0;
-
-
 	g0 = (-64.0*rh4*psi4+96.0*rh2*r2*psi4-64.0*rh*r3*psi4 + 12.0*r4*psi4 +3.0)/
 	  (64.0*rh*r3*psi4);
-
-
 	g4 = (4.0*psi4*a2mr*a2mr*a2mr*(2.0*rh+3.0*r)-3.0)/(128.0*rh*r3*psi4);
-
 	g5 = 0;
-
-
       }
       else{
 	f0 = (-16.0*rh4-24.0*rh2*r2+32.0*rh*r3-9.0*r4)/
 	  (32.0*rh*r3);
-
 	f4 = 0;
-
 	f5 = (4.0*psi4*a2mr*a2mr*(4.0*rh2+4.0*rh*r+9.0*r2)-3.0)/
 	  (256.0*rh*r3*psi4);
-
-
 	g0 = a2mr*a2mr*a2mr*(2.0*rh+3.0*r)/(16.0*rh*r3);
-
 	g4 = 0;
-
 	g5 = (3.0 - 4.0*psi4*a2mr*a2mr*a2mr*(2.0*rh+3.0*r))/(128.0*rh*r3*psi4);
-
       }
       f1 = (-2.0*psi2*a2pr*(4.0*rh2-4.0*rh*r+9.0*r2) + 2.0*rh -3.0*r)/
 	(128.0*rh*r3*psi3*sqrt(M_PI));
-
       f2 = (2.0*psi2*a2mr*(4.0*rh2+4.0*rh*r+9.0*r2)-2.0*rh-3.0*r)/
 	(128.0*rh*r3*psi3*sqrt(M_PI));
-
       f3 = 3.0*(6.0*r2*psi2+1.0)/(64.0*sqrt(M_PI)*rh*r2*psi3);
-
       f6 = (4.0*psi4*a2pr*a2pr*(4.0*rh2-4.0*rh*r+9.0*r2)-3.0)/
 	(256.0*rh*r3*psi4);
-
       f7 = 3.0*(1.0-12.0*r4*psi4)/(128.0*rh*r3*psi4);
-
       g1 = (2.0*psi2*a2pr*a2pr*(2.0*rh-3.0*r)-2.0*rh+3.0*r)/
 	(64.0*sqrt(M_PI)*rh*r3*psi3);
-
       g2 = (-2.0*psi2*a2mr*a2mr*(2.0*rh+3.0*r)+2.0*rh+3.0*r)/
 	(64.0*sqrt(M_PI)*rh*r3*psi3);
-
       g3 = (3.0*(2.0*r2*psi2-1.0))/(32.0*sqrt(M_PI)*rh*r2*psi3);
-
       g6 = (3.0-4.0*psi4*(2.0*rh-3.0*r)*a2pr*a2pr*a2pr)/(128.0*rh*r3*psi4);
-
       g7 = -3.0*(4.0*r4*psi4+1.0)/(64.0*rh*r3*psi4);
-
-      return {params2FG(r, f0, f1, f2, f3, f4, f5, f6, f7),
-	  params2FG(r, g0, g1, g2, g3, g4, g5, g6, g7)};
+      return {params2FG(r, f0, f1, f2, f3, f4, f5, f6, f7), params2FG(r, g0, g1, g2, g3, g4, g5, g6, g7)};
     }
 
 
@@ -145,13 +115,13 @@ namespace uammd{
       double a2mr = 2*rh-r;
       double a2pr = 2*rh+r;
       double rsq = r*r;
-      return  f0 + f1*exp(-psisq*a2pr*a2pr)  +
-	f2*exp(-a2mr*a2mr*psisq) + f3*exp(-psisq*rsq) +
-	f4*erfc(a2mr*psi) + f5*erfc(-a2mr*psi) +
+      return  f0 + f1*exp(-psisq*a2pr*a2pr) +
+	f2*exp(-a2mr*a2mr*psisq) + f3*exp(-psisq*rsq)+
+	f4*erfc(a2mr*psi) + f5*erfc(-a2mr*psi)+
 	f6*erfc(a2pr*psi) + f7*erfc(r*psi);
-
     }
 
 
   }
 }
+#endif

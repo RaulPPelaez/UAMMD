@@ -10,9 +10,7 @@ All psi output is adimensional (multipied by rh)
 #include"Interactor/Interactor.cuh"
 #include"Integrator/BDHI/BDHI_EulerMaruyama.cuh"
 #include"Integrator/BDHI/BDHI_PSE.cuh"
-
 #include<iostream>
-
 #include<vector>
 #include<fstream>
 using namespace uammd;
@@ -75,6 +73,7 @@ long double pullForce_measureMobility(real L, real psi){
     }
   }
   sys->finish();
+
   return vel/(F*M0*Ntest);
 }
 
@@ -105,7 +104,6 @@ bool selfMobility_pullForce_test(){
   }
   return true;
 }
-
 
 //Two particles, pull one of them, measure the velocity of the other
 double pullForce_pairMobility_measureMobility(real L, real psi, real F){
@@ -184,7 +182,6 @@ bool deterministicPairMobility_test(){
   }
   return true;
 }
-
 
 bool idealParticlesDiffusion(int N, real L, real psi){
   auto sys = make_shared<System>();
@@ -290,7 +287,6 @@ double3 singleParticleNoise(real T, real L, real psi){
   return variance/(T*selfMobility);
 }
 
-
 void noiseVariance_test(){
   int Npsi = 10;
   real psi_min = 0.1/rh;
@@ -310,7 +306,6 @@ void noiseVariance_test(){
     CudaCheckError();
   }
 }
-
 
 int main( int argc, char *argv[]){
   temperature = std::stod(argv[2]);
