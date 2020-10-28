@@ -28,9 +28,11 @@ namespace uammd{
 	{
 	  initializeDeterministicPart(par);
 	  this->seed = sys->rng().next32();
-	  //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
-	  auto lanczosTolerance = par.tolerance; //std::min(0.05f, sqrt(par.tolerance));
-	  this->lanczos = std::make_shared<LanczosAlgorithm>(sys, lanczosTolerance);
+	  if(temperature>real(0.0)){
+	    //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
+	    auto lanczosTolerance = par.tolerance; //std::min(0.05f, sqrt(par.tolerance));
+	    this->lanczos = std::make_shared<LanczosAlgorithm>(sys, lanczosTolerance);
+	  }
 	  CudaCheckError();
 	}
 
