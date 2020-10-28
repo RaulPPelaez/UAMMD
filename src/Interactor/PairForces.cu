@@ -12,7 +12,7 @@
   See misc/Potential.cuh and https://github.com/RaulPPelaez/UAMMD/wiki/Potential for more info on potentials and how to implement them.
 */
 
-#include<third_party/cub/cub.cuh>
+#include<cub/cub.cuh>
 #include"PairForces.cuh"
 #include"utils/GPUUtils.cuh"
 #include"utils/cxx_utils.h"

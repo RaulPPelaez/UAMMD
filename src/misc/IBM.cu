@@ -1,7 +1,7 @@
 #include"IBM.cuh"
 #include<third_party/type_names.h>
 #include <type_traits>
-#include<third_party/cub/cub.cuh>
+#include<cub/cub.cuh>
 
 namespace uammd{
 

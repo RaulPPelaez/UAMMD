@@ -36,7 +36,7 @@ References:
 
  */
 #include"SPH.cuh"
-#include<third_party/cub/cub.cuh>
+#include<cub/cub.cuh>
 
 #include"utils/GPUUtils.cuh"
 #include"SPH/Kernel.cuh"

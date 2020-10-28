@@ -9,7 +9,7 @@ TODO:
 */
 
 #include"BondedForces.cuh"
-#include<third_party/cub/cub.cuh>
+#include<cub/cub.cuh>
 #include<thrust/sort.h>
 #include<thrust/reduce.h>
 #include<algorithm>
