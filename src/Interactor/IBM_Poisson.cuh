@@ -19,15 +19,14 @@ namespace uammd{
     struct Gaussian{
       int support;
       Gaussian(real tolerance, real width, real h){
-	this-> prefactor = pow(2*M_PI*width*width, -1.5);
+	this-> prefactor = cbrt(pow(2*M_PI*width*width, -1.5));
 	this-> tau = -1.0/(2.0*width*width);
 	real rmax = sqrt(log(tolerance*sqrt(2*M_PI*width*width))/tau);
 	support = std::max(3, int(2*rmax/h+0.5));
       }
 
-      inline __device__ real delta(real3 rvec, real3 h) const{
-	const real r2 = dot(rvec, rvec);
-	return prefactor*exp(tau*r2);
+      inline __device__ real phi(real r) const{
+	return prefactor*exp(tau*r*r);
       }
     private:
       real prefactor;
@@ -85,10 +84,10 @@ namespace uammd{
     //using managed_vector = thrust::device_vector<T, managed_allocator<T>>;
 
     managed_vector<char> cufftWorkArea;
-    TabulatedFunction<real> nearFieldGreensFunction;
+    std::shared_ptr<TabulatedFunction<real>> nearFieldGreensFunction;
     managed_vector<real> nearFieldGreensFunctionTable;
 
-    TabulatedFunction<real> nearFieldPotentialGreensFunction;
+    std::shared_ptr<TabulatedFunction<real>> nearFieldPotentialGreensFunction;
     managed_vector<real> nearFieldPotentialGreensFunctionTable;
 
     cudaStream_t st;
@@ -102,7 +101,7 @@ namespace uammd{
     void spreadCharges(real* gridCharges);
     void forwardTransformCharge(real* gridCharges, cufftComplex* gridChargesFourier);
     void convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier);
-    void inverseTransform(cufftComplex4* gridFieldPotentialFourier, real4* gridFieldPotential);
+    void inverseTransform(cufftComplex* gridFieldPotentialFourier, real* gridFieldPotential);
     void interpolateFields(real4* gridFieldPotential);
 
     Box box;

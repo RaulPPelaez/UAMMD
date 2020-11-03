@@ -120,13 +120,13 @@ namespace uammd{
       sys->log<System::MESSAGE>("[Poisson] Elements in near field table: %d", Ntable);
       nearFieldGreensFunctionTable.resize(Ntable);
       real* ptr = thrust::raw_pointer_cast(nearFieldGreensFunctionTable.data());
-      nearFieldGreensFunction = TabulatedFunction<real>(ptr, Ntable, 0, nearFieldCutOff,
+      nearFieldGreensFunction = std::make_shared<TabulatedFunction<real>>(ptr, Ntable, 0, nearFieldCutOff,
 					[=](real r){
 					  return Poisson_ns::greensFunctionField(r, gw, split, epsilon);
 					});
       nearFieldPotentialGreensFunctionTable.resize(Ntable);
       ptr = thrust::raw_pointer_cast(nearFieldPotentialGreensFunctionTable.data());
-      nearFieldPotentialGreensFunction = TabulatedFunction<real>(ptr, Ntable, 0, nearFieldCutOff*nearFieldCutOff,
+      nearFieldPotentialGreensFunction = std::make_shared<TabulatedFunction<real>>(ptr, Ntable, 0, nearFieldCutOff*nearFieldCutOff,
 					[=](real r2){
 					  return Poisson_ns::greensFunction(r2, gw, split, epsilon);
 					});
@@ -256,7 +256,7 @@ namespace uammd{
     convolveFourier((cufftComplex*) gridCharges.get(), gridFieldPotentialFourier.get());
     gridCharges.reset();
     auto gridFieldPotential = Poisson_ns::allocateTemporaryArray<real4>(2*(n.x/2+1)*n.y*n.z);
-    inverseTransform(gridFieldPotentialFourier.get(), gridFieldPotential.get());
+    inverseTransform((cufftComplex*)gridFieldPotentialFourier.get(), (real*) gridFieldPotential.get());
     interpolateFields(gridFieldPotential.get());
   }
 
@@ -267,7 +267,7 @@ namespace uammd{
       nl->update(box, nearFieldCutOff, st);
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
-      auto tr = Poisson_ns::NearFieldForceTransverser(force.begin(), charge.begin(), nearFieldGreensFunction, box);
+      auto tr = Poisson_ns::NearFieldForceTransverser(force.begin(), charge.begin(), *nearFieldGreensFunction, box);
       nl->transverseList(tr, st);
     }
   }
@@ -286,7 +286,7 @@ namespace uammd{
       nl->update(box, nearFieldCutOff, st);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
       auto energy = pd->getEnergy(access::location::gpu, access::mode::read);
-      auto tr = Poisson_ns::NearFieldEnergyTransverser(energy.begin(), charge.begin(), nearFieldPotentialGreensFunction, box);
+      auto tr = Poisson_ns::NearFieldEnergyTransverser(energy.begin(), charge.begin(), *nearFieldPotentialGreensFunction, box);
       nl->transverseList(tr, st);
     }
   }
@@ -375,11 +375,7 @@ namespace uammd{
   void Poisson::forwardTransformCharge(real *gridCharges, cufftComplex* gridChargesFourier){
     CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
     sys->log<System::DEBUG2>("[Poisson] Taking grid to wave space");
-    auto cufftStatus = cufftExecReal2Complex<real>(cufft_plan_forward, gridCharges, gridChargesFourier);
-    if(cufftStatus != CUFFT_SUCCESS){
-      sys->log<System::ERROR>("[Poisson] Error in forward CUFFT");
-      throw std::runtime_error("CUFFT Error");
-    }
+    CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, gridCharges, gridChargesFourier));
   }
 
   void Poisson::convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier){
@@ -395,16 +391,10 @@ namespace uammd{
     CudaCheckError();
   }
 
-  void Poisson::inverseTransform(cufftComplex4* gridFieldPotentialFourier, real4* gridFieldPotential){
+  void Poisson::inverseTransform(cufftComplex* gridFieldPotentialFourier, real* gridFieldPotential){
     sys->log<System::DEBUG2>("[Poisson] Force to real space");
     CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
-    auto cufftStatus = cufftExecComplex2Real<real>(cufft_plan_inverse,
-     						   (cufftComplex*)gridFieldPotentialFourier,
-     						   (cufftReal*)gridFieldPotential);
-    if(cufftStatus != CUFFT_SUCCESS){
-      sys->log<System::ERROR>("[Poisson] Error in inverse CUFFT");
-      throw std::runtime_error("CUFFT Error");
-    }
+    CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridFieldPotentialFourier, gridFieldPotential));
     CudaCheckError();
   }
 
