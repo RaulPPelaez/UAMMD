@@ -63,27 +63,25 @@ namespace uammd{
   struct LinearInterpolation{
     template<class iterator, class T = typename std::iterator_traits<iterator>::value_type>
     inline  __device__ T operator()(const iterator &table, int Ntable, real dr, real r) const{
-      int i = r*Ntable;
-      real r0 = i*dr;
-
-      T v0 = table[i];
-      T v1 = table[i+1];
-
-      real t = (r - r0)*(real)Ntable;
-
+      const int i = r*Ntable;
+      const real r0 = i*dr;
+      const T v0 = table[i];
+      const T v1 = table[i+1];
+      const real t = (r - r0)*(real)Ntable;
       return lerp(v0, v1, t);
     }
   };
 
   template<class T, class Interpolation = LinearInterpolation>
   struct TabulatedFunction{
-    int Ntable;
-    real rmin, rmax, invInterval;
-    real drNormalized;
+    const int Ntable;
+    const real rmin, rmax, interval;
+    const real dr;
     T *table;
-    Interpolation interp;
+    const Interpolation interp;
     bool freeTable = false;
-    bool isCopy;
+    const bool isCopy;
+
     TabulatedFunction(){}
 
   private:
@@ -92,15 +90,18 @@ namespace uammd{
     template<class Functor>
     TabulatedFunction(int N, real rmin, real rmax, Functor foo):
       TabulatedFunction(myCudaMalloc(N), N, rmin, rmax, foo)
-    {this->freeTable=true;}
+    {
+      this->freeTable=true;
+    }
+
     template<class Functor>
     TabulatedFunction(T* table, int N, real rmin, real rmax, Functor foo):
       Ntable(N-1),
       rmin(rmin),
       rmax(rmax),
+      interval(1.0/(rmax-rmin)),
+      dr(1.0/real(Ntable)),
       table(table),
-      drNormalized(1.0/(real)Ntable),
-      invInterval(1.0/(rmax-rmin)),
       interp(),
       freeTable(false),
       isCopy(false)
@@ -110,15 +111,21 @@ namespace uammd{
 	double x = (i/(double)(Ntable))*(rmax-rmin) + rmin;
 	tableCPU[i] = foo(x);
       }
-      CudaSafeCall(cudaMemcpy(table,
-       			      tableCPU.data(),
-       			      (Ntable+1)*sizeof(T),
-       			      cudaMemcpyHostToDevice));
-
+      CudaSafeCall(cudaMemcpy(table, tableCPU.data(), (Ntable+1)*sizeof(T), cudaMemcpyHostToDevice));
     }
 
     //This copy constructor prevents cuda from calling the destructor after a kernel call
-    TabulatedFunction( const TabulatedFunction& _orig ) { *this = _orig; isCopy = true; }
+    TabulatedFunction( const TabulatedFunction& _orig ):
+      Ntable(_orig.Ntable),
+      rmin(_orig.rmin),
+      rmax(_orig.rmax),
+      interval(_orig.interval),
+      dr(_orig.dr),
+      table(_orig.table),
+      interp(_orig.interp),
+      freeTable(false),
+      isCopy(true){ }
+
     ~TabulatedFunction(){
       if(freeTable and ! isCopy)CudaSafeCall(cudaFree(table));
     }
@@ -128,14 +135,13 @@ namespace uammd{
       return this->operator()<modifier>(rs);
     }
 
-
     template<cub::CacheLoadModifier modifier = cub::LOAD_DEFAULT>
     inline __device__ T operator()(real rs) const{
-      real r = (rs-rmin)*invInterval;
+      real r = (rs-rmin)*interval;
       if(rs >= rmax) return T();
       if(r <= real(0.0)) return table[0];
       cub::CacheModifiedInputIterator<modifier, T> table_itr(table);
-      return interp(table_itr, Ntable, drNormalized, r);
+      return interp(table_itr, Ntable, dr, r);
     }
 
   };
