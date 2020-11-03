@@ -24,16 +24,16 @@ namespace uammd{
   namespace BDHI{
     struct RPYPSE_near{
     private:
-      double rh, psi;
-      double normalization; //Divide F and G by this.
-      double rcut;
+      const double rh, psi;
+      const double normalization; //Divide F and G by this.
+      const double rcut;
 
     public:
       RPYPSE_near(real rh, real psi, real normalization, real rcut):
 	rh(rh), psi(psi), normalization(normalization), rcut(rcut){}
 
-      double2 FandG(double r);
-      __device__ __host__ inline real2 operator()(double r){
+      double2 FandG(double r) const;
+      inline real2 operator()(double r) const{
 	return make_real2(this->FandG(r)/normalization);
       }
 
@@ -41,11 +41,11 @@ namespace uammd{
 
       double params2FG(double r,
 		       double f0, double f1, double f2, double f3,
-		       double f4, double f5, double f6, double f7);
+		       double f4, double f5, double f6, double f7) const;
     };
 
 
-    double2 RPYPSE_near::FandG(double r){
+    double2 RPYPSE_near::FandG(double r) const{
       double r2 = r*r;
       if(r>=rcut) return make_double2(0.0, 0.0);
       if(r<=real(0.0)){
@@ -110,7 +110,7 @@ namespace uammd{
 
     double RPYPSE_near::params2FG(double r,
 				  double f0, double f1, double f2, double f3,
-				  double f4, double f5, double f6, double f7){
+				  double f4, double f5, double f6, double f7) const{
       double psisq = psi*psi;
       double a2mr = 2*rh-r;
       double a2pr = 2*rh+r;
