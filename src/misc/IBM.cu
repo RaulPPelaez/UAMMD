@@ -1,46 +1,13 @@
+/*Raul P. Pelaez 2019-2020. Immersed Boundary Method (IBM).
+  See IBM.cuh
+ */
 #include"IBM.cuh"
-#include<third_party/type_names.h>
-#include <type_traits>
+#include<type_traits>
 #include<cub/cub.cuh>
-
+#include"utils/atomics.cuh"
 namespace uammd{
 
   namespace IBM_ns{
-
-    template<class T>
-    inline __device__ T atomicAdd(T* address, T val){ return ::atomicAdd(address, val);}
-
-#ifndef SINGLE_PRECISION
-#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ < 600
-      inline __device__ double atomicAdd(double* address, double val){
-      unsigned long long int* address_as_ull =
-	(unsigned long long int*)address;
-      unsigned long long int old = *address_as_ull, assumed;
-      do {
-	assumed = old;
-	old = atomicCAS(address_as_ull, assumed,
-			__double_as_longlong(val +
-					     __longlong_as_double(assumed)));
-      } while (assumed != old);
-      return __longlong_as_double(old);
-    }
-#endif
-#endif
-
-    inline __device__ real3 atomicAdd(real3* address, real3 val){
-      real3 newval;
-      if(val.x) newval.x = atomicAdd(&(*address).x, val.x);
-      if(val.y) newval.y = atomicAdd(&(*address).y, val.y);
-      if(val.z) newval.z = atomicAdd(&(*address).z, val.z);
-      return newval;
-    }
-
-    inline __device__ real2 atomicAdd(real2* address, real2 val){
-      real2 newval;
-      if(val.x) newval.x = atomicAdd(&(*address).x, val.x);
-      if(val.y) newval.y = atomicAdd(&(*address).y, val.y);
-      return newval;
-    }
 
     namespace detail{
       SFINAE_DEFINE_HAS_MEMBER(getSupport)
@@ -50,17 +17,57 @@ namespace uammd{
       template<class Kernel, bool def = has_getSupport<Kernel>::value> struct GetSupport;
 
       template<class Kernel> struct GetSupport<Kernel, true>{
-	static __device__ int3 get(Kernel &kernel, int3 cell){return kernel.getSupport(cell);}
+	static __host__  __device__ int3 get(Kernel &kernel, int3 cell){return kernel.getSupport(cell);}
       };
 
       template<class Kernel> struct GetSupport<Kernel, false>{
-	static __device__ int3 get(Kernel &kernel, int3 cell){return make_int3(kernel.support);}
+	static __host__  __device__ int3 get(Kernel &kernel, int3 cell){return make_int3(kernel.support);}
       };
+
+      template<class Grid>
+      __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
+	int3 P = support/2;
+	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
+	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
+	if(shift.x or shift.y or shift.z){
+	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
+	  const real3 pi_pbc = grid.box.apply_pbc(pos);
+	  P -= make_int3(((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5)))*shift;
+	}
+	return P;
+      }
+
+      template<class Grid, class Kernel>
+      __device__ void fillSharedWeights(real* weights, real3 pi, int3 support, int3 celli, int3 P,  Grid &grid, Kernel &kernel){
+	real *weightsX = &weights[0];
+	const int tid = threadIdx.x;
+	for(int i = tid; i<support.x; i+=blockDim.x){
+	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
+	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
+	  weightsX[i] = kernel.phi(rij);
+	}
+	real *weightsY = &weights[support.x];
+	for(int i = tid; i<support.y; i+=blockDim.x){
+	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
+	  const real rij = grid.distanceToCellCenter(pi, cellj).y;
+	  weightsY[i] = kernel.phi(rij);
+	}
+	real *weightsZ = &weights[support.x+support.y];
+	for(int i = tid; i<support.z; i+=blockDim.x){
+	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
+	  const real rij = grid.distanceToCellCenter(pi, cellj).z;
+	  weightsZ[i] = kernel.phi(rij);
+	}
+      }
+
+      __device__ real computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
+	return weights[ii]*weights[support.x+jj]*weights[support.x+support.y+kk];
+      }
+      
     }
 
-    /*Spreads the 3D quantity v (defined on the particle positions) to a grid
-
-      S v(z) = v(x) = \sum_{z}{ v(z)*\delta(||z-x||^2) }
+    /*Spreads the quantity v (defined on the particle positions) to a grid
+      S v(z) = v(x) = \sum_{z}{ v(z)*\delta(z-x) }
       Where:
       - S is the spreading operator
       - "v" is a certain quantity
@@ -88,39 +95,35 @@ namespace uammd{
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
       __shared__ int3 support;
+      extern __shared__ real weights[];
       if(tid==0){
 	pi = make_real3(pos[id]);
 	vi = particleQuantity[id];
 	celli = grid.getCell(pi);
 	support = detail::GetSupport<Kernel>::get(kernel, celli);
-	P = (support/2);
-	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
-	if(shift.x or shift.y or shift.z){
-	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
-	  const real3 pi_pbc = grid.box.apply_pbc(pi);
-	  P -= make_int3(((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5)))*shift;
+	P = detail::computeSupportShift(pi, celli, grid, support);
+	if(is2D){
+	  P.z = 0;
 	}
-	if(is2D) P.z = 0;
       }
+      __syncthreads();
+      detail::fillSharedWeights(weights, pi, support, celli, P, grid, kernel);
       __syncthreads();
       int numberNeighbourCells = support.x*support.y;
       if(!is2D)  numberNeighbourCells *= support.z;
       for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
-	int3 cellj = make_int3(celli.x + i%support.x - P.x,
-			       celli.y + (i/support.x)%support.y - P.y,
-			       is2D?0:(celli.z + i/(support.x*support.y) - P.z));
-	cellj = grid.pbc_cell(cellj);
-	const real3 rij = grid.distanceToCellCenter(pi, cellj);
-	const auto weight = vi*kernel.delta(rij, grid.getCellSize(cellj));
+	const int ii = i%support.x;
+	const int jj=(i/support.x)%support.y;
+	const int kk=is2D?0:(i/(support.x*support.y));
+	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	const int jcell = cell2index(cellj);
+	const auto weight = vi*detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	atomicAdd(&gridQuantity[jcell], weight);
       }
     }
 
     /*Interpolates a quantity (i.e velocity) from its values in the grid to the particles.
-
-      J(z) q(x) = q(z) = \sum_{x\in G}{ q(x)*\delta(||x-z||^2) weight(x)}
+      J(z) q(x) = q(z) = \sum_{x\in G}{ q(x)*\delta(x-z) weight(x)}
       Where :
          - J is the interpolation operator
 	 - "q" a certain quantity
@@ -130,7 +133,7 @@ namespace uammd{
 	 - weight() is the quadrature weight of a cell. (cellsize^d in a regular grid) given by QuadratureWeights
 
       This is the discretization of an integral and thus requires quadrature weigths for each element.
-        Which in a regular grid is just the cell size, h. But can in general be something depending on the position.
+        Which in a regular grid is just the cell size, h. But can in general be something that depends on the position.
     */
     template<int TPP, bool is2D, class Grid,
       class InterpolationKernel,
@@ -158,51 +161,42 @@ namespace uammd{
       __shared__ int3 P; //Neighbour cell offset
       __shared__ typename BlockReduce::TempStorage temp_storage;
       __shared__ int3 support;
+      extern __shared__ real weights[];
       if(id<numberParticles){
 	if(tid==0){
 	  pi = make_real3(pos[id]);
 	  celli = grid.getCell(pi);
 	  support = detail::GetSupport<InterpolationKernel>::get(kernel, celli);
-	  P = support/2;
-	  //Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	  const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
-	  if(shift.x or shift.y or shift.z){
-	    const auto invCellSize = real(1.0)/grid.getCellSize(celli);
-	    const real3 pi_pbc = grid.box.apply_pbc(pi);
-	    P -= make_int3(((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5)))*shift;
-	  }
+	  P = detail::computeSupportShift(pi, celli, grid, support);
 	  if(is2D) P.z = 0;
 	}
       }
+      __syncthreads();
+      detail::fillSharedWeights(weights, pi, support, celli, P, grid, kernel);
       __syncthreads();
       if(id<numberParticles){
 	int numberNeighbourCells = support.x*support.y;
 	if(!is2D)  numberNeighbourCells *= support.z;
 	for(int i = tid; i<numberNeighbourCells; i+=blockDim.x){
-	  int3 cellj = make_int3(celli.x + i%support.x - P.x,
-				 celli.y + (i/support.x)%support.y - P.y,
-				 is2D?0:(celli.z + i/(support.x*support.y) - P.z));
-	  cellj = grid.pbc_cell(cellj);
-	  const real3 rij = grid.distanceToCellCenter(pi, cellj);
-	  const auto weight = kernel.delta(rij, grid.getCellSize(cellj));
-	  const int jcell = cell2index(cellj);
-	  const auto cellj_vel = gridQuantity[jcell];
+	  const int ii = i%support.x;
+	  const int jj=(i/support.x)%support.y;
+	  const int kk=is2D?0:(i/(support.x*support.y));
+	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	  const real dV = qw(cellj, grid);
-	  result += (dV*weight)*cellj_vel;
+	  const int jcell = cell2index(cellj);
+	  const auto weight = gridQuantity[jcell]*detail::computeWeightFromShared(weights, ii, jj, kk, support);
+	  result += dV*weight;
 	}
       }
       GridQuantityType total = BlockReduce(temp_storage).Sum(result);
-      __syncthreads();
       if(tid==0 and id<numberParticles){
 	particleQuantity[id] += total;
       }
     }
 
-    template<int threadsPerParticle, bool is2D, class ...T> void callGather(int numberParticles, cudaStream_t st, T... args){
-      grid2ParticlesDTPP<threadsPerParticle, is2D><<<numberParticles, threadsPerParticle, 0, st>>>(args...);
+    template<int threadsPerParticle, bool is2D, class ...T> void callGather(int numberParticles, size_t shMemory, cudaStream_t st, T... args){
+      grid2ParticlesDTPP<threadsPerParticle, is2D><<<numberParticles, threadsPerParticle, shMemory, st>>>(args...);
     }
 
   }
 }
-
-

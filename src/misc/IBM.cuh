@@ -1,8 +1,16 @@
-/*Raul P. Pelaez 2019. Immersed Boundary Method (IBM).
-This class contains functions to spread marker information to a grid and interpolate information from a grid to some marker positions. This can be adapted to aid in, for example, an Immersed Boundary Method or a NUFFT method.
+/*Raul P. Pelaez 2019-2020. Immersed Boundary Method (IBM).
+This class contains functions to spread marker information to a grid and
+interpolate information from a grid to some marker positions. This can be
+adapted to aid in, for example, an Immersed Boundary Method or a NUFFT method.
 
 It allows to employ any Kernel to do so, see IBM_kernels.cuh.
 Furthemore the quadrature weights can also be specified when interpolating.
+
+A Kernel has the following requirements:
+
+  -A publicly accesible member called support (either an int or int3) or a
+function getSupport(int3 cell) if support depends on grid position
+  -A function phi(real r) that returns the window function evaluated at that distance
 
 USAGE:
 
@@ -92,18 +100,19 @@ namespace uammd{
 		GridDataIterator &gridData,
 		int numberParticles, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[IBM] Spreading");
-      int support = kernel->support;
-      int numberNeighbourCells = support*support*support;
-      int threadsPerParticle = std::min(32*(numberNeighbourCells/32), 512);
+      int3 support = IBM_ns::detail::GetSupport<Kernel>::get(*kernel, int3());
+      int numberNeighbourCells = support.x*support.y*support.z;
+      int threadsPerParticle = std::min(32*(numberNeighbourCells/32), 128);
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }
+      size_t shMemory = (support.x+support.y+support.z)*sizeof(real);
       if(grid.cellDim.z == 1){
-	IBM_ns::particles2GridD<true><<<numberParticles, threadsPerParticle, 0, st>>>
+	IBM_ns::particles2GridD<true><<<numberParticles, threadsPerParticle, shMemory, st>>>
 	  (pos, v, gridData, numberParticles, grid, cell2index, *kernel);
       }
       else{
-	IBM_ns::particles2GridD<false><<<numberParticles, threadsPerParticle, 0, st>>>
+	IBM_ns::particles2GridD<false><<<numberParticles, threadsPerParticle, shMemory, st>>>
 	  (pos, v, gridData, numberParticles, grid, cell2index, *kernel);
       }
     }
@@ -134,18 +143,16 @@ namespace uammd{
 		const GridQuantityIterator &gridData,
 		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[IBM] Gathering");
-      int support = kernel->support;
-      int numberNeighbourCells = support*support*support;
-      int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 512);
+      int3 support = IBM_ns::detail::GetSupport<Kernel>::get(*kernel, int3());
+      int numberNeighbourCells = support.x*support.y*support.z;
+      int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 64);
+      size_t shMemory = (support.x+support.y+support.z)*sizeof(real);
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }
-#define KERNEL(x) if(threadsPerParticle<=x){ IBM_ns::callGather<x, is2D>(numberParticles, st, pos, Jq, gridData, numberParticles, grid, cell2index, *kernel, qw); return;}
+#define KERNEL(x) if(threadsPerParticle<=x){ IBM_ns::callGather<x, is2D>(numberParticles, shMemory, st, pos, Jq, gridData, numberParticles, grid, cell2index, *kernel, qw); return;}
       KERNEL(32)
 	KERNEL(64)
-	KERNEL(128)
-	KERNEL(256)
-	KERNEL(512)
 #undef KERNEL
 
     }

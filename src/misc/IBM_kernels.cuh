@@ -1,27 +1,16 @@
-/*Raul P. Pelaez 2018. Immerse boundary kernels
+/*Raul P. Pelaez 2018-2020. Immerse boundary kernels. AKA Window functions
 
-USAGE:
-Create with:
+A Kernel has the following requirements if used with the IBM module:
 
-Kernel kern(cellSize, tolerance);
-\delta(rij) can be computed with kern.delta(rij);
-Each kernel will need a certain number of support cells given by Kernel::support
-support 3 means up to first neighbours (27 cells in 3D).
-
-the expected hydrodynamic radius for the given cellsize and tolerance can be obtained with kern.getHydrodynamcRadius(IBM::SpatialDiscretization::Spectral); (or any other SpatialDiscretization).
+  -A publicly accesible member called support (either an int or int3) or a
+function getSupport(int3 cell) if support depends on grid position
+  -A function phi(real r) that returns the window function evaluated at that
+distance
 
 
-INTERFACE:
-
-An IBM kernel must be a class with these characteristics:
-
-   -A constructor that takes a cell size and a tolerance (which might be unused)
-   -A "delta" member device function that takes a real3 distance and a real3 cellsize and returns a real weight, prototype:
-       	__device__ real delta(real3 rvec, real3 h);
-   -A function that returns the expected hydrodynamic radius for a given SpatialDiscretization (returns -1 if unknown):
-      real getHydrodynamicRadius(SpatialDiscretization sd) const;
-   -A public member called support with the necessary support cells (3 means first neighbours, 27 cells in total in 3D).
-
+Notice that in order to use the Kernels in this file you must somehow inherit
+from them to provide the support. These are meant to be a skeleton on top of
+which the kernel is created for each particular use case.
 
 REFERENCES:
 [1] Charles S. Peskin. The immersed boundary method (2002). DOI: 10.1017/S0962492902000077
@@ -29,132 +18,106 @@ REFERENCES:
  */
 #ifndef IBMKERNELS_CUH
 #define IBMKERNELS_CUH
-#include"misc/TabulatedFunction.cuh"
+#include"global/defines.h"
+#include "misc/TabulatedFunction.cuh"
 namespace uammd{
   namespace IBM_kernels{
-    enum class SpatialDiscretization{Staggered, Centered, Spectral};
 
-    struct GaussianKernel{
-      int support;
-      GaussianKernel(real3 h, real tolerance){
-	real amin = 0.55;
-	real amax = 1.65;
-	real x = -log10(2*tolerance)/10.0;
-	real factor = std::min(amin + x*(amax-amin), amax);
+    class Gaussian{
+      const real prefactor;
+      const real tau;
+    public:
+      Gaussian(real width):
+	prefactor(pow(2.0*M_PI*width*width, -0.5)),
+	tau(-0.5/(width*width)){}
 
-
-	real sigma = h.x*factor;
-	this->prefactor = pow(2*M_PI*sigma*sigma, -1.5);
-	this->tau  = -0.5/(sigma*sigma);
-	this->support = int(2*(sqrt(1.0/tau*log(0.9*tolerance)/(h.x*h.x) + 0.5))+0.5);
-	if(support < 3 ) support = 3;
-
-	this->hydrodynamicRadius = sigma*sqrt(M_PIl);
+      __host__ __device__ real phi(real r) const{
+	return prefactor*exp(tau*r*r);
       }
-
-      inline __host__ __device__ real phi(real r) const{
-	return pow(prefactor,1/3.0)*exp(tau*r*r);
-      }
-
-      inline __device__ real delta(real3 rvec, real3 h) const{
-	const real r2 = dot(rvec, rvec);
-	return prefactor*exp(tau*r2);
-      }
-      inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
-	return hydrodynamicRadius;
-      }
-
-    private:
-      real prefactor;
-      real tau;
-      real hydrodynamicRadius;
-    };
-    struct SimpleGaussian{
-      int support;
-      SimpleGaussian(int support, real width):support(support){
-	this-> prefactor = pow(1.0/sqrt(2*M_PI*width*width),3);
-	this-> tau = -1.0/(2.0*width*width);
-	sup = 0.5*support;
-      }
-
-      inline __device__ real delta(real3 rvec, real3 h) const{
-	const real r2 = dot(rvec, rvec);
-	if(r2>sup*sup*h.x*h.x) return 0;
-	return prefactor*exp(tau*r2);
-      }
-    private:
-      real prefactor;
-      real tau;
-      real sup;
     };
 
+    namespace detail{
+      template<class Foo>
+      real integrate(Foo foo, real rmin, real rmax, int Nr){
+	double integral = foo(rmin)*0.5;
+	for(int i = 1; i<Nr; i++){
+	  integral += foo(rmin+i*(rmax-rmin)/Nr);
+	}
+	integral += foo(rmax)*0.5;
+	integral *= (rmax-rmin)/(real)Nr;
+	return integral;
+      }
 
+    }
+    //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
+    struct BarnettMagland{
+    private:
+      __host__ __device__ real BM(real zz, real w, real beta) const{
+	const real z = zz/w;
+	const real z2 = z*z;
+	return (z2>real(1.0))?0:(exp(beta*(sqrt(real(1.0)-z2)-real(1.0))));
+      }
 
+      real computeNorm() const{
+	auto foo=[=](real r){return BM(r, w, beta);};
+	real norm = detail::integrate(foo, -w, w, 100000);
+	return norm;
+      }
 
+      const real invnorm;
+    public:
+      const real beta;
+      const real w;
 
-    namespace PeskinKernel{
+      BarnettMagland(real w, real beta):
+	w(w),
+	beta(beta),
+	invnorm(1.0/computeNorm()){ }
+
+      inline __host__  __device__ real phi(real zz) const{
+	return BM(zz, w, beta)*invnorm;
+      }
+    };
+
+    namespace Peskin{
       //[1] Charles S. Peskin. The immersed boundary method (2002). DOI: 10.1017/S0962492902000077
       //Standard 3-point Peskin interpolator
       struct threePoint{
-	real3 invh;
-	static constexpr int support = 3;
-	threePoint(real3 h, real tolerance = 0):invh(1.0/h){}
-	inline __host__ __device__ real phi(real r) const{
+	const real invh;
+	threePoint(real h):invh(1.0/h){}
+	__host__ __device__ real phi(real rr) const{
+	  const real r = fabs(rr)*invh;
 	  if(r<real(0.5)){
 	    constexpr real onediv3 = real(1/3.0);
-	    return onediv3*(real(1.0) + sqrt(real(1.0)+real(-3.0)*r*r));
+	    return invh*onediv3*(real(1.0) + sqrt(real(1.0)+real(-3.0)*r*r));
 	  }
 	  else if(r<real(1.5)){
 	    constexpr real onediv6 = real(1/6.0);
 	    const real omr = real(1.0) - r;
-	    return onediv6*(real(5.0)-real(3.0)*r - sqrt(real(1.0) + real(-3.0)*omr*omr));
+	    return invh*onediv6*(real(5.0)-real(3.0)*r - sqrt(real(1.0) + real(-3.0)*omr*omr));
 	  }
 	  else return 0;
-	}
-	inline __device__ real delta(real3 rvec, real3 h) const{
-
-	  return invh.x*invh.y*invh.z*phi(fabs(rvec.x*invh.x))*phi(fabs(rvec.y*invh.y))*phi(fabs(rvec.z*invh.z));
-	}
-
-        inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
-	  switch(sd){
-	  case SpatialDiscretization::Staggered: return 0.91/invh.x;
-	    //case SpatialDiscretization::Spectral:  return 0.971785649216029/invh.x; //exact at 0.5h, +-1e-2 variation across unit cell
-	  case SpatialDiscretization::Spectral:  return 0.975/invh.x; //+-1e-2 variation across unit cell
-	  default: return -1;
-	  }
 	}
       };
 
       //Standard 4-point Peskin interpolator
       struct fourPoint{
-	real3 invh;
-	static constexpr int support = 4;
-	fourPoint(real3 h, real tolerance = 0):invh(1.0/h){}
-	inline __host__  __device__ real phi(real r) const{
-	  constexpr real onediv8 = real(0.125);
-	  if(r<real(1.0)){
-	    return onediv8*(real(3.0) - real(2.0)*r + sqrt(real(1.0)+real(4.0)*r*(real(1.0)-r)));
-	  }
-	  else if(r<real(2.0)){
-	    return onediv8*(real(5.0) - real(2.0)*r - sqrt(real(-7.0) + real(12.0)*r-real(4.0)*r*r));
-	  }
-	  else return 0;
-	}
-	inline __device__ real delta(real3 rvec, real3 h) const{
-	  return invh.x*invh.y*invh.z*phi(fabs(rvec.x*invh.x))*phi(fabs(rvec.y*invh.y))*phi(fabs(rvec.z*invh.z));
-	}
+	const real invh;
+	fourPoint(real h):invh(1.0/h){}
 
-	inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
-	  switch(sd){
-	  case SpatialDiscretization::Staggered: return 1.255/invh.x;
-	    //case SpatialDiscretization::Spectral:  return 1.31275/invh.x;
-	    //case SpatialDiscretization::Spectral:  return 1.321553589/invh.x; //exact at x=0
-	    case SpatialDiscretization::Spectral:  return 1.3157892485/invh.x; //exact at x=0.5h, +-4e-3 variation across unit cell
-	  default: return -1;
-	  }
-	}
+	 __host__  __device__ real phi(real rr) const{
+	   const real r = fabs(rr)*invh;
+	   constexpr real onediv8 = real(0.125);
+	   if(r<real(1.0)){
+	     return invh*onediv8*(real(3.0) - real(2.0)*r + sqrt(real(1.0)+real(4.0)*r*(real(1.0)-r)));
+	   }
+	   else if(r<real(2.0)){
+	     return invh*onediv8*(real(5.0) - real(2.0)*r - sqrt(real(-7.0) + real(12.0)*r-real(4.0)*r*r));
+	   }
+	   else return 0;
+	 }
       };
+
     }
 
     namespace GaussianFlexible{
@@ -163,21 +126,13 @@ namespace uammd{
       struct sixPoint{
       private:
 	static constexpr real K = 0.714075092976608; //59.0/60.0-sqrt(29.0)/20.0;
-	TabulatedFunction<real> phi_tab;
-	real3 invh;
-      public:
-	sixPoint(real3 h, real tolerance = 1e-7):
-	  invh(1.0/h),
-	  phi_tab(int(1e5*(-log10(tolerance)/20.0)), 0, 3, phi)
-	{}
-	~sixPoint() = default;
-
-	static constexpr int support = 6;
-	/* the new C3 6-pt kernel */
-	static inline __host__  __device__ real phi(real r){
+	const TabulatedFunction<real> phi_tab;
+	const real invh;
+	// the new C3 6-pt kernel
+	static inline __host__  __device__ real phi_impl(real r){
 	  //if (r <= real(-3) || r>=real(3)) return 0;
 	  if (r>=real(3)) return 0;
-	  real R = r - ceil(r) + real(1.0);  /* R between [0,1] */
+	  real R = r - ceil(r) + real(1.0);  // R between [0,1]
 	  real R2 = R * R;
 	  real R3 = R2*R;
 	  const real alpha = real(28.);
@@ -191,18 +146,8 @@ namespace uammd{
 
 	  const real discr = beta*beta - real(4.0) * alpha * gamma;
 
-	  const int sgn = ((real(1.5)-K)>0) ? 1 : -1;   /* sign(3/2 - K) */
+	  const int sgn = ((real(1.5)-K)>0) ? 1 : -1;   // sign(3/2 - K)
 	  const real prefactor = real(1.)/(real(2)*alpha) * ( -beta + sgn * sqrt(discr) );
-	  // if (r<=real(-2)){
-	  //   return prefactor;
-	  // }
-	  // else if (r <= real(-1)){
-	  //   const real rp2 = r+real(2.0);
-	  //   return real(-3.)*prefactor -
-	  //     real(1./16) +
-	  //     real(1./8)*( K+rp2*rp2 ) +
-	  //     real(1./12)*(real(3)*K-real(1.0))*rp2 + real(1./12)*rp2*rp2*rp2;
-	  // }
 	  if (r <= real(0) ){
 	    const real rp1 = r+real(1.0);
 	    return  real(2.)*prefactor +
@@ -230,91 +175,27 @@ namespace uammd{
 	  return real(0.0);
 	}
 
-	inline __device__ real delta(real3 rvec, real3 h) const{
-	  //Uncomment to evaluate instead of reading from a table
-	  //return invh.x*invh.y*invh.z*phi(fabs(rvec.x*invh.x))*phi(fabs(rvec.y*invh.y))*phi(fabs(rvec.z*invh.z));
-	  return invh.x*invh.y*invh.z*phi_tab(fabs(rvec.x*invh.x))*phi_tab(fabs(rvec.y*invh.y))*phi_tab(fabs(rvec.z*invh.z));
+      public:
+	sixPoint(real h, real tolerance = 1e-7):
+	  invh(1.0/h),
+	  phi_tab(int(1e5*(-log10(tolerance)/20.0)), 0, 3, phi_impl)
+	{}
+
+	~sixPoint() = default;
+
+	inline __host__  __device__ real phi(real r) const{
+	  return phi_impl(fabs(r)*invh)*invh;
 	}
 
-
-	inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
-	  switch(sd){
-	  case SpatialDiscretization::Staggered: return -1;
-	  case SpatialDiscretization::Spectral:  return 1.519854/invh.x; //exact at x=0.5h, +-1e-4 variation across unit cell
-	  default: return -1;
-	  }
+        inline __host__  __device__ real phi_tabulated(real r) const{
+	  #ifdef  __CUDA_ARCH__
+	  return phi_tab(fabs(r)*invh)*invh;
+	  #else
+	  return phi(r*invh)*invh;
+	  #endif
 	}
-
-
       };
     }
-
-    //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
-    struct BarnettMagland{
-    private:
-      template<class Foo>
-      real integrate(Foo foo, real rmin, real rmax, int Nr){
-	double integral = foo(rmin)*0.5;
-	for(int i = 1; i<Nr; i++){
-	  integral += foo(rmin+i*(rmax-rmin)/Nr);
-	}
-	integral += foo(rmax)*0.5;
-	integral *= (rmax-rmin)/(real)Nr;
-	return integral;
-      }
-      real beta;
-      real hydrodynamicRadius;
-      real invnorm;
-      real prefactor;
-      real w;
-    public:
-      int support;
-      BarnettMagland(real3 h, real tolerance){
-
-        this-> w = abs(log10(tolerance))+1;
-	//real3 alpha = w*h*0.5;
-	//Empirically found to have the minimum translational variace of the hydrodynamic radius
-	this->beta=1.841*w;
-
-	this->support = int(w + 0.5);
-
-	this->invnorm = 1;
-	{
-	  auto foo = [&](real r){ return this->phi(r);};
-	  real norm = integrate(foo, -1.0, 1.0, 1000000)*w*0.5;
-	  this->invnorm = 1.0/norm;
-	}
-	this->prefactor = 1/(h.x*h.y*h.z);
-	{//Totally empirical, starting from approximating the BM kernel to a Gaussian
-	  double c = 0.552088;
-	  double b = 0.618579;
-	  hydrodynamicRadius = h.x*3.0*w/sqrt(2*M_PI)*(pow(beta, -c) - b/beta);
-	}
-
-      }
-      inline __host__  __device__ real phi(real z) const{
-	const real z2 = z*z;
-	if(z2>real(1.0)) return 0;
-	return exp(beta*(sqrt(real(1.0)-z2)-real(1.0)))*invnorm;
-      }
-      inline __device__ real delta(real3 rvec, real3 h) const{
-	return phi(rvec.x/(real(0.5)*w*h.x))*
-	  phi(rvec.y/(real(0.5)*w*h.y))*
-	  phi(rvec.z/(real(0.5)*w*h.z))/(h.x*h.y*h.z);
-      }
-
-      inline real getHydrodynamicRadius(SpatialDiscretization sd) const{
-	switch(sd){
-	case SpatialDiscretization::Staggered: return -1;
-	case SpatialDiscretization::Spectral:
-	  return hydrodynamicRadius;
-	default: return -1;
-	}
-      }
-    };
-
-
-
 
   }
 }
