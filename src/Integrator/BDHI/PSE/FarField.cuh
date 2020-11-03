@@ -6,7 +6,7 @@ Far field
 
 #ifndef BDHI_PSE_FARFIELD_CUH
 #define BDHI_PSE_FARFIELD_CUH
-#include"Integrator/BDHI/BDHI_PSE.cuh"
+#include"uammd.cuh"
 #include"utils.cuh"
 #include"third_party/saruprng.cuh"
 #include"utils/debugTools.h"
@@ -15,28 +15,33 @@ Far field
 #include "utils/cufftPrecisionAgnostic.h"
 #include "utils/cufftDebug.h"
 #include "misc/IBM.cuh"
-#include"third_party/managed_allocator.h"
+//#include"third_party/managed_allocator.h"
+#include"utils/NVTXTools.h"
 namespace uammd{
   namespace BDHI{
     namespace pse_ns{
 
       class Kernel{
 	real prefactor;
-	real3 tau;
+	real tau;
       public:
 	int support;
 	Kernel(int P, real3 width){
 	  this->support = 2*P+1;
-	  this->prefactor = 1.0/(width.x*width.y*width.z*pow(2.0*M_PI, 1.5));
-	  this->tau = -0.5/(width*width);
+	  this->prefactor = cbrt(1.0/(width.x*width.y*width.z*pow(2.0*M_PI, 1.5)));
+	  this->tau = -0.5/(width.x*width.x);
+	}
+
+	inline __device__ real phi(real r) const{
+	  return prefactor*exp(tau*r*r);
 	}
 
 	inline __device__ real delta(real3 rvec, real3 h) const{
-	  return prefactor*exp(dot(tau*rvec,rvec));
+	  return prefactor*prefactor*prefactor*exp(dot(tau*rvec,rvec));
 	}
 
       };
-      
+
       class FarField{
       public:
 	using cufftReal = cufftReal_t<real>;
@@ -65,7 +70,7 @@ namespace uammd{
 	  sys->log<System::MESSAGE>("[BDHI::PSE] Unitless splitting factor ξ·a: %f", psi*par.hydrodynamicRadius);
 	  sys->log<System::MESSAGE>("[BDHI::PSE] Far range grid size: %d %d %d", n.x, n.y, n.z);
 	}
-	
+
 	~FarField(){
 	  cufftDestroy(cufft_plan_inverse);
 	  cufftDestroy(cufft_plan_forward);
@@ -75,33 +80,33 @@ namespace uammd{
 
       private:
 	//template<class T> using gpu_container = thrust::device_vector<T, managed_allocator<T>>;
-	template<class T> using gpu_cached_container = thrust::device_vector<T, System::allocator_thrust<T>>;
+	//template<class T> using gpu_cached_container = thrust::device_vector<T, System::allocator_thrust<T>>;
 	template<class T> using gpu_container = thrust::device_vector<T>;
 	shared_ptr<ParticleData> pd;
 	shared_ptr<ParticleGroup> pg;
 	shared_ptr<System> sys;
 	Box box;
 	uint seed;
-	
+
 	void initializeCuFFT();
 	void initializeKernel(real tolerance);
 	void initializeFourierFactors();
 	void initializeGrid(real tolerance);
-	
+
 	void spreadForce(cudaStream_t st);
 	void forwardTransformForces(cudaStream_t st);
 	void convolveFourier(cudaStream_t st);
 	void addBrownianNoise(cudaStream_t st);
 	void inverseTransformVelocity(cudaStream_t st);
 	void interpolateVelocity(real3* MF, cudaStream_t st);
-	
+
 	real hydrodynamicRadius;
 	real temperature;
 	real viscosity;
 	real dt;
 	real psi; /*Splitting factor*/
 	Grid grid;
-	/*Grid interpolation kernel parameters*/
+
 	real3 eta; // kernel width in each direction
 	cufftHandle cufft_plan_forward, cufft_plan_inverse;
 	gpu_container<char> cufftWorkArea;
@@ -146,13 +151,11 @@ namespace uammd{
 	  Output:gridVels = B·FFTf·S·F + 1/√σ·√B·dWw
 	  See sec. B.2 in [1]
 	*/
-	/*A thread per fourier node*/
 	__global__ void forceFourier2Vel(cufftComplex3 * gridForces, /*Input array*/
 					 cufftComplex3 * gridVels, /*Output array, can be the same as input*/
 					 /*Fourier scaling factors, see fillFourierScaling Factors*/
 					 const real3* Bfactor,
-					 Grid grid/*Grid information and methods*/
-					 ){
+					 Grid grid){
 	  const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	  if(id == 0){
 	    gridVels[0] = cufftComplex3();
@@ -161,14 +164,12 @@ namespace uammd{
 	  const int3 ncells = grid.cellDim;
 	  if(id>=(ncells.z*ncells.y*(ncells.x/2+1))) return;
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
-	  const real3 k = waveNumberToWaveVector(waveNumber, grid.box.boxSize);	
-	  /*Get my scaling factor B(k,xi,eta)*/
+	  const real3 k = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
 	  const real3 B = Bfactor[id];
 	  cufftComplex3 factor = gridForces[id];
 	  factor.x *= B.x;
 	  factor.y *= B.y;
 	  factor.z *= B.z;
-	  /*Store vel in global memory, note that this is overwritting any previous value in gridVels*/
 	  gridVels[id] = projectFourier(k, factor);
 	}
 
@@ -212,12 +213,11 @@ namespace uammd{
              kz  O--------O--------+  ky
                  kx ->     1
 	  */
-	  /*Handle nyquist points*/
 	  //Is the current wave number a nyquist point?
-	  bool isXnyquist = (cell.x == ncells.x - cell.x) and (ncells.x%2 == 0);
-	  bool isYnyquist = (cell.y == ncells.y - cell.y) and (ncells.y%2 == 0);
-	  bool isZnyquist = (cell.z == ncells.z - cell.z) and (ncells.z%2 == 0);
-	  bool nyquist =  (isXnyquist and cell.y==0    and cell.z==0)  or  //1
+	  const bool isXnyquist = (cell.x == ncells.x - cell.x) and (ncells.x%2 == 0);
+	  const bool isYnyquist = (cell.y == ncells.y - cell.y) and (ncells.y%2 == 0);
+	  const bool isZnyquist = (cell.z == ncells.z - cell.z) and (ncells.z%2 == 0);
+	  const bool nyquist =  (isXnyquist and cell.y==0    and cell.z==0)  or  //1
 	    (isXnyquist and isYnyquist and cell.z==0)  or  //2
 	    (cell.x==0    and isYnyquist and cell.z==0)  or  //3
 	    (isXnyquist and cell.y==0    and isZnyquist) or  //4
@@ -226,7 +226,7 @@ namespace uammd{
 	    (isXnyquist and isYnyquist and isZnyquist);    //7
 	  return nyquist;
 	}
-	
+
 	/*Computes the long range stochastic velocity term
 	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
 	= σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
@@ -234,16 +234,11 @@ namespace uammd{
 	This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds 1/√σ·√B(k)·dWw.
 	Keeping special care that v_k = v*_{N-k}, which implies that dWw_k = dWw*_{N-k}
 	*/
-	__global__ void fourierBrownianNoise(/*Values of vels on each cell*/
-					     cufftComplex3 *__restrict__ gridVelsFourier,
-					     /*Fourier scaling factors, see fillFourierScalingFactor*/
+	__global__ void fourierBrownianNoise(cufftComplex3 *__restrict__ gridVelsFourier,
 					     const real3* __restrict__ Bfactor,
-					     Grid grid, /*Grid parameters. Size of a cell, number of cells...*/
+					     Grid grid,
 					     real prefactor,/* sqrt(2·T/dt)*/
-					     //Parameters to seed the RNG
-					     uint seed,
-					     uint step
-					     ){
+					     uint seed1, uint seed2){
 	  const uint id = blockIdx.x*blockDim.x + threadIdx.x;
 	  const int3 nk = grid.cellDim;
 	  if(id >= (nk.z*nk.y*(nk.x/2+1))) return;
@@ -263,7 +258,7 @@ namespace uammd{
 	       which is not stored and therfore must not be computed*/
 	     (cell.x==0 and cell.y == 0 and 2*cell.z >= nk.z+1) or
 	     (cell.x==0 and 2*cell.y >= nk.y + 1)) return;
-	  cufftComplex3 noise = generateNoise(prefactor, id, seed, step);
+	  cufftComplex3 noise = generateNoise(prefactor, id, seed1, seed2);
 	  const bool nyquist =  isNyquistWaveNumber(cell, nk);
 	  if(nyquist){
 	    /*Nyquist points are their own conjugates, so they must be real.
@@ -292,7 +287,7 @@ namespace uammd{
 	  if(cell.x == nk.x - cell.x or cell.x == 0){
 	    int xc = cell.x;
 	    int yc = (cell.y > 0)*(nk.y - cell.y);
-	    int zc = (cell.z > 0)*(nk.z - cell.z);	    
+	    int zc = (cell.z > 0)*(nk.z - cell.z);
 	    int id_conj =  xc + (nk.x/2 + 1)*(yc + zc*nk.y);
 	    const int3 ik = indexToWaveNumber(id_conj, nk);
 	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
@@ -333,12 +328,12 @@ namespace uammd{
       void FarField::forwardTransformForces(cudaStream_t st){
 	sys->log<System::DEBUG2>("[BDHI::PSE] Taking grid to wave space");
 	auto d_gridVels = (real*)thrust::raw_pointer_cast(gridVels.data());
-	auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());       
+	auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
 	cufftSetStream(cufft_plan_forward, st);
 	/*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
 	CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, d_gridVels, d_gridVelsFourier));
       }
-      
+
       void FarField::convolveFourier(cudaStream_t st){
 	sys->log<System::DEBUG2>("[BDHI::PSE] Wave space velocity scaling");
 	/*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
@@ -357,11 +352,11 @@ namespace uammd{
 	/*Add the stochastic noise to the fourier velocities if T>0 -> 1/√σ·√B·dWw */
 	if(temperature > real(0.0)){
 	  auto d_gridVelsFourier = (cufftComplex3*) thrust::raw_pointer_cast(gridVelsFourier.data());
-	  uint seed2 = sys->rng().next32();	  
+	  uint seed2 = sys->rng().next32();
 	  sys->log<System::DEBUG2>("[BDHI::PSE] Wave space brownian noise");
 	  auto d_fourierFactor = thrust::raw_pointer_cast(fourierFactor.data()); 	//B in [1]
 	  const int3 n = grid.cellDim;
-	  const real dV = grid.getCellVolume(); 
+	  const real dV = grid.getCellVolume();
 	  real prefactor = sqrt(2*temperature/(dt*dV));
 	  int Nthreads = 128;
 	  int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
@@ -372,7 +367,7 @@ namespace uammd{
 								     seed2);
 	}
       }
-      
+
       void FarField::inverseTransformVelocity(cudaStream_t st){
         sys->log<System::DEBUG2>("[BDHI::PSE] Going back to real space");
 	auto d_gridVels = (real*)thrust::raw_pointer_cast(gridVels.data());
@@ -385,7 +380,7 @@ namespace uammd{
       void FarField::interpolateVelocity(real3* MF, cudaStream_t st){
 	sys->log<System::DEBUG2>("[BDHI::PSE] Grid to particles");
 	/*Interpolate the real space velocities back to the particle positions ->
-	  Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/	
+	  Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
 	int numberParticles = pg->getNumberParticles();
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
 	auto d_gridVels = (real3*)thrust::raw_pointer_cast(gridVels.data());
@@ -393,7 +388,7 @@ namespace uammd{
 	ibm.gather(pos.begin(), MF, d_gridVels, numberParticles, st);
 	CudaCheckError();
       }
-      
+
     /*Far contribution of M·F and B·dW
       Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
       = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
@@ -401,13 +396,32 @@ namespace uammd{
       void FarField::Mdot(real3 *MF, cudaStream_t st){
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
 	sys->log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
+	cudaDeviceSynchronize();
+	PUSH_RANGE("Clean grid", 1);
 	thrust::fill(thrust::cuda::par.on(st), gridVels.begin(), gridVels.end(), real3());
+	cudaDeviceSynchronize();
+	POP_RANGE;
+	PUSH_RANGE("Spread", 2);
 	spreadForce(st);
+	cudaDeviceSynchronize();
+	POP_RANGE;
+	PUSH_RANGE("FFTF", 3);
 	forwardTransformForces(st);
+	cudaDeviceSynchronize();
+	POP_RANGE;
+	PUSH_RANGE("Convolve", 4);
 	convolveFourier(st);
+	cudaDeviceSynchronize();
+	POP_RANGE;
 	addBrownianNoise(st);
+	PUSH_RANGE("FFTI", 5);
 	inverseTransformVelocity(st);
+	cudaDeviceSynchronize();
+	POP_RANGE;
+	PUSH_RANGE("Interpolate", 6);
 	interpolateVelocity(MF, st);
+	cudaDeviceSynchronize();
+	POP_RANGE;
 	sys->log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
       }
 
@@ -495,6 +509,7 @@ namespace uammd{
 	double3 w   = pw*h/2.0;
 	/*Gaussian splitting parameter*/
 	this->eta = make_real3(pow(2.0*psi, 2)*w*w/(gaussM*gaussM));
+	sys->log<System::MESSAGE>("[BDHI::PSE] eta: %g", eta.x);
 	kernel = std::make_shared<Kernel>(P, sqrt(eta)/(2.0*psi));
       }
 
@@ -506,7 +521,7 @@ namespace uammd{
 						 Grid grid,
 						 double rh, //Hydrodynamic radius
 						 double viscosity,
-						 double split, 
+						 double split,
 						 real3 eta //Gaussian kernel splitting parameter
 						 ){
 	  const int id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -516,8 +531,8 @@ namespace uammd{
 	    Bfactor[0] = make_real3(0.0);
 	    return;
 	  }
-	  const int3 waveNumber = indexToWaveNumber(id, ncells);	
-	  const real3 K = waveNumberToWaveVector(waveNumber, grid.box.boxSize);	
+	  const int3 waveNumber = indexToWaveNumber(id, ncells);
+	  const real3 K = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
 	  /*Compute the scaling factor for this node*/
 	  double k2 = dot(K,K);
 	  double kmod = sqrt(k2);
@@ -538,7 +553,7 @@ namespace uammd{
 	}
 
       }
-      
+
       void FarField::initializeFourierFactors(){
 	/*B in [1], this array stores, for each cell/fourier node,
 	  the scaling factor to go from forces to velocities in fourier space*/

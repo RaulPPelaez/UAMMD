@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
+/*Raul P. Pelaez 2017-2020. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
 
 
   As this is a BDHI module. BDHI_PSE computes the terms M·F and B·dW in the differential equation:
@@ -79,6 +79,7 @@ namespace uammd{
       void setup_step(              cudaStream_t st = 0){}
       /*Compute M·F = Mr·F + Mw·F*/
       void computeMF(real3* MF, cudaStream_t st){
+	cudaDeviceSynchronize();
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
