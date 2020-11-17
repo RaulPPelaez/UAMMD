@@ -12,10 +12,10 @@
 
 -----------------  
 
-Raul P. Pelaez 2018. (raul.perez(at)uam.es)  
+Raul P. Pelaez 2018-2020. (raul.perez(at)uam.es)  
 
 
-A C++11 header-only fast generic multiscale CUDA Molecular Dynamics framework made into modules for expandability and generality.  
+A C++11+ header-only fast generic multiscale CUDA Molecular Dynamics framework made into modules for expandability and generality.  
 
 Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for much more than that. To this moment multiple integrators are implemented allowing it to perform:  
 
@@ -32,7 +32,7 @@ Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for 
 Multiple building blocks are provided in order for the user to construct a certain simulation, 
 highly templated so the user can easily add in the input the specific interactions when they are not implemented by default.  
 
-For example, there is not a harmonic trap module, but you can write a simple functor in the input file (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box and you are set!. You can do the same with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction... See the examples folder and the wiki for more info!  
+For example, there is not a harmonic trap module, but you can write a simple functor in the input file (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. You can do the same with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction... See the examples folder and the wiki for more info  
 
 UAMMD is coded into separated types of modules. A code that uses UAMMD needs to create/instantiate some of this modules and update them when necessary (i.e to forward the simulation time). For example, the simulation could have a VerletNVT integrator module and a PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc. See the example folder.  
 
@@ -48,7 +48,7 @@ For example, an Interactor could compute the pair Lennard Jonnes forces between 
 
 **Integrators**
 
-An Integrator is an entity that has the ability of taking the simulation state to the next next time step.  
+An Integrator is an abstract entity that has the ability of taking the simulation state to the next next time step.  
 In order to do so it can hold any number of Interactors and use them to compute the forces, energies... at any time.  
 For example, the VerletNVT module updates the positions and velocities of particles according to the interactors it holds to ensure that the temperature is conserved each time the simulation time is updated.  
 
@@ -70,7 +70,33 @@ See the wiki page at https://github.com/RaulPPelaez/UAMMD/wiki for a full list o
 
 To use it in your project, include the modules you need, create a System and ParticleData instances and configure the simulation as you need.  
 See examples/LJ.cu and examples/Makefile or [Simulation File](https://github.com/RaulPPelaez/UAMMD/wiki/Simulation-File) in the wiki  
+```c++
+//Ideal brownian particles
+#include"uammd.cuh"
+#include"Integrator/BrownianDynamics.cuh"
+using namespace uammd;
+int main(int argc, char * argv[]){
+	int numberParticles = 1<<14;
+	auto sys = make_shared<System>(argc, argv);
+	auto pd = make_shared<ParticleData>(numberParticles, sys);
+	{
+		auto pos = pd->getPos(access::location::cpu, access::mode::write);
+		std::generate(pos.begin(), pos.end(), [&](){ return make_real4(sys->rng.uniform3(-0.5, 0.5), 0);});	
+	}
+	BD::EulerMaruyama::Parameters par;
+	par.temperature = temperature;
+	par.viscosity = viscosity;
+	par.hydrodynamicRadius = 1.0;
+	par.dt = dt;
+	auto bd = make_shared<BD::EulerMaruyama>(pd, sys, par);
+	for(int i = 0; i<numberSteps; i++){
+		bd->forwardTime();
+	}
+	sys->finish();
+	return 0;
+}
 
+```
 See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for instructions.  
 
 UAMMD can be compiled in single or double precision, it works in single precision by default unless you specify otherwise when compiling. See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki.  
@@ -82,10 +108,9 @@ You can use the --device X flag to specify a certain GPU.
 ---------------------
 Depends on:
 
-	1. thrust                                   :   https://github.com/thrust/thrust
-	2. CUDA 7.5+                                :   https://developer.nvidia.com/cuda-downloads
+	1. CUDA 7.5+                                :   https://developer.nvidia.com/cuda-downloads
 
-Some modules make use of certain NVIDIA libraries:
+Some modules make use of certain NVIDIA libraries included with CUDA:
 	
 	1. cuRAND
 	2. cuBLAS
@@ -94,13 +119,6 @@ Some modules make use of certain NVIDIA libraries:
 	
 Apart from this, any dependency is already included in the repository under the third_party	folder.  
 See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for more information.  
-
-## REQUERIMENTS  
-
---------------------  
-
-Apart from CUDA, UAMMD needs a c++ compiler with full C++11 support, 4.8+ recommended  
-
 
 ## NOTES FOR DEVELOPERS
 
@@ -125,10 +143,9 @@ Some things to take into account:
 Some advice:
 
 	1. Make use of the existing modules and submodules when possible, inherit from them if you need an extra level of control. For example with a neighbourList.
-	2. Use cub when possible.
+	2. Use cub/thrust when possible, it is unusual to write an actual kernel. Most times a thrust::transform of thrust::for_each will do the trick.
 	3. When constructing a new kind of simulation compile the modules in one file and compile another separate one for using the first (to reduce compilation time), or better yet make the code read all needed parameters from a file or script using InputFile.
-	4. Use uammd::GPUfillWith instead of cudaMemset (it is MUCH faster).
-	5. Use the iterator scheme and the full extent of C++11 philosophy whenever possible.  
+	4. Use the iterator concept whenever possible.  
 	
 -------------------------------
 
@@ -139,7 +156,7 @@ These containers start with zero size and are initialized by ParticleData the fi
 
 **Guidelines**
 
-Each module should be under the uammd namespace. And if helper functions are needed which are not available in UAMMD, they should be under another, module specific, namespace (they can later be introduced to the code base).  
+Each module should be under the uammd namespace. And if helper functions are needed which are not available in UAMMD, they should be under another, module specific, namespace (usually called detail, they can later be introduced to the code base).  
 If you want to make small changes to an existing module without changing it you should create a new module that inherits it, and overload the necessary functions or just copy it.  
 
 ------------------------------------------
