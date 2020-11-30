@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019. Four bonded forces, AKA torsional springs.
+/*Raul P. Pelaez 2019-2020. Four bonded forces, AKA torsional springs.
 
   Joins four particles with a torsional bond i---j---k---l
 
@@ -126,7 +126,110 @@ namespace uammd{
       }
 
     };
+
+    //Salvatore Assenza 2020.
+    //Fourier like LAMMPS: U=kdih(1+cos(phi-phi0)) with phi in [-pi,pi]
+    //kdih has to be given in my units
+    struct FourierLAMMPS{
+    public:
+      Box box;
+      FourierLAMMPS(Box box): box(box){}
+
+      struct BondInfo{
+	real phi0, kdih;
+      };
+
+      static BondInfo readBond(std::istream &in){
+	BondInfo bi;
+	in>>bi.kdih>>bi.phi0;
+	return bi;
+      }
+
+      inline __device__ real3 force(int i1, int i2, int i3, int i4,
+                                    int bond_index,
+                                    real3 pos1,
+                                    real3 pos2,
+                                    real3 pos3,
+                                    real3 pos4,
+                                    BondInfo bond_info){
+	//define useful quantities
+	  const real3 r12 = box.apply_pbc(pos2 - pos1);
+	  const real3 r23 = box.apply_pbc(pos3 - pos2);
+	  const real3 r34 = box.apply_pbc(pos4 - pos3);
+	  const real3 v123 = cross(r12, r23);
+	  const real3 v234 = cross(r23, r34);
+	  const real v123q = dot(v123, v123);
+	  const real v234q = dot(v234, v234);
+	  if(v123q < real(1e-15) or v234q < real(1e-15)){
+	    return make_real3(0);
+	  }
+	  const real invsqv123 = rsqrt(v123q);
+	  const real invsqv234 = rsqrt(v234q);
+	  const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*invsqv123 * invsqv234));
+	  const real phi = signOfPhi(r12, r23, r34)*acos(cosPhi);
+	  if(fabs(phi)<real(1e-10) or real(M_PI) - fabs(phi) < real(1e-10)){
+	    return make_real3(0);
+	  }
+	  /// in order to change the potential, you just need to modify this with (dU/dphi)/sin(phi)
+	  const real pref = -bond_info.kdih*sin(phi-bond_info.phi0)/sin(phi);
+	  //compute force
+	  const real3 vu234 = v234*invsqv234;
+	  const real3 vu123 = v123*invsqv123;
+	  const real3 w1 = (vu234 - cosPhi*vu123)*invsqv123;
+	  const real3 w2 = (vu123 - cosPhi*vu234)*invsqv234;
+	  if (bond_index == i1){
+	    return pref*make_real3(cross(w1, r23));
+	  }
+	  else if (bond_index == i2){
+	    const real3 r13 = box.apply_pbc(pos3 - pos1);
+	    return pref*make_real3(cross(w2, r34) - cross(w1, r13));
+	  }
+	  else if (bond_index == i3){
+	    const real3 r24 = box.apply_pbc(pos4 - pos2);
+	    return pref*make_real3(cross(w1, r12) - cross(w2, r24));
+	  }
+	  else if (bond_index == i4){
+	    return pref*make_real3(cross(w2, r23));
+	  }
+	  return make_real3(0);
+      }
+
+      inline __device__ real energy(int i1, int i2, int i3, int i4,
+                                    int bond_index,
+                                    real3 pos1,
+                                    real3 pos2,
+                                    real3 pos3,
+                                    real3 pos4,
+                                    BondInfo &bond_info){
+	//define useful quantities
+	const real3 r12 = box.apply_pbc(pos2 - pos1);
+	const real3 r23 = box.apply_pbc(pos3 - pos2);
+	const real3 r34 = box.apply_pbc(pos4 - pos3);
+	const real3 v123 = cross(r12, r23);
+	const real3 v234 = cross(r23, r34);
+	const real v123q = dot(v123, v123);
+	const real v234q = dot(v234, v234);
+	if (v123q < real(1e-15) || v234q < real(1e-15))
+	  return real(0.0);
+	const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*rsqrt(v123q)*rsqrt(v234q)));
+	const real dphi = signOfPhi(r12, r23, r34)*acos(cosPhi) - bond_info.phi0;
+	return bond_info.kdih*(1+cos(dphi));  //U=kdih(1+cos(phi-phi0))
+      }
+
+    private:
+      inline __device__ real signOfPhi(real3 r12, real3 r23, real3 r34){
+	const real3 ru23 = r23*rsqrt(dot(r23, r23));
+	const real3 uloc1 = r12*rsqrt(dot(r12, r12));
+	const real3 uloc2 = ru23 - dot(uloc1, ru23)*uloc1;
+	const real3 uloc3 = cross(uloc1, uloc2);
+	const real segnophi = (dot(r34, uloc3) < 0)?real(-1.0):real(1.0);
+	return segnophi;
+      }
+
+    };
   }
+
+}
 
   namespace TorsionalBondedForces_ns{
 
