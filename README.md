@@ -177,3 +177,4 @@ Marc Melendez Schofield
 Sergio Panzuela  
 Nerea Alcazar  
 Pablo Ibañez Freire (https://github.com/PabloIbannez)  
+Salvatore Assenza
