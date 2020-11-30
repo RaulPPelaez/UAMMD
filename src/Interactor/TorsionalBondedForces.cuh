@@ -229,8 +229,6 @@ namespace uammd{
     };
   }
 
-}
-
   namespace TorsionalBondedForces_ns{
 
     template<class Bond>
@@ -318,7 +316,6 @@ namespace uammd{
     };
 
   }
-
 
   template<class BondType>
   class TorsionalBondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
