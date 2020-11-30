@@ -772,7 +772,7 @@ namespace uammd{
 
     LBVHList(shared_ptr<ParticleData> pd,
 	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys), ps(sys){
+	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys){
       sys->log<System::MESSAGE>("[LBVHList] Created");
 
 
