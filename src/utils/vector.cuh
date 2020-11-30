@@ -876,6 +876,9 @@ VECATTR double3 normalize(double3 v)
 VECATTR double3 cross(double3 a, double3 b){
   return make_double3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
+VECATTR float3 cross(float3 a, float3 b){
+  return make_float3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
+}
 
 
 VECATTR float3 sqrt(const float3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
