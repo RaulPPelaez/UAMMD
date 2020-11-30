@@ -791,7 +791,7 @@ namespace uammd{
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
       int numberParticles = pg->getNumberParticles();
-      sys->log<System::DEBUG2>("[LBVHList] Transversing Cell List with %s", type_name<Transverser>().c_str());
+      sys->log<System::DEBUG2>("[LBVHList] Transversing LBVH List with %s", type_name<Transverser>().c_str());
 
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
