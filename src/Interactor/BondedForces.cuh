@@ -1,5 +1,5 @@
 /*
-  Raul P. Pelaez 2016. Bonded Forces Interactor implementation. AKA two body bonds
+  Raul P. Pelaez 2017-2020. Bonded Forces Interactor implementation. AKA two body bonds
 
   This module implements an algorithm to compute the force between two particles, or a particle and a point in space) joined a bond.
 
@@ -134,6 +134,24 @@ namespace uammd{
 
   }
 
+  namespace BondedForces_ns{
+    enum class ComputeMode{force, energy};
+    template<ComputeMode mode>  struct ComputeDispatch;
+    template<> struct ComputeDispatch<ComputeMode::force>{
+      using type = real4;
+      template<class BondType, class ...T>
+      __device__ static inline type compute(BondType &bond, T...args){
+	return make_real4(bond.force(args...), 0);
+      }
+    };
+    template<> struct ComputeDispatch<ComputeMode::energy>{
+      using type = real;
+      template<class BondType, class ...T>
+      __device__ static inline type compute(BondType &bond, T...args){
+	return bond.energy(args...);
+      }
+    };
+  }
 
   //Two body bonded forces. Handles particle-particle and particle.point bonds
   template<class BondType>
@@ -156,14 +174,14 @@ namespace uammd{
       typename BondType::BondInfo bond_info;
     };
 
-
     explicit BondedForces(shared_ptr<ParticleData> pd,
 			  shared_ptr<System> sys,
 			  Parameters par,
 			  std::shared_ptr<BondType> bondForce = std::make_shared<BondType>());
     ~BondedForces();
 
-    void callComputeBondedForces(cudaStream_t st);
+    template<BondedForces_ns::ComputeMode mode, class ResultType>
+    void callComputeBonded(ResultType* result, cudaStream_t st);
 
     void sumForce(cudaStream_t st = 0) override;
 
@@ -185,7 +203,7 @@ namespace uammd{
     thrust::device_vector<BondFP*> bondStartFP;
     thrust::device_vector<int> nbondsPerParticleFP;
 
-    std::shared_ptr<BondType> bondForce;
+    std::shared_ptr<BondType> bondCompute;
 
     int TPP; // Threads per particle
 
