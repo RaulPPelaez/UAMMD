@@ -34,7 +34,7 @@
   real4* pos_ptr = pos_handle.raw();
 
   To get the indices of particles in the original order (ordered by ID):
-  int * originalOrder = pd->getIndexArrayById(access::location::cpu);
+  int * originalOrder = pd->getIdOrderedIndices(access::location::cpu);
   particle zero would be: pos.raw()[originalOrder[0]];
 
   //To get a property only if it has been asked for before (i.e if the mass has been set)
