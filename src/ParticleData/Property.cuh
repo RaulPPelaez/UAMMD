@@ -297,7 +297,7 @@ namespace uammd{
       else{
 	sys->log<System::DEBUG1>("[Property] Swapping internal device references of %s", name.c_str());
         deviceVector_alt.resize(N);
-	managedVector.swap(managedVector_alt);
+	deviceVector.swap(deviceVector_alt);
 	hostVectorNeedsUpdate = true;
       }
     }
