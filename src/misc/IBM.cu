@@ -6,29 +6,32 @@
 #include<cub/cub.cuh>
 #include"utils/atomics.cuh"
 namespace uammd{
-
   namespace IBM_ns{
 
     namespace detail{
       SFINAE_DEFINE_HAS_MEMBER(getSupport)
-
-      template<class Kernel, bool def = has_getSupport<Kernel>::value> int3 getSupport(Kernel &kernel, int3 cell);
-
       template<class Kernel, bool def = has_getSupport<Kernel>::value> struct GetSupport;
-
       template<class Kernel> struct GetSupport<Kernel, true>{
 	static __host__  __device__ int3 get(Kernel &kernel, int3 cell){return kernel.getSupport(cell);}
       };
-
       template<class Kernel> struct GetSupport<Kernel, false>{
 	static __host__  __device__ int3 get(Kernel &kernel, int3 cell){return make_int3(kernel.support);}
+      };
+
+      SFINAE_DEFINE_HAS_MEMBER(getMaxSupport)
+      template<class Kernel, bool def = has_getMaxSupport<Kernel>::value> struct GetMaxSupport;
+      template<class Kernel> struct GetMaxSupport<Kernel, true>{
+	static __host__  __device__ int3 get(Kernel &kernel){return kernel.getMaxSupport();}
+      };
+      template<class Kernel> struct GetMaxSupport<Kernel, false>{
+	static __host__  __device__ int3 get(Kernel &kernel){return make_int3(kernel.support);}
       };
 
       template<class Grid>
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
 	int3 P = support/2;
 	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
+	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);	
 	if(shift.x or shift.y or shift.z){
 	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
 	  const real3 pi_pbc = grid.box.apply_pbc(pos);
@@ -117,8 +120,9 @@ namespace uammd{
 	const int kk=is2D?0:(i/(support.x*support.y));
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	const int jcell = cell2index(cellj);
-	const auto weight = vi*detail::computeWeightFromShared(weights, ii, jj, kk, support);
-	atomicAdd(&gridQuantity[jcell], weight);
+	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
+	const auto weight = vi*kern;
+	if(kern)atomicAdd(&gridQuantity[jcell], weight);
       }
     }
 

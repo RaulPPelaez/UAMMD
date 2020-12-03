@@ -76,8 +76,7 @@ namespace uammd{
 	return grid.getCellVolume(cellj);
       }
     };
-
-  }
+  }  
 
   template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>
   class IBM{
@@ -100,7 +99,7 @@ namespace uammd{
 		GridDataIterator &gridData,
 		int numberParticles, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[IBM] Spreading");
-      int3 support = IBM_ns::detail::GetSupport<Kernel>::get(*kernel, int3());
+      int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       int numberNeighbourCells = support.x*support.y*support.z;
       int threadsPerParticle = std::min(32*(numberNeighbourCells/32), 128);
       if(numberNeighbourCells < 64){
@@ -143,7 +142,7 @@ namespace uammd{
 		const GridQuantityIterator &gridData,
 		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[IBM] Gathering");
-      int3 support = IBM_ns::detail::GetSupport<Kernel>::get(*kernel, int3());
+      int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       int numberNeighbourCells = support.x*support.y*support.z;
       int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 64);
       size_t shMemory = (support.x+support.y+support.z)*sizeof(real);
