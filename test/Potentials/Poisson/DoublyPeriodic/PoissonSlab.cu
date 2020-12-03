@@ -1,4 +1,69 @@
-/*Raul P. Pelaez 2019. Poisson test
+/*Raul P. Pelaez 2020. DP Poisson test
+
+This file encodes the following simulation:
+
+A group of Gaussian sources of charge with width gw evolve via Brownian Dynamics inside a doubly periodic domain of dimensions Lxy, Lxy, H (periodic in XY and open in Z). 
+
+Sources interact via an electrostatic potential and repell each other via a repulsive LJ-like potential.
+
+There are two (potentially) charged walls on z=-H/2 and z=H/2, this walls have the same charge equal to half of the sum of all charges in the system but with opposite sign (so the overall system is always electroneutral).
+Charges are repelled by the wall via the same repulsive potential they have between each other.
+The three domains demarcated by the walls (above, between and below) may have different, arbitrary permittivities.
+
+The repulsive potential can be found in RepulsivePotential.cuh (should be available along this file) and has the following form:
+U_{LJ}(r) = 4*U0* ( (sigma/r)^{2p} - (sigma/r)^p ) + U0
+The repulsive force is then defined by parts using F_{LJ}=-\partial U_{LJ}/\partial r 
+F(r<=rm) = F_{LJ}(r=rm);
+F(rm<r<=sigma*2^1/p) = F_{LJ}(r);
+F(r>sigma*2^1/p) = 0;
+
+USAGE:
+This code expects to find a file called data.main in the folder where it is executed.
+data.main contains a series of parameters that allow to customize the simulation and must have the following  format:
+
+----data.main starts
+#Lines starting with # are ignored
+option [argument] #Anything after the argument is ignored
+flag #An option that does not need arguments
+----end of data.main
+
+The following options are available:
+
+ numberParticles: The number of charges in the simulation
+ gw: The Gaussian width of the charges
+ 
+ H: The width of the domain
+ Lxy: The dimensions of the box in XY
+ permitivity: Permittivity inside the slab
+ permitivityBottom: Below z=-H/2
+ permitivityTop: Above z=H/2
+
+ temperature: Temperature for the Brownian Dynamics integrator, the diffusion coefficient will be D=T/(6*pi*viscosity*hydrodynamicRadius)
+ viscosity: For BD
+ hydrodynamicRadius: For BD
+ dt: Time step for the BD integrator
+ 
+ U0, sigma, r_m, p: Parameters for the repulsive interaction. If U0=0 the steric repulsion is turned off. 
+ 
+ numberSteps: The simulation will run for this many steps
+ printSteps: If greater than 0, the positions and forces will be printed every printSteps steps
+ relaxSteps: The simulation will run without printing for this many steps.
+ 
+ outfile: Positions and charge will be written to this file, each snapshot is separated by a #, each line will contain X Y Z Charge. Can be /dev/stdout to print to screen.
+ forcefile: Optional, if present forces acting on particles will written to this file.
+ readFile: Optional, if present charge positions will be read from this file with the format X Y Z Charge. numberParticles lines will be read. Can be /dev/stdin to read from pipe.
+ 
+ noWall: Optional, if this flag is present particles will not be repelled by the wall.
+
+ split: The Ewald splitting parameter
+ Nxy: The number of cells in XY. If this option is present split must NOT be present, it will be computed from this.
+
+ The following accuracy options are optional, the defaults provide a tolerance of 5e-4:
+ support: Number of support cells for the interpolation kernel. Default is 10.
+ numberStandardDeviations: Gaussian truncation. Default is 4
+ tolerance: Determines the cut off for the near field section of the algortihm. Default is 1e-4
+ upsampling: The relation between the grid cell size and gt=sqrt(gw^2+1/(4*split^2)). h_xy= gt/upsampling. default is 1.2
+
 */
 #include"uammd.cuh"
 #include"RepulsivePotential.cuh"
@@ -6,7 +71,6 @@
 #include"Interactor/ExternalForces.cuh"
 #include"Integrator/BrownianDynamics.cuh"
 #include"utils/InputFile.h"
-#include"Interactor/DoublyPeriodic/DPPoisson.cuh"
 #include"Interactor/DoublyPeriodic/DPPoissonSlab.cuh"
 #include <fstream>
 #include<random>
@@ -37,25 +101,24 @@ struct Parameters{
   int numberParticles;
   real Lxy, H;
   int Nxy = -1;
-  int support = -1;
-  real numberStandardDeviations = -1;
-  real upsampling = -1;
+  int support = 10;
+  real numberStandardDeviations = 4;
+  real upsampling = 1.2;
+  real tolerance = 1e-4;
   real temperature;
   real permitivity, permitivityBottom, permitivityTop;
   
   int numberSteps, printSteps, relaxSteps;
   real dt, viscosity, hydrodynamicRadius;
 
-  real gw, tolerance;
+  real gw;
   real split = -1;
   real U0, sigma, r_m, p, cutOff;
   
   std::string outfile, readFile, forcefile;
 
-  bool slabMode;
   bool noWall = false;
 };
-
 
 struct UAMMD{
   std::shared_ptr<System> sys;
@@ -77,13 +140,17 @@ void initializeParticles(UAMMD sim){
 		    real3 p;
 		    real pdf;
 		    do{
-		      p = make_real3(sim.sys->rng().uniform3(-0.5, 0.5))*make_real3(Lxy, Lxy, H);
+		      p = make_real3(sim.sys->rng().uniform3(-0.5, 0.5))*make_real3(Lxy, Lxy, H-2*sim.par.gw);
 		      double K= 2.0/H;
 		      pdf = 1.0 ; //1.0/pow(cos(K*p.z),2)*pow(cos(K),2);
-		  }while(sim.sys->rng().uniform(0, 1) > pdf);
+		    }while(sim.sys->rng().uniform(0, 1) > pdf);
 		    return make_real4(p, 0);
 		  });
-    std::fill(charge.begin(), charge.end(), 1);
+    //std::fill(charge.begin(), charge.end(), 1);
+    fori(0, sim.par.numberParticles){
+      charge[i] = ((i%2)-0.5)*2;
+    }
+
   }
   else{
     std::ifstream in(sim.par.readFile);
@@ -169,17 +236,6 @@ std::shared_ptr<DPPoissonSlab> createElectrostaticInteractor(UAMMD sim){
   return std::make_shared<DPPoissonSlab>(sim.pd, pg, sim.sys, par);
 }
 
-std::shared_ptr<DPPoisson> createElectrostaticInteractorNoSlab(UAMMD sim){  
-  DPPoisson::Parameters par;
-  par.box = Box(make_real3(sim.par.Lxy, sim.par.Lxy, sim.par.H));
-  par.epsilon = sim.par.permitivity;
-  par.gw = sim.par.gw;
-  par.tolerance = sim.par.tolerance;
-  par.split = 0;
-  //par.upsampling=2;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<DPPoisson>(sim.pd, pg, sim.sys, par);
-}
 
 std::shared_ptr<Interactor> createWallRepulsionInteractor(UAMMD sim){
   RepulsivePotentialFunctor::PairParameters potpar;
@@ -232,7 +288,9 @@ void writeSimulation(UAMMD sim){
     p.z = pos[i].z;
     real q = charge[i];
     out<<std::setprecision(2*sizeof(real))<<p<<" "<<q<<"\n";
-    outf<<std::setprecision(2*sizeof(real))<<force[i]<<"\n";
+    if(outf.good()){
+      outf<<std::setprecision(2*sizeof(real))<<force[i]<<"\n";
+    }
   }
   out<<std::flush;
 }
@@ -271,12 +329,8 @@ void saveConfiguration(UAMMD sim) {
 int main(int argc, char *argv[]){  
   auto sim = initialize(argc, argv);
   auto bd = createIntegrator(sim);  
-  if(sim.par.slabMode){
-    bd->addInteractor(createElectrostaticInteractor(sim));
-  }
-  else{
-    bd->addInteractor(createElectrostaticInteractorNoSlab(sim));
-  }
+
+  bd->addInteractor(createElectrostaticInteractor(sim));
   if(sim.par.U0 > 0){
     bd->addInteractor(createShortRangeInteractor<RepulsivePotential>(sim));
   }
@@ -365,10 +419,9 @@ Parameters readParameters(std::string datamain, shared_ptr<System> sys){
   in.getOption("r_m", InputFile::Required)>>par.r_m;
   in.getOption("p", InputFile::Required)>>par.p;
   in.getOption("sigma", InputFile::Required)>>par.sigma;
-  in.getOption("cutOff", InputFile::Required)>>par.cutOff;
   in.getOption("readFile", InputFile::Optional)>>par.readFile;
   in.getOption("gw", InputFile::Required)>>par.gw;
-  in.getOption("tolerance", InputFile::Required)>>par.tolerance;
+  in.getOption("tolerance", InputFile::Optional)>>par.tolerance;
   in.getOption("permitivity", InputFile::Required)>>par.permitivity;
   in.getOption("permitivityTop", InputFile::Required)>>par.permitivityTop;
   in.getOption("permitivityBottom", InputFile::Required)>>par.permitivityBottom;
@@ -377,14 +430,13 @@ Parameters readParameters(std::string datamain, shared_ptr<System> sys){
   in.getOption("support", InputFile::Optional)>>par.support;
   in.getOption("numberStandardDeviations", InputFile::Optional)>>par.numberStandardDeviations;
   in.getOption("upsampling", InputFile::Optional)>>par.upsampling;
-  in.getOption("slabMode", InputFile::Required)>>par.slabMode;
   if(in.getOption("noWall", InputFile::Optional)){
     par.noWall= true;
   }
   if(par.split < 0 and par.Nxy < 0){
     System::log<System::CRITICAL>("ERROR: I need either Nxy or split");    
   }
-
+  par.cutOff = par.sigma*pow(2,1.0/par.p);
   return par;
 }
 
