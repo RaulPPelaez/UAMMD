@@ -1,4 +1,4 @@
-/*Raul P.Pelaez. 2017. External Forces Module.
+/*Raul P.Pelaez. 2017-2020. External Forces Module.
   Computes a force acting on each particle due to an external potential.
   i.e harmonic confinement, gravity...
 
@@ -22,7 +22,7 @@ struct HarmonicWall{
   //   return real(0.5)*k*pow(pos.z-zwall, 2);
   // }
 
-  std::tuple<const real4 *> getArrays(shared_ptr<ParticleData> pd){
+  std::tuple<const real4 *> getArrays(ParticleData* pd){
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     return std::make_tuple(pos.raw());
   }
@@ -49,7 +49,7 @@ struct ReallyComplexExternalForce{
     return make_real4(0);
   }
 
-  std::tuple<real4*, real3*, int*, real*> getArrays(shared_ptr<ParticleData> pd){
+  std::tuple<real4*, real3*, int*, real*> getArrays(ParticleData* pd){
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     auto vel = pd->getVel(access::location::gpu, access::mode::read);
     auto id = pd->getId(access::location::gpu, access::mode::read);
