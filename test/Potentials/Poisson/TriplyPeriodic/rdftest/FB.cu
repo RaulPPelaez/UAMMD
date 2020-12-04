@@ -10,7 +10,7 @@
 #include"Interactor/NeighbourList/CellList.cuh"
 #include"Interactor/NeighbourList/VerletList.cuh"
 #include"Interactor/PairForces.cuh"
-#include"Interactor/IBM_Poisson.cuh"
+#include"Interactor/SpectralEwaldPoisson.cuh"
 #include"Interactor/Potential/Potential.cuh"
 #include"SoftPotential.cuh"
 #include"RepulsivePotential.cuh"

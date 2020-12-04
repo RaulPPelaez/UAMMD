@@ -4,7 +4,7 @@ TODO:
 50- In place C2R cufft does not work. I believe cufft just does not allow it, but I am not sure.
  */
 
-#include"IBM_Poisson.cuh"
+#include"SpectralEwaldPoisson.cuh"
 #include"utils/cufftDebug.h"
 #include <thrust/iterator/zip_iterator.h>
 namespace uammd{

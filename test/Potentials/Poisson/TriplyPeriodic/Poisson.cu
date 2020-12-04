@@ -1,7 +1,17 @@
-/*Raul P. Pelaez 2019. Poisson test
+/*Raul P. Pelaez 2019-2020. Poisson test
+Computes the electric field between two opposite charges placed in a periodic box.
+USAGE:
+./poisson [gw] [L] [r]
+
+gw: Gaussian width of the charges
+L: Box size (cubic box)
+r: distance between the charges
+
+In the limit when L->inf the field between the two particles should be:
+Ex =  exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
 */
 #include"uammd.cuh"
-#include"Interactor/IBM_Poisson.cuh"
+#include"Interactor/SpectralEwaldPoisson.cuh"
 #include<fstream>
 
 using namespace uammd;

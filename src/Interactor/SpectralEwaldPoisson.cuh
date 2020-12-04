@@ -1,7 +1,45 @@
 /*Raul P. Pelaez 2019-2020. Spectral Poisson solver with Ewald splitting.
+Computes forces and energies acting on a group of charges due to their electrostatic interaction.
+
+USAGE:
+
+Poisson is created as the typical UAMMD module:
+
+```c++
+#include<uammd.cuh>
+#include<Interactor/SpectralEwaldPoisson.cuh>
+using namespace uammd;
+...
+int main(int argc, char *argv[]){
+...
+  int N = 1<<14;
+  auto sys = make_shared<System>(arc, argv);
+  auto pd = make_shared<ParticleData>(N, sys);          
+  auto pg = make_shared<ParticleGroup>(pd, sys, "All"); //A group with all the particles
+  {
+    auto pos = pd->getPos(access::location::cpu, access::mode::write);
+    auto charge = pd->getCharge(access::location::cpu, access::mode::write);
+   ...
+  }
+  Poisson::Parameters par;
+  par.box = Box(128);
+  par.epsilon = 1; //Permittivity
+  par.gw = 1.0;
+  par.tolerance = 1e-4;
+  par.split = 1.0;
+  auto poisson = make_shared<Poisson>(pd, pg, sys, par);
+...
+  myintegrator->addInteractor(poisson);
+...
+return 0;
+}
+```
+The tolerance parameter is the maximum relative error allowed in the potential for two charges. The potential for L->inf is extrapolated and compared with the analytical solution. Also in Ewald split mode the relative error between two different splits is less than the tolerance. See test/Potential/Poisson  
+
+See the wiki page for more information.
  */
-#ifndef IBM_POISSON_CUH
-#define IBM_POISSON_CUH
+#ifndef SPECTRALEWALDPOISSON_CUH
+#define SPECTRALEWALDPOISSON_CUH
 #include"Interactor/Interactor.cuh"
 #include"Interactor/NeighbourList/CellList.cuh"
 #include "misc/IBM.cuh"
@@ -116,6 +154,6 @@ namespace uammd{
 
 }
 
-#include"IBM_Poisson.cu"
+#include"SpectralEwaldPoisson.cu"
 #endif
 

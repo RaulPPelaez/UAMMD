@@ -1,7 +1,7 @@
 
 #The target CUDA compute capability(s), if not set it will be autodetected
 #ARCH ?= 30 35 50 52 60 61
-ARCH=52
+ARCH=
 
 #Uncomment to compile in double precision mode, single by default
 DOUBLE_PRECISION=-DDOUBLE_PRECISION
@@ -40,7 +40,7 @@ endif
 
 
 
-INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../../../src -I ../../../src/third_party
+INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../../../../src -I ../../../../src/third_party
 OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
 BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets -lineinfo -src-in-ptx
 
