@@ -1,0 +1,46 @@
+#Input parameters for PoissonSlab.cu, see there for more info on each parameter
+#Units:
+#Charge e=1.602e-19C
+#Energy kT=4.11e-21J
+#Longitude a=2.125e-10m
+#Time: tau_D0=hydroRadius^2/D
+#Water relative permittivity is 78.5
+#Vacuum permittivity: 3.013175745204730e-04 *e^2/(kT*a)
+#The number of particles and slab size correspond to a Molarity = 1.003mol/L
+
+numberParticles  19144
+gw 0.25
+
+Lxy 185.762
+H 50
+
+permitivity 2.365342959985713e-02
+permitivityTop 2.365342959985713e-02
+permitivityBottom 3.013175745204730e-04 
+
+#Diffusion coefficient is D=kT/(6*pi*vis*hydroRadius)
+temperature 1.0
+viscosity   0.053051647697298
+hydrodynamicRadius 1.0
+
+#Relaxation time: 500000*0.002=1000 tau_D0
+#A snapshot is generated every: 500*0.002= tau_D0
+#Total simulation time: 10000*0.02 = 20 tau_D0
+numberSteps 500000
+printSteps  500
+relaxSteps  10000
+dt 0.002
+
+outfile /dev/stdout
+readFile /dev/stdin
+
+#Repulsive potential parameters
+U0 0.700471
+r_m 1.5
+p 6
+sigma 2
+
+#DPPoisson splitting, number of grid cells. You may switch this parameter to "split" instead. 
+Nxy 72
+
+

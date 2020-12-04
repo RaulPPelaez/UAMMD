@@ -168,7 +168,11 @@ UAMMD initialize(int argc, char *argv[]){
   std::random_device r;
   auto now = static_cast<long long unsigned int>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
   sim.sys->rng().setSeed(now);
-  sim.par = readParameters("data.main", sim.sys); 
+  std::string datamain = argv[1]; 
+  if(datamain.empty()){
+    datamain = "data.main";
+  }
+  sim.par = readParameters(datamain, sim.sys); 
   sim.pd = std::make_shared<ParticleData>(sim.par.numberParticles, sim.sys);
   sim.savedPositions = std::make_shared<thrust::device_vector<real4>>();
   sim.savedPositions->resize(sim.par.numberParticles);
@@ -414,7 +418,7 @@ Parameters readParameters(std::string datamain, shared_ptr<System> sys){
   in.getOption("viscosity", InputFile::Required)>>par.viscosity;
   in.getOption("hydrodynamicRadius", InputFile::Required)>>par.hydrodynamicRadius;
   in.getOption("outfile", InputFile::Required)>>par.outfile;
-  in.getOption("forcefile", InputFile::Required)>>par.forcefile;
+  in.getOption("forcefile", InputFile::Optional)>>par.forcefile;
   in.getOption("U0", InputFile::Required)>>par.U0;
   in.getOption("r_m", InputFile::Required)>>par.r_m;
   in.getOption("p", InputFile::Required)>>par.p;
