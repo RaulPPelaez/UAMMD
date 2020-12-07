@@ -11,14 +11,10 @@
 namespace uammd{
 
   namespace detail{
-    real computeNumberStandardDeviations(real tolerance){
-      //TODO: This number should change with tolerance
-      return 4;
-    }
     
-    void throwIfInvalidSplit(real numberStandardDeviations, DPPoissonSlab::Parameters par){
+    void throwIfInvalidSplit(DPPoissonSlab::Parameters par){
       constexpr real upperRangeFactor = 3.2; //TODO: Hardcoded for 1e-3 tolerance, should change
-      real minimumSplit = upperRangeFactor/(par.H + numberStandardDeviations*par.gw);
+      real minimumSplit = upperRangeFactor/(par.H + par.numberStandardDeviations*par.gw);
       real maximumSplit = 1/(par.gw*sqrt(12));
       if(par.split < minimumSplit or par.split > maximumSplit){
 	System::log<System::ERROR>("Splitting parameter is outside of valid range [%g:%g] (got %g)",
@@ -26,6 +22,15 @@ namespace uammd{
 	throw std::invalid_argument("Invalid splitting parameter");
       }
     }
+
+    real computeSplitFromNxy(DPPoissonSlab::Parameters par){
+      real hxy = par.Lxy.x/par.Nxy;
+      real gt = par.upsampling*hxy;
+      real gw = par.gw;
+      real split = sqrt(1/(4*(gt*gt - gw*gw)));
+      return split;
+    }
+
   }
 
   DPPoissonSlab::DPPoissonSlab(shared_ptr<ParticleData> pd,
@@ -33,11 +38,18 @@ namespace uammd{
 		       shared_ptr<System> sys,
 		       DPPoissonSlab::Parameters par):
     Interactor(pd, pg, sys, "IBM::DPPoissonSlab"){
-    this->numberStandardDeviations = par.numberStandardDeviations;
-    if(this->numberStandardDeviations<=0){
-      this->numberStandardDeviations = detail::computeNumberStandardDeviations(par.tolerance);
+    if(par.split<=0){
+      if(par.Nxy<=0){
+	sys->log<System::EXCEPTION>("[DPPoissonSlab] I need either split or Nxy");
+	  throw std::invalid_argument("Missing input parameters");
+      }
+      par.split = detail::computeSplitFromNxy(par);
     }
-    detail::throwIfInvalidSplit(numberStandardDeviations, par);
+    else if(par.Nxy>0){
+      sys->log<System::EXCEPTION>("[DPPoissonSlab] Pass only split OR Nxy, not both");
+      throw std::invalid_argument("Invalid input parameters");
+    }
+    detail::throwIfInvalidSplit(par);
     printStartingMessages(par);
     initializeFarField(par);
     initializeNearField(par);
@@ -60,7 +72,7 @@ namespace uammd{
     nfpar.H = par.H;
     nfpar.Lxy = par.Lxy;
     nfpar.tolerance = par.tolerance;
-    nfpar.numberStandardDeviations = numberStandardDeviations;
+    nfpar.numberStandardDeviations = par.numberStandardDeviations;
     this->nearField = std::make_shared<DPPoissonSlab_ns::NearField>(sys, pd, pg, nfpar);
   }
 
@@ -70,12 +82,11 @@ namespace uammd{
     ffpar.permitivity = par.permitivity;
     ffpar.gw = par.gw;
     ffpar.H = par.H;
-    ffpar.numberStandardDeviations = numberStandardDeviations;
+    ffpar.numberStandardDeviations = par.numberStandardDeviations;
     ffpar.Lxy = par.Lxy;
     ffpar.tolerance = par.tolerance;
     ffpar.upsampling = par.upsampling;
     ffpar.surfaceCharge = par.surfaceCharge;
-    ffpar.cells = par.cells;
     ffpar.support = par.support;
     this->farField = std::make_shared<DPPoissonSlab_ns::FarField>(sys, pd, pg, ffpar);
   }

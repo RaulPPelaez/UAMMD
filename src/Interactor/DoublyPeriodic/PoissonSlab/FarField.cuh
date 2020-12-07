@@ -15,20 +15,10 @@ namespace uammd{
   namespace DPPoissonSlab_ns{
 
     namespace detail{
-      //TODO: this should change with tolerance
-      double proposeUpsampling(real tolerance, real upsampling){
-	if(upsampling>0){
-	  return upsampling;
-	}
-	else{
-	  return 1.2;
-	}
-      }
 
-      int3 proposeCellDim(real farFieldGaussianWidth, real tolerance, real upsampling, real3 L){
-	const double spacingFactor = detail::proposeUpsampling(tolerance, upsampling);
+      int3 proposeCellDim(real farFieldGaussianWidth, real upsampling, real3 L){
 	constexpr int minimumNumberCells = 16; //Just an arbitrary number. It does not really help to have <=16 cells
-	double h = farFieldGaussianWidth/spacingFactor;
+	double h = farFieldGaussianWidth/upsampling;
 	int3 cd = make_int3(L/h);
 	cd.x = std::max(minimumNumberCells, cd.x);
 	cd.y = std::max(minimumNumberCells, cd.y);
@@ -71,12 +61,12 @@ namespace uammd{
         Permitivity permitivity;
 	real gw;
 	real H;
-	real numberStandardDeviations;
+
 	real2 Lxy;
-	real tolerance;
+	real tolerance = -1;
+	real numberStandardDeviations =-1;
 	real upsampling = -1;
-	int support = -1;
-	int3 cells = make_int3(-1,-1,-1);
+	int support = -1;	
 	std::shared_ptr<SurfaceChargeDispatch> surfaceCharge = std::make_shared<SurfaceChargeDispatch>();
       };
 
@@ -107,12 +97,7 @@ namespace uammd{
 	const real minimumBoxSize = std::min({par.Lxy.x, par.Lxy.y, par.H});
 	detail::throwIfInvalidConfiguration(He, minimumBoxSize);
 	real3 totalBoxSize = make_real3(par.Lxy, par.H+4*He);
-	if(par.cells.x>0){
-	  this->cellDim = par.cells;
-	}
-	else{
-	  this->cellDim = detail::proposeCellDim(farFieldGaussianWidth, par.tolerance, par.upsampling, totalBoxSize);
-	}
+	this->cellDim = detail::proposeCellDim(farFieldGaussianWidth, par.upsampling, totalBoxSize);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] cells: %d %d %d", cellDim.x, cellDim.y, cellDim.z);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] box size: %g %g %g (enlarged to %g)",
 				  par.Lxy.x, par.Lxy.y, par.H, par.H + He*4);

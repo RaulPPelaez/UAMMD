@@ -150,7 +150,6 @@ void initializeParticles(UAMMD sim){
     fori(0, sim.par.numberParticles){
       charge[i] = ((i%2)-0.5)*2;
     }
-
   }
   else{
     std::ifstream in(sim.par.readFile);
@@ -191,17 +190,15 @@ std::shared_ptr<BDMethod> createIntegrator(UAMMD sim){
 }
 
 std::shared_ptr<DPPoissonSlab> createElectrostaticInteractor(UAMMD sim){  
-  DPPoissonSlab::Parameters par;    
+  DPPoissonSlab::Parameters par;
   par.Lxy = make_real2(sim.par.Lxy);
   par.H = sim.par.H;
   DPPoissonSlab::Permitivity perm;
-  perm.inside = sim.par.permitivity; 
+  perm.inside = sim.par.permitivity;
   perm.top = sim.par.permitivityTop;
   perm.bottom = sim.par.permitivityBottom;
   par.permitivity = perm;
   par.gw = sim.par.gw;
-
-  
   par.tolerance = sim.par.tolerance;
   if(sim.par.split>0){
     par.split = sim.par.split;
@@ -209,30 +206,17 @@ std::shared_ptr<DPPoissonSlab> createElectrostaticInteractor(UAMMD sim){
   if(sim.par.upsampling > 0){
     par.upsampling=sim.par.upsampling;
   }
+  if(sim.par.numberStandardDeviations > 0){
+    par.numberStandardDeviations=sim.par.numberStandardDeviations;
+  }
+  if(sim.par.support > 0){
+    par.support=sim.par.support;
+  }
   if(sim.par.Nxy > 0){
     if(sim.par.split>0){
       System::log<System::CRITICAL>("ERROR: Cannot set both Nxy and split at the same time");
     }
-    real upsampling = sim.par.upsampling > 0?sim.par.upsampling:1.2;
-    real hxy = par.Lxy.x/sim.par.Nxy;
-    real gt = upsampling*hxy;
-    real gw = sim.par.gw;
-    real split = sqrt(1/(4*(gt*gt - gw*gw)));
-    par.split = split;
-    real He = 1.25*sim.par.numberStandardDeviations*gt;
-    real H = par.H;
-    int Nz = ceil(M_PI*0.5*(H+4*He)/hxy);
-    int3 cd = make_int3(Nz, Nz, Nz);
-    cd.z = 2*cd.z-2;
-    cd = nextFFTWiseSize3D(cd);
-    while(cd.z%2 != 0){
-      cd.z++;
-      cd = nextFFTWiseSize3D(cd);
-      //cd.z must be even so that cd.z = ((2*cd.z-2)+2)/2 and 2*cd.z-2 is still a friendly number
-    }
-    cd.z = (cd.z+2)/2;
-    Nz = cd.z;
-    par.cells = make_int3(sim.par.Nxy, sim.par.Nxy, Nz);
+    par.Nxy = sim.par.Nxy;
   }
   par.support = sim.par.support;
   par.numberStandardDeviations = sim.par.numberStandardDeviations;

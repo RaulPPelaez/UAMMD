@@ -1,7 +1,5 @@
 /*Raul P. Pelaez 2019-2020. Spectral/Chebyshev Doubly Periodic Poisson solver. Slab geometry
 
-
-
  */
 
 #ifndef DOUBLYPERIODIC_POISSON_SLAB_CUH
@@ -20,8 +18,8 @@ namespace uammd{
     using SurfaceChargeDispatch = DPPoissonSlab_ns::SurfaceChargeDispatch;
     struct Parameters{
       real upsampling = 1.2;
-      int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
       real2 Lxy;
+      int Nxy = -1;
       real H;
       Permitivity permitivity;
       real tolerance = 1e-4;
@@ -63,8 +61,6 @@ namespace uammd{
     void initializeNearField(Parameters par);
     void initializeFarField(Parameters par);
     void printStartingMessages(Parameters par);
-
-    real numberStandardDeviations;
   };
 
 }
