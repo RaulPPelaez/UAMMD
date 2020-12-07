@@ -5,8 +5,9 @@ if ! test -f ../poisson; then echo "ERROR: This script poisson to be compiled an
 
 mkdir -p results
 
-{    
-    bash tools/init.sh | ../poisson data.main.relax 2> log.relax | tail -19144 | ../poisson data.main > results/pos.dat 2> log;
+{
+    numberParticles=$(grep -Eo "^numberParticles[[:space:]].*" data.main | awk '{print $2}')
+    bash tools/init.sh | ../poisson data.main.relax 2> log.relax | tail -$numberParticles | ../poisson data.main > results/pos.dat 2> log;
 } || {
     echo "ERROR: UAMMD Failed, here is the log" > /dev/stderr
     cat log.relax log > /dev/stderr
