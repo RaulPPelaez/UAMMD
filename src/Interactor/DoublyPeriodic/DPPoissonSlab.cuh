@@ -19,15 +19,15 @@ namespace uammd{
     using Permitivity = DPPoissonSlab_ns::Permitivity;
     using SurfaceChargeDispatch = DPPoissonSlab_ns::SurfaceChargeDispatch;
     struct Parameters{
-      real upsampling = -1.0;
+      real upsampling = 1.2;
       int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
       real2 Lxy;
       real H;
       Permitivity permitivity;
       real tolerance = 1e-4;
       real gw = -1;
-      int support = -1;
-      real numberStandardDeviations = -1;
+      int support = 10;
+      real numberStandardDeviations = 4;
       real split = -1;
       std::shared_ptr<SurfaceChargeDispatch> surfaceCharge = std::make_shared<SurfaceChargeDispatch>();
     };
