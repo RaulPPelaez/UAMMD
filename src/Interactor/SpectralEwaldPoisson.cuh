@@ -94,6 +94,11 @@ namespace uammd{
     };
 
     Poisson(shared_ptr<ParticleData> pd,
+	    shared_ptr<System> sys,
+	    Parameters par):
+      Poisson(pd, std::make_shared<ParticleGroup>("All"), sys, par){}
+
+    Poisson(shared_ptr<ParticleData> pd,
 	    shared_ptr<ParticleGroup> pg,
 	    shared_ptr<System> sys,
 	    Parameters par);
