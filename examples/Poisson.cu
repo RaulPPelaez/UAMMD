@@ -1,7 +1,7 @@
 /*Raul P. Pelaez 2019-2020. Triply periodic Poisson example.
 Computes the electric field between two opposite charges placed in a periodic box.
 USAGE:
-./poisson [gw] [L] [r]
+./poisson [L] [r] [gw]
 
 gw: Gaussian width of the charges
 L: Box size (cubic box)
