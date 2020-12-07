@@ -110,8 +110,11 @@ error_handling:
 poisson:
 	$(BASIC_LINE) Poisson.cu  -o poisson -lcufft
 
+dppoisson:
+	$(BASIC_LINE) DoublyPeriodicPoisson.cu  -o dppoisson -lcufft -llapacke
+
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D temporary_memory neighbour_list_iterator error_handling poisson
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D temporary_memory neighbour_list_iterator error_handling poisson dppoisson
 
 
 
