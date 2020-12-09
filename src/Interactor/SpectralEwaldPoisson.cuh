@@ -133,19 +133,17 @@ namespace uammd{
     std::shared_ptr<TabulatedFunction<real>> nearFieldPotentialGreensFunction;
     managed_vector<real> nearFieldPotentialGreensFunctionTable;
 
-    cudaStream_t st;
-
     void initCuFFT();
 
     void farField(cudaStream_t st);
     void nearFieldForce(cudaStream_t st);
     void nearFieldEnergy(cudaStream_t st);
 
-    void spreadCharges(real* gridCharges);
-    void forwardTransformCharge(real* gridCharges, cufftComplex* gridChargesFourier);
-    void convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier);
-    void inverseTransform(cufftComplex* gridFieldPotentialFourier, real* gridFieldPotential);
-    void interpolateFields(real4* gridFieldPotential);
+    void spreadCharges(real* gridCharges, cudaStream_t st);
+    void forwardTransformCharge(real* gridCharges, cufftComplex* gridChargesFourier, cudaStream_t st);
+    void convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier, cudaStream_t st);
+    void inverseTransform(cufftComplex* gridFieldPotentialFourier, real* gridFieldPotential, cudaStream_t st);
+    void interpolateFields(real4* gridFieldPotential, cudaStream_t st);
 
     Box box;
     Grid grid;

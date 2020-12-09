@@ -112,7 +112,6 @@ namespace uammd{
 				farFieldGaussianWidth, 1/par.gw*sqrt(1/(4*par.split*par.split)+par.gw*par.gw));
       sys->log<System::MESSAGE>("[Poisson] Near field cut off: %g", nearFieldCutOff);
     }
-    CudaSafeCall(cudaStreamCreate(&st));
     initCuFFT();
     if(split){
       //TODO: I need a better heuristic to select the table size
@@ -136,7 +135,6 @@ namespace uammd{
   }
 
   Poisson::~Poisson(){
-    cudaStreamDestroy(st);
   }
 
   void Poisson::initCuFFT(){
@@ -251,13 +249,13 @@ namespace uammd{
     auto gridCharges = Poisson_ns::allocateTemporaryArray<real>(2*(n.x/2+1)*n.y*n.z);
     auto  gridFieldPotentialFourier = Poisson_ns::allocateTemporaryArray<cufftComplex4>((n.x/2+1)*n.y*n.z);
     thrust::fill(thrust::cuda::par.on(st), gridCharges.get(), gridCharges.get() + 2*(n.x/2+1)*n.y*n.z, 0);
-    spreadCharges(gridCharges.get());
-    forwardTransformCharge(gridCharges.get(), (cufftComplex*) gridCharges.get());
-    convolveFourier((cufftComplex*) gridCharges.get(), gridFieldPotentialFourier.get());
+    spreadCharges(gridCharges.get(), st);
+    forwardTransformCharge(gridCharges.get(), (cufftComplex*) gridCharges.get(), st);
+    convolveFourier((cufftComplex*) gridCharges.get(), gridFieldPotentialFourier.get(), st);
     gridCharges.reset();
     auto gridFieldPotential = Poisson_ns::allocateTemporaryArray<real4>(2*(n.x/2+1)*n.y*n.z);
-    inverseTransform((cufftComplex*)gridFieldPotentialFourier.get(), (real*) gridFieldPotential.get());
-    interpolateFields(gridFieldPotential.get());
+    inverseTransform((cufftComplex*)gridFieldPotentialFourier.get(), (real*) gridFieldPotential.get(), st);
+    interpolateFields(gridFieldPotential.get(), st);
   }
 
   void Poisson::nearFieldForce(cudaStream_t st){
@@ -361,7 +359,7 @@ namespace uammd{
 
   }
 
-  void Poisson::spreadCharges(real* gridCharges){
+  void Poisson::spreadCharges(real* gridCharges, cudaStream_t st){
     sys->log<System::DEBUG2>("[Poisson] Spreading charges");
     int numberParticles = pg->getNumberParticles();
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
@@ -372,13 +370,13 @@ namespace uammd{
     CudaCheckError();
   }
 
-  void Poisson::forwardTransformCharge(real *gridCharges, cufftComplex* gridChargesFourier){
+  void Poisson::forwardTransformCharge(real *gridCharges, cufftComplex* gridChargesFourier, cudaStream_t st){
     CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
     sys->log<System::DEBUG2>("[Poisson] Taking grid to wave space");
     CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, gridCharges, gridChargesFourier));
   }
 
-  void Poisson::convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier){
+  void Poisson::convolveFourier(cufftComplex* gridChargesFourier, cufftComplex4* gridFieldPotentialFourier, cudaStream_t st){
     sys->log<System::DEBUG2>("[Poisson] Wave space convolution");
     dim3 NthreadsCells = dim3(8,8,8);
     dim3 NblocksCells;
@@ -391,7 +389,7 @@ namespace uammd{
     CudaCheckError();
   }
 
-  void Poisson::inverseTransform(cufftComplex* gridFieldPotentialFourier, real* gridFieldPotential){
+  void Poisson::inverseTransform(cufftComplex* gridFieldPotentialFourier, real* gridFieldPotential, cudaStream_t st){
     sys->log<System::DEBUG2>("[Poisson] Force to real space");
     CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
     CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridFieldPotentialFourier, gridFieldPotential));
@@ -423,7 +421,7 @@ namespace uammd{
 
   }
 
-  void Poisson::interpolateFields(real4* gridFieldPotential){
+  void Poisson::interpolateFields(real4* gridFieldPotential, cudaStream_t st){
     sys->log<System::DEBUG2>("[Poisson] Interpolating forces and energies");
     int numberParticles = pg->getNumberParticles();
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
