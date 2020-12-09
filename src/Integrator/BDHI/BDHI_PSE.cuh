@@ -79,7 +79,6 @@ namespace uammd{
       void setup_step(              cudaStream_t st = 0){}
       /*Compute M·F = Mr·F + Mw·F*/
       void computeMF(real3* MF, cudaStream_t st){
-	cudaDeviceSynchronize();
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());

@@ -397,7 +397,6 @@ namespace uammd{
 	thrust::fill(thrust::cuda::par.on(st), gridVels.begin(), gridVels.end(), real3());
 	spreadForce(st);
 	forwardTransformForces(st);
-	cudaDeviceSynchronize();
 	convolveFourier(st);
 	addBrownianNoise(st);
 	inverseTransformVelocity(st);
