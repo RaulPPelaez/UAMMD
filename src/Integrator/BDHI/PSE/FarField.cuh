@@ -15,8 +15,6 @@ Far field
 #include "utils/cufftPrecisionAgnostic.h"
 #include "utils/cufftDebug.h"
 #include "misc/IBM.cuh"
-//#include"third_party/managed_allocator.h"
-#include"utils/NVTXTools.h"
 namespace uammd{
   namespace BDHI{
     namespace pse_ns{
@@ -396,32 +394,14 @@ namespace uammd{
       void FarField::Mdot(real3 *MF, cudaStream_t st){
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
 	sys->log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
-	cudaDeviceSynchronize();
-	PUSH_RANGE("Clean grid", 1);
 	thrust::fill(thrust::cuda::par.on(st), gridVels.begin(), gridVels.end(), real3());
-	cudaDeviceSynchronize();
-	POP_RANGE;
-	PUSH_RANGE("Spread", 2);
 	spreadForce(st);
-	cudaDeviceSynchronize();
-	POP_RANGE;
-	PUSH_RANGE("FFTF", 3);
 	forwardTransformForces(st);
 	cudaDeviceSynchronize();
-	POP_RANGE;
-	PUSH_RANGE("Convolve", 4);
 	convolveFourier(st);
-	cudaDeviceSynchronize();
-	POP_RANGE;
 	addBrownianNoise(st);
-	PUSH_RANGE("FFTI", 5);
 	inverseTransformVelocity(st);
-	cudaDeviceSynchronize();
-	POP_RANGE;
-	PUSH_RANGE("Interpolate", 6);
 	interpolateVelocity(MF, st);
-	cudaDeviceSynchronize();
-	POP_RANGE;
 	sys->log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
       }
 
