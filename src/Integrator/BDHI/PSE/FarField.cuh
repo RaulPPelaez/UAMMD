@@ -24,18 +24,14 @@ namespace uammd{
 	real tau;
       public:
 	int support;
-	Kernel(int P, real3 width){
+	Kernel(int P, real width){
 	  this->support = 2*P+1;
-	  this->prefactor = cbrt(1.0/(width.x*width.y*width.z*pow(2.0*M_PI, 1.5)));
-	  this->tau = -0.5/(width.x*width.x);
+	  this->prefactor = cbrt(1.0/(width*width*width*pow(2.0*M_PI, 1.5)));
+	  this->tau = -0.5/(width*width);
 	}
 
 	inline __device__ real phi(real r) const{
 	  return prefactor*exp(tau*r*r);
-	}
-
-	inline __device__ real delta(real3 rvec, real3 h) const{
-	  return prefactor*prefactor*prefactor*exp(dot(tau*rvec,rvec));
 	}
 
       };
@@ -105,12 +101,12 @@ namespace uammd{
 	real psi; /*Splitting factor*/
 	Grid grid;
 
-	real3 eta; // kernel width in each direction
+	real eta; // kernel width
 	cufftHandle cufft_plan_forward, cufft_plan_inverse;
 	gpu_container<char> cufftWorkArea;
 	gpu_container<cufftComplex> gridVelsFourier;
 	gpu_container<real3> gridVels;
-	gpu_container<real3> fourierFactor;
+	gpu_container<real> fourierFactor;
 	std::shared_ptr<Kernel> kernel;
       };
 
@@ -152,7 +148,7 @@ namespace uammd{
 	__global__ void forceFourier2Vel(cufftComplex3 * gridForces, /*Input array*/
 					 cufftComplex3 * gridVels, /*Output array, can be the same as input*/
 					 /*Fourier scaling factors, see fillFourierScaling Factors*/
-					 const real3* Bfactor,
+					 const real* Bfactor,
 					 Grid grid){
 	  const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	  if(id == 0){
@@ -163,11 +159,8 @@ namespace uammd{
 	  if(id>=(ncells.z*ncells.y*(ncells.x/2+1))) return;
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
 	  const real3 k = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
-	  const real3 B = Bfactor[id];
-	  cufftComplex3 factor = gridForces[id];
-	  factor.x *= B.x;
-	  factor.y *= B.y;
-	  factor.z *= B.z;
+	  const real B = Bfactor[id];
+	  const cufftComplex3 factor = gridForces[id]*B;
 	  gridVels[id] = projectFourier(k, factor);
 	}
 
@@ -233,7 +226,7 @@ namespace uammd{
 	Keeping special care that v_k = v*_{N-k}, which implies that dWw_k = dWw*_{N-k}
 	*/
 	__global__ void fourierBrownianNoise(cufftComplex3 *__restrict__ gridVelsFourier,
-					     const real3* __restrict__ Bfactor,
+					     const real* __restrict__ Bfactor,
 					     Grid grid,
 					     real prefactor,/* sqrt(2·T/dt)*/
 					     uint seed1, uint seed2){
@@ -268,13 +261,11 @@ namespace uammd{
 	  }
 	  /*Z = sqrt(B)·(I-k^k)·dW*/
 	  {// Compute for v_k wave number
-	    const real3 Bsq = sqrt(Bfactor[id]);
+	    const real Bsq = sqrt(Bfactor[id]);
 	    cufftComplex3 factor = noise;
 	    const int3 ik = indexToWaveNumber(id, nk);
 	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
-	    factor.x *= Bsq.x;
-	    factor.y *= Bsq.y;
-	    factor.z *= Bsq.z;
+	    factor *= Bsq;
 	    gridVelsFourier[id] += projectFourier(k, factor);
 	  }
 	  /*Compute for conjugate v_{N-k} if needed*/
@@ -289,15 +280,13 @@ namespace uammd{
 	    int id_conj =  xc + (nk.x/2 + 1)*(yc + zc*nk.y);
 	    const int3 ik = indexToWaveNumber(id_conj, nk);
 	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
-	    const real3 Bsq = sqrt(Bfactor[id_conj]);
+	    const real Bsq = sqrt(Bfactor[id_conj]);
 	    cufftComplex3 factor = noise;
 	    /*v_{N-k} = v*_k, so the complex noise must be conjugated*/
 	    factor.x.y *= real(-1.0);
 	    factor.y.y *= real(-1.0);
 	    factor.z.y *= real(-1.0);
-	    factor.x *= Bsq.x;
-	    factor.y *= Bsq.y;
-	    factor.z *= Bsq.z;
+	    factor *= Bsq;
 	    gridVelsFourier[id_conj] += projectFourier(k, factor);
 	  }
 	}
@@ -480,15 +469,15 @@ namespace uammd{
 	  P = support/2;
 	  m = C*sqrt(M_PI*support);
 	}
-	double3 pw = make_double3(2*P+1);
-	double3 h = make_double3(grid.cellSize);
+	double pw = 2*P+1;
+	double h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
 	/*Number of standard deviations in the grid's Gaussian kernel support*/
-	double3 gaussM = make_double3(m);
+	double gaussM = m;
 	/*Standard deviation of the Gaussian kernel*/
-	double3 w   = pw*h/2.0;
+	double w   = pw*h/2.0;
 	/*Gaussian splitting parameter*/
-	this->eta = make_real3(pow(2.0*psi, 2)*w*w/(gaussM*gaussM));
-	sys->log<System::MESSAGE>("[BDHI::PSE] eta: %g", eta.x);
+	this->eta = pow(2.0*psi*w/gaussM, 2);
+	sys->log<System::MESSAGE>("[BDHI::PSE] eta: %g", eta);
 	kernel = std::make_shared<Kernel>(P, sqrt(eta)/(2.0*psi));
       }
 
@@ -496,18 +485,18 @@ namespace uammd{
 	/* Precomputes the fourier scaling factor B (see eq. 9 and 20.5 in [1]),
 	 Bfactor = B(||k||^2, xi, tau) = 1/(vis·Vol) · sinc(k·rh)^2/k^2·Hashimoto(k,xi,tau)
       */
-	__global__ void fillFourierScalingFactor(real3 * __restrict__ Bfactor,
+	__global__ void fillFourierScalingFactor(real * __restrict__ Bfactor,
 						 Grid grid,
 						 double rh, //Hydrodynamic radius
 						 double viscosity,
 						 double split,
-						 real3 eta //Gaussian kernel splitting parameter
+						 real eta //Gaussian kernel splitting parameter
 						 ){
 	  const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	  const int3 ncells = grid.cellDim;
 	  if(id>=(ncells.z*ncells.y*(ncells.x/2+1))) return;
 	  if(id == 0){
-	    Bfactor[0] = make_real3(0.0);
+	    Bfactor[0] = 0;
 	    return;
 	  }
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
@@ -522,13 +511,13 @@ namespace uammd{
 	    split is the splitting between near and far contributions,
 	    eta is the splitting of the gaussian kernel used in the grid interpolation, see sec. 2 in [2]*/
 	  /*See eq. 11 in [1] and eq. 11 and 14 in [2]*/
-	  double3 tau = make_double3(-k2_invsplit2_4*(1.0-eta));
-	  double3 hashimoto = (1.0 + k2_invsplit2_4)*make_double3(exp(tau.x), exp(tau.y), exp(tau.z))/k2;
+	  double tau = -k2_invsplit2_4*(1.0-eta);
+	  double hashimoto = (1.0 + k2_invsplit2_4)*exp(tau)/k2;
 	  /*eq. 20.5 in [1]*/
-	  double3 B = sink*sink*invk2*hashimoto/(viscosity*rh*rh);
+	  double B = sink*sink*invk2*hashimoto/(viscosity*rh*rh);
 	  B /= double(ncells.x*ncells.y*ncells.z);
 	  /*Store theresult in global memory*/
-	  Bfactor[id] = make_real3(B);
+	  Bfactor[id] = B;
 	}
 
       }
@@ -536,7 +525,7 @@ namespace uammd{
       void FarField::initializeFourierFactors(){
 	/*B in [1], this array stores, for each cell/fourier node,
 	  the scaling factor to go from forces to velocities in fourier space*/
-	fourierFactor.resize(grid.cellDim.z*grid.cellDim.y*(grid.cellDim.x/2+1), real3());
+	fourierFactor.resize(grid.cellDim.z*grid.cellDim.y*(grid.cellDim.x/2+1), real());
 	int Nthreads = 128;
 	int Nblocks = (grid.cellDim.z*grid.cellDim.y*(grid.cellDim.x/2+1))/Nthreads +1;
 	detail::fillFourierScalingFactor<<<Nblocks, Nthreads>>>
