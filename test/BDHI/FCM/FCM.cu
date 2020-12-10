@@ -18,7 +18,7 @@ All output is adimensional.
 #include<random>
 using namespace uammd;
 
-real temperature, viscosity, rh, tolerance, fac;
+real temperature, viscosity, rh, tolerance;
 
 //FCM kernel M(\vec{r}) = f(r)·I + g(r)·\vec{r}\otimes\vec{r}/r^2
 //M0 = f(0)
@@ -65,7 +65,6 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   par.dt = 1;
   par.box = box;
   par.tolerance = tolerance;
-  par.fac = fac;
 
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
 
@@ -124,7 +123,6 @@ void computeSelfMobilityMatrixRH(real3 L, double F, long double *M, long double 
   par.dt = 1;
   par.box = box;
   par.tolerance = tolerance;
-  par.fac = fac;
   static auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
   if(!bdhi){
     bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
@@ -214,7 +212,7 @@ bool selfMobilityCubicBox_test(){
     real L = L_min + i*((L_max-L_min)/(real)(NL-1));
     long double M0;// = computeM0PBC(L);
     long double real_rh;
-    computeSelfMobilityMatrix(make_real3(L), F, M, M0, real_rh);
+    computeSelfMobilityMatrix(make_real3(L, L, L), F, M, M0, real_rh);
 
     CudaCheckError();
 
@@ -576,7 +574,6 @@ int main( int argc, char *argv[]){
   viscosity = std::stod(argv[3]);
   rh = std::stod(argv[4]);
   tolerance = std::stod(argv[5]);
-  fac = 0;//std::stod(argv[6]);
   if(strcmp(argv[1], "selfMobilityCubicBox")==0) selfMobilityCubicBox_test();
   if(strcmp(argv[1], "hydrodynamicRadiusVariance")==0) hydrodynamicRadiusVariance_test();
   if(strcmp(argv[1], "pairMobilityCubicBox")==0){

@@ -55,8 +55,9 @@ namespace uammd{
     }
 
     void FCM::initializeKernel(Parameters par){
-      kernel = std::make_shared<Kernel>(grid.cellSize.x, par.tolerance);
-      this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(par.hydrodynamicRadius, grid.cellSize.x);
+      real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
+      kernel = std::make_shared<Kernel>(h, par.tolerance);
+      this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h, grid.cellSize.x);
     }
 
     void FCM::printMessages(Parameters par){
