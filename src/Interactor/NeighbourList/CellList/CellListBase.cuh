@@ -50,6 +50,7 @@ References:
 #include"utils/Grid.cuh"
 #include"utils/debugTools.h"
 #include<thrust/device_vector.h>
+#include<third_party/managed_allocator.h>
 #include<limits>
 
 namespace uammd{
@@ -89,7 +90,7 @@ namespace uammd{
   protected:
     thrust::device_vector<uint> cellStart;
     thrust::device_vector<int>  cellEnd;
-    thrust::device_vector<int>  errorFlags;
+    managed_vector<int>  errorFlags;
     thrust::device_vector<real4> sortPos;
     uint currentValidCell;
     int currentValidCell_counter;
@@ -103,6 +104,8 @@ namespace uammd{
       System::log<System::MESSAGE>("[CellList] Created");
       CudaSafeCall(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
       currentValidCell_counter = -1;
+      errorFlags.resize(1);
+      errorFlags[0] = 0;
       CudaCheckError();
     }
 
@@ -222,10 +225,7 @@ namespace uammd{
       const int numberParticles = sortPos.size();
       const int Nthreads = 512;
       const int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-      int h_errorFlag = 0;
-      errorFlags.resize(1);
       int *d_errorFlag = thrust::raw_pointer_cast(errorFlags.data());
-      CudaSafeCall(cudaMemcpyAsync(d_errorFlag, &h_errorFlag, sizeof(int), cudaMemcpyHostToDevice, st));
       CellList_ns::fillCellList<<<Nblocks, Nthreads, 0, st>>>(thrust::raw_pointer_cast(sortPos.data()),
 							      thrust::raw_pointer_cast(cellStart.data()),
 							      thrust::raw_pointer_cast(cellEnd.data()),
@@ -233,13 +233,13 @@ namespace uammd{
 							      d_errorFlag,
 							      numberParticles,
 							      grid);
-      CudaSafeCall(cudaMemcpyAsync(&h_errorFlag, d_errorFlag, sizeof(int), cudaMemcpyDeviceToHost, st));
-      CudaSafeCall(cudaEventRecord(event, st));
-      CudaSafeCall(cudaEventSynchronize(event));
-      if(h_errorFlag > 0){
+#ifdef UAMMD_DEBUG
+      CudaCheckError(cudaDeviceSynchronize());
+      if(d_errorFlag[0] > 0){
 	System::log<System::ERROR>("[CellList] NaN positions found during construction");
-	throw std::overflow_error("CellList encountered NaN positions");
+       	throw std::overflow_error("CellList encountered NaN positions");
       }
+#endif
       CudaCheckError();
     }
 
