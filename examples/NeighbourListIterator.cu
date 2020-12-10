@@ -10,7 +10,7 @@
  */
 #include"uammd.cuh"
 #include"Interactor/NeighbourList/CellList.cuh"
-#include"Interactor/NeighbourList/VerletList.cuh"
+//#include"Interactor/NeighbourList/VerletList.cuh"
 #include"utils/InputFile.h"
 #include"utils/InitialConditions.cuh"
 #include"Interactor/Interactor.cuh"
@@ -58,7 +58,7 @@ __global__ void processNeighbours(NeighbourContainer ni,// Provides iterator wit
     const real3 pj = make_real3(neigh.getPos());
     const real3 rij = box.apply_pbc(pj-pi);
     const real r2 = dot(rij, rij);
-    if(r2>0) f += lj(r2)*rij;
+    if(r2>0 and r2<(real(6.25))) f += lj(r2)*rij;
   }
   force[ni.getGroupIndexes()[i]] += make_real4(f);
 }
@@ -66,8 +66,8 @@ __global__ void processNeighbours(NeighbourContainer ni,// Provides iterator wit
 //A small interactor that computes LJ force using a CellList
 class myInteractor: public Interactor{
   //Uncomment to select a different neighbour list strategy
-  using NeighbourList = VerletList;
-  //using NeighbourList = CellList;
+  //using NeighbourList = VerletList;
+  using NeighbourList = CellList;
   std::shared_ptr<NeighbourList> cl;
 public:
   myInteractor(std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys):
