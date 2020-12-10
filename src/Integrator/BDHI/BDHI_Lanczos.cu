@@ -194,7 +194,7 @@ namespace uammd{
 	curandGenerateNormal(curng, noise,
 			     3*numberParticles + (3*numberParticles)%2,
 			     real(0.0), real(1.0));
-	lanczosAlgorithm->solve(Mdot, (real*) BdW, noise, numberParticles, tolerance, st);
+	lanczosAlgorithm->solve(Mdot, (real*) BdW, noise, numberParticles, st);
       }
     }
 
