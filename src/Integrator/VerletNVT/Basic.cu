@@ -51,18 +51,12 @@ namespace uammd{
 	if(id>=N) return;
 	Saru rng(id, seed);
 	int i = indexIterator[id];
-
-	real mass_i = real(1.0);
-	if(mass) mass_i = mass[i];
-
-	double3 noisei = make_double3(rng.gd(0, vamp/mass_i), rng.gd(0, vamp/mass_i).x); //noise[id];
-
+	real mass_i = mass?mass[i]:real(1.0);
+	double3 noisei = make_double3(rng.gd(0, vamp/mass_i), is2D?0.0:rng.gd(0, vamp/mass_i).x);
 	int index = indexIterator[i];
 	vel[index].x = noisei.x;
 	vel[index].y = noisei.y;
-	if(!is2D){
-	  vel[index].z = noisei.z;
-	}
+	vel[index].z = noisei.z;
       }
 
     }
@@ -81,7 +75,6 @@ namespace uammd{
       Integrator(pd, pg, sys, name),
       dt(par.dt), temperature(par.temperature), viscosity(par.viscosity), is2D(par.is2D),
       steps(0){
-
       sys->rng().next32();
       sys->rng().next32();
       seed = sys->rng().next32();
@@ -91,36 +84,25 @@ namespace uammd{
       if(is2D){
 	sys->log<System::MESSAGE>("[%s] Working in 2D mode.", name.c_str());
       }
-
       this->noiseAmplitude = sqrt(2*dt*6*M_PI*viscosity*temperature);
-
       int numberParticles = pg->getNumberParticles();
-
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
       if(pd->isVelAllocated()){
 	sys->log<System::WARNING>("[%s] Velocity will be overwritten to ensure temperature conservation!", name.c_str());
       }
       {
 	auto vel_handle = pd->getVel(access::location::gpu, access::mode::write);
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
-
 	real velAmplitude = sqrt(3.0*temperature);
-
 	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
-
-
 	Basic_ns::initialVelocities<<<Nblocks, Nthreads>>>(vel_handle.raw(),
 							   mass.raw(),
 							   groupIterator,
 							   velAmplitude, is2D, numberParticles,
 							   sys->rng().next32());
-
       }
-
       cudaStreamCreate(&stream);
-
     }
 
 
@@ -149,7 +131,6 @@ namespace uammd{
 	if(id>=N) return;
 	//Index of current particle in group
 	const int i = indexIterator[id];
-
 	real invMass = real(1.0);
 	if(mass){
 	  invMass = real(1.0)/mass[i];
@@ -158,19 +139,12 @@ namespace uammd{
 	if(radius){
 	  radius_i = radius[i];
 	}
-
 	Saru rng(id, stepNum, seed);
-
 	noiseAmplitude *= sqrtf(0.5*radius_i*invMass);
-
 	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), rng.gf(0, noiseAmplitude).x); //noise[id];
-
 	const real damping = real(6.0)*real(M_PI)*viscosity*radius_i;
-
 	vel[i] += (make_real3(force[i])-damping*vel[i])*(dt*real(0.5)*invMass) + noisei;
-
 	if(is2D) vel[i].z = real(0.0);
-
 	//In the first step, upload positions
 	if(step==1){
 	  const real3 newPos = make_real3(pos[i]) + vel[i]*dt;
@@ -178,25 +152,17 @@ namespace uammd{
 	  //Reset force
 	  force[i] = make_real4(0);
 	}
-
       }
-
-
     }
 
     //Move the particles in my group 1 dt in time.
     void Basic::forwardTime(){
       for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
-
       steps++;
       sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
-
       int numberParticles = pg->getNumberParticles();
-
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
-
       //First simulation step is special
       if(steps==1){
 	{
@@ -213,7 +179,6 @@ namespace uammd{
       }
       //First integration step
       {
-
 	//An iterator with the global indices of my groups particles
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
 	//Get all necessary properties
@@ -239,8 +204,6 @@ namespace uammd{
       }
       //Compute all the forces
       for(auto forceComp: interactors) forceComp->sumForce(stream);
-
-
       //Second integration step
       {
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
@@ -262,7 +225,6 @@ namespace uammd{
 								     noiseAmplitude,
 								     steps, seed);
       }
-
     }
   }
 }
