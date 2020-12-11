@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019. Quasi2D Integrator
+/*Raul P. Pelaez 2019-2020. Quasi2D Integrator
   See BDHI_quasi2D.cuh for more information.
  */
 #include"BDHI_quasi2D.cuh"
@@ -16,7 +16,7 @@
 #include<thrust/tuple.h>
 namespace uammd{
   namespace BDHI{
-        template<class HydroKernel>
+    template<class HydroKernel>
     BDHI2D<HydroKernel>::BDHI2D(shared_ptr<ParticleData> pd,
 				shared_ptr<System> sys,
 				Parameters par):
@@ -88,7 +88,6 @@ namespace uammd{
       }
       double width = hydroKernel->getGaussianVariance(par.hydrodynamicRadius);
       this->ibmKernel = std::make_shared<Kernel>(support, width);
-      this->ibmKernelThermalDrift = std::make_shared<KernelThermalDrift>(support, width);
     }
 
     template<class HydroKernel>
@@ -96,6 +95,7 @@ namespace uammd{
       try{
 	const int ncells = (grid.cellDim.x/2+1)*grid.cellDim.y;
 	gridVelsFourier.resize(ncells, cufftComplex2());
+	gridVels.resize(2*ncells, real2());
 	const int numberParticles = pg->getNumberParticles();
 	particleVels.resize(numberParticles, real2());
       }
@@ -202,8 +202,12 @@ namespace uammd{
     void BDHI2D<HydroKernel>::resetContainers(){
       sys->log<System::DEBUG2>("[BDHI::BDHI2D] Setting vels to zero...");
       thrust::fill(thrust::cuda::par.on(st2), particleVels.begin(), particleVels.end(), real2());
-      thrust::fill(thrust::cuda::par.on(st), gridVelsFourier.begin(), gridVelsFourier.end(),
-		   typename decltype(gridVelsFourier)::value_type());
+      if(interactors.size() > 0 or (hydroKernel->hasThermalDrift() and temperature > 0)){
+	thrust::fill(thrust::cuda::par.on(st), gridVels.begin(), gridVels.end(), typename decltype(gridVels)::value_type());
+      }
+      if(interactors.size() > 0 or temperature > 0){
+	thrust::fill(thrust::cuda::par.on(st), gridVelsFourier.begin(), gridVelsFourier.end(), typename decltype(gridVelsFourier)::value_type());
+      }
       auto force = pd->getForce(access::location::gpu, access::mode::write);
       thrust::fill(thrust::cuda::par.on(st2), force.begin(), force.end(), real4());
     }
@@ -222,12 +226,17 @@ namespace uammd{
 	sys->log<System::DEBUG2>("[BDHI::BDHI2D] Spreading thermal drift");
 	const int numberParticles = pg->getNumberParticles();
 	const auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVelsFourier.data());
-	const real variance = hydroKernel->getGaussianVariance(hydrodynamicRadius);
-	const auto tr = thrust::make_constant_iterator<real>(temperature/variance);
+	real2* d_gridVels = thrust::raw_pointer_cast(gridVels.data());
 	const auto n = grid.cellDim;
-	IBM<KernelThermalDrift> ibm(sys, ibmKernelThermalDrift, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-	ibm.spread(pos.begin(), tr, d_gridVels, numberParticles, st);
+	double width = hydroKernel->getGaussianVariance(hydrodynamicRadius);
+	const auto trX = thrust::make_constant_iterator<real2>({temperature,0});
+	auto kernelX = std::make_shared<KernelThermalDrift<0>>(ibmKernel->support, width);
+	IBM<KernelThermalDrift<0>> ibmX(sys, kernelX, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	ibmX.spread(pos.begin(), trX, d_gridVels, numberParticles, st);
+	const auto trY = thrust::make_constant_iterator<real2>({0,temperature});
+	auto kernelY = std::make_shared<KernelThermalDrift<1>>(ibmKernel->support, width);
+	IBM<KernelThermalDrift<1>> ibmY(sys, kernelY, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	ibmY.spread(pos.begin(), trY, d_gridVels, numberParticles, st);
 	CudaCheckError();
       }
     }
@@ -244,7 +253,7 @@ namespace uammd{
 	sys->log<System::DEBUG2>("[BDHI::BDHI2D] Spread particle forces");
 	const int numberParticles = pg->getNumberParticles();
 	const auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVelsFourier.data());
+	real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVels.data());
 	const auto force = pd->getForce(access::location::gpu, access::mode::read);
 	const auto f_tr = thrust::make_transform_iterator(force.begin(), BDHI2D_ns::toReal2());
 	const auto n = grid.cellDim;
@@ -274,8 +283,9 @@ namespace uammd{
       if(isGridDataNonZero){
 	sys->log<System::DEBUG2>("[BDHI::BDHI2D] Taking grid to wave space");
 	CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
-	auto d_gridVels = thrust::raw_pointer_cast(gridVelsFourier.data());
-	CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, (cufftReal*)d_gridVels, (cufftComplex*)d_gridVels));
+	auto d_gridVels = thrust::raw_pointer_cast(gridVels.data());
+	auto d_gridVelsF = thrust::raw_pointer_cast(gridVelsFourier.data());
+	CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, (cufftReal*)d_gridVels, (cufftComplex*)d_gridVelsF));
       }
     }
 
@@ -361,14 +371,14 @@ namespace uammd{
 	  gridVelsFourier[0] = cufftComplex2();
 	  return;
 	}
-	if(ik.x == 0 and ik.y == 0) return;
 	if(ik.x == 0 and ik.y > (nk.y - ik.y)) return;
-	if(ik.x == nk.x-ik.x and ik.y > (nk.y - ik.y)) return;
+	if(ik.x == nk.x - ik.x and ik.y > (nk.y - ik.y) ) return;
 	const bool isXnyquist = (ik.x == (nk.x - ik.x)) and (nk.x%2 == 0);
 	const bool isYnyquist = (ik.y == (nk.y - ik.y)) and (nk.y%2 == 0);
-	const bool isNyquist = (isXnyquist and ik.y == 0) or
-	  (isYnyquist and ik.x == 0) or
-	  (isXnyquist and isYnyquist );
+	if(isXnyquist and ik.y == 0){
+	  gridVelsFourier[id] = cufftComplex2();
+	}
+	const bool isNyquist = (isYnyquist and ik.x == 0) or (isXnyquist and isYnyquist );
 	cufftComplex2 noise;
 	{
 	  Saru saru(id, step, seed);
@@ -399,10 +409,10 @@ namespace uammd{
 	  gridVelsFourier[id] += factor;
 	  if(isNyquist) return;
 	  //Ensure correct conjugacy v_i = \conj{v_{N-i}}
-	  if((ik.x == 0 or ik.x == (nk.x-ik.x))){
+	  if(ik.x == (nk.x-ik.x) or ik.x == 0){
 	    factor.x.y *= real(-1.0);
 	    factor.y.y *= real(-1.0);
-	    const int indexOfConjugate = ik.x + (nk.y - ik.y)*(nk.x/2+1);
+	    const int indexOfConjugate =  ik.x + (nk.x/2 + 1)*(nk.y - ik.y);
 	    gridVelsFourier[indexOfConjugate] += factor;
 	  }
 	}
@@ -454,8 +464,9 @@ namespace uammd{
       if(isGridDataNonZero){
 	sys->log<System::DEBUG2>("[BDHI::BDHI2D] Going back to real space");
 	CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
-	auto d_gridVels = thrust::raw_pointer_cast(gridVelsFourier.data());
-	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, (cufftComplex*)d_gridVels, (cufftReal*)d_gridVels));
+	auto d_gridVelsF = thrust::raw_pointer_cast(gridVelsFourier.data());
+	auto d_gridVels = thrust::raw_pointer_cast(gridVels.data());
+	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, (cufftComplex*)d_gridVelsF, (cufftReal*)d_gridVels));
       }
     }
 
@@ -464,7 +475,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::BDHI2D] Interpolate grid velocities to particles");
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVelsFourier.data());
+      real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVels.data());
       real2* d_particleVels = thrust::raw_pointer_cast(particleVels.data());
       const auto n = grid.cellDim;
       IBM<Kernel> ibm(sys, ibmKernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));

@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019. Quasi2D Integrator.
+/*Raul P. Pelaez 2019-2020. Quasi2D Integrator.
 This integrator solves the Brownian Dynamics with Hydrodynamic interactions equation where
 particles are restricted to move in a 2D enviroment.
 The hydrodynamic kernel is free to choose as a kernel argument, mainly:
@@ -94,7 +94,7 @@ namespace uammd{
 	static constexpr inline bool hasThermalDrift(){ return false;}
 
 	inline __device__ real2 operator()(real k2, real a){
-	  const real fk = 0;
+	  constexpr real fk = 0;
 	  const real gk = real(1.0)/(k2*k2);
 	  return {fk, gk};
 	}
@@ -118,28 +118,48 @@ namespace uammd{
 	}
       };
 
-      template<bool thermalDrift>
       struct Gaussian{
 	int support;
         Gaussian(int support, real width):support(support){
-	  this-> prefactor = 1.0/(2.0*M_PI*width);
+	  this-> prefactor = sqrt(1.0/(2.0*M_PI*width));
 	  this-> tau = -1.0/(2.0*width);
-	  sup = 0.5*support;
+	}
+	inline __device__ real phiX(real r) const{
+	  return prefactor*exp(tau*r*r);
+	}
+	inline __device__ real phiY(real r) const{
+	  return prefactor*exp(tau*r*r);
+	}
+	static constexpr inline __device__ real phiZ(real r){
+	  return real(1.0);
 	}
 
-	inline __device__ real2 delta(real3 rvec, real3 h) const{
-	  const real r2 = dot(rvec, rvec);
-	  //if(r2>sup*sup*h.x*h.x) return 0;
-	  if(thermalDrift)
-	    return -prefactor*exp(tau*r2)*make_real2(rvec);
-	  else
-	    return make_real2(prefactor*exp(tau*r2));
-	}
       private:
 	real prefactor;
 	real tau;
-	real sup;
       };
+
+      template<int direction>
+      struct GaussianThermalDrift{
+	int support;
+	GaussianThermalDrift(int support, real width):support(support){
+	  this-> prefactor = -sqrt(1.0/(2.0*M_PI*width*width));
+	  this-> tau = -1.0/(2.0*width);
+	}
+	inline __device__ real phiX(real r) const{
+	  return prefactor*exp(tau*r*r)*(direction==0?r:real(1.0));
+	}
+	inline __device__ real phiY(real r) const{
+	  return prefactor*exp(tau*r*r)*(direction==1?r:real(1.0));
+	}
+	inline __device__ real phiZ(real r) const{
+	  return real(1.0);
+	}
+
+	private:
+	  real prefactor;
+	  real tau;
+	};
 
       using cufftComplex2 = cufftComplex2_t<real>;
       using cufftComplex = cufftComplex_t<real>;
@@ -149,10 +169,9 @@ namespace uammd{
     template<class HydroKernel>
     class BDHI2D: public Integrator{
     public:
-      //WARNING! the code is specifically tailored for a Gaussian kernel at the moment.
-      //It assumes that d\delta(r)/dr = \sigma \delta(r)
-      using Kernel = BDHI2D_ns::Gaussian<false>;
-      using KernelThermalDrift = BDHI2D_ns::Gaussian<true>;
+      using Kernel = BDHI2D_ns::Gaussian;
+      template<int dir>
+      using KernelThermalDrift = BDHI2D_ns::GaussianThermalDrift<dir>;
 
       using cufftComplex2 = BDHI2D_ns::cufftComplex2;
       using cufftComplex = BDHI2D_ns::cufftComplex;
@@ -164,9 +183,9 @@ namespace uammd{
       };
 
       BDHI2D(shared_ptr<ParticleData> pd,
-	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys,
-	  Parameters par);
+	     shared_ptr<ParticleGroup> pg,
+	     shared_ptr<System> sys,
+	     Parameters par);
       BDHI2D(shared_ptr<ParticleData> pd,
 	     shared_ptr<System> sys,
 	     Parameters par);
@@ -186,7 +205,6 @@ namespace uammd{
       real tolerance;
 
       std::shared_ptr<Kernel> ibmKernel;
-      std::shared_ptr<KernelThermalDrift> ibmKernelThermalDrift;
       std::shared_ptr<HydroKernel> hydroKernel;
 
       Box box;
@@ -199,6 +217,7 @@ namespace uammd{
 #endif
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       gpu_container<char> cufftWorkArea;
+      gpu_container<real2> gridVels;
       gpu_container<cufftComplex2> gridVelsFourier;
       gpu_container<real2> particleVels;
 
