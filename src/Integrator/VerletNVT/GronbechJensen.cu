@@ -68,73 +68,39 @@ namespace uammd{
 				   uint stepNum, uint seed){
 	const int id = blockIdx.x*blockDim.x+threadIdx.x;
 	if(id>=N) return;
-
 	//Index of current particle in group
 	const int i = indexIterator[id];
-
 	Saru rng(id, stepNum, seed);
-
-	real invMass = real(1.0);
-	if(mass){
-	  invMass = real(1.0)/mass[i];
-	}
-	real radius_i = real(1.0);
-	if(radius){
-	  radius_i = radius[i];
-	}
-
+	real invMass = mass?(real(1.0)/mass[i]):real(1.0);
+	real radius_i = radius?radius[i]:real(1.0);
 	noiseAmplitude *= sqrtf(radius_i)*invMass;
-	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), rng.gf(0, noiseAmplitude).x); //noise[id];
-
+	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), is2D?real():rng.gf(0, noiseAmplitude).x);
 	const real damping = real(6.0)*real(M_PI)*viscosity*radius_i;
-
 	if(step==1){
 	  const real gdthalfinvMass = damping*dt*invMass*real(0.5);
 	  const real b = real(1.0)/(real(1.0) + gdthalfinvMass);
-
 	  const real a = (real(1.0) - gdthalfinvMass)*b;
-
-
 	  real3 p = make_real3(pos[i]);
-	  p = p + b*dt*(
-			vel[i] +
-			real(0.5)*(
-				   (dt*invMass)*make_real3(force[i]) +
-				   noisei
-				   )
-			);
-
+	  p = p + b*dt*(vel[i] + real(0.5)*((dt*invMass)*make_real3(force[i]) + noisei));
 	  pos[i] = make_real4(p, pos[i].w);
-
-	  vel[i] = a*vel[i] +
-	    dt*real(0.5)*invMass*a*make_real3(force[i]) +
-	    b*noisei;
-
-	  if(is2D) vel[i].z = real(0.0);
-
+	  vel[i] = a*vel[i] + dt*real(0.5)*invMass*a*make_real3(force[i]) + b*noisei;
 	  force[i] = make_real4(0);
 	}
 	else{
 	  vel[i] += dt*real(0.5)*invMass*make_real3(force[i]);
 	}
-
+	if(is2D) vel[i].z = real(0.0);
       }
-
-
     }
     //Move the particles in my group 1 dt in time.
     void GronbechJensen::forwardTime(){
       CudaCheckError();
       for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
-
       steps++;
       sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
-
       int numberParticles = pg->getNumberParticles();
-
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
       //First simulation step is special
       if(steps==1){
 	{
