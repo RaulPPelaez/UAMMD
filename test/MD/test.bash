@@ -8,16 +8,18 @@ cutOff=2.5  #Reduced units
 
 numberParticles=10000 #The box will adapt to achieve a certain density
 
+mkdir -p tools
 cd tools
-#Download rdf
-if ! test  rdf
+if ! test -f rdf
 then
-   git clone https://github.com/raulppelaez/RadialDistributionFunction RDF
-   cd RDF
-   cmake . && make -j2
-   cp bin/rdf ..
-   cd ..
-   rm -rf RDF
+    git clone https://github.com/raulppelaez/RadialDistributionFunction
+    if ! (cd RadialDistributionFunction && mkdir build && cd build && cmake .. && make -j4)
+    then
+	echo "ERROR When compiling RadialDistributionFunction, check inside tools/ and ensure tools/rdf exists before continuing" > /dev/stderr
+	exit 1
+    fi
+    cp RadialDistributionFunction/build/bin/rdf .
+    rm -rf RadialDistributionFunction
 fi
 cd ..
 
