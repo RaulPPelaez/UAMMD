@@ -37,7 +37,7 @@ vis=$(head -100 /dev/urandom | cksum | awk '{srand($1);print 1+rand();}')
 #Hydrodynamic radus
 a=$(head -100 /dev/urandom | cksum | awk '{srand($1);print 1+rand();}')
 
-tol=1e-4
+tol=1e-6
 
 function checkSelfDiffusion {
     scheme=$1    
@@ -59,9 +59,9 @@ function checkSelfDiffusion {
 		exit
 	    fi
 	    t0=$(echo $a $D0 | awk '{print ($1*$1)/$2}');
-	    dt=$(echo $t0 | awk '{print 0.0001*$1}');
+	    dt=$(echo $t0 | awk '{print 0.001*$1}');
 	    msdtmp=$(mktemp)
-	    cat<<EOF | ./q2D /dev/stdin 2> /dev/null | tools/fastmsd -N $N -Nsteps $Nsteps -precision double 2> /dev/null | awk '{print $1*'$dt', ($2+$3)/(4*'$D0')}' > $msdtmp
+	    cat<<EOF |./q2D /dev/stdin 2> log.selfDiffusion.$scheme | tools/fastmsd -N $N -Nsteps $Nsteps -precision double 2> /dev/null | awk '{print $1*'$dt', ($2+$3)/(4*'$D0')}' > $msdtmp
 		scheme 	       	     	$scheme
 		test 			selfDiffusion
 		boxSize			$L $L
@@ -114,7 +114,7 @@ function checkSelfMobility {
 	fi
 	pullForce=$(echo 1 | awk '{print '$a'/('$M0'*'$dt');}')
 	msdtmp=$(mktemp)	
-	cat<<EOF | ./q2D /dev/stdin 2> /dev/null | awk '{printf "%g %.15g\n", '$l', sqrt((1.0-($1)/('$M0'))^2); fflush(stdout);}'
+	cat<<EOF | ./q2D /dev/stdin 2> log.selfMobility.$scheme | awk '{printf "%g %.15g\n", '$l', sqrt((1.0-($1)/('$M0'))^2); fflush(stdout);}'
 		scheme 	       	     	$scheme
 		test 			selfMobility
 		boxSize			$L $L
@@ -135,11 +135,11 @@ function checkRadialDistributionFunction {
     scheme=$1
     L=128
     N=16384
-    Nsteps=1000000
-    printSteps=1000
+    Nsteps=200000
+    printSteps=200
     Nsnapshots=$(echo $Nsteps $printSteps | awk '{print int($1/$2);}')
     dt=0.005
-    cat<<EOF | ./q2D /dev/stdin 2> /dev/null | tools/rdf -N $N -Nsnapshots $Nsnapshots -precision double -L $L -nbins 100 -rcut $a -dim 2D 2> /dev/null | awk '{print $1/'$a', $2, $3}' 
+    cat<<EOF | ./q2D /dev/stdin 2> log.rdf.$scheme | tools/rdf -N $N -Nsnapshots $Nsnapshots -precision double -L $L -nbins 50 -rcut $a -dim 2D 2> /dev/null | awk '{print $1/'$a', $2, $3}' 
 		scheme 	       	     	$scheme
 		test 			selfDiffusion
 		boxSize			$L $L
@@ -147,7 +147,7 @@ function checkRadialDistributionFunction {
 		numberSteps		$Nsteps
 		printSteps	       	$printSteps
 		dt			$dt
-		relaxSteps		0
+		relaxSteps		2000
 		viscosity		$vis
 		temperature		$T
 		hydrodynamicRadius	$a
@@ -168,8 +168,8 @@ checkSelfMobility "quasi2D"   > selfMobilityDeviation.quasi2D
 checkRadialDistributionFunction "true2D"   > rdf.true2D
 checkRadialDistributionFunction "quasi2D"   > rdf.quasi2D
 
-
-
+mkdir -p results
+mv *true2D *quasi2D results
 
 
 
