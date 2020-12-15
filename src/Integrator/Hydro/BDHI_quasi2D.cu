@@ -229,11 +229,11 @@ namespace uammd{
 	real2* d_gridVels = thrust::raw_pointer_cast(gridVels.data());
 	const auto n = grid.cellDim;
 	double width = hydroKernel->getGaussianVariance(hydrodynamicRadius);
-	const auto trX = thrust::make_constant_iterator<real2>({temperature,0});
+	const auto trX = thrust::make_constant_iterator<real2>({-temperature,0});
 	auto kernelX = std::make_shared<KernelThermalDrift<0>>(ibmKernel->support, width);
 	IBM<KernelThermalDrift<0>> ibmX(sys, kernelX, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibmX.spread(pos.begin(), trX, d_gridVels, numberParticles, st);
-	const auto trY = thrust::make_constant_iterator<real2>({0,temperature});
+	const auto trY = thrust::make_constant_iterator<real2>({0,-temperature});
 	auto kernelY = std::make_shared<KernelThermalDrift<1>>(ibmKernel->support, width);
 	IBM<KernelThermalDrift<1>> ibmY(sys, kernelY, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibmY.spread(pos.begin(), trY, d_gridVels, numberParticles, st);
