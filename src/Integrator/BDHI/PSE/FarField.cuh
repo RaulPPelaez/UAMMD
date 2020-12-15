@@ -48,6 +48,7 @@ namespace uammd{
 	  hydrodynamicRadius(par.hydrodynamicRadius),
 	  dt(par.dt),
 	  psi(par.psi),
+	  shearStrain(par.shearStrain),
 	  sys(sys), pd(pd), pg(pg)
 	{
 	  this->seed = sys->rng().next32();
@@ -102,6 +103,7 @@ namespace uammd{
 	Grid grid;
 
 	real eta; // kernel width
+	real shearStrain;
 	cufftHandle cufft_plan_forward, cufft_plan_inverse;
 	gpu_container<char> cufftWorkArea;
 	gpu_container<cufftComplex> gridVelsFourier;
@@ -149,6 +151,7 @@ namespace uammd{
 					 cufftComplex3 * gridVels, /*Output array, can be the same as input*/
 					 /*Fourier scaling factors, see fillFourierScaling Factors*/
 					 const real* Bfactor,
+					 real shearStrain,
 					 Grid grid){
 	  const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	  if(id == 0){
@@ -158,7 +161,7 @@ namespace uammd{
 	  const int3 ncells = grid.cellDim;
 	  if(id>=(ncells.z*ncells.y*(ncells.x/2+1))) return;
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
-	  const real3 k = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
+	  const real3 k = waveNumberToWaveVector(waveNumber, grid.box.boxSize, shearStrain);
 	  const real B = Bfactor[id];
 	  const cufftComplex3 factor = gridForces[id]*B;
 	  gridVels[id] = projectFourier(k, factor);
@@ -229,6 +232,7 @@ namespace uammd{
 					     const real* __restrict__ Bfactor,
 					     Grid grid,
 					     real prefactor,/* sqrt(2·T/dt)*/
+					     real shearStrain,
 					     uint seed1, uint seed2){
 	  const uint id = blockIdx.x*blockDim.x + threadIdx.x;
 	  const int3 nk = grid.cellDim;
@@ -264,7 +268,7 @@ namespace uammd{
 	    const real Bsq = sqrt(Bfactor[id]);
 	    cufftComplex3 factor = noise;
 	    const int3 ik = indexToWaveNumber(id, nk);
-	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
+	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, shearStrain);
 	    factor *= Bsq;
 	    gridVelsFourier[id] += projectFourier(k, factor);
 	  }
@@ -279,7 +283,7 @@ namespace uammd{
 	    int zc = (cell.z > 0)*(nk.z - cell.z);
 	    int id_conj =  xc + (nk.x/2 + 1)*(yc + zc*nk.y);
 	    const int3 ik = indexToWaveNumber(id_conj, nk);
-	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
+	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, shearStrain);
 	    const real Bsq = sqrt(Bfactor[id_conj]);
 	    cufftComplex3 factor = noise;
 	    /*v_{N-k} = v*_k, so the complex noise must be conjugated*/
@@ -329,7 +333,7 @@ namespace uammd{
 	const int3 n = grid.cellDim;
 	int Nthreads = 128;
 	int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
-	detail::forceFourier2Vel<<<Nblocks, Nthreads, 0, st>>> (d_gridVelsFourier, d_gridVelsFourier, d_fourierFactor, grid);
+	detail::forceFourier2Vel<<<Nblocks, Nthreads, 0, st>>> (d_gridVelsFourier, d_gridVelsFourier, d_fourierFactor, shearStrain, grid);
 	CudaCheckError();
       }
 
@@ -350,6 +354,7 @@ namespace uammd{
 	  //In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
 	  detail::fourierBrownianNoise<<<Nblocks, Nthreads, 0, st>>>(d_gridVelsFourier, d_fourierFactor, grid,
 								     prefactor, // 1/√σ· sqrt(2*T/dt),
+								     shearStrain,
 								     seed, //Saru needs two seeds apart from thread id
 								     seed2);
 	}
@@ -487,10 +492,11 @@ namespace uammd{
       */
 	__global__ void fillFourierScalingFactor(real * __restrict__ Bfactor,
 						 Grid grid,
-						 double rh, //Hydrodynamic radius
+						 double rh, //Hydrodynamic radius						 
 						 double viscosity,
 						 double split,
-						 real eta //Gaussian kernel splitting parameter
+						 double eta, //Gaussian kernel splitting parameter
+						 double shearStrain
 						 ){
 	  const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	  const int3 ncells = grid.cellDim;
@@ -500,7 +506,7 @@ namespace uammd{
 	    return;
 	  }
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
-	  const real3 K = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
+	  const real3 K = waveNumberToWaveVector(waveNumber, grid.box.boxSize, shearStrain);
 	  /*Compute the scaling factor for this node*/
 	  double k2 = dot(K,K);
 	  double kmod = sqrt(k2);
@@ -530,7 +536,7 @@ namespace uammd{
 	int Nblocks = (grid.cellDim.z*grid.cellDim.y*(grid.cellDim.x/2+1))/Nthreads +1;
 	detail::fillFourierScalingFactor<<<Nblocks, Nthreads>>>
 	  (thrust::raw_pointer_cast(fourierFactor.data()), grid,
-	   hydrodynamicRadius, viscosity, psi, eta);
+	   hydrodynamicRadius, viscosity, psi, eta, shearStrain);
       }
 
       void FarField::initializeGrid(real tolerance){

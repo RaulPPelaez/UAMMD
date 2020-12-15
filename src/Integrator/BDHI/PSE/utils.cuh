@@ -18,6 +18,7 @@ namespace uammd{
 	//lower values will give more importance to the near part (neighbour list) and higher values will
 	// put the weight of the computation in the far part (FFT).
 	real psi = 0.5;
+	real shearStrain = 0;
       };
 
       __device__ int3 indexToWaveNumber(int i, int3 nk){
@@ -30,8 +31,10 @@ namespace uammd{
 	return make_int3(ikx, iky, ikz);
       }
 
-      __device__ real3 waveNumberToWaveVector(int3 ik, real3 L){
-	return (real(2.0)*real(M_PI)/L)*make_real3(ik.x, ik.y, ik.z);
+      __device__ real3 waveNumberToWaveVector(int3 ik, real3 L, real shearStrain){
+	auto kvec = (real(2.0)*real(M_PI)/L)*make_real3(ik.x, ik.y, ik.z);
+	kvec.y -= shearStrain*kvec.x;
+	return kvec;
       }
     }
   }
