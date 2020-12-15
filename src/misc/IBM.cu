@@ -27,6 +27,18 @@ namespace uammd{
 	static __host__  __device__ int3 get(Kernel &kernel){return make_int3(kernel.support);}
       };
 
+      SFINAE_DEFINE_HAS_MEMBER(phiX)
+      SFINAE_DEFINE_HAS_MEMBER(phiY)
+      SFINAE_DEFINE_HAS_MEMBER(phiZ)
+#define ENABLE_PHI_IF_HAS(foo) template<class Kernel> __device__ inline SFINAE::enable_if_t<has_phi##foo<Kernel>::value, real>
+#define ENABLE_PHI_IF_NOT_HAS(foo) template<class Kernel> __device__ inline SFINAE::enable_if_t<not has_phi##foo<Kernel>::value, real>
+      ENABLE_PHI_IF_HAS(X) phiX(Kernel &kern, real r){return kern.phiX(r);}
+      ENABLE_PHI_IF_HAS(Y) phiY(Kernel &kern, real r){return kern.phiY(r);}
+      ENABLE_PHI_IF_HAS(Z) phiZ(Kernel &kern, real r){return kern.phiZ(r);}
+      ENABLE_PHI_IF_NOT_HAS(X) phiX(Kernel &kern, real r){return kern.phi(r);}
+      ENABLE_PHI_IF_NOT_HAS(Y) phiY(Kernel &kern, real r){return kern.phi(r);}
+      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r){return kern.phi(r);}
+
       template<class Grid>
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
 	int3 P = support/2;
@@ -47,19 +59,19 @@ namespace uammd{
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
 	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
-	  weightsX[i] = kernel.phi(rij);
+	  weightsX[i] = detail::phiX(kernel, rij);
 	}
 	real *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
 	  const real rij = grid.distanceToCellCenter(pi, cellj).y;
-	  weightsY[i] = kernel.phi(rij);
+	  weightsY[i] = detail::phiY(kernel,rij);
 	}
 	real *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
 	  const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	  weightsZ[i] = kernel.phi(rij);
+	  weightsZ[i] = detail::phiZ(kernel, rij);
 	}
       }
 
@@ -107,6 +119,7 @@ namespace uammd{
 	P = detail::computeSupportShift(pi, celli, grid, support);
 	if(is2D){
 	  P.z = 0;
+	  support.z = 1;
 	}
       }
       __syncthreads();
@@ -172,7 +185,10 @@ namespace uammd{
 	  celli = grid.getCell(pi);
 	  support = detail::GetSupport<InterpolationKernel>::get(kernel, celli);
 	  P = detail::computeSupportShift(pi, celli, grid, support);
-	  if(is2D) P.z = 0;
+	  if(is2D){
+	    P.z = 0;
+	    support.z = 1;
+	  }
 	}
       }
       __syncthreads();

@@ -100,13 +100,14 @@ namespace uammd{
 		int numberParticles, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[IBM] Spreading");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
-      int numberNeighbourCells = support.x*support.y*support.z;
+      const bool is2D = grid.cellDim.z == 1;
+      int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
       int threadsPerParticle = std::min(32*(numberNeighbourCells/32), 128);
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }
-      size_t shMemory = (support.x+support.y+support.z)*sizeof(real);
-      if(grid.cellDim.z == 1){
+      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(real);
+      if(is2D){
 	IBM_ns::particles2GridD<true><<<numberParticles, threadsPerParticle, shMemory, st>>>
 	  (pos, v, gridData, numberParticles, grid, cell2index, *kernel);
       }
@@ -143,9 +144,9 @@ namespace uammd{
 		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
       sys->log<System::DEBUG2>("[IBM] Gathering");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
-      int numberNeighbourCells = support.x*support.y*support.z;
+      int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
       int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 64);
-      size_t shMemory = (support.x+support.y+support.z)*sizeof(real);
+      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(real);
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }
