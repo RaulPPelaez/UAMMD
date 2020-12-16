@@ -65,6 +65,7 @@ References:
 #include"CellList/CellListBase.cuh"
 #include"CellList/NeighbourContainer.cuh"
 #include"Interactor/NeighbourList/common.cuh"
+#include <limits>
 namespace uammd{
   class CellList{
   protected:
@@ -101,34 +102,43 @@ namespace uammd{
       posWriteConnection.disconnect();
     }
 
-    void update(Grid in_grid, real3 cutOff, cudaStream_t st = 0){
-      if(needsRebuild(in_grid.box, cutOff)){
-	sys->log<System::DEBUG1>("[CellList] Updating cell list");
-	currentBox = in_grid.box;
-	currentCutOff = cutOff;
-	int numberParticles = pg->getNumberParticles();
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	auto posGroupIterator = pg->getPropertyIterator(pos);
-	cl.update(posGroupIterator, numberParticles, in_grid, st);
-      }
-      else{
-	sys->log<System::DEBUG1>("[CellList] Ignoring unnecessary update");
-      }
-    }
-
     void update(Box box, real cutOff, cudaStream_t st = 0){
       update(box, make_real3(cutOff), st);
     }
 
-    void update(Box box, real3 cutOff, cudaStream_t st = 0){
-      Grid a_grid = Grid(box, cutOff);
+    Grid createUpdateGrid(Box box, real3 cutOff){
+      real3 L = box.boxSize;
+      real inf = std::numeric_limits<real>::max();
+      //If the box is non periodic L and cellDim are free parameters
+      int maximumNumberOfCells = 64;
+      if(L.x >= inf and not box.isPeriodicX()) L.x = maximumNumberOfCells*cutOff.x;
+      if(L.y >= inf and not box.isPeriodicY()) L.y = maximumNumberOfCells*cutOff.y;
+      if(L.z >= inf and not box.isPeriodicZ()) L.z = maximumNumberOfCells*cutOff.z;
+      Box updateBox(L);
+      updateBox.setPeriodicity(box.isPeriodicX(), box.isPeriodicY(), box.isPeriodicZ());
+      Grid a_grid = Grid(updateBox, cutOff);
       int3 cellDim = a_grid.cellDim;
       if(cellDim.x <= 3) cellDim.x = 1;
       if(cellDim.y <= 3) cellDim.y = 1;
       if(cellDim.z <= 3) cellDim.z = 1;
-      //if(box.boxSize.z > real(0.0) && cellDim.z < 3) cellDim.z = 3;
-      a_grid = Grid(box, cellDim);
-      update(a_grid, cutOff, st);
+      a_grid = Grid(updateBox, cellDim);
+      return a_grid;
+    }
+
+    void update(Box box, real3 cutOff, cudaStream_t st = 0){
+      if(needsRebuild(box, cutOff)){
+	sys->log<System::DEBUG1>("[CellList] Updating cell list");
+	currentBox = box;
+	currentCutOff = cutOff;
+	int numberParticles = pg->getNumberParticles();
+	auto pos = pd->getPos(access::location::gpu, access::mode::read);
+	auto posGroupIterator = pg->getPropertyIterator(pos);
+	Grid grid = createUpdateGrid(box, cutOff);
+	cl.update(posGroupIterator, numberParticles, grid, st);
+      }
+      else{
+	sys->log<System::DEBUG1>("[CellList] Ignoring unnecessary update");
+      }
     }
 
     template<class Transverser>
