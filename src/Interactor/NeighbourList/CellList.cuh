@@ -85,6 +85,26 @@ namespace uammd{
       force_next_update = true;
     }
 
+    Grid createUpdateGrid(Box box, real3 cutOff){
+      real3 L = box.boxSize;
+      constexpr real inf = std::numeric_limits<real>::max();
+      //If the box is non periodic L and cellDim are free parameters
+      //If the box is infinite then periodicity is irrelevan
+      constexpr int maximumNumberOfCells = 64;
+      if(L.x >= inf) L.x = maximumNumberOfCells*cutOff.x;
+      if(L.y >= inf) L.y = maximumNumberOfCells*cutOff.y;
+      if(L.z >= inf) L.z = maximumNumberOfCells*cutOff.z;
+      Box updateBox(L);
+      updateBox.setPeriodicity(box.isPeriodicX() and L.x < inf, box.isPeriodicY() and L.y<inf, box.isPeriodicZ() and L.z<inf);
+      Grid a_grid = Grid(updateBox, cutOff);
+      int3 cellDim = a_grid.cellDim;
+      if(cellDim.x <= 3) cellDim.x = 1;
+      if(cellDim.y <= 3) cellDim.y = 1;
+      if(cellDim.z <= 3) cellDim.z = 1;
+      a_grid = Grid(updateBox, cellDim);
+      return a_grid;
+    }
+
   public:
 
     CellList(shared_ptr<ParticleData> pd, shared_ptr<System> sys):
@@ -106,24 +126,6 @@ namespace uammd{
       update(box, make_real3(cutOff), st);
     }
 
-    Grid createUpdateGrid(Box box, real3 cutOff){
-      real3 L = box.boxSize;
-      real inf = std::numeric_limits<real>::max();
-      //If the box is non periodic L and cellDim are free parameters
-      int maximumNumberOfCells = 64;
-      if(L.x >= inf and not box.isPeriodicX()) L.x = maximumNumberOfCells*cutOff.x;
-      if(L.y >= inf and not box.isPeriodicY()) L.y = maximumNumberOfCells*cutOff.y;
-      if(L.z >= inf and not box.isPeriodicZ()) L.z = maximumNumberOfCells*cutOff.z;
-      Box updateBox(L);
-      updateBox.setPeriodicity(box.isPeriodicX(), box.isPeriodicY(), box.isPeriodicZ());
-      Grid a_grid = Grid(updateBox, cutOff);
-      int3 cellDim = a_grid.cellDim;
-      if(cellDim.x <= 3) cellDim.x = 1;
-      if(cellDim.y <= 3) cellDim.y = 1;
-      if(cellDim.z <= 3) cellDim.z = 1;
-      a_grid = Grid(updateBox, cellDim);
-      return a_grid;
-    }
 
     void update(Box box, real3 cutOff, cudaStream_t st = 0){
       if(needsRebuild(box, cutOff)){

@@ -94,14 +94,15 @@ namespace uammd{
 
     Grid createUpdateGrid(Box box, real cutOff){
       real3 L = box.boxSize;
-      real inf = std::numeric_limits<real>::max();
+      constexpr real inf = std::numeric_limits<real>::max();
       //If the box is non periodic L and cellDim are free parameters
-      int maximumNumberOfCells = 64;
-      if(L.x >= inf and not box.isPeriodicX()) L.x = maximumNumberOfCells*cutOff;
-      if(L.y >= inf and not box.isPeriodicY()) L.y = maximumNumberOfCells*cutOff;
-      if(L.z >= inf and not box.isPeriodicZ()) L.z = maximumNumberOfCells*cutOff;
+      //If the box is infinite then periodicity is irrelevan
+      constexpr int maximumNumberOfCells = 64;
+      if(L.x >= inf) L.x = maximumNumberOfCells*cutOff;
+      if(L.y >= inf) L.y = maximumNumberOfCells*cutOff;
+      if(L.z >= inf) L.z = maximumNumberOfCells*cutOff;
       Box updateBox(L);
-      updateBox.setPeriodicity(box.isPeriodicX(), box.isPeriodicY(), box.isPeriodicZ());
+      updateBox.setPeriodicity(box.isPeriodicX() and L.x < inf, box.isPeriodicY() and L.y<inf, box.isPeriodicZ() and L.z<inf);
       Grid a_grid = Grid(updateBox, cutOff);
       int3 cellDim = a_grid.cellDim;
       if(cellDim.x <= 3) cellDim.x = 1;
