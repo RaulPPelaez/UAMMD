@@ -35,6 +35,7 @@ namespace uammd{
     nl(par.nl),
     nb(nullptr)
   {
+    sys->log<System::MESSAGE>("[PairForces] Using Box with size: %g %g %g", box.boxSize.x, box.boxSize.y, box.boxSize.z);
     this->setDelegate(pot.get());
   }
 
