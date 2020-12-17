@@ -16,11 +16,10 @@ References:
 #include<ostream>
 #include<vector>
 #include"utils/vector.cuh"
-namespace uammd{
-std::ostream& operator<<(std::ostream& out, const real3 &f){
+std::ostream& operator<<(std::ostream& out, const uammd::real3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
-std::ostream& operator<<(std::ostream& out, const real4 &f){
+std::ostream& operator<<(std::ostream& out, const uammd::real4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
 }
 
@@ -31,7 +30,7 @@ std::ostream& operator<<(std::ostream& out, const int4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
 }
 
-
+namespace uammd{
 /*A timer class to measure time, just use
   t.tic to start and t.toc to get elapsed seconds*/
 class Timer{
