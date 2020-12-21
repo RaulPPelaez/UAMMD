@@ -76,34 +76,10 @@ namespace uammd{
 	}
       inline __device__ PairParameters operator()(int ti, int tj){
 	if(ntypes==1) return this->globalMem[0];
-
-
-	#if CUB_PTX_ARCH < 300
-        constexpr auto cubModifier = cub::LOAD_DEFAULT;
-	#else
-	constexpr auto cubModifier = cub::LOAD_CA;
-	#endif
-
-	cub::CacheModifiedInputIterator<cubModifier, PairParameters> itr(globalMem);
-
-	  //if(ntypes==1) return itr[0];
-
-	  if(ti>tj) thrust::swap(ti,tj);
-
+	cub::CacheModifiedInputIterator<cub::LOAD_CA, PairParameters> itr(globalMem);
+	if(ti>tj) thrust::swap(ti,tj);
 	  int typeIndex = ti+this->ntypes*tj;
 	  if(ti >= ntypes || tj >= ntypes) typeIndex = 0;
-
-	   // real4 tmp = __ldg((real4*)this->globalMem+typeIndex);
-
-	   // PairParameters tmp2;
-	   // tmp2.cutOff2 = tmp.x;
-	   // tmp2.sigma2 = tmp.y;
-	   // tmp2.epsilonDivSigma2= tmp.z;
-	   // tmp2.shift = tmp.w;
-
-	   // return tmp2;
-
-	  //return this->globalMem[typeIndex];
 	  return itr[typeIndex];
 	}
 

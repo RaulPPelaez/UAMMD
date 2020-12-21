@@ -42,20 +42,15 @@ namespace uammd{
 			      int* tooManyNeighboursFlag){
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=numberParticles) return;
-#if CUB_PTX_ARCH < 300
-      constexpr auto cubModifier = cub::LOAD_DEFAULT;
-#else
-      constexpr auto cubModifier = cub::LOAD_LDG;
-#endif
       int nneigh = 0;
       const int offset = id*maxNeighboursPerParticle;
-      const real3 pi = make_real3(cub::ThreadLoad<cubModifier>(ni.getSortedPositions() + id));
+      const real3 pi = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + id));
       ni.set(id);
       auto it = ni.begin();
       while(it){
 	auto n = *it++;
 	const int cur_j = n.getInternalIndex();
-	const real3 pj = make_real3(cub::ThreadLoad<cubModifier>(ni.getSortedPositions() + cur_j));
+	const real3 pj = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + cur_j));
 	const real3 rij = box.apply_pbc(pj-pi);
 	if(dot(rij, rij) <= cutOff2){
 	  nneigh++;
