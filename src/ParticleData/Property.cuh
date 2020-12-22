@@ -1,3 +1,4 @@
+
 /*Raul P. Pelaez 2019. Property, a container for a particle property (pos, force, vel...)
 
   Maintains a GPU and CPU version, has two copies of the GPU version for fast swapping.
@@ -194,6 +195,7 @@ namespace uammd{
     string name;
     bool isBeingWritten = false, isBeingRead= false;
     bool isManaged = false;
+    bool hasDataBeenRequested = false;
     shared_ptr<System> sys;
 
     T* getAltGPUBuffer(){
@@ -210,6 +212,10 @@ namespace uammd{
 
     property_ptr<T> tryToGetData(access::location dev, access::mode mode){
       const bool requestedForWriting = (mode==access::mode::write or mode==access::mode::readwrite);
+      if(not hasDataBeenRequested and mode == access::mode::read){
+	sys->log<System::WARNING>("[Property] First request for %s is for reading, contents will probably be uninitialized", name.c_str());
+      }
+      this->hasDataBeenRequested = true;
       throwIfIllegalDataRequest(mode);
       lockIfNecesary(mode);
       switch(dev){
