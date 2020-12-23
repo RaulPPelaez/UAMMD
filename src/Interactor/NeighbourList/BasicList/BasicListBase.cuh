@@ -42,20 +42,15 @@ namespace uammd{
 			      int* tooManyNeighboursFlag){
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=numberParticles) return;
-#if CUB_PTX_ARCH < 300
-      constexpr auto cubModifier = cub::LOAD_DEFAULT;
-#else
-      constexpr auto cubModifier = cub::LOAD_LDG;
-#endif
       int nneigh = 0;
       const int offset = id*maxNeighboursPerParticle;
-      const real3 pi = make_real3(cub::ThreadLoad<cubModifier>(ni.getSortedPositions() + id));
+      const real3 pi = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + id));
       ni.set(id);
       auto it = ni.begin();
       while(it){
 	auto n = *it++;
 	const int cur_j = n.getInternalIndex();
-	const real3 pj = make_real3(cub::ThreadLoad<cubModifier>(ni.getSortedPositions() + cur_j));
+	const real3 pj = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + cur_j));
 	const real3 rij = box.apply_pbc(pj-pi);
 	if(dot(rij, rij) <= cutOff2){
 	  nneigh++;
@@ -92,6 +87,26 @@ namespace uammd{
     using CountingIterator = cub::CountingInputIterator<int>;
     using StrideIterator = cub::TransformInputIterator<int, NeighbourListOffsetFunctor, CountingIterator>;
 
+    Grid createUpdateGrid(Box box, real cutOff){
+      real3 L = box.boxSize;
+      constexpr real inf = std::numeric_limits<real>::max();
+      //If the box is non periodic L and cellDim are free parameters
+      //If the box is infinite then periodicity is irrelevan
+      constexpr int maximumNumberOfCells = 64;
+      if(L.x >= inf) L.x = maximumNumberOfCells*cutOff;
+      if(L.y >= inf) L.y = maximumNumberOfCells*cutOff;
+      if(L.z >= inf) L.z = maximumNumberOfCells*cutOff;
+      Box updateBox(L);
+      updateBox.setPeriodicity(box.isPeriodicX() and L.x < inf, box.isPeriodicY() and L.y<inf, box.isPeriodicZ() and L.z<inf);
+      Grid a_grid = Grid(updateBox, cutOff);
+      int3 cellDim = a_grid.cellDim;
+      if(cellDim.x <= 3) cellDim.x = 1;
+      if(cellDim.y <= 3) cellDim.y = 1;
+      if(cellDim.z <= 3) cellDim.z = 1;
+      a_grid = Grid(updateBox, cellDim);
+      return a_grid;
+    }
+
   public:
 
     BasicNeighbourListBase(){
@@ -105,7 +120,7 @@ namespace uammd{
     void update(PositionIterator pos, int numberParticles, Box box, real cutOff, cudaStream_t st = 0){
       currentBox = box;
       currentCutOff = cutOff;
-      Grid grid(box, cutOff);
+      Grid grid = createUpdateGrid(box, cutOff);
       cl.update(pos, numberParticles, grid, st);
       resizeNeighbourListToCurrent(numberParticles);
       fillBasicNeighbourList(st);

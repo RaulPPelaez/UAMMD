@@ -19,9 +19,9 @@ namespace uammd{
     Box(real L):Box(make_real3(L)){}
     Box(real2 L):Box(make_real3(L, 0)){}
     Box(real3 L): boxSize(L), minusInvBoxSize(make_real3(real(-1.0)/L.x, real(-1.0)/L.y, real(-1.0)/L.z)){
-      if(boxSize.x==real(0.0)) 	minusInvBoxSize.x = real(0.0);
-      if(boxSize.y==real(0.0))	minusInvBoxSize.y = real(0.0);
-      if(boxSize.z==real(0.0))	minusInvBoxSize.z = real(0.0);
+      if(boxSize.x==real(0.0) or isinf(boxSize.x)) minusInvBoxSize.x = real(0.0);
+      if(boxSize.y==real(0.0) or isinf(boxSize.y)) minusInvBoxSize.y = real(0.0);
+      if(boxSize.z==real(0.0) or isinf(boxSize.z)) minusInvBoxSize.z = real(0.0);
     }
     //Sets the periodicity of each dimension of the box.
     inline void setPeriodicity(bool x, bool y, bool z){
@@ -33,13 +33,13 @@ namespace uammd{
     inline __host__ __device__ bool isPeriodicY() const{return minusInvBoxSize.y != 0;}
     inline __host__ __device__ bool isPeriodicZ() const{return minusInvBoxSize.z != 0;}
 
-    inline __host__ __device__ real3 apply_pbc(const real3 &r) const{
+    inline __host__ __device__ real3 apply_pbc(real3 r) const{
       //return  r - floorf(r/L+real(0.5))*L; //MIC Algorithm
       real3 offset = floorf(r*minusInvBoxSize + real(0.5)); //MIC Algorithm
-      if(!isPeriodicX()) offset.x = 0;
-      if(!isPeriodicY()) offset.y = 0;
-      if(!isPeriodicZ()) offset.z = 0;
-      return  r + offset*boxSize;
+      r.x += isPeriodicX()?(offset.x*boxSize.x):0;
+      r.y += isPeriodicY()?(offset.y*boxSize.y):0;
+      r.z += isPeriodicZ()?(offset.z*boxSize.z):0;
+      return  r;
     }
     template< class vecType>
     inline __device__ __host__ bool isInside(const vecType &pos) const{

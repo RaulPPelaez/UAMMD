@@ -15,12 +15,7 @@ namespace uammd{
       const int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id >= N) return;
       const int ori = globalIndex[ni.getGroupIndexes()[id]];
-#if CUB_PTX_ARCH < 300
-      constexpr auto cubModifier = cub::LOAD_DEFAULT;
-#else
-      constexpr auto cubModifier = cub::LOAD_LDG;
-#endif
-      const real4 pi = cub::ThreadLoad<cubModifier>(ni.getSortedPositions() + id);
+      const real4 pi = cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + id);
       auto quantity = tr.zero();
       SFINAE::Delegator<Transverser> del;
       del.getInfo(tr, ori);
