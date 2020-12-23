@@ -74,9 +74,9 @@ namespace uammd{
 	  const double a = par.hydrodynamicRadius;
 	  RPYPSE_near rpy(a, split, (6*M_PI*a*par.viscosity), rcut);
 	  const real textureTolerance = a*par.tolerance; //minimum distance described
-	  constexpr int maximumTextureElements = 2e6;
-	  int nPointsTable = int(rcut/textureTolerance + 0.5);
-	  nPointsTable = std::min(maximumTextureElements, std::max(4096, nPointsTable));
+	  constexpr uint maximumTextureElements = 1<<22;
+	  uint nPointsTable = std::min((rcut/textureTolerance + 0.5), 2e30); //2e30 to avoid overflow
+	  nPointsTable = std::min(maximumTextureElements, std::max(1u<<14, nPointsTable));
 	  tableDataRPY.resize(nPointsTable+1);
 	  RPY_near = std::make_shared<TabulatedFunction<real2>>(thrust::raw_pointer_cast(tableDataRPY.data()),
 								nPointsTable,
