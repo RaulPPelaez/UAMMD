@@ -234,7 +234,7 @@ namespace uammd{
 							      numberParticles,
 							      grid);
 #ifdef UAMMD_DEBUG
-      CudaCheckError(cudaDeviceSynchronize());
+      CudaSafeCall(cudaDeviceSynchronize());
       if(d_errorFlag[0] > 0){
 	System::log<System::ERROR>("[CellList] NaN positions found during construction");
        	throw std::overflow_error("CellList encountered NaN positions");
