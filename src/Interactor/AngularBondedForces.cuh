@@ -30,7 +30,8 @@
   Box box(128);
   Angular::Parameters ang_params;
   ang_params.readFile = "angular.bonds";
-  auto abf = make_shared<Angular>(pd, sys, ang_params, AngularBondType(box));
+  auto pot = std::make_shared<AngularBondType>(box);
+  auto abf = make_shared<Angular>(pd, sys, ang_params, pot);
   ...
   myIntegrator->addInteractor(abf);
   ...
