@@ -2,6 +2,7 @@
 
 Near field
 
+Ondrej implemented the sheared-cell functionality.
 */
 
 #ifndef BDHI_PSE_NEARFIELD_CUH
@@ -15,6 +16,7 @@ Near field
 #include "Interactor/NeighbourList/CellList.cuh"
 //#include"Interactor/NeighbourList/VerletList.cuh"
 #include"misc/LanczosAlgorithm.cuh"
+#include "Interactor/NBody.cuh"
 namespace uammd{
   namespace BDHI{
     namespace pse_ns{
@@ -124,10 +126,22 @@ namespace uammd{
 	  }
 
 	  __device__ real3 computeShearedDistancePBC(real3 pi, real3 pj){
+	    // You are passing in sheared coordinates
 	    real3 rij = make_real3(pj)-make_real3(pi);
 	    const real Ly = box.boxSize.y;
-	    rij.x -= shearStrain*floorf(rij.y/Ly+real(0.5))*Ly;
-	    return box.apply_pbc(rij);
+	    const real Lx = box.boxSize.x;
+	    const real Lz = box.boxSize.z;
+	    // Make standard coordinates from sheared
+	    rij.x += shearStrain*rij.y; // standard coordinates
+	    // Now periodically shift on sheared domain
+	    real s1 = round(rij.y/Ly);
+	    // Shift in (y', z') directions
+	    rij.x-= shearStrain*Ly*s1;
+	    rij.y-= Ly*s1;
+	    rij.z-= Lz*round(rij.z/Lz);
+	    // Shift in x direction
+	    rij.x-= Lx*round(rij.x/Lx);
+	    return rij;
 	  }
 	  /*Compute the dot product Mr_ij(3x3)·vj(3)*/
 	  inline __device__ computeType compute(const real4 &pi, const real4 &pj,
@@ -209,10 +223,12 @@ namespace uammd{
       void NearField::Mdot(real3 *MF, cudaStream_t st){
 	//Sheared coordinates fix. The rcut must be increased by a safety factor
 	real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
+	sys->log<System::MESSAGE>("[BDHI::PSE] Safety factor %f", safetyFactor);
 	cl->update(box, rcut*safetyFactor, st);
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
 	pse_ns::RPYNearTransverser<real4> tr(force.begin(), MF, *RPY_near, rcut, box, shearStrain);
+	sys->log<System::MESSAGE>("[BDHI::PSE] Shear strain %f", shearStrain);
 	cl->transverseList(tr, st);
       }
 

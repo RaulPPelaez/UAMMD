@@ -2,6 +2,7 @@
 
 Far field
 
+Ondrej implemented the sheared cell functionality.
 */
 
 #ifndef BDHI_PSE_FARFIELD_CUH
@@ -506,19 +507,24 @@ namespace uammd{
 	    return;
 	  }
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
-	  const real3 K = waveNumberToWaveVector(waveNumber, grid.box.boxSize, shearStrain);
+	  const real3 K_NUFFT = waveNumberToWaveVector(waveNumber, grid.box.boxSize, 0.0); // in the NUFFT, the Gaussian thinks the sheared grid is orthonormal
+	  const real3 K_Ewald = waveNumberToWaveVector(waveNumber, grid.box.boxSize, shearStrain);
 	  /*Compute the scaling factor for this node*/
-	  double k2 = dot(K,K);
-	  double kmod = sqrt(k2);
-	  double invk2 = 1.0/k2;
+	  double K_Ewald2 = dot(K_Ewald,K_Ewald);
+	  double K_NUFFT2 = dot(K_NUFFT,K_NUFFT);
+	  double kmod = sqrt(K_Ewald2);
+	  double invk2 = 1.0/K_Ewald2;
 	  double sink = sin(kmod*rh);
-	  double k2_invsplit2_4 = k2/(4.0*split*split);
+	  double kEw2_invsplit2_4 = K_Ewald2/(4.0*split*split);
+	  double kNU2_invsplit2_4 = K_NUFFT2/(4.0*split*split);
 	  /*The Hashimoto splitting function,
 	    split is the splitting between near and far contributions,
 	    eta is the splitting of the gaussian kernel used in the grid interpolation, see sec. 2 in [2]*/
 	  /*See eq. 11 in [1] and eq. 11 and 14 in [2]*/
-	  double tau = -k2_invsplit2_4*(1.0-eta);
-	  double hashimoto = (1.0 + k2_invsplit2_4)*exp(tau)/k2;
+	  /* Modification for shear strain: the right exponential is 
+	  exp ((eta*kNUFFT^2- kEwald^2)/(4*xi^2)) */
+	  double tau = eta*kNU2_invsplit2_4-kEw2_invsplit2_4;
+	  double hashimoto = (1.0 + kEw2_invsplit2_4)*exp(tau)/K_Ewald2;
 	  /*eq. 20.5 in [1]*/
 	  double B = sink*sink*invk2*hashimoto/(viscosity*rh*rh);
 	  B /= double(ncells.x*ncells.y*ncells.z);
