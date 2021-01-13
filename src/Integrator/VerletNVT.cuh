@@ -84,14 +84,14 @@ namespace uammd{
 	    Parameters par):
 	Basic(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
 
-      ~Basic();
+      virtual ~Basic();
 
       virtual void forwardTime() override;
       virtual real sumEnergy() override{ return 0;};
     };
 
 
-    class GronbechJensen: public Basic{
+    class GronbechJensen final: public Basic{
     public:
       GronbechJensen(shared_ptr<ParticleData> pd,
 		     shared_ptr<ParticleGroup> pg,
@@ -103,6 +103,8 @@ namespace uammd{
 		     shared_ptr<System> sys,
 		     Basic::Parameters par):
 	Basic(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par, "VerletNVT::GronbechJensen"){}
+
+      ~GronbechJensen(){}
 
       using Parameters = Basic::Parameters;
 

@@ -63,6 +63,10 @@
 namespace uammd{
 
   class ParameterUpdatable{
+  protected:
+
+    virtual ~ParameterUpdatable(){}
+
   public:
 
     // virtual void updateTimeStep(real dt){};

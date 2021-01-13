@@ -168,7 +168,7 @@ namespace uammd{
     }
 
     void tryToResizeCellListToCurrentGrid(){
-      const int ncells = grid.getNumberCells();
+      const uint ncells = grid.getNumberCells();
       if(cellStart.size()!= ncells){
 	cellStart.clear();
 	cellStart.resize(ncells);
@@ -191,7 +191,7 @@ namespace uammd{
       }
     }
 
-    void updateCurrentValidCell(int numberParticles){
+    void updateCurrentValidCell(uint numberParticles){
       if(numberParticles != sortPos.size()){
 	currentValidCell_counter = -1;
       }

@@ -34,6 +34,9 @@ namespace uammd{
     shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
     shared_ptr<System> sys;
+    virtual ~Interactor(){
+      sys->log<System::DEBUG>("[Interactor] %s Destroyed", name.c_str());
+    }
 
   public:
 
@@ -49,10 +52,6 @@ namespace uammd{
       pd(pd), pg(pg), sys(sys), name(name){
       sys->log<System::MESSAGE>("[Interactor] %s created.", name.c_str());
       sys->log<System::MESSAGE>("[Interactor] Acting on group %s", pg->getName().c_str());
-    }
-
-    ~Interactor(){
-      sys->log<System::DEBUG>("[Interactor] %s Destroyed", name.c_str());
     }
 
     virtual void sumForce(cudaStream_t st) = 0;

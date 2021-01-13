@@ -65,6 +65,17 @@ namespace uammd{
 
     __host__ __device__ property_ptr(const property_ptr& _orig ):super_t(_orig.ptr) { *this = _orig; isCopy = true; }
 
+    __host__ __device__ property_ptr& operator=(const property_ptr& _orig ){
+      super_t::operator=(_orig);
+      this->ptr = _orig.ptr;
+      this->m_size = _orig.m_size;
+      this->isBeingRead = _orig.isBeingRead;
+      this->isBeingWritten = _orig.isBeingWritten;
+      this->device = _orig.device;
+      this->isCopy = true;
+      return *this;
+    }
+
     __host__ __device__ ~property_ptr(){
 #ifdef __CUDA_ARCH__
       return;
