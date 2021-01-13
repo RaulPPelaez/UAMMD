@@ -1,35 +1,21 @@
-/*Raul P. Pelaez 2017. Implemented Potentials
+/*Raul P. Pelaez 2017-2021. Implemented Potentials
 
   In this file there are functors and objects describing different potentials.
-
-  A potential must provide:
-   -transversers to compute force, energy and virial through get*Transverser(Box box, shared_ptr<ParticleData> pd)
-   -A maximum interaction distance (can be infty)
-   -Handle particle types (with setPotParameters(i, j, InputParameters p)
-
-
-
   A single Potential might be written to handle a variety of similar potentials.
   For example, all radial potentials need only the distance between particles,
     so RadialPotential is defined, and the particular potential is a functor passed to it (See LJFunctor).
-    See RadialPotential on how to implement a RadialPotential.
 
-
+See RadialPotential on how to implement a RadialPotential.
+For more information on how to code a new Potential see examples/customPotentials.cu
 
  */
 #ifndef POTENTIAL_CUH
 #define POTENTIAL_CUH
-
-#include"ParticleData/ParticleData.cuh"
 #include"utils/Box.cuh"
-
 #include"PotentialBase.cuh"
 #include"RadialPotential.cuh"
 namespace uammd{
-
   namespace Potential{
-
-
     //LJFunctor is a radial potential that can be passed to RadialPotential to be used as a Potential in
     //a module (i.e PairForces, NBodyForces...). Encodes the Lennard Jonnes potential
     //RadialPotential expects a functor with the rules of this one:
@@ -44,25 +30,22 @@ namespace uammd{
 	bool shift = false; //Shift the potential so lj(rc) = 0?
       };
 
-      struct __align__(16) PairParameters{
+      struct PairParameters{
 	real cutOff2;
 	real sigma2, epsilonDivSigma2;
 	real shift = 0.0; // Contains lj_force(rc)
       };
 
-      static inline __host__ __device__ real force(const real &r2, const PairParameters &params){
+      static inline __device__ real force(real r2, PairParameters params){
 	if(r2 >= params.cutOff2) return 0;
 	const real invr2 = params.sigma2/r2;
 	const real invr6 = invr2*invr2*invr2;
-	const real invr8 = invr6*invr2;
-	real fmod = params.epsilonDivSigma2*(real(-48.0)*invr6 + real(24.0))*invr8;
-	if(params.shift != real(0.0)){
-	  fmod += params.shift*sqrtf(invr2);
-	}
+	real fmod = params.epsilonDivSigma2*(real(-48.0)*invr6 + real(24.0))*invr6*invr2;
+	fmod += params.shift?(params.shift*rsqrt(r2)):real(0.0);
 	return fmod;
       }
 
-      static inline __host__ __device__ real energy(const real &r2, const PairParameters &params){
+      static inline __device__ real energy(real r2, PairParameters params){
 	if(r2 >= params.cutOff2) return 0;
 	real invr2 = params.sigma2/r2;
 	real invr6 = invr2*invr2*invr2;
@@ -94,7 +77,6 @@ namespace uammd{
       }
 
     };
-
 
     using LJ = Radial<LJFunctor>;
   }
