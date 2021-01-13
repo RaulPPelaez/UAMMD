@@ -127,6 +127,7 @@ namespace uammd{
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
+      SFINAE::TransverserAdaptor<Transverser>::prepare(tr, pd);
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(tr);
       NeighbourList_ns::transverseWithNeighbourContainer<<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
 									       globalIndex,

@@ -16,9 +16,10 @@ namespace uammd{
       if(id >= N) return;
       const int ori = globalIndex[ni.getGroupIndexes()[id]];
       const real4 pi = cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + id);
-      auto quantity = tr.zero();
-      SFINAE::Delegator<Transverser> del;
-      del.getInfo(tr, ori);
+      using Adaptor = SFINAE::TransverserAdaptor<Transverser>;
+      Adaptor adaptor;
+      auto quantity = Adaptor::zero(tr);
+      adaptor.getInfo(tr, ori);
       //for(auto n: ni){
       ni.set(id);
       auto it = ni.begin();
@@ -26,7 +27,7 @@ namespace uammd{
 	auto neighbour = *it++;
 	const real4 pj = neighbour.getPos();
 	const int global_index = globalIndex[neighbour.getGroupIndex()];
-	tr.accumulate(quantity, del.compute(tr, global_index, pi, pj));
+	Adaptor::accumulate(tr, quantity, adaptor.compute(tr, global_index, pi, pj));
       }
       tr.set(ori, quantity);
     }
