@@ -1,4 +1,4 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.8**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.9**
 
 
 <img src="https://github.com/raulppelaez/uammd/blob/master/.res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/master/.res/shotlogo.png" width="500">  
@@ -12,10 +12,10 @@
 
 -----------------  
 
-Raul P. Pelaez 2018-2020. (raul.perez(at)uam.es)  
+Raul P. Pelaez 2018-2021. (raul.perez(at)uam.es)  
 
 
-A C++11+ header-only fast generic multiscale CUDA Molecular Dynamics framework made into modules for expandability and generality.  
+A C++14+ header-only fast generic multiscale CUDA Molecular Dynamics framework made into modules for expandability and generality.  
 
 Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for much more than that. To this moment multiple integrators are implemented allowing it to perform:  
 
