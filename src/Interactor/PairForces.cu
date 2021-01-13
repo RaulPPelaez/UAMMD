@@ -19,12 +19,13 @@
 #include"Potential/PotentialUtils.cuh"
 #include"utils/TransverserUtils.cuh"
 namespace uammd{
+
   template<class MyPotential, class NL>
   PairForces<MyPotential, NL>::PairForces(shared_ptr<ParticleData> pd,
-					shared_ptr<ParticleGroup> pg,
-					shared_ptr<System> sys,
-					Parameters par,
-					shared_ptr<MyPotential> pot):
+					  shared_ptr<ParticleGroup> pg,
+					  shared_ptr<System> sys,
+					  Parameters par,
+					  shared_ptr<MyPotential> pot):
     Interactor(pd, pg, sys,
 	       "PairForces/" +
 	       stringUtils::removePattern(type_name<NL>(), "uammd::") +
@@ -89,8 +90,15 @@ namespace uammd{
   template<class MyPotential, class NL>
   real PairForces<MyPotential, NL>::sumForceEnergy(cudaStream_t st){
     sys->log<System::DEBUG1>("[PairForces] Summing Force and Energy");
-    auto ft = pot->getForceEnergyTransverser(box, pd);
-    this->sumTransverser(ft, st);
+    auto fet = Potential::getIfHasForceEnergyTransverser<MyPotential>::get(pot, box, pd);
+    constexpr bool isnull = std::is_same<decltype(fet), BasicNullTransverser>::value;
+    if(isnull){
+      sumForce(st);
+      sumEnergy();
+    }
+    else{
+      this->sumTransverser(fet, st);
+    }
     return 0;
   }
 
