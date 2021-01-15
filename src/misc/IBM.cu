@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2020. Immersed Boundary Method (IBM).
+/*Raul P. Pelaez 2019-2021. Immersed Boundary Method (IBM).
   See IBM.cuh
  */
 #include"IBM.cuh"
@@ -34,10 +34,10 @@ namespace uammd{
 #define ENABLE_PHI_IF_NOT_HAS(foo) template<class Kernel> __device__ inline SFINAE::enable_if_t<not has_phi##foo<Kernel>::value, real>
       ENABLE_PHI_IF_HAS(X) phiX(Kernel &kern, real r){return kern.phiX(r);}
       ENABLE_PHI_IF_HAS(Y) phiY(Kernel &kern, real r){return kern.phiY(r);}
-      ENABLE_PHI_IF_HAS(Z) phiZ(Kernel &kern, real r){return kern.phiZ(r);}
+      ENABLE_PHI_IF_HAS(Z) phiZ(Kernel &kern, real r, real3 pi){return kern.phiZ(r, pi);}
       ENABLE_PHI_IF_NOT_HAS(X) phiX(Kernel &kern, real r){return kern.phi(r);}
       ENABLE_PHI_IF_NOT_HAS(Y) phiY(Kernel &kern, real r){return kern.phi(r);}
-      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r){return kern.phi(r);}
+      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r, real3 pi){return kern.phi(r, pi);}
 
       template<class Grid>
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
@@ -58,20 +58,26 @@ namespace uammd{
 	const int tid = threadIdx.x;
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
-	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
-	  weightsX[i] = detail::phiX(kernel, rij);
+	  if(cellj.x>0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).x;
+	    weightsX[i] = detail::phiX(kernel, rij);
+	  }
 	}
 	real *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
-	  const real rij = grid.distanceToCellCenter(pi, cellj).y;
-	  weightsY[i] = detail::phiY(kernel,rij);
+	  if(cellj.y>0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).y;
+	    weightsY[i] = detail::phiY(kernel, rij);
+	  }
 	}
 	real *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
-	  const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	  weightsZ[i] = detail::phiZ(kernel, rij);
+	  if(cellj.z>0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).z;
+	    weightsZ[i] = detail::phiZ(kernel, rij, pi);
+	  }
 	}
       }
 
@@ -132,6 +138,8 @@ namespace uammd{
 	const int jj=(i/support.x)%support.y;
 	const int kk=is2D?0:(i/(support.x*support.y));
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
+	if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	  continue;
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	const auto weight = vi*kern;
@@ -202,6 +210,8 @@ namespace uammd{
 	  const int jj=(i/support.x)%support.y;
 	  const int kk=is2D?0:(i/(support.x*support.y));
 	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
+	  if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	    continue;
 	  const real dV = qw(cellj, grid);
 	  const int jcell = cell2index(cellj);
 	  const auto weight = gridQuantity[jcell]*detail::computeWeightFromShared(weights, ii, jj, kk, support);

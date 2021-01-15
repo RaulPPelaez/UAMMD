@@ -1,3 +1,6 @@
+/*Raul P. Pelaez 2019-2021. Some utilities for working with Chebyshev grids.
+
+ */
 #ifndef CHEVYSHEVUTILS_CUH
 #define CHEVYSHEVUTILS_CUH
 #include"global/defines.h"
@@ -34,7 +37,7 @@ namespace uammd{
 	  this->hxhy = cellSizex*cellSizey;
 	  std::vector<real> weights(nz+1, 0);
 	  for(int i = 0; i<nz; i++){
-	    weights[i] = -0.5*H*clencurt(i, nz-1);
+	    weights[i] = 0.5*H*clencurt(i, nz-1);
 	  }
 	  CudaSafeCall(cudaMemcpy(clencurtWeights, weights.data(), (nz+1)*sizeof(real), cudaMemcpyHostToDevice));
 	}
@@ -88,7 +91,7 @@ namespace uammd{
 	template<class VecType>
 	inline __host__ __device__ int3 getCell(const VecType &r) const{
 	  real3 pos_inBox = box.apply_pbc(make_real3(r));
-	  int cz = int((cellDim.z)*(acos(real(2.0)*pos_inBox.z/box.boxSize.z)/real(M_PI)));
+	  int cz = int((cellDim.z)*(acos(real(-2.0)*pos_inBox.z/box.boxSize.z)/real(M_PI)));
 	  int3 cell = make_int3((pos_inBox.x+real(0.5)*box.boxSize.x)*invCellSize.x,
 				(pos_inBox.y+real(0.5)*box.boxSize.y)*invCellSize.y,
 				cz);
@@ -119,7 +122,7 @@ namespace uammd{
 	    ncells = cellDim.y;
 	  }
 	  if(coordinate == 2){
-	    return cell;
+	    return (cell<0 or cell>=cellDim.z)?-1:cell;
 	  }
 	  if(cell <= -1) cell += ncells;
 	  else if(cell >= ncells) cell -= ncells;
