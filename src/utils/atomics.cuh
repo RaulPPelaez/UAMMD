@@ -21,7 +21,16 @@ namespace uammd{
   }
 #endif
 #endif
-
+  
+  inline __device__ real4 atomicAdd(real4* address, real4 val){
+    real4 newval;
+    if(val.x) newval.x = atomicAdd(&(*address).x, val.x);
+    if(val.y) newval.y = atomicAdd(&(*address).y, val.y);
+    if(val.z) newval.z = atomicAdd(&(*address).z, val.z);
+    if(val.w) newval.z = atomicAdd(&(*address).w, val.w);
+    return newval;
+  }
+  
   inline __device__ real3 atomicAdd(real3* address, real3 val){
     real3 newval;
     if(val.x) newval.x = atomicAdd(&(*address).x, val.x);
