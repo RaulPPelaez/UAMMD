@@ -55,6 +55,29 @@ namespace uammd{
 
     };
 
+    //This macro defines a struct called has_getForceTransverser
+    SFINAE_DEFINE_HAS_MEMBER(getForceTransverser)
+    //Calling get on this struct will provide the getForceTransverser of a Potential if it exists, and will return a BasicNullTransverser otherwise
+    template<class T, bool hasForceTransverser = has_getForceTransverser<T>::value>
+    struct getIfHasForceTransverser;
+
+    template<class T>
+    struct getIfHasForceTransverser<T, true>{
+      template<class ...Types>
+      static auto get(std::shared_ptr<T> t, Types... args) -> decltype(t->getForceTransverser(args...)){
+	return t->getForceTransverser(args...);
+      }
+    };
+
+    template<class T>
+    struct getIfHasForceTransverser<T, false>{
+      template<class ...Types>
+      static BasicNullTransverser get(std::shared_ptr<T> t, Types... args){
+	return BasicNullTransverser();
+      }
+
+    };
+
   }
 }
 

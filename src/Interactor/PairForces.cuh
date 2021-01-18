@@ -1,11 +1,12 @@
-/*Raul P. Pelaez 2017. PairForces definition.
+/*Raul P. Pelaez 2017-2021. PairForces definition.
 
-  PairForces Module is an interactor that computes short range forces.
-  Computes the interaction between neighbour particles (pairs of particles closer tan rcut).
+  PairForces Module is an interactor that computes forces and/or energies between pairs of particle closer to a given cut off distance.
+  If the cut off reaches a certain threshold the algorithm switches to n-body.
 
-  For that, it uses a NeighbourList and computes the force given by Potential for each pair of particles. It sums the force for all neighbours of every particle.
+  A Potential describing the interaction must be provided. 
+  See misc/Potential.cuh and https://github.com/RaulPPelaez/UAMMD/wiki/Potential for more info on potentials and how to implement them.
 
-  See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces   for more info.
+  See https://github.com/RaulPPelaez/UAMMD/wiki/Pair-Forces for more info.
 */
 
 #ifndef PAIRFORCES_H

@@ -7,12 +7,14 @@ Potentials provide Transversers to PairForces in order to compute forces, energi
 The Potential interface requires a given class/struct to provide the following public member functions:
 Required members:
  real getCutOff(); //The maximum cut-off the potential requires.
- ForceTransverser getForceTransverser(Box box, shared_ptr<ParticleData> pd); //Provides a Transverser that computes the force
-Optional members:
+Optional members (at least one of the following must exist):
+ ForceTransverser getForceTransverser(Box box, shared_ptr<ParticleData> pd); //Provides a Transverser that computes the force. 
+ //If not present the force is computed using getForceEnergyTransverser.
  EnergyTransverser getEnergyTransverser(Box box, shared_ptr<ParticleData> pd); //Provides a Transverser that computes the energy
- //If not present defaults to every interaction having zero energy contribution
+ //If not present getForceEnergyTransverser is used. 
  ForceEnergyTransverser getForceEnergyTransverser(Box box, shared_ptr<ParticleData> pd); //Provides a Transverser that computes the force and energy at the same time
  //If not present defaults to sequentially computing force and energy one after the other.
+If there is no way to compute either force or energy it will be assumed to be zero. For example energy will be assumed to be zero if the only method defined is getForceTransverser.  
 A struct/class adhering to the Potential interface can also be ParameterUpdatable[1].
 
 The type(s) returned by these functions must adhere to the Transverser interface described below.
