@@ -130,7 +130,7 @@ namespace uammd{
 	R += dt*( KR + M*F );
 	if(temperature > 0){
 	  Saru rng(i, stepNum, seed);
-	  real B = sqrt(real(2.0)*temperature*selfMobility*dt);
+	  real B = sqrt(real(2.0)*temperature*M*dt);
 	  real3 dW = make_real3(rng.gf(0, B), rng.gf(0, B).x);
 	  R += dW;
 	}
@@ -226,7 +226,7 @@ namespace uammd{
 	}
 	p += dt*(KR + M*f);
 	if(temperature > real(0.0)){
-	  const real B = sqrt(temperature*selfMobility*dt);
+	  const real B = sqrt(temperature*M*dt);
 	  Saru rng(id, stepNum, seed);
 	  real3 dW = make_real3(rng.gf(0, B), rng.gf(0, B).x);
 	  p += dW;
@@ -315,7 +315,7 @@ namespace uammd{
 	real3 fprev = make_real3(previousForces[id]);
 	p += dt*(KR + M*(real(1.5)*fn - real(0.5)*fprev));
 	if(temperature > real(0.0)){
-	  const real B = sqrt(real(2.0)*temperature*selfMobility*dt);
+	  const real B = sqrt(real(2.0)*temperature*M*dt);
 	  Saru rng(id, stepNum, seed);
 	  real3 dW = make_real3(rng.gf(0, B), rng.gf(0, B).x);
 	  p += dW;
@@ -383,7 +383,7 @@ namespace uammd{
 	R += dt*( KR + M*F );
 	if(temperature > 0){
 	  int ori = originalIndex[i];
-	  real B = sqrt(real(0.5)*temperature*selfMobility*dt);
+	  real B = sqrt(real(0.5)*temperature*M*dt);
 	  real3 dW = genNoise(ori, stepNum, seed) + genNoise(ori, stepNum-1, seed);
 	  R += B*dW;
 	}
