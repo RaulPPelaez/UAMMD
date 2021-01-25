@@ -74,7 +74,7 @@
 
   numParticlesChangedSignal() -> int : Triggered when the total number of particles changes
   reorderSignal() -> void : Triggered when the global sorting of particles changes
-  [PROPERTY]WrittenSignal() -> void: Triggered when PROPERTY has been requested with the write or readwrite flag (notice that the signal is emitted at requesting of the property, so the requester has writing rights
+  [PROPERTY]WriteRequestedSignal() -> void: Triggered when PROPERTY has been requested with the write or readwrite flag (notice that the signal is emitted at requesting of the property, so the requester has writing rights
 
 */
 #ifndef PARTICLEDATA_CUH
