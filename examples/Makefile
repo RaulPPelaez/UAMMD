@@ -119,8 +119,14 @@ poisson:
 dppoisson:
 	$(BASIC_LINE) DoublyPeriodicPoisson.cu  -o dppoisson -lcufft -llapacke
 
+signals:
+	$(BASIC_LINE) signals.cu -o signals
+
+parameter_updatable:
+	$(BASIC_LINE) ParameterUpdatable.cu -o parameter_updatable
+
 clean:
-	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D temporary_memory neighbour_list_iterator error_handling poisson dppoisson custom_potentials
+	rm -f lj dpd nvt bdhi pse icm bd bonds sph a.out ljMult benchmark mcnvt fcm dambreak fib logo q2D temporary_memory neighbour_list_iterator error_handling poisson dppoisson custom_potentials signals parameter_updatable
 
 
 
