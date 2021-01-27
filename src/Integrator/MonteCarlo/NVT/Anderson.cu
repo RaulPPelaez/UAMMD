@@ -251,9 +251,10 @@ namespace uammd {
 
       template<class CellList, class PotentialTransverser>
       __device__ real computeEnergyDifference(int group_i, real4 newPos, real4 oldPos, real4* pos, CellList cl, PotentialTransverser pot, int3 celli){
-	pot.zero();
-	SFINAE::Delegator<PotentialTransverser> del;
-	del.getInfo(pot, group_i);
+	using Adaptor = SFINAE::TransverserAdaptor<PotentialTransverser>;
+	Adaptor adaptor;
+	auto quantity = Adaptor::zero(pot);
+	adaptor.getInfo(pot, group_i);
 	real oldEnergy = 0;
 	real newEnergy = 0;
 	const bool is2D = cl.grid.cellDim.z == 1;
@@ -274,11 +275,11 @@ namespace uammd {
 	  for(int j = firstParticle; j < nincell + firstParticle; j++) {
 	    auto pos_j = pos[j];
 	    const int group_j = cl.groupIndex[j];
-	    pot.accumulate(oldEnergy, del.compute(pot, group_j, oldPos, pos_j));
+	    Adaptor::accumulate(pot, oldEnergy, adaptor.compute(pot, group_j, oldPos, pos_j));
 	    if(group_i == group_j){
 	      pos_j = newPos;
 	    }
-	    pot.accumulate(newEnergy, del.compute(pot, group_j, newPos, pos_j));
+	    Adaptor::accumulate(pot, newEnergy, adaptor.compute(pot, group_j, newPos, pos_j));
 	  }
 	}
 	return newEnergy - oldEnergy;
