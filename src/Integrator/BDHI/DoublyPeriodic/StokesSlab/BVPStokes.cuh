@@ -189,11 +189,11 @@ namespace uammd{
 	return;
       }
       auto fn = make_third_index_iterator(gridForce, ik.x, ik.y, Index3D(nkx/2+1, nky, 2*nz-2));
-      if(id == 0){
-	fori(0, nz){
-	  fn[i] *= 0;
-	}
-      }
+      // if(id == 0){
+      // 	fori(0, nz){
+      // 	  fn[i] *= 0;
+      // 	}
+      // }
       const auto waveNumber = computeWaveNumber(id, nkx, nky);
       const auto waveVector = computeWaveVector(waveNumber, Lxy);
       const bool isUnpairedX = waveNumber.x == (nkx - waveNumber.x);
@@ -211,14 +211,7 @@ namespace uammd{
 	const auto beta = cufftComplex();
 	bvp.solve(id, rightHandSide,  alpha, beta,  an, pressure);
       }
-      //Unnecessary if fhat(k=0) = 0, which we are enforcing
-      // if(id == 0){
-      //   cufftComplex linearCorrection = cufftComplex();
-      //   fori(0, nz){
-      //     linearCorrection += precomputedPressureChebyshevIntegrals[i]*fn[i].z;
-      //   }
-      //   pressure[1] += real(-0.5)*linearCorrection;
-      // }
+      
       //VELOCITY SOLVE
       auto gridVels = make_third_index_iterator(gridVelocity, ik.x, ik.y, Index3D(nkx/2+1, nky, 2*nz-2));
       const real k = sqrt(dot(waveVector, waveVector));
@@ -231,13 +224,13 @@ namespace uammd{
 	  const cufftComplex beta = rhs_bc.computeBottomParallel(waveVector.x, mu);
 	  bvp.solve(id, rightHandSide,  alpha, beta,  an, velocity);
 	}
-	if(id == 0){
-	  cufftComplex linearCorrection = cufftComplex();
-	  fori(0, nz){
-	    linearCorrection += precomputedVelocityChebyshevIntegrals[i]*fn[i].x;
-	  }
-	  velocity[1] += (real(0.5)/mu)*linearCorrection;
-	}
+	// if(id == 0){
+	//   cufftComplex linearCorrection = cufftComplex();
+	//   fori(0, nz){
+	//     linearCorrection += precomputedVelocityChebyshevIntegrals[i]*fn[i].x;
+	//   }
+	//   velocity[1] += (real(0.5)/mu)*linearCorrection;
+	// }
 	fori(0, nz){
 	  gridVels[i].x = velocity[i];
 	}
@@ -248,13 +241,13 @@ namespace uammd{
 	  const cufftComplex beta = rhs_bc.computeBottomParallel(waveVector.y, mu);
 	  bvp.solve(id, rightHandSide,  alpha, beta,  an, velocity);
 	}
-	if(id == 0){
-	  cufftComplex linearCorrection = cufftComplex();
-	  fori(0, nz){
-	    linearCorrection += precomputedVelocityChebyshevIntegrals[i]*fn[i].y;
-	  }
-	  velocity[1] += (real(0.5)/mu)*linearCorrection;
-	}
+	// if(id == 0){
+	//   cufftComplex linearCorrection = cufftComplex();
+	//   fori(0, nz){
+	//     linearCorrection += precomputedVelocityChebyshevIntegrals[i]*fn[i].y;
+	//   }
+	//   velocity[1] += (real(0.5)/mu)*linearCorrection;
+	// }
 	fori(0, nz){
 	  gridVels[i].y = velocity[i];
 	}
@@ -266,6 +259,15 @@ namespace uammd{
 	const cufftComplex beta = rhs_bc.computeBottomPerpendicular(mu);
 	bvp.solve(id, rightHandSide, alpha, beta,  an, velocity);
       }
+      if(id == 0){
+	cufftComplex linearCorrection = cufftComplex();
+	fori(0, nz){
+	  linearCorrection += precomputedPressureChebyshevIntegrals[i]*fn[i].z;
+	}
+	pressure[0] += real(0.5)*linearCorrection;
+	pressure[1] += real(0.5)*linearCorrection;
+      }
+
       fori(0, nz){
 	gridVels[i].z = velocity[i];
 	gridVels[i].w = pressure[i];

@@ -10,9 +10,10 @@ namespace uammd{
     cached_vector<real4> DPStokes::Mdot(real4* pos, real4* forces, int numberParticles, cudaStream_t st){
       System::log<System::DEBUG2>("[DPStokes] Far field computation");
       auto gridData = spreadForces(pos, forces, numberParticles, st);
-      auto gridDataFourier = fct->forwardTransform(gridData, st);
-      solveBVPVelocity(gridDataFourier, st);
-      gridData = fct->inverseTransform(gridDataFourier, st);
+      auto gridDataCheb = fct->forwardTransform(gridData, st);
+      solveBVPVelocity(gridDataCheb, st);
+      correction->correctSolution(gridDataCheb, st);
+      gridData = fct->inverseTransform(gridDataCheb, st);
       auto particleVelocities = interpolateVelocity(gridData, pos, numberParticles, st);
       return particleVelocities;
     }

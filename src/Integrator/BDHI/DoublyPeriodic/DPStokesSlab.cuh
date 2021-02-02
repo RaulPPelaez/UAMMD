@@ -14,6 +14,8 @@
 #include"misc/ChevyshevUtils.cuh"
 #include"StokesSlab/FastChebyshevTransform.cuh"
 #include"StokesSlab/utils.cuh"
+#include"StokesSlab/Correction.cuh"
+
 namespace uammd{
   namespace DPStokesSlab_ns{
     struct Gaussian{
@@ -84,6 +86,7 @@ namespace uammd{
     private:
       shared_ptr<Kernel> kernel;
       shared_ptr<FastChebyshevTransform> fct;
+      shared_ptr<Correction> correction;
       
       gpu_container<real> zeroModeVelocityChebyshevIntegrals;
       gpu_container<real> zeroModePressureChebyshevIntegrals;

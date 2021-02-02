@@ -98,7 +98,7 @@ namespace uammd{
 	CudaCheckError();
         fct_ns::periodicExtension<<<nblocks, blockSize, 0, st>>>(d_gridData, make_int3(2*(n.x/2+1), n.y, n.z));	
 	CudaCheckError();
-	cached_vector<cufftComplex> gridDataFouR(8*(2*n.z-2)*n.y*(n.x/2+1));
+	cached_vector<cufftComplex> gridDataFouR(4*(2*n.z-2)*n.y*(n.x/2+1));
 	cufftComplex* d_gridDataFouR = thrust::raw_pointer_cast(gridDataFouR.data());
 	{
 	  cached_vector<real> gridDataR(4*(2*n.z-2)*n.y*2*(n.x/2+1));

@@ -14,6 +14,9 @@ namespace uammd{
       tolerance(par.tolerance){
       setUpGrid(par);
       this->fct = std::make_shared<FastChebyshevTransform>(grid.cellDim);
+      real H = box.boxSize.z;
+      real2 Lxy = make_real2(box.boxSize);
+      this->correction = std::make_shared<Correction>(H, Lxy, grid.cellDim, viscosity);
       initializeKernel(par.support);
       printStartingMessages(par);
       initializeBoundaryValueProblemSolver();
