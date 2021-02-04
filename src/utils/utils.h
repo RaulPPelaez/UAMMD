@@ -14,20 +14,35 @@ References:
 #include<sys/time.h>
 #include<cstring>
 #include<ostream>
+#include<istream>
 #include<vector>
 #include"utils/vector.cuh"
-std::ostream& operator<<(std::ostream& out, const uammd::real3 &f){
+inline std::ostream& operator<<(std::ostream& out, const uammd::real3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
-std::ostream& operator<<(std::ostream& out, const uammd::real4 &f){
+inline std::ostream& operator<<(std::ostream& out, const uammd::real4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
 }
 
-std::ostream& operator<<(std::ostream& out, const int3 &f){
+inline std::ostream& operator<<(std::ostream& out, const int3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
-std::ostream& operator<<(std::ostream& out, const int4 &f){
+inline std::ostream& operator<<(std::ostream& out, const int4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
+}
+
+inline std::istream& operator>>(std::istream& in, uammd::real3 &f){
+  return in >> f.x>>f.y>>f.z;
+}
+inline std::istream& operator>>(std::istream& in, uammd::real4 &f){
+  return in>>f.x>>f.y>>f.z>>f.w;
+}
+
+inline std::istream& operator>>(std::istream& in,  int3 &f){
+  return in>>f.x>>f.y>>f.z;
+}
+inline std::istream& operator>>(std::istream& in,  int4 &f){
+  return in>>f.x>>f.y>>f.z>>f.w;
 }
 
 namespace uammd{
