@@ -81,7 +81,7 @@ namespace uammd{
 				   real3* __restrict__ vel,
 				   real4* __restrict__  force,
 				   const real* __restrict__ mass,
-				   ParticleGroup::IndexIterator __restrict__ indexIterator,
+				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
 				   real dt, bool is2D){
 	int id = blockIdx.x*blockDim.x+threadIdx.x;
