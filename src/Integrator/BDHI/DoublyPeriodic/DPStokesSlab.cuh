@@ -19,20 +19,28 @@
 namespace uammd{
   namespace DPStokesSlab_ns{
     struct Gaussian{
-      int support;
+      int3 support;
       Gaussian(real tolerance, real width, real h, real H, int supportxy, int nz):H(H), nz(nz){
 	this-> prefactor = cbrt(pow(2*M_PI*width*width, -1.5));
 	this-> tau = -1.0/(2.0*width*width);
 	rmax = supportxy*h*0.5;
-	support = supportxy;
+	support = {supportxy, supportxy, supportxy};
+	int ct = int(nz*(acos(-2*(-H*0.5+rmax)/H)/M_PI));
+	support.z = 2*ct+1;
       }
       
+      inline __host__  __device__ int3 getMaxSupport() const{
+	return support;
+      }
+
       inline __host__  __device__ int3 getSupport(int3 cell) const{
-	real ch = real(0.5)*H*cospi((real(cell.z))/(nz-1));
-	int czt = int((nz)*(acos(real(2.0)*(ch+rmax)/H)/real(M_PI)));
-	int czb = int((nz)*(acos(real(2.0)*(ch-rmax)/H)/real(M_PI)));
-	int sz = 2*thrust::max(cell.z - czt, czb - cell.z)+1;
-	return make_int3(support, support, sz);
+	real ch = real(-0.5)*H*cospi((real(cell.z))/(nz-1));
+	real zmax = thrust::min(ch+rmax, H*real(0.5));
+	int czt = int((nz)*(acos(real(-2.0)*(zmax)/H)/real(M_PI)));
+	real zmin = thrust::max(ch-rmax, -H*real(0.5));
+	int czb = int((nz)*(acos(real(-2.0)*(zmin)/H)/real(M_PI)));
+	int sz = 2*thrust::max(czt-cell.z, cell.z-czb)+1;
+	return make_int3(support.x, support.y, thrust::min(sz, support.z));
       }
       
       inline __host__  __device__ real phiX(real r) const{
@@ -45,10 +53,17 @@ namespace uammd{
       //For this algorithm we spread a particle and its image to enforce the force density outside the slab is zero.
       //A particle on the wall position will spread zero force. phi(r) = phi(r) - phi(r_img);
       inline __host__  __device__ real phiZ(real r, real3 pi) const{
-	real top_rimg = H-pi.z-r;
-	real bot_rimg = -H-pi.z-r;
-	real rimg = thrust::min(abs(top_rimg), abs(bot_rimg));
-	return (abs(r)>=rmax)?real(0):(prefactor*(exp(tau*r*r)-(rimg>=rmax?real(0.0):exp(tau*rimg*rimg))));
+	 if(fabs(r) >=rmax){
+	   return 0;
+	 }
+	 else{
+	   real top_rimg =  H-2*pi.z+r;
+	   real bot_rimg = -H-2*pi.z+r;
+	   real rimg = thrust::min(fabs(top_rimg), fabs(bot_rimg));
+	   real phi_img = rimg>=rmax?real(0.0):prefactor*exp(tau*rimg*rimg);
+	   real phi = prefactor*exp(tau*r*r);
+	   return phi - phi_img;
+	 }
       }
 
     private:
