@@ -58,7 +58,7 @@ namespace uammd{
 	const int tid = threadIdx.x;
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
-	  if(cellj.x>0){
+	  if(cellj.x>=0){
 	    const real rij = grid.distanceToCellCenter(pi, cellj).x;
 	    weightsX[i] = detail::phiX(kernel, rij);
 	  }
@@ -66,7 +66,7 @@ namespace uammd{
 	real *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
-	  if(cellj.y>0){
+	  if(cellj.y>=0){
 	    const real rij = grid.distanceToCellCenter(pi, cellj).y;
 	    weightsY[i] = detail::phiY(kernel, rij);
 	  }
@@ -74,7 +74,7 @@ namespace uammd{
 	real *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
-	  if(cellj.z>0){
+	  if(cellj.z>=0){
 	    const real rij = grid.distanceToCellCenter(pi, cellj).z;
 	    weightsZ[i] = detail::phiZ(kernel, rij, pi);
 	  }
