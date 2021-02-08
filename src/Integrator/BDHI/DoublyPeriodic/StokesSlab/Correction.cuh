@@ -41,6 +41,7 @@ namespace uammd{
 			insideSolution.begin(), insideSolution.begin()+size,
 			correction.begin(), insideSolution.begin(),
 			thrust::plus<cufftComplex4>());
+      //thrust::copy(correction.begin(), correction.end(), insideSolution.begin());
     }
 
     class Correction{
@@ -195,7 +196,7 @@ namespace uammd{
 	complexmatvecprod(invA+8*8*id, b+8*id, C, 8);
 	const real halfmu = real(0.5)/viscosity;
 	for(int i = 0; i<n.z; i++){
-	  const real z =  (real(0.5)*H)*cospi(i/real(n.z-1))+real(0.5)*H; //from 0 to H
+	  const real z =  (real(-0.5)*H)*cospi(i/real(n.z-1))+real(0.5)*H; //from 0 to H
 	  const real ekzmH = exp(k*(z-H));
 	  const real ekz = exp(-k*z);
 	  const cufftComplex ucorr =
