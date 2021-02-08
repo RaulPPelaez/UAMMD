@@ -154,7 +154,7 @@ namespace uammd{
 	}
 
 	inline __host__ __device__ real cellHeight(int cellz){
-	  return real(0.5)*box.boxSize.z*cospi((real(cellz))/(cellDim.z-1));
+	  return real(-0.5)*box.boxSize.z*cospi((real(cellz))/(cellDim.z-1));
 	}
 
       };
