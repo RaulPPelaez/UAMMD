@@ -85,7 +85,7 @@ namespace uammd{
     template<class T> using cached_vector = thrust::device_vector<T, managed_allocator<T>>;
 #endif
 
-
+    enum class WallMode{bottom, slit, none};
 
     class IndexToWaveNumber{
       const int nkx, nky;
