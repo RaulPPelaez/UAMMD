@@ -67,36 +67,59 @@ namespace uammd{
     }
     
     namespace detail{
-      class TrivialBoundaryConditions{
+      class TopBoundaryConditions{
+	real k, H;
       public:
-	__host__ __device__ TrivialBoundaryConditions(int instance){}
-
-	static real getFirstIntegralFactor(){
-	  return 1.0;
+	TopBoundaryConditions(real k, real H):k(k),H(H){
 	}
 
-	static real getSecondIntegralFactor(){
-	  return 1.0;
+	real getFirstIntegralFactor() const{
+	  return (k!=0)*H;
 	}
 
+	real getSecondIntegralFactor() const{
+	  return k!=0?(H*H*k):(1.0);
+	}
       };
 
-      template<class BoundaryConditions = TrivialBoundaryConditions>
+      class BottomBoundaryConditions{
+	real k, H;
+      public:
+	BottomBoundaryConditions(real k, real H):k(k),H(H){
+	}
+
+	real getFirstIntegralFactor() const{
+	  return (k!=0)*H;
+	}
+
+	real getSecondIntegralFactor() const{
+	  return k!=0?(-H*H*k):(1.0);
+	}
+      };
+
+      template<class BoundaryConditions, class Klist>
       class BoundaryConditionsDispatch{
+	Klist klist;
+	real H;
       public:
-	__host__ __device__ BoundaryConditions operator()(int instance_index){
-	  return BoundaryConditions(instance_index);
+	BoundaryConditionsDispatch(Klist klist, real H):klist(klist), H(H){}
+
+	BoundaryConditions operator()(int i) const{
+	  return BoundaryConditions(klist[i], H);
 	}
       };
+
     }
 
     void DPStokes::initializeBoundaryValueProblemSolver(){
       System::log<System::DEBUG>("[DPStokes] Initializing BVP solver");
       const int2 nk = {grid.cellDim.x, grid.cellDim.y};
-      const real2 Lxy = make_real2(box.boxSize);
-      auto klist = DPStokesSlab_ns::make_wave_vector_modulus_iterator(nk, Lxy);
-      auto topBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), detail::BoundaryConditionsDispatch<>());
-      auto botBC = topBC;
+      auto klist = DPStokesSlab_ns::make_wave_vector_modulus_iterator(nk, make_real2(Lxy, Lxy));
+      real halfH = H*0.5;
+      auto topdispatch = detail::BoundaryConditionsDispatch<detail::TopBoundaryConditions, decltype(klist)>(klist, halfH);
+      auto topBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), topdispatch);
+      auto botdispatch = detail::BoundaryConditionsDispatch<detail::BottomBoundaryConditions, decltype(klist)>(klist, halfH);
+      auto botBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), botdispatch);
       int numberSystems = (nk.x/2+1)*nk.y;
       real halfH = box.boxSize.z*0.5;
       int nz = grid.cellDim.z;

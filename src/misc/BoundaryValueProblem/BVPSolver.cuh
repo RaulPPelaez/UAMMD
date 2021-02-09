@@ -3,7 +3,7 @@
   Solves the equation:
   y''(z)-k y(z)^2 = f(z)
   With the boundary conditions:
-  tfi y(1)' + tsi k y(1) = \alpha ;      bfi y(-1)' - bsi k y(-1) = \beta ;
+  tfi y(1)' + tsi y(1) = \alpha ;      bfi y(-1)' - bsi y(-1) = \beta ;
   Where tfi, tsi, bfi and bsi are some arbitrary factors.
 
   In Chebyshev space.
@@ -14,7 +14,7 @@
   y(z) = \sum_n c_n T_n(z)
   f(z) = \sum_n f_n T_n(z)
 
-  And using the relations between the different Chebyshev coefficients the system can be written in matrix form as>
+  And using the relations between the different Chebyshev coefficients the system can be written in matrix form as:
 
   ( A B ; C D ) ( a0; a1; ...; c0; d0 ) = ( f0; f1; ...; \alpha; \beta )
 
@@ -63,7 +63,7 @@ namespace uammd{
 	  auto CinvABmD_it = memoryManager.retrieveStorage(CinvABmD_storage);
 	  auto invA = computeInverseSecondIntegralMatrix(k, H, nz);
 	  SchurBoundaryCondition bcs(nz, H);
-	  auto CandD = bcs.computeBoundaryConditionMatrix(k, top, bottom);
+	  auto CandD = bcs.computeBoundaryConditionMatrix(top, bottom);
 	  real4 D = make_real4(CandD[2*nz], CandD[2*nz+1], CandD[2*nz+2], CandD[2*nz+3]);
 	  auto CinvA = matmul(CandD, nz, 2, invA, nz, nz);
 	  std::copy(CinvA.begin(), CinvA.end(), CinvA_it);
@@ -92,10 +92,8 @@ namespace uammd{
 
 	template<class T>
 	__device__ thrust::pair<T,T> solveSubsystem(real4 CinvABmD, thrust::pair<T,T> CinvAfmab) const{
-	  const real det  = CinvABmD.x*CinvABmD.w - CinvABmD.y*CinvABmD.z;
-	  const T d0 = (CinvAfmab.second*CinvABmD.x - CinvAfmab.first*CinvABmD.z)/det;
-	  const T c0 = (CinvAfmab.first - d0*CinvABmD.y)/CinvABmD.x;
-	  return thrust::make_pair(c0, d0);
+	  auto c0d0 = solve2x2System(CinvABmD, CinvAfmab);
+	  return c0d0;
 	}
 
 	template<class T, class FnIterator, class CinvAIterator>
