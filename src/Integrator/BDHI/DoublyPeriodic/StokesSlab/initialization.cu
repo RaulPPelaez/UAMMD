@@ -15,9 +15,9 @@ namespace uammd{
       mode(par.mode){
       setUpGrid(par);
       this->fct = std::make_shared<FastChebyshevTransform>(grid.cellDim);
-      real H = box.boxSize.z;
-      real2 Lxy = make_real2(box.boxSize);
-      this->correction = std::make_shared<Correction>(H, Lxy, grid.cellDim, viscosity);
+      if(par.mode != WallMode::none){ //Correction is only needed for walls
+	this->correction = std::make_shared<Correction>(H, make_real2(Lxy), grid.cellDim, viscosity, par.mode);
+      }
       initializeKernel(par.support);
       printStartingMessages(par);
       initializeBoundaryValueProblemSolver();

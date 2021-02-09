@@ -12,7 +12,9 @@ namespace uammd{
       auto gridData = spreadForces(pos, forces, numberParticles, st);
       auto gridDataCheb = fct->forwardTransform(gridData, st);
       solveBVPVelocity(gridDataCheb, st);
-      correction->correctSolution(gridDataCheb, st);
+      if(mode != WallMode::none){
+      	correction->correctSolution(gridDataCheb, gridDataCheb, st);
+      }
       gridData = fct->inverseTransform(gridDataCheb, st);
       auto particleVelocities = interpolateVelocity(gridData, pos, numberParticles, st);
       return particleVelocities;

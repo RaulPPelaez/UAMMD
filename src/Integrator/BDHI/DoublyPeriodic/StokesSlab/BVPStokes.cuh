@@ -190,11 +190,17 @@ namespace uammd{
 	return;
       }
       auto fn = make_third_index_iterator(gridForce, ik.x, ik.y, Index3D(nkx/2+1, nky, 2*nz-2));
-      // if(id == 0){
-      // 	fori(0, nz){
-      // 	  fn[i] *= 0;
-      // 	}
-      // }
+      auto gridVels = make_third_index_iterator(gridVelocity, ik.x, ik.y, Index3D(nkx/2+1, nky, 2*nz-2));
+      //Zero mode is added as a correction when there are walls
+      if(id == 0){
+	//If there are no walls the zero mode is just zero
+	if(mode == WallMode::none){
+	  fori(0, nz){
+	    gridVels[i] = cufftComplex4();
+	  }
+	}
+	return;
+      }
       const auto waveNumber = computeWaveNumber(id, nkx, nky);
       const auto waveVector = computeWaveVector(waveNumber, Lxy);
       const bool isUnpairedX = waveNumber.x == (nkx - waveNumber.x);
@@ -214,7 +220,6 @@ namespace uammd{
       }
       
       //VELOCITY SOLVE
-      auto gridVels = make_third_index_iterator(gridVelocity, ik.x, ik.y, Index3D(nkx/2+1, nky, 2*nz-2));
       const real k = sqrt(dot(waveVector, waveVector));
       VelocityBoundaryConditionsRightHandSide rhs_bc(pressure, k, nz);
       {
