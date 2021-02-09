@@ -5,6 +5,7 @@
 #include "utils/cufftPrecisionAgnostic.h"
 #include<global/defines.h>
 #include<utils/exception.h>
+#include<thrust/pair.h>
 #include<vector>
 #ifdef USE_MKL
 #include<mkl.h>
@@ -96,6 +97,16 @@ namespace uammd{
 	}
       }
       return C;
+    }
+
+    //Solves the linear system A*x = b
+    //Given A as a real4 (2x2 matrix) and b as two numbers of an arbitrary type (could be complex, real...)
+    template<class T>
+    __device__ thrust::pair<T,T> solve2x2System(real4 A, thrust::pair<T,T> b){
+      const real det  = A.x*A.w - A.y*A.z;
+      const T c0 = (b.first*A.w - A.y*b.second)/det;
+      const T d0 = (b.second*A.x - b.first*A.z)/det;
+      return thrust::make_pair(c0, d0);
     }
 
   }
