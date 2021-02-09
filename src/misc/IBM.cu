@@ -37,7 +37,7 @@ namespace uammd{
       ENABLE_PHI_IF_HAS(Z) phiZ(Kernel &kern, real r, real3 pi){return kern.phiZ(r, pi);}
       ENABLE_PHI_IF_NOT_HAS(X) phiX(Kernel &kern, real r){return kern.phi(r);}
       ENABLE_PHI_IF_NOT_HAS(Y) phiY(Kernel &kern, real r){return kern.phi(r);}
-      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r, real3 pi){return kern.phi(r, pi);}
+      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r, real3 pi){return kern.phi(r);}
 
       template<class Grid>
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
