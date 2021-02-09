@@ -81,13 +81,16 @@ namespace uammd{
       using QuadratureWeights = chebyshev::doublyperiodic::QuadratureWeights;
 
       struct Parameters{
-	int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
+	int nxy, nz;
 	real dt;
 	real viscosity;
-	Box box;
+	real Lxy;
+	real H;
 	real tolerance = 1e-7;
 	real gw;
 	int support = -1; //-1 means auto compute from tolerance
+	//Can be either none, bottom or slit
+	WallMode mode = WallMode::none;
       };
 
       DPStokes(Parameters par);
@@ -121,19 +124,19 @@ namespace uammd{
       void resizeTmpStorage(size_t size);
       cached_vector<real4> interpolateVelocity(cached_vector<real4> &gridData, real4* pos, int N, cudaStream_t st);
     
-      Box box;
+      real Lxy;
+      real H;
       Grid grid;   
       real viscosity;
       real gw;
       real tolerance;
-    
+      WallMode mode;
       shared_ptr<QuadratureWeights> qw;
       shared_ptr<BVP::BatchedBVPHandler> bvpSolver;
 
     };
   }
 }
-
 #include"StokesSlab/initialization.cu"
 #include"StokesSlab/DPStokes.cu"
 #endif

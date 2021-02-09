@@ -40,18 +40,16 @@ namespace uammd{
       cached_vector<char> tmp_storage(tmp.allocationSize);
       const auto d_precomputedPressure = thrust::raw_pointer_cast(zeroModePressureChebyshevIntegrals.data());
       const auto d_precomputedVelocity = thrust::raw_pointer_cast(zeroModeVelocityChebyshevIntegrals.data());
-      const real2 Lxy = make_real2(box.boxSize);
-      const real H = box.boxSize.z*0.5;
       const int blockSize = 64;
       const int numberBlocks = numberSystems/blockSize+1;
       solveBVPVelocityD<<<numberBlocks, blockSize, 0,st>>>(bvpSolver->getGPUSolver(), n.x, n.y, n.z,
-							  Lxy, H,
-							  d_gridForceFourier,
-							  d_gridVelocityFourier,
-							  tmp,
-							  thrust::raw_pointer_cast(tmp_storage.data()),
-							  d_precomputedPressure, d_precomputedVelocity,
-							  viscosity);
+							   make_real2(Lxy), H*0.5,
+							   d_gridForceFourier,
+							   d_gridVelocityFourier,
+							   tmp,
+							   thrust::raw_pointer_cast(tmp_storage.data()),
+							   d_precomputedPressure, d_precomputedVelocity,
+							   viscosity, mode);
       CudaCheckError();
       System::log<System::DEBUG2>("[DPStokes] BVP solve done");
     }

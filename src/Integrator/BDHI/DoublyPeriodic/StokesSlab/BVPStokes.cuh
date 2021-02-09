@@ -174,14 +174,15 @@ namespace uammd{
 
     template<class BVPSolver>
     __global__ void solveBVPVelocityD(BVPSolver bvp, int nkx, int nky, int nz,
-				      real2 Lxy, real H,
-				      cufftComplex4* gridForce,
+				      real2 Lxy, real H, //Domain is [-H, H]
+				      const cufftComplex4* gridForce,
 				      cufftComplex4* gridVelocity,
 				      BVPKernelTemporalStorage tmp,
 				      char* tmp_storage_raw_memory,
 				      const real* precomputedVelocityChebyshevIntegrals,
 				      const real* precomputedPressureChebyshevIntegrals,
-				      real mu){
+				      real mu,
+				      WallMode mode){
       const int id = blockIdx.x*blockDim.x + threadIdx.x;
       const int2 ik = make_int2(id%(nkx/2+1), id/(nkx/2+1));
       const int numberSystems = nky*(nkx/2+1);
@@ -224,13 +225,6 @@ namespace uammd{
 	  const cufftComplex beta = rhs_bc.computeBottomParallel(waveVector.x, mu);
 	  bvp.solve(id, rightHandSide,  alpha, beta,  an, velocity);
 	}
-	// if(id == 0){
-	//   cufftComplex linearCorrection = cufftComplex();
-	//   fori(0, nz){
-	//     linearCorrection += precomputedVelocityChebyshevIntegrals[i]*fn[i].x;
-	//   }
-	//   velocity[1] += (real(0.5)/mu)*linearCorrection;
-	// }
 	fori(0, nz){
 	  gridVels[i].x = velocity[i];
 	}
@@ -241,13 +235,6 @@ namespace uammd{
 	  const cufftComplex beta = rhs_bc.computeBottomParallel(waveVector.y, mu);
 	  bvp.solve(id, rightHandSide,  alpha, beta,  an, velocity);
 	}
-	// if(id == 0){
-	//   cufftComplex linearCorrection = cufftComplex();
-	//   fori(0, nz){
-	//     linearCorrection += precomputedVelocityChebyshevIntegrals[i]*fn[i].y;
-	//   }
-	//   velocity[1] += (real(0.5)/mu)*linearCorrection;
-	// }
 	fori(0, nz){
 	  gridVels[i].y = velocity[i];
 	}
@@ -259,6 +246,7 @@ namespace uammd{
 	const cufftComplex beta = rhs_bc.computeBottomPerpendicular(mu);
 	bvp.solve(id, rightHandSide, alpha, beta,  an, velocity);
       }
+      //PRESSURE LINEAR CORRECTION
       if(id == 0){
 	cufftComplex linearCorrection = cufftComplex();
 	fori(0, nz){

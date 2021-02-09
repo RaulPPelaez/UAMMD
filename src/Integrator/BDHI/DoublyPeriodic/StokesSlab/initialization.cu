@@ -9,9 +9,10 @@ namespace uammd{
   namespace DPStokesSlab_ns{
     DPStokes::DPStokes(DPStokes::Parameters par):
       viscosity(par.viscosity),
-      box(par.box),
+      H(par.H), Lxy(par.Lxy),
       gw(par.gw),
-      tolerance(par.tolerance){
+      tolerance(par.tolerance),
+      mode(par.mode){
       setUpGrid(par);
       this->fct = std::make_shared<FastChebyshevTransform>(grid.cellDim);
       real H = box.boxSize.z;
@@ -34,16 +35,16 @@ namespace uammd{
 
     void DPStokes::setUpGrid(Parameters par){
       System::log<System::DEBUG>("[DPStokes] setUpGrid");
-      int3 cellDim = par.cells;
+      int3 cellDim = {par.nxy, par.nxy, par.nz};
       if(cellDim.x < 0){
 	double h = DPStokes_ns::proposeCellSize(par.tolerance, gw);
 	constexpr int minimumNumberCells = 16;
-	h = std::min(h, par.box.boxSize.x/double(minimumNumberCells));
+	h = std::min(h, Lxy/double(minimumNumberCells));
 	System::log<System::MESSAGE>("[DPStokes] Proposed h: %g", h);
-	cellDim = make_int3(par.box.boxSize/h);
+	cellDim = make_int3(make_real3(Lxy, Lxy, H)/h);
 	cellDim = nextFFTWiseSize3D(cellDim);
       }
-      this->grid = Grid(par.box, cellDim);
+      this->grid = Grid(Box(make_real3(Lxy, Lxy, H)), cellDim);
       System::log<System::MESSAGE>("[DPStokes] Selected h: %g", grid.cellSize.x);
     }
 
@@ -54,7 +55,7 @@ namespace uammd{
 	System::log<System::WARNING>("[DPStokes] Support is too big, cell dims: %d %d %d, requested support: %d",
 				     grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
       }
-      this->kernel = std::make_shared<Kernel>(tolerance, gw, h, box.boxSize.z, supportxy, grid.cellDim.z);
+      this->kernel = std::make_shared<Kernel>(tolerance, gw, h, H, supportxy, grid.cellDim.z);
     }
 
     void DPStokes::printStartingMessages(Parameters par){
@@ -63,7 +64,7 @@ namespace uammd{
       System::log<System::MESSAGE>("[DPStokes] viscosity: %g", viscosity);
       System::log<System::MESSAGE>("[DPStokes] Gaussian source width: %g", par.gw);
       System::log<System::MESSAGE>("[DPStokes] cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
-      System::log<System::MESSAGE>("[DPStokes] box size: %g %g %g", box.boxSize.x, box.boxSize.y, box.boxSize.z);
+      System::log<System::MESSAGE>("[DPStokes] box size: %g %g %g", Lxy, Lxy, H);
     }
     
     namespace detail{
@@ -121,7 +122,6 @@ namespace uammd{
       auto botdispatch = detail::BoundaryConditionsDispatch<detail::BottomBoundaryConditions, decltype(klist)>(klist, halfH);
       auto botBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), botdispatch);
       int numberSystems = (nk.x/2+1)*nk.y;
-      real halfH = box.boxSize.z*0.5;
       int nz = grid.cellDim.z;
       this->bvpSolver = std::make_shared<BVP::BatchedBVPHandler>(klist, topBC, botBC, numberSystems, halfH, nz);
       CudaCheckError();
@@ -129,12 +129,11 @@ namespace uammd{
 
     void DPStokes::initializeQuadratureWeights(){
       System::log<System::DEBUG>("[DPStokes] Initialize quadrature weights");
-      real H = box.boxSize.z;
       real hx = grid.cellSize.x;
       real hy = grid.cellSize.y;
       int nz = grid.cellDim.z;
       qw = std::make_shared<QuadratureWeights>(H, hx, hy, nz);
-}
+    }
 
     namespace detail{
       namespace detail{
@@ -172,14 +171,13 @@ namespace uammd{
 	return std::move(computeZeroModeIntegrals(H, nz, detail::VelOrPressure::velocity));
       }
 
-}
+    }
 
     void DPStokes::precomputeIntegrals(){
       System::log<System::DEBUG>("[DPStokes] Precomputing integrals");
       int nz = grid.cellDim.z;
       zeroModeVelocityChebyshevIntegrals.resize(nz);
       zeroModePressureChebyshevIntegrals.resize(nz);
-      real H = box.boxSize.z;
       zeroModeVelocityChebyshevIntegrals = detail::computeZeroModeVelocityChebyshevIntegral(H, nz);
       zeroModePressureChebyshevIntegrals = detail::computeZeroModePressureChebyshevIntegral(H, nz);
     }
