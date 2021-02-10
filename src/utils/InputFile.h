@@ -1,5 +1,4 @@
-
-/*Raul P. Pelaez 2018. Input file parser.
+/*Raul P. Pelaez 2018-2021. Input file parser.
   Allows to read parameters and options from a file.
   The input file must have the following format:
 
@@ -13,7 +12,7 @@
 USAGE:
 
    //Creation:
-   InputFile inputFile("options.in", sys);
+   InputFile inputFile("options.in");
 
    //Read an option of type float
    float cutOff;
@@ -37,15 +36,12 @@ USAGE:
       cerr<<"Some parameter missing in the option!"<<endl;
    }
 
-
-
    getOption will return an std::istringstream, so you can work with its output as such.
-   A second argument can be passed to getOption containing either InputFile::Required or InputFile::Optional (the latter being the default). If Required is passed and the option is not found, a CRITICAL log event will be issued and the program will terminate.
+   A second argument can be passed to getOption containing either InputFile::Required or InputFile::Optional (the latter being the default). If Required is passed and the option is not found, an ERROR log event will be issued and an std::runtime_error exception thrown.
 
  */
 #ifndef INPUT_FILE_H
 #define INPUT_FILE_H
-
 
 #include<string>
 #include<System/System.h>
@@ -60,30 +56,19 @@ namespace uammd{
 
     size_t maxFileSizeToStore = 1e7; //10 mb
     std::string fileName;
-    shared_ptr<System> sys;
     std::vector<std::pair<string,string>> options;
 
     //Process a line of the file and store option/arguments if necessary
-    //TODO: this could be prettier...
     void process_line(std::string &line){
-
       auto first_char = line.find_first_not_of(" \t\n");
-      //Ignore empty lines
-      if(first_char == std::string::npos) return;
-      //Ignore comments
-      if(line[first_char]=='#'){
-	sys->log<System::DEBUG4>("[InputFile] Comment!");
+      //Ignore comments and empty lines
+      if(first_char == std::string::npos or line[first_char]=='#'){
 	return;
       }
-
       else{
 	std::string word;
-	sys->log<System::DEBUG4>("[InputFile] Processing line!");
-	//Given an option
-	//in>>std::ws;
 	auto first_non_space = line.find_first_not_of(" \t");
 	line = line.substr(first_non_space, line.size());
-	sys->log<System::DEBUG4>("[InputFile] remove left whitespaces: \"%s\"", line.c_str());
 	auto space_after_option = line.find_first_of(" \t");
 	if(space_after_option == std::string::npos){
 	  word = line;
@@ -100,31 +85,33 @@ namespace uammd{
 	    line = line.substr(start_of_args, line.size());
 	  }
 	}
-	sys->log<System::DEBUG3>("[InputFile] option \"%s\" registered with args \"%s\"",  word.c_str(), line.c_str());
+	System::log<System::DEBUG7>("[InputFile] option \"%s\" registered with args \"%s\"",  word.c_str(), line.c_str());
 	if(word.compare("shell") == 0){
-	  sys->log<System::DEBUG3>("[InputFile] Executing shell command: %s", line.c_str());
+	  System::log<System::DEBUG3>("[InputFile] Executing shell command: %s", line.c_str());
 	  int rc = std::system(line.c_str());
 	  if(rc < 0){
-	    sys->log<System::ERROR>("[InputFile] Shell command execution failed with code %d: %s", rc, line.c_str());
+	    System::log<System::ERROR>("[InputFile] Shell command execution failed with code %d: %s", rc, line.c_str());
 	  }
 	  return;
 	}
-
 	options.emplace_back(std::make_pair(word, line));
-
       }
     }
   public:
     enum OptionType{Required, Optional};
 
-    InputFile(std::string name, shared_ptr<System> sys):fileName(name),
-							sys(sys){
+    InputFile(std::string name, shared_ptr<System> sys = nullptr):
+      fileName(name){
+      System::log<System::DEBUG4>("[InputFile] Reading from %s", name.c_str());
       struct stat stat_buf;
       int err = stat(name.c_str(), &stat_buf);
-      if(err!=0) sys->log<System::CRITICAL>("[InputFile] ERROR: Could not open file %s!.", name.c_str());
+      if(err!=0){
+	System::log<System::ERROR>("[InputFile] ERROR: Could not open file %s!.", name.c_str());
+	std::runtime_error("Parameter file not readable");
+      }
       size_t fileSize = stat_buf.st_size;
       if(fileSize>=maxFileSizeToStore){
-	sys->log<System::ERROR>("[InputFile] Attempting to store a file of size %s, are you sure you want to do this?", printUtils::prettySize(fileSize).c_str());
+	System::log<System::ERROR>("[InputFile] Attempting to store a file of size %s, are you sure you want to do this?", printUtils::prettySize(fileSize).c_str());
       }
       //Store options and arguments
       std::ifstream in(fileName);
@@ -136,35 +123,28 @@ namespace uammd{
       process_line(line);
     }
 
-
+    //Return a stringstream to the line of an option in the file (pointing to the first argument)
+    //If the option does not exist and type==Required an exception will be thrown
     //Returns a reference because g++-4.8 doesnt allow to std::move an stringstream...
     std::istringstream& getOption(std::string op, OptionType type = OptionType::Optional){
       static std::istringstream ret;
       ret.str();
       ret.clear();
-      sys->log<System::DEBUG1>("[InputFile] Looking for option %s in file %s",  op.c_str(), fileName.c_str());
       for(auto s: options){
 	if(std::get<0>(s).compare(op)==0){
-	  sys->log<System::DEBUG1>("[InputFile] Option found!");
-	  //std::stringstream ret(std::get<1>(s));
 	  ret.str(std::get<1>(s));
 	  return ret;
 	}
       }
-      sys->log<System::DEBUG1>("[InputFile] Option not found!");
       if(type == OptionType::Required){
-	sys->log<System::CRITICAL>("[InputFile] Option %s not found in %s!",op.c_str(), fileName.c_str());
+	System::log<System::ERROR>("[InputFile] Option %s not found in %s!",op.c_str(), fileName.c_str());
+	throw std::runtime_error("Required option not found in file " + fileName);
       }
-      //std::stringstream bad_ss(std::string(""));
-      //bad_ss.setstate(std::ios::failbit);
-      //return  bad_ss;
       ret.setstate(std::ios::failbit);
       if(op.compare("shell") == 0){
-	sys->log<System::ERROR>("[InputFile] Ignoring use of the reserved \"shell\" option");
+	System::log<System::ERROR>("[InputFile] Ignoring use of the reserved \"shell\" option");
       }
-
       return ret;
-
     }
 
   };
