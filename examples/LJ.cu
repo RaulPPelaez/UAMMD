@@ -51,7 +51,7 @@ struct HarmonicWall: public ParameterUpdatable{
     auto pos = pd->getPos(access::gpu, access::read);
     return pos.begin();
     //If there are more arrays:
-    //return {pos.begin(), otherthing1.begin(), otherthing2.begin()};
+    //return std::make_tuple(pos.begin(), otherthing1.begin(), otherthing2.begin());
   }
 
   //void updateSimulationTime(real time){
@@ -162,7 +162,6 @@ std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
 }
 
 void addShortRangeInteraction(std::shared_ptr<Integrator> verlet, UAMMD sim){
-
   //You can force the use of a certain neighbour list passing its name as a second template argument
   //The default list is a CellList
   using PairForces = PairForces<Potential::LJ, VerletList>;

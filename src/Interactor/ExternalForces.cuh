@@ -102,7 +102,7 @@ namespace uammd{
 
   namespace ExternalForces_ns{
     //These functions can transform several return types gathered from getArrays into a tuple
-    template<class T> constexpr auto getTuple(T tuple){
+    template<class ...T> constexpr auto getTuple(std::tuple<T...> tuple){
       return tuple;
     }
 
@@ -110,7 +110,7 @@ namespace uammd{
       return std::make_tuple(ptr);
     }
 
-    template<class ...T> constexpr auto getTuple(std::initializer_list<T...> ptrlist){
+    template<class T> constexpr auto getTuple(std::initializer_list<T> ptrlist){
       return std::make_tuple(ptrlist);
     }
 
