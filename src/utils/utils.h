@@ -96,9 +96,7 @@ public:
   }
 
   double gaussian(double mean, double std){
-
     constexpr double pi2 = 2.0*M_PI;
-
     static double z0, z1;
     static bool generate = false;
     generate = !generate;
@@ -127,12 +125,12 @@ public:
   double2 gaussian2(double mean, double std){
     return make_double2(gaussian(mean, std),
 			gaussian(mean, std));
-
   }
 
   void setSeed(uint64_t s0, uint64_t s1){
     s[0] = s0;  s[1] = s1;
   }
+
   void setSeed(uint64_t s0){
     s[0] = s0;  s[1] = (s0+15438657923749336752ULL)%RANDOM_MAX;
   }
