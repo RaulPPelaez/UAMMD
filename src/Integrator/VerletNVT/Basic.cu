@@ -1,64 +1,27 @@
-/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
-
-  This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
-  that conserves the temperature, volume and number of particles.
-
-  Uses a simple thermostat with velocity damping and a gaussian noise force.
-
- Usage:
-
-    Create the module as any other integrator with the following parameters:
-
-
-    auto sys = make_shared<System>();
-    auto pd = make_shared<ParticleData>(N,sys);
-    auto pg = make_shared<ParticleGroup>(pd,sys, "All");
-
-    using NVT = VerletNVT::Basic;
-    NVT::Parameters par;
-     par.temperature = 1.0;
-     par.dt = 0.01;
-     par.viscosity = 1.0;
-     par.is2D = false;
-
-    auto verlet = make_shared<NVT>(pd, pg, sys, par);
-
-    //Add any interactor
-    verlet->addInteractor(...);
-    ...
-
-    //forward simulation 1 dt:
-
-    verlet->forwardTime();
-
- */
+/*Raul P. Pelaez 2017-2021. Basic Verlet NVT Integrator module.
+  See VerletNVT.cuh for more info
+*/
 
 #include"../VerletNVT.cuh"
-
 #include"third_party/saruprng.cuh"
-
-
-
 namespace uammd{
-
   namespace VerletNVT{
     namespace Basic_ns{
       //Fill the initial velocities of the particles in my group with a gaussian distribution according with my temperature.
-      __global__ void initialVelocities(real3* vel, const real* mass,
+      __global__ void initialVelocities(real3* vel, const real* mass, real defaultMass,
 					ParticleGroup::IndexIterator indexIterator, //global index of particles in my group
 					real vamp, bool is2D, int N, uint seed){
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>=N) return;
 	Saru rng(id, seed);
 	int i = indexIterator[id];
-	real mass_i = mass?mass[i]:real(1.0);
+	real mass_i = 1.0;//mass?mass[i]:defaultMass;
 	double3 noisei = make_double3(rng.gd(0, vamp/mass_i), is2D?0.0:rng.gd(0, vamp/mass_i).x);
 	int index = indexIterator[i];
 	vel[index].x = noisei.x;
 	vel[index].y = noisei.y;
 	vel[index].z = noisei.z;
       }
-
     }
 
     Basic::Basic(shared_ptr<ParticleData> pd,
@@ -91,13 +54,21 @@ namespace uammd{
       if(pd->isVelAllocated()){
 	sys->log<System::WARNING>("[%s] Velocity will be overwritten to ensure temperature conservation!", name.c_str());
       }
+      bool useDefaultMass = not pd->isMassAllocated();
+      this->defaultMass = par.mass;
+      if(useDefaultMass and this->defaultMass < 0 ){
+	this->defaultMass = 1.0;
+      }     
       {
 	auto vel_handle = pd->getVel(access::location::gpu, access::mode::write);
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
 	real velAmplitude = sqrt(3.0*temperature);
-	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
+	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
+	if(defaultMass > 0){
+	  mass = nullptr;
+	}
 	Basic_ns::initialVelocities<<<Nblocks, Nthreads>>>(vel_handle.raw(),
-							   mass.raw(),
+							   mass, defaultMass,
 							   groupIterator,
 							   velAmplitude, is2D, numberParticles,
 							   sys->rng().next32());
@@ -105,13 +76,9 @@ namespace uammd{
       cudaStreamCreate(&stream);
     }
 
-
-
     Basic::~Basic(){
       cudaStreamDestroy(stream);
     }
-
-
 
     namespace Basic_ns{
 
@@ -121,7 +88,7 @@ namespace uammd{
 				   real3* __restrict__ vel,
 				   real4* __restrict__  force,
 				   const real* __restrict__ mass,
-				   const real* __restrict__ radius,
+				   real defaultMass,
 				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
 				   real dt, real viscosity, bool is2D,
@@ -131,19 +98,15 @@ namespace uammd{
 	if(id>=N) return;
 	//Index of current particle in group
 	const int i = indexIterator[id];
-	real invMass = real(1.0);
+	real invMass = real(1.0)/defaultMass;
 	if(mass){
 	  invMass = real(1.0)/mass[i];
 	}
-	real radius_i = real(1.0);
-	if(radius){
-	  radius_i = radius[i];
-	}
 	Saru rng(id, stepNum, seed);
-	noiseAmplitude *= sqrtf(0.5*radius_i*invMass);
+	noiseAmplitude *= sqrtf(0.5*invMass);
 	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), rng.gf(0, noiseAmplitude).x); //noise[id];
-	const real damping = real(6.0)*real(M_PI)*viscosity*radius_i;
-	vel[i] += (make_real3(force[i])-damping*vel[i])*(dt*real(0.5)*invMass) + noisei;
+	const real damping = real(6.0)*real(M_PI)*viscosity;
+	vel[i] += (make_real3(force[i]) - damping*vel[i])*(dt*real(0.5)*invMass) + noisei;
 	if(is2D) vel[i].z = real(0.0);
 	//In the first step, upload positions
 	if(step==1){
@@ -185,18 +148,16 @@ namespace uammd{
 	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 	auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
-
-	//Mass is assumed 1 for all particles if it has not been set.
-	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
-	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
-
+	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
+	if(this->defaultMass > 0){
+	  mass = nullptr;
+	}
 	/*First step integration and reset forces*/
-
 	Basic_ns::integrateGPU<1><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
 								    vel.raw(),
 								    force.raw(),
-								    mass.raw(),
-								    radius.raw(),
+								    mass,
+								    defaultMass,
 								    groupIterator,
 								    numberParticles, dt, viscosity, is2D,
 								    noiseAmplitude,
@@ -207,19 +168,18 @@ namespace uammd{
       //Second integration step
       {
 	auto groupIterator = pg->getIndexIterator(access::location::gpu);
-
 	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
 	auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
-
-	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read);
-	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
-
+	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
+	if(this->defaultMass > 0){
+	  mass = nullptr;
+	}
 	Basic_ns::integrateGPU<2><<<Nblocks, Nthreads, 0 , stream>>>(pos.raw(),
 								     vel.raw(),
 								     force.raw(),
-								     mass.raw(),
-								     radius.raw(),
+								     mass,
+								     defaultMass,
 								     groupIterator,
 								     numberParticles, dt, viscosity, is2D,
 								     noiseAmplitude,

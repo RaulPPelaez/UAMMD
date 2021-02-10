@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
+/*Raul P. Pelaez 2017-2021. Verlet NVT Integrator module.
 
   This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
   that conserves the temperature, volume and number of particles.
@@ -13,7 +13,6 @@
 
     Create the module as any other integrator with the following parameters:
 
-
     auto sys = make_shared<System>();
     auto pd = make_shared<ParticleData>(N,sys);
     auto pg = make_shared<ParticleGroup>(pd,sys, "All");
@@ -24,7 +23,8 @@
      par.dt = 0.01;
      par.viscosity = 1.0;
      par.is2D = false;
-
+     //If mass is specified all particles will be assumed to have this mass. If unspecified pd::getMass will be used, if it has not been requested, all particles are assumed to have mass=1.
+     //par.mass = 1.0;
     auto verlet = make_shared<NVT>(pd, pg, sys, par);
 
     //Add any interactor
@@ -58,11 +58,13 @@ namespace uammd{
 	real dt = 0;
 	real viscosity = 1.0;
 	bool is2D = false;
+	real mass = -1.0;
       };
     protected:
       real noiseAmplitude;
       uint seed;
       real dt, temperature, viscosity;
+      real defaultMass;
       bool is2D;
 
       cudaStream_t stream;
@@ -109,7 +111,8 @@ namespace uammd{
       using Parameters = Basic::Parameters;
 
       virtual void forwardTime() override;
-
+    private:
+      template<int step> void callIntegrate();
     };
 
 
