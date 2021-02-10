@@ -1,13 +1,7 @@
 /*Raul P. Pelaez 2017-2021. Implemented Potentials
 
-  In this file there are functors and objects describing different potentials.
-  A single Potential might be written to handle a variety of similar potentials.
-  For example, all radial potentials need only the distance between particles,
-    so RadialPotential is defined, and the particular potential is a functor passed to it (See LJFunctor).
-
-See RadialPotential on how to implement a RadialPotential.
 For more information on how to code a new Potential see examples/customPotentials.cu
-
+See RadialPotential.cuh for an additional example.
  */
 #ifndef POTENTIAL_CUH
 #define POTENTIAL_CUH
@@ -16,12 +10,12 @@ For more information on how to code a new Potential see examples/customPotential
 #include"RadialPotential.cuh"
 namespace uammd{
   namespace Potential{
-    //LJFunctor is a radial potential that can be passed to RadialPotential to be used as a Potential in
-    //a module (i.e PairForces, NBodyForces...). Encodes the Lennard Jonnes potential
+    //LJFunctor encodes the Lennard Jonnes potential
+    //this class is meant to be used to specialize RadialPotential, which can then to be used as the Potential for PairForces
     //RadialPotential expects a functor with the rules of this one:
     //   -InputPairParameters, a type with the necessary parameters to differentiate between type pairs
     //   -PairParameters, a type with type pair parameters that the GPU computation will use (can be an alias of InputPairParameters).
-    //   -A force*, energy and virial (not yet) functions taking a squared distance and a PairParameters
+    //   -A force and energy functions taking a squared distance and a PairParameters
     //   -A processPairParameters function that transforms between InputPairParameters and PairParameters
     //* Notice that the force function in a RadialPotential must, in fact, return the modulus of the force divided by the distance, |f|/r.
     struct LJFunctor{
