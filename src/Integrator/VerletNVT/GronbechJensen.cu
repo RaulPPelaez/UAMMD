@@ -76,7 +76,6 @@ namespace uammd{
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
       auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
-      //Mass is assumed 1 for all particles if it has not been set.
       auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
       if(this->defaultMass > 0){
 	mass = nullptr;
