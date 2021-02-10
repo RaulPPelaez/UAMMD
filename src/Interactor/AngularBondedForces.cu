@@ -26,7 +26,7 @@ namespace uammd{
   }
 
   template<class BondType>
-  AngularBondedForces<BondType>::BondProcessor AngularBondedForces<BondType>::readBondFile(std::string bondFile){
+  typename AngularBondedForces<BondType>::BondProcessor AngularBondedForces<BondType>::readBondFile(std::string bondFile){
     int numberParticles = pg->getNumberParticles();
     BondProcessor bondProcessor(numberParticles);
     BondReader bondReader(bondFile);

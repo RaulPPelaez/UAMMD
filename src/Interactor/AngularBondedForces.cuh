@@ -48,10 +48,10 @@
 
 namespace uammd{
 
-  namespace AngularBondedForces_ns{
-    struct AngularBond{
+  namespace BondedType{
+    struct Angular{
       Box box;
-      AngularBond(Box box): box(box){}
+      Angular(Box box): box(box){}
       struct BondInfo{
 	real ang0, k;
       };
@@ -145,7 +145,8 @@ namespace uammd{
   }
 
   namespace AngularBondedForces_ns{
-
+    using AngularBond = BondedType::Angular;
+    
     template<class Bond>
     class BondProcessor{
       int numberParticles;
@@ -264,13 +265,19 @@ namespace uammd{
     };
 
     struct Parameters{
-      std::string readFile;
+      std::string file;
     };
 
     explicit AngularBondedForces(shared_ptr<ParticleData> pd,
 				 shared_ptr<System> sys,
 				 Parameters par,
 				 std::shared_ptr<BondType> bondType = std::make_shared<BondType>());
+    
+    explicit AngularBondedForces(shared_ptr<ParticleData> pd,
+				 shared_ptr<System> sys,
+				 Parameters par,
+				 BondType bondType):
+      AngularBondedForces(pd, sys, par, std::make_shared<BondType>(bondType)){}
 
     ~AngularBondedForces() = default;
 

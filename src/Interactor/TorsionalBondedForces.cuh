@@ -43,8 +43,8 @@
 
 namespace uammd{
 
-  namespace TorsionalBondedForces_ns{
-    struct TorsionalBond{
+  namespace BondedType{
+    struct Torsional{
     private:
 
       __device__ real3 cross(real3 a, real3 b){
@@ -53,7 +53,7 @@ namespace uammd{
 
     public:
       Box box;
-      TorsionalBond(Box box): box(box){}
+      Torsional(Box box): box(box){}
 
       struct BondInfo{
 	real phi0, k;
@@ -230,7 +230,7 @@ namespace uammd{
   }
 
   namespace TorsionalBondedForces_ns{
-
+    using TorsionalBond = BondedType::Torsional;
     template<class Bond>
     class BondProcessor{
       int numberParticles;
@@ -334,6 +334,12 @@ namespace uammd{
 				   shared_ptr<System> sys,
 				   Parameters par,
 				   std::shared_ptr<BondType> bondType = std::make_shared<BondType>());
+    
+    explicit TorsionalBondedForces(shared_ptr<ParticleData> pd,
+				   shared_ptr<System> sys,
+				   Parameters par,
+				   BondType bondType):
+      TorsionalBondedForces(pd, sys, par, std::make_shared<BondType>(bondType)){}
 
     ~TorsionalBondedForces() = default;
 

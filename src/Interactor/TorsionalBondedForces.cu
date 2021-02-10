@@ -26,7 +26,7 @@ namespace uammd{
   }
 
   template<class BondType>
-  TorsionalBondedForces<BondType>::BondProcessor TorsionalBondedForces<BondType>::readBondFile(std::string bondFile){
+  typename TorsionalBondedForces<BondType>::BondProcessor TorsionalBondedForces<BondType>::readBondFile(std::string bondFile){
     int numberParticles = pg->getNumberParticles();
     BondProcessor bondProcessor(numberParticles);
     BondReader bondReader(bondFile);
