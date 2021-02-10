@@ -47,6 +47,21 @@ namespace uammd{
       template<class ...Types> static constexpr inline __device__ __host__ real energy(T &t, Types... args){return real(0.0); }
     };
 
+    //Detects if a type has a member called force.
+    //Use with: SFINAE::has_force<T>::value
+    SFINAE_DEFINE_HAS_MEMBER(force)
+
+    //If an object has an force member function it calls that function, otherwise returns {0,0,0}
+    template<class T, bool general = has_force<T>::value> struct ForceDelegator;
+
+    template<class T> struct ForceDelegator<T, true>{
+      template<class ...Types> static inline __device__ __host__ auto force(T &t, Types... args){return t.force(args...);}
+    };
+
+    template<class T> struct ForceDelegator<T, false>{
+      template<class ...Types> static constexpr inline __device__ __host__ real3 force(T &t, Types... args){return real3(); }
+    };
+
     //For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser
     //This macro defines a tempalted struct has_getInfo<T> that contains a static value=0 if T has not a getInfo method, and 1 otherwise
     SFINAE_DEFINE_HAS_MEMBER(getInfo);
