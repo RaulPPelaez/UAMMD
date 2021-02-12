@@ -71,7 +71,7 @@ namespace uammd{
     if(par.split > 0) farFieldGaussianWidth = sqrt(par.gw*par.gw+1.0/(4.0*par.split*par.split));
     if(par.upsampling>0) h = 1.0/par.upsampling;
     else h = (1.3 - std::min((-log10(par.tolerance))/10.0, 0.9))*farFieldGaussianWidth;
-    h = std::min(h, box.boxSize.x/16.0);
+    h = std::min(h, box.boxSize.x/32.0);
     sys->log<System::MESSAGE>("[Poisson] Proposed h: %g", h);
     {
       int3 cellDim = nextFFTWiseSize3D(make_int3(box.boxSize/h));
@@ -82,7 +82,7 @@ namespace uammd{
     int ncells = grid.getNumberCells();
     this->kernel = std::make_shared<Kernel>(par.tolerance, farFieldGaussianWidth, h);
     if(kernel->support > grid.cellDim.x/2-1){
-      sys->log<System::ERROR>("[Poisson] Kernel support is too large for this configuration, try increasing splitting parameter or decrasing tolerance");
+      sys->log<System::ERROR>("[Poisson] Kernel support (%d) is too large for this configuration (max is %d), try increasing splitting parameter or decrasing tolerance", kernel->support, grid.cellDim.x/2-1);
       throw std::invalid_argument("[Poisson] Kernel support is too large");
     }
     kernel->support = std::min(kernel->support, grid.cellDim.x/2-2);
