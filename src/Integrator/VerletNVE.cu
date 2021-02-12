@@ -114,7 +114,7 @@ namespace uammd{
     real vamp = sqrt(2.0*K/3.0);
     auto vel  = pd->getVel(access::location::cpu, access::mode::write);
     auto vel_gr = pg->getPropertyIterator(vel);
-    std::generate(vel_gr, vel_gr + pg->getNumberParticles(), [&](){return vamp*sys->rng().gaussian3(0.0, 1.0);});
+    std::generate(vel_gr, vel_gr + pg->getNumberParticles(), [&](){return make_real3(vamp*sys->rng().gaussian3(0.0, 1.0));});
   }
 
   template<int step>

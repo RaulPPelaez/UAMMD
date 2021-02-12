@@ -92,6 +92,12 @@ namespace uammd{
 		   std::shared_ptr<Functor> tr = std::make_shared<Functor>()):
       ExternalForces(pd, std::make_shared<ParticleGroup>(pd, sys), sys, tr){
     }
+    //Alternative using an instance of Functor instead of a pointer
+    ExternalForces(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg, shared_ptr<System> sys, Functor f):
+      ExternalForces(pd, pg, sys, std::make_shared<Functor>(f)){}
+
+    ExternalForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys, Functor f):
+      ExternalForces(pd, sys, std::make_shared<Functor>(f)){}
 
     void sumForce(cudaStream_t st) override;
     real sumEnergy() override;

@@ -327,7 +327,7 @@ namespace uammd{
     };
 
     struct Parameters{
-      std::string readFile;
+      std::string file;
     };
 
     explicit TorsionalBondedForces(shared_ptr<ParticleData> pd,

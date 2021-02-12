@@ -101,7 +101,7 @@ namespace uammd{
   public:
 
     CellListBase(){
-      System::log<System::MESSAGE>("[CellList] Created");
+      System::log<System::DEBUG>("[CellList] Created");
       CudaSafeCall(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
       currentValidCell_counter = -1;
       errorFlags.resize(1);
