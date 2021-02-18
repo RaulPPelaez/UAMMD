@@ -2,7 +2,7 @@
 #The target CUDA compute capability(s), if set to AUTO it will be autodetected, if empty no arch will be specified
 #ARCH ?= 50 52 60 61
 #ARCH=
-ARCH=AUTO
+ARCH=75
 
 #Uncomment to compile in double precision mode, single by default
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
