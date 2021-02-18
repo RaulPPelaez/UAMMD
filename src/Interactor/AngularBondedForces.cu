@@ -20,7 +20,7 @@ namespace uammd{
     TPP(32),
     bondType(bondType_in){
     this->setDelegate(bondType);
-    auto bondProcessor = readBondFile(par.readFile);
+    auto bondProcessor = readBondFile(par.file);
     generateBondList(bondProcessor);
     bondProcessor.checkDuplicatedBonds();
   }
