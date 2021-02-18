@@ -178,6 +178,13 @@ namespace uammd{
 			  shared_ptr<System> sys,
 			  Parameters par,
 			  std::shared_ptr<BondType> bondForce = std::make_shared<BondType>());
+
+    explicit BondedForces(shared_ptr<ParticleData> pd,
+			  shared_ptr<System> sys,
+			  Parameters par,
+			  BondType bondType):
+      BondedForces(pd, sys, par, std::make_shared<BondType>(bondType)){}
+
     ~BondedForces();
 
     template<BondedForces_ns::ComputeMode mode, class ResultType>
