@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. Verlet NVT Integrator module.
+/*Raul P. Pelaez 2017-2021. Verlet NVT Integrator module.
 
 
   This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
@@ -6,17 +6,15 @@
 
   Create the module as any other integrator with the following parameters:
 
-
   auto sys = make_shared<System>();
   auto pd = make_shared<ParticleData>(N,sys);
   auto pg = make_shared<ParticleGroup>(pd,sys, "All");
 
-
   VerletNVE::Parameters par;
-     par.energy = 1.0; //Target energy per particle, can be ommited if initVelocities=false
+     par.energy = 1.0; //Target energy per particle, will be ignored if initVelocities=false
      par.dt = 0.01;
      par.is2D = false;
-     par.initVelocities=true; //Modify starting velocities to ensure the target energy
+     par.initVelocities=true; //Modify starting velocities to ensure the target energy, default is true
 
     auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
 
@@ -47,11 +45,11 @@ namespace uammd{
     dt(par.dt), energy(par.energy), is2D(par.is2D), initVelocities(par.initVelocities),
     steps(0){
     if(initVelocities)
-      sys->log<System::MESSAGE>("[VerletNVE] Energy: %.3f", energy);
+      sys->log<System::MESSAGE>("[VerletNVE] Target energy per particle: %g", energy);
     else
-      sys->log<System::MESSAGE>("[VerletNVE] Not enforcing input energy.");
+      sys->log<System::MESSAGE>("[VerletNVE] Not fixing an initial per particle energy.");
 
-    sys->log<System::MESSAGE>("[VerletNVE] Time step: %.3f", dt);
+    sys->log<System::MESSAGE>("[VerletNVE] Time step: %g", dt);
     if(is2D){
       sys->log<System::MESSAGE>("[VerletNVE] Working in 2D mode.");
     }
@@ -77,7 +75,7 @@ namespace uammd{
     template<int step>
       __global__ void integrateGPU(real4* __restrict__  pos,
 				   real3* __restrict__ vel,
-				   real4* __restrict__  force,
+				   const real4* __restrict__  force,
 				   const real* __restrict__ mass,
 				   real defaultMass,
 				   ParticleGroup::IndexIterator indexIterator,
@@ -88,18 +86,13 @@ namespace uammd{
 	//Index of current particle in group
 	int i = indexIterator[id];
 	//Half step velocity
-	real invMass = real(1.0)/defaultMass;
-	if(mass){
-	  invMass = real(1.0)/mass[i];
-	}
-	vel[i] += (make_real3(force[i])*invMass)*dt*real(0.5);
+	real m = mass?mass[i]:defaultMass;
+	vel[i] += (make_real3(force[i])/m)*dt*real(0.5);
 	if(is2D) vel[i].z = real(0.0);
 	//In the first step, upload positions
 	if(step==1){
 	  real3 newPos = make_real3(pos[i]) + vel[i]*dt;
 	  pos[i] = make_real4(newPos, pos[i].w);
-	  //Reset force
-	  force[i] = make_real4(0);
 	}
       }
   }
@@ -109,19 +102,48 @@ namespace uammd{
     //in order to adapt the initial kinetic energy to match the input total energy
     //E = U+K
     real U = 0.0;
-    for(auto forceComp: interactors) U += forceComp->sumEnergy();
-    real K = abs(energy - U);
-    real vamp = sqrt(2.0*K/3.0);
+    int numberParticles = pg->getNumberParticles();
+    {
+      auto energy = pd->getEnergy(access::gpu, access::write);
+      auto energy_gr = pg->getPropertyIterator(energy);
+      thrust::fill(thrust::cuda::par, energy_gr, energy_gr + numberParticles, real(0.0));
+    }
+    for(auto forceComp: interactors){
+      U += forceComp->sumEnergy();
+    }
+    {
+      auto energy = pd->getEnergy(access::gpu, access::read);
+      auto energy_gr = pg->getPropertyIterator(energy);
+      U += thrust::reduce(thrust::cuda::par, energy_gr, energy_gr + numberParticles);
+    }
+    U = U/numberParticles;
+    real K = energy - U;
+    if(K<0){
+      sys->log<System::ERROR>("[VerletNVE] Cannot fix requested energy per particle. Requested E = U + K = %g, but U=%g", energy, U);
+      throw std::runtime_error("[VerletNVE] Cannot fix energy");
+    }
+    sys->log<System::MESSAGE>("Starting potential energy per particle: %g", U);
     auto vel  = pd->getVel(access::location::cpu, access::mode::write);
     auto vel_gr = pg->getPropertyIterator(vel);
-    std::generate(vel_gr, vel_gr + pg->getNumberParticles(), [&](){return make_real3(vamp*sys->rng().gaussian3(0.0, 1.0));});
+    auto mass = pd->getMassIfAllocated(access::location::cpu, access::mode::read).raw();
+    auto gindex = pg->getIndexIterator(access::cpu);
+    std::transform(gindex, gindex + pg->getNumberParticles(),
+		   vel_gr,
+		   [&](int i){
+		     auto dir = make_real3(sys->rng().gaussian3(0.0,1.0));
+		     dir = dir/sqrt(dot(dir, dir));
+		     //K = 0.5*m*v^2 -> v = sqrt(2*K/m)
+		     real m = mass?mass[i]:defaultMass;
+		     return make_real3(sqrt(2.0*K/m)*dir);
+		   });
+    sys->log<System::MESSAGE>("Starting kinetic energy per particle: %g", K);
   }
 
   template<int step>
   void VerletNVE::callIntegrate(){
     int numberParticles = pg->getNumberParticles();
-    int Nthreads=128;
-    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);    
+    int Nthreads = 128;
+    int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
     //An iterator with the global indices of my groups particles
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
     //Get all necessary properties
@@ -129,9 +151,6 @@ namespace uammd{
     auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
     auto force = pd->getForce(access::location::gpu, access::mode::read);
     auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
-    if(this->defaultMass > 0){
-      mass = nullptr;
-    }
     //First step integration and reset forces
     VerletNVE_ns::integrateGPU<step><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
 								       vel.raw(),
@@ -142,110 +161,71 @@ namespace uammd{
 								       numberParticles, dt, is2D);
   }
 
+  void VerletNVE::resetForces(){
+    int numberParticles = pg->getNumberParticles();
+    auto force = pd->getForce(access::location::gpu, access::mode::write);
+    auto force_gr = pg->getPropertyIterator(force);
+    thrust::fill(thrust::cuda::par.on(stream), force_gr, force_gr + numberParticles, real4());
+  }
+
+  void VerletNVE::firstStepPreparation(){
+    if(initVelocities){
+      initializeVelocities();
+    }
+    resetForces();
+    for(auto forceComp: interactors){
+      forceComp->updateTimeStep(dt);
+      forceComp->sumForce(stream);
+    }
+  }
+
   //Move the particles in my group 1 dt in time.
   void VerletNVE::forwardTime(){
     steps++;
     sys->log<System::DEBUG1>("[VerletNVE] Performing integration step %d", steps);
-    for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
-    if(steps==1){
-      if(initVelocities){
-	initializeVelocities();
-      }
-      for(auto forceComp: interactors){
-	forceComp->updateTimeStep(dt);
-      }
-    }
-    //First simulation step is special
-    if(steps==1){
-      {
-	int numberParticles = pg->getNumberParticles();
-	auto force = pd->getForce(access::location::gpu, access::mode::write);
-	auto force_gr = pg->getPropertyIterator(force);
-	thrust::fill(thrust::cuda::par.on(stream), force_gr, force_gr + numberParticles, real4());
-      }
-      for(auto forceComp: interactors){
-	forceComp->updateTimeStep(dt);
-	forceComp->sumForce(stream);
-      }
-      cudaDeviceSynchronize();
-    }
+    if(steps==1)
+      firstStepPreparation();
     callIntegrate<1>();
+    resetForces();
     for(auto forceComp: interactors){
+      forceComp->updateSimulationTime(steps*dt);
       forceComp->sumForce(stream);
     }
     callIntegrate<2>();
   }
 
-  namespace VerletNVE_ns{
-    __global__ void sumEnergy(const real3* vel,
-			      real *energy,
-			      const real *mass,
-			      real defaultMass,
-			      ParticleGroup::IndexIterator groupIterator,
-			      int numberParticles){
+  namespace verletnve_ns{
+    template<class VelocityIterator, class MassIterator, class EnergyIterator>
+    __global__ void sumKineticEnergy(const VelocityIterator vel,
+				     EnergyIterator energy,
+				     const MassIterator mass,
+				     int numberParticles){
       const int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id >= numberParticles) return;
-      const int i = groupIterator[id];
-      const real mass_i = mass?mass[i]:defaultMass;
-      energy[i] += real(0.5)*dot(vel[i], vel[i])*mass_i;
+      auto v = vel[id];
+      energy[id] += real(0.5)*dot(v,v)*mass[id];
     }
   };
 
+
   real VerletNVE::sumEnergy(){
     int numberParticles = pg->getNumberParticles();
-    auto groupIterator = pg->getIndexIterator(access::location::gpu);
-    auto vel = pd->getVel(access::location::gpu, access::mode::read);
-    auto Energy = pd->getEnergy(access::location::gpu, access::mode::write);
-    auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
-    if(this->defaultMass > 0){
-      mass = nullptr;
-    }
+    auto vel_gr = pg->getPropertyIterator(pd->getVel(access::location::gpu, access::mode::read));
+    auto energy_gr = pg->getPropertyIterator(pd->getEnergy(access::location::gpu, access::mode::write));
     int Nthreads = 128;
     int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-    VerletNVE_ns::sumEnergy<<<Nblocks, Nthreads>>>(vel.raw(),
-						   Energy.raw(),
-						   mass, defaultMass,
-						   groupIterator,
-						   numberParticles);
+    auto mass = pd->getMassIfAllocated(access::gpu, access::read);
+    if(not mass.raw()){
+      auto mass_iterator = thrust::make_constant_iterator(defaultMass);
+      verletnve_ns::sumKineticEnergy<<<Nblocks, Nthreads>>>(vel_gr, energy_gr, mass_iterator, numberParticles);
+    }
+    else{
+      auto mass_iterator = pg->getPropertyIterator(mass);
+      verletnve_ns::sumKineticEnergy<<<Nblocks, Nthreads>>>(vel_gr, energy_gr, mass_iterator, numberParticles);
+    }
+
     return 0.0;
   }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

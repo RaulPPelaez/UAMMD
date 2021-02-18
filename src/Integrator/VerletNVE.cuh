@@ -45,12 +45,16 @@ namespace uammd{
     int steps;
     void initializeVelocities();
     template<int step> void callIntegrate();
+    void resetForces();
+    void firstStepPreparation();
   public:
     struct Parameters{
-      real energy = 0;
+      real energy = 0; //Target energy, ignored if initVelocities is false
       real dt = 0;
       bool is2D = false;
-      bool initVelocities = true;
+      bool initVelocities = true; //Modify initial particle velocities to enforce the provided energy
+      //If >0 all particles will have this mass, otherwise the ParticleData mass will be used, if masses have not been set
+      // the default mass is 1
       real mass = -1;
     };
     VerletNVE(shared_ptr<ParticleData> pd,
