@@ -218,7 +218,7 @@ using Verlet = VerletNVT::GronbechJensen;
 std::shared_ptr<Verlet> createIntegratorVerletNVT(UAMMD sim){
   typename Verlet::Parameters par;
   par.temperature = sim.par.temperature;
-  par.viscosity = sim.par.viscosity;
+  par.friction = sim.par.friction;
   par.dt = sim.par.dt;
   auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
   return std::make_shared<Verlet>(sim.pd, pg, sim.sys, par);
@@ -412,31 +412,17 @@ std::shared_ptr<Interactor> createExternalPotentialInteractor(UAMMD sim){
 }
 
 
-double getTotalEnergy(std::shared_ptr<Integrator> integrator,
-                      std::shared_ptr<ParticleData> particles){
+double sumTotalEnergy(std::shared_ptr<Integrator> integrator, std::shared_ptr<ParticleData> particles){
   {
-    auto energy
-      = particles->getEnergy(access::location::cpu,
-                             access::mode::write);
-    std::fill(energy.begin(), energy.end(), real(0.0));
+    auto energy = particles->getEnergy(access::location::gpu, access::mode::write);
+    thrust::fill(thrust::cuda::par, energy.begin(), energy.end(), real(0.0));
   }
-
-  double totalEnergy = 0;
-
   integrator->sumEnergy();
-
   for(auto interactor: integrator->getInteractors()){
     interactor->sumEnergy();
   }
-
-  {
-    auto energy
-      = particles->getEnergy(access::location::cpu,
-                             access::mode::read);
-    for(int i = 0; i < particles->getNumParticles(); ++i) {
-      totalEnergy += energy[i];
-    }
-  }
+  auto energy = particles->getEnergy(access::location::gpu, access::mode::read);
+  double totalEnergy = thrust::reduce(thrust::cuda::par, energy.begin(), energy.end(), 0.0);
   return totalEnergy;
 }
 
@@ -445,20 +431,28 @@ double getTotalEnergy(std::shared_ptr<Integrator> integrator,
 //Each snapshot is separated by a line containing only a "#".
 //Particle positions are folded into the primary box via MIC.
 void writeSimulation(UAMMD sim){
-  auto pos = sim.pd->getPos(access::location::cpu, access::mode::read);
   //Particles might change ordering once in a while, this array always points to the index of a particle given its name or id.
   //This means that a particle that started at index "i" (and thus has the id or name "i") will always be accesible via
   //id2index[i]
   auto id2index = sim.pd->getIdOrderedIndices(access::cpu);
   static std::ofstream out(sim.par.outfile);
-  static std::ofstream eout("energy.dat");
-  eout<<std::setprecision(2*sizeof(real))<<getTotalEnergy(sim.integrator, sim.pd)<<std::endl;
+  static std::ofstream eout(sim.par.outfileEnergy);
+  static std::ofstream vout(sim.par.outfileVelocities);
+  if(eout.good())
+    eout<<std::setprecision(2*sizeof(real))<<"# Total energy: "<<sumTotalEnergy(sim.integrator, sim.pd)<<std::endl;
+  if(sim.pd->isVelAllocated() and vout.good())
+    vout<<"#"<<std::endl;
   Box box(sim.par.L);
   real3 L = box.boxSize;
   out<<"#Lx="<<L.x*0.5<<";Ly="<<L.y*0.5<<";Lz="<<L.z*0.5<<";\n";
+  auto pos = sim.pd->getPos(access::location::cpu, access::mode::read);
+  auto vel = sim.pd->getVelIfAllocated(access::location::cpu, access::mode::read);
+  auto energy = sim.pd->getEnergy(access::location::cpu, access::mode::read);
   fori(0, sim.par.numberParticles){
     real3 p = box.apply_pbc(make_real3(pos[id2index[i]]));
     out<<std::setprecision(2*sizeof(real))<<p<<"\n";
+    if(eout.good()) eout<<energy[id2index[i]]<<"\n";
+    if(sim.pd->isVelAllocated() and vout.good()) vout<<vel[id2index[i]]<<"\n";
   }
   out<<std::flush;
 }
@@ -542,7 +536,8 @@ void writeDefaultDatamain(std::string datamain){
   out<<"hydrodynamicRadius 1.0"<<std::endl;
   out<<"#################################################################"<<std::endl;
   out<<"#Environment parameters"<<std::endl;
-  out<<"viscosity 1"<<std::endl;
+  out<<"viscosity 1"<<std::endl;  
+  out<<"friction 1 #Used in VerletNVT"<<std::endl;
   out<<"temperature 0.1"<<std::endl;
   out<<"##################################################################"<<std::endl;
   out<<"#Short range potential parameters"<<std::endl;
@@ -600,6 +595,8 @@ void writeDefaultDatamain(std::string datamain){
   out<<""<<std::endl;
   out<<"L 32 32 32             #Domain size in the three dimensions"<<std::endl;
   out<<"outfile /dev/stdout    #Positions will be written to this file"<<std::endl;
+  out<<"#outfileVelocity /dev/null #If present velocities will be written to this file (if the integrator uses velocity)"<<std::endl;
+  out<<"#outfilEnergy /dev/null    #If present per particle energy will be written to this file for each spanshot"<<std::endl;
   out<<"numberSteps 100000     #Number of simulation steps"<<std::endl;
   out<<"printSteps 500         #Positions will be writen to \"outfile\" every printSteps steps"<<std::endl;
   out<<"relaxSteps  100       #Run this number of steps before writting"<<std::endl;
@@ -628,6 +625,8 @@ Parameters readParameters(std::string datamain){
   in.getOption("dt", InputFile::Required)>>par.dt;
   in.getOption("temperature", InputFile::Required)>>par.temperature;  
   in.getOption("outfile", InputFile::Required)>>par.outfile;
+  in.getOption("outfileVelocities", InputFile::Optional)>>par.outfileVelocities;
+  in.getOption("outfileEnergy", InputFile::Optional)>>par.outfileEnergy;
   in.getOption("epsilon", InputFile::Required)>>par.epsilon;
   in.getOption("sigma", InputFile::Required)>>par.sigma;
   in.getOption("cutOff", InputFile::Required)>>par.cutOff;
@@ -650,8 +649,11 @@ Parameters readParameters(std::string datamain){
   if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0){
     in.getOption("hydrodynamicRadius", InputFile::Required)>>par.hydrodynamicRadius;
   }
-  if(par.integrator.compare("BD")==0 or par.integrator.compare("VerletNVT")==0 or par.integrator.compare("BDHI")==0){
+  if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0){
     in.getOption("viscosity", InputFile::Required)>>par.viscosity;
+  }
+  if(par.integrator.compare("VerletNVT")==0){
+     in.getOption("friction", InputFile::Required)>>par.friction;
   }
   if(in.getOption("useElectrostatics", InputFile::Optional)){
     par.useElectrostatics = true;

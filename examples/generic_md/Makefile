@@ -33,8 +33,8 @@ OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
 
 INCLUDE_FLAGS= -I$(CUDA_ROOT)/include -I$(UAMMD_ROOT)/src/ -I$(UAMMD_ROOT)/src/third_party/ -I/usr/include/lapacke -I/usr/include/cblas
 LIBRARIES=-lcufft -llapacke -lcublas -lcblas
-generic: generic_simulation.cu
-	$(NVCC) --expt-relaxed-constexpr -std=c++14 -O3 $(OPTIONS) -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) generic_simulation.cu $(INCLUDE_FLAGS) $(LIBRARIES) -o generic
+generic: generic_simulation.cu customizations.cuh
+	$(NVCC) --expt-relaxed-constexpr --expt-extended-lambda -std=c++14 -O3 $(OPTIONS) -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) generic_simulation.cu $(INCLUDE_FLAGS) $(LIBRARIES) -o generic
 
 all: generic
 

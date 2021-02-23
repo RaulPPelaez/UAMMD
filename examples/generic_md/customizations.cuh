@@ -35,11 +35,13 @@ struct Parameters{
   int numberParticles;
   real3 L;
   int numberSteps, printSteps, relaxSteps;  
-  real dt, viscosity, hydrodynamicRadius;  
+  real dt, viscosity, hydrodynamicRadius;
+  real friction; //Friction coefficient for VerletNVT
   real temperature;
   real  sigma, epsilon, cutOff;  
-  std::string outfile, readFile, chargeReadFile;
+  std::string readFile, chargeReadFile;
   std::string bondFile, angularBondFile, torsionalBondFile;
+  std::string outfile, outfileVelocities, outfileEnergy;
   std::string integrator;
   //Electrostatics
   bool useElectrostatics = false;
@@ -103,31 +105,18 @@ void furtherParticleInitialization(std::shared_ptr<ParticleData> pd, Parameters 
 }
 
 //Some helper functions to compute forces/energies
-__device__ real lj_force(real r2, real rc2){
+__device__ real lj_force(real r2){
   const real invr2 = real(1.0)/r2;
   const real invr6 = invr2*invr2*invr2;
   real fmoddivr = (real(-48.0)*invr6 + real(24.0))*invr6*invr2;
-
-  real invCutOff2 = 1/rc2;
-  real invrc6 = invCutOff2*invCutOff2*invCutOff2;
-  real invrc7 = invrc6*sqrtf(invCutOff2);
-  real invrc13 = invrc7*invrc6;
-  real shift = (real(48.0)*invrc13 - real(24.0)*invrc7);
-  fmoddivr += shift*rsqrt(r2);
   return fmoddivr;
 }
 
-__device__ real lj_energy(real r2, real rc2){
+__device__ real lj_energy(real r2){
   const real invr2 = real(1.0)/r2;
   const real invr6 = invr2*invr2*invr2;
-  real invCutOff2 = 1/rc2;
-  real invrc6 = invCutOff2*invCutOff2*invCutOff2;
-  real invrc7 = invrc6*sqrtf(invCutOff2);
-  real invrc13 = invrc7*invrc6;
-  real shift = (real(48.0)*invrc13 - real(24.0)*invrc7);
-  real rc = sqrt(rc2);
-  
-  return -(sqrt(r2)-rc)*shift - real(4.0)*(invr6 - real(1.0))*invr6;
+  real E = real(4.0)*invr6*(invr6-real(1.0));
+  return E;
 }
 
 //A simple LJ Potential for the short range interaction
@@ -184,7 +173,8 @@ struct ShortRangePotential{
       //name of particle j is in: infoj.id
       //Note that a particle is considered to be a neighbour of itself
       if(r2>0 and r2< rc*rc){
-	return make_real4(ep/s*lj_force(r2/(s*s), (rc*rc)/(s*s))*rij, energy?(ep/s*lj_energy(r2/(s*s), rc*rc/(s*s))):real(0.0));
+	return make_real4(ep/s*lj_force(r2/(s*s))*rij,
+			  energy?(ep/s*(lj_energy(r2/(s*s))-lj_energy(rc*rc/(s*s)))):real(0.0));
       }
       return real4();
     }
@@ -192,7 +182,7 @@ struct ShortRangePotential{
     __device__ void set(int id, real4 total){
       //Write the total result to memory if the pointer was provided
       force[id] += make_real4(total.x, total.y, total.z, 0);
-      if(energy) energy[id] += total.w;
+      if(energy) energy[id] += real(0.5)*total.w;
     }
   };
 
