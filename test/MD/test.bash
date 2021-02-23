@@ -1,12 +1,12 @@
-make -B
-dt=0.002
-T=3.45464 #Temperature, the theoretical estimation of the eq of state only works far from the transition points
-sigma=1.675413
-epsilon=1.345346
-shiftPotential=0 #Shift potential at cut off?
+make -C ../../examples/generic_md/
+cp ../../examples/generic_md/generic langevin
+dt=0.0005
+T=3 #Temperature, the theoretical estimation of the eq of state only works far from the transition points
+sigma=1
+epsilon=1
 cutOff=2.5  #Reduced units
 
-numberParticles=10000 #The box will adapt to achieve a certain density
+numberParticles=8192 #The box will adapt to achieve a certain density
 
 mkdir -p tools
 cd tools
@@ -33,11 +33,11 @@ do
     cd -
     L=$(echo $numberParticles $dens | awk '{printf "%.13g", ($1/$2)^(1/3.0)*'$sigma'}')
     
-    nsteps=200000
-    printSteps=1000
-    relaxSteps=40000
-
-    echo "boxSize $L $L $L " > data.main
+    nsteps=100000
+    printSteps=250
+    relaxSteps=10000
+    echo "integrator VerletNVT" > data.main
+    echo "L $L $L $L " >> data.main
     echo "numberSteps $nsteps" >> data.main
     echo "printSteps $printSteps" >> data.main
     echo "relaxSteps $relaxSteps " >> data.main
@@ -47,9 +47,9 @@ do
     echo "epsilon $epsilon " >> data.main
     echo "temperature $T " >> data.main
     echo "outfile rho$dens.pos " >> data.main
-    echo "energyOutfile rho$dens.energy " >> data.main
-    echo "shiftLJ $shiftPotential" >> data.main
+    echo "outfileEnergy rho$dens.energy " >> data.main
     echo "cutOff $cutOff" >> data.main
+    echo "friction 1.0" >> data.main
     ./langevin > rho$dens.log 2>&1 
 
     #Compute rdf
@@ -60,9 +60,12 @@ do
     P=$(bash tools/pressure.sh rho$dens.rdf | awk '{print $1}')
 
     #Compute energy
-    E=$(cat rho$dens.energy | awk '{printf "%.13g", $1+$2}' | awk '{count++; d=$1-mean; mean+=d/count; d2 =$1-mean; m2+=d*d2;}END{printf "%.13g %.13g", mean, m2/count}' | awk '{printf "%.13g", $1/'$epsilon'}')
+    E=$(cat rho$dens.energy |
+	    grep Total |
+	    awk '{print $4/'$numberParticles'}' |
+	    awk '{count++; d=$1-mean; mean+=d/count; d2 =$1-mean; m2+=d*d2;}END{printf "%.13g %.13g", mean, m2/count}' | awk '{printf "%.13g", $1/'$epsilon'}')
    
-    echo $dens $T $E $P >> eq_state.langevin 
+    echo $dens $(echo $T $epsilon | awk '{print $1/$2}') $E $P >> eq_state.langevin 
         
 done
 
