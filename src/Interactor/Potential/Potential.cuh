@@ -63,7 +63,7 @@ namespace uammd{
 	  real invCutOff2 = params.sigma2/params.cutOff2;
 	  real invrc6 = invCutOff2*invCutOff2*invCutOff2;
 	  //params.shift = params.epsilonDivSigma2*(real(48.0)*invrc13 - real(24.0)*invrc7);
-	  params.shift = params.epsilonDivSigma2*params.sigma2*real(4.0)*invrc6*(invrc6-real(1.0));
+	  params.shift = in_par.epsilon*real(4.0)*invrc6*(invrc6-real(1.0));
 	}
 	else params.shift = real(0.0);
 	return params;

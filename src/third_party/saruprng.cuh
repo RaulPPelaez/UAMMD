@@ -71,6 +71,7 @@ Saru n=s.fork<123>();
 #include<limits>
 #include<cfloat>
 #include<cstddef>
+#include"utils/vector.cuh"
 #define CUDAENABLED  __device__ __host__
 
 class Saru {
