@@ -36,44 +36,47 @@ namespace uammd{
 		   Basic::Parameters par,
 		   std::string name):
       Integrator(pd, pg, sys, name),
-      dt(par.dt), temperature(par.temperature), viscosity(par.viscosity), is2D(par.is2D),
+      dt(par.dt), temperature(par.temperature), friction(par.friction), is2D(par.is2D),
       steps(0){
       sys->rng().next32();
       sys->rng().next32();
       seed = sys->rng().next32();
       sys->log<System::MESSAGE>("[%s] Temperature: %f", name.c_str(), temperature);
       sys->log<System::MESSAGE>("[%s] Time step: %f", name.c_str(), dt);
-      sys->log<System::MESSAGE>("[%s] Viscosity: %f", name.c_str(), viscosity);
+      sys->log<System::MESSAGE>("[%s] Friction: %f", name.c_str(), friction);
       if(is2D){
 	sys->log<System::MESSAGE>("[%s] Working in 2D mode.", name.c_str());
       }
-      this->noiseAmplitude = sqrt(2*dt*6*M_PI*viscosity*temperature);
-      int numberParticles = pg->getNumberParticles();
-      int Nthreads=128;
-      int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-      if(pd->isVelAllocated()){
-	sys->log<System::WARNING>("[%s] Velocity will be overwritten to ensure temperature conservation!", name.c_str());
-      }
+      this->noiseAmplitude = sqrt(2*dt*friction*temperature);
       bool useDefaultMass = not pd->isMassAllocated();
       this->defaultMass = par.mass;
       if(useDefaultMass and this->defaultMass < 0 ){
 	this->defaultMass = 1.0;
-      }     
-      {
-	auto vel_handle = pd->getVel(access::location::gpu, access::mode::write);
-	auto groupIterator = pg->getIndexIterator(access::location::gpu);
-	real velAmplitude = sqrt(3.0*temperature);
-	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
-	if(defaultMass > 0){
-	  mass = nullptr;
-	}
-	Basic_ns::initialVelocities<<<Nblocks, Nthreads>>>(vel_handle.raw(),
-							   mass, defaultMass,
-							   groupIterator,
-							   velAmplitude, is2D, numberParticles,
-							   sys->rng().next32());
       }
+      if(par.initVelocities)
+	initVelocities();
       cudaStreamCreate(&stream);
+    }
+
+    void Basic::initVelocities(){
+      int numberParticles = pg->getNumberParticles();
+      if(pd->isVelAllocated()){
+	sys->log<System::WARNING>("[%s] Velocity will be overwritten to ensure temperature conservation!", name.c_str());
+      }
+      auto vel_handle = pd->getVel(access::location::gpu, access::mode::write);
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      real velAmplitude = sqrt(3.0*temperature);
+      auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
+      if(defaultMass > 0){
+	mass = nullptr;
+      }
+      const int Nthreads = 128;
+      const int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+      Basic_ns::initialVelocities<<<Nblocks, Nthreads>>>(vel_handle.raw(),
+							 mass, defaultMass,
+							 groupIterator,
+							 velAmplitude, is2D, numberParticles,
+							 sys->rng().next32());
     }
 
     Basic::~Basic(){
@@ -82,31 +85,29 @@ namespace uammd{
 
     namespace Basic_ns{
 
-      //Integrate the movement 1 dt and reset the forces in the first step
+      //Integrate the movement 0.5 dt and reset the forces in the first step
+      //velocity is updated half step using current forces
+      //If step==1 additionally position is updated and force set to 0
       template<int step>
-      __global__ void integrateGPU(real4* __restrict__  pos,
-				   real3* __restrict__ vel,
-				   real4* __restrict__  force,
-				   const real* __restrict__ mass,
+      __global__ void integrateGPU(real4* pos,
+				   real3* vel,
+				   real4* force,
+				   const real* mass,
 				   real defaultMass,
 				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
-				   real dt, real viscosity, bool is2D,
+				   real dt, real friction, bool is2D,
 				   real noiseAmplitude,
 				   uint stepNum, uint seed){
-	const int id = blockIdx.x*blockDim.x+threadIdx.x;
+	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>=N) return;
 	//Index of current particle in group
 	const int i = indexIterator[id];
-	real invMass = real(1.0)/defaultMass;
-	if(mass){
-	  invMass = real(1.0)/mass[i];
-	}
-	Saru rng(id, stepNum, seed);
+	const real invMass = real(1.0)/(defaultMass>0?defaultMass:mass[i]);
+	Saru rng(id+N*(step-1), stepNum, seed);
 	noiseAmplitude *= sqrtf(0.5*invMass);
-	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), rng.gf(0, noiseAmplitude).x); //noise[id];
-	const real damping = real(6.0)*real(M_PI)*viscosity;
-	vel[i] += (make_real3(force[i]) - damping*vel[i])*(dt*real(0.5)*invMass) + noisei;
+	const real3 noisei = make_real3(rng.gf(0, noiseAmplitude), rng.gf(0, noiseAmplitude).x);
+	vel[i] += (make_real3(force[i])*invMass - friction*vel[i])*(dt*real(0.5)) + noisei;
 	if(is2D) vel[i].z = real(0.0);
 	//In the first step, upload positions
 	if(step==1){
@@ -118,73 +119,92 @@ namespace uammd{
       }
     }
 
-    //Move the particles in my group 1 dt in time.
-    void Basic::forwardTime(){
-      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
-      steps++;
-      sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
+    void Basic::resetForces(){
       int numberParticles = pg->getNumberParticles();
-      int Nthreads=128;
-      int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-      //First simulation step is special
-      if(steps==1){
-	{
-	  auto groupIterator = pg->getIndexIterator(access::location::gpu);
-	  auto force = pd->getForce(access::location::gpu, access::mode::write);
-	  fillWithGPU<<<Nblocks, Nthreads>>>(force.raw(), groupIterator, make_real4(0), numberParticles);
-	}
-	for(auto forceComp: interactors){
-	  forceComp->updateTemperature(temperature);
-	  forceComp->updateTimeStep(dt);
-	  forceComp->sumForce(stream);
-	}
-	cudaDeviceSynchronize();
+      auto force = pd->getForce(access::location::gpu, access::mode::write);
+      auto force_group = pg->getPropertyIterator(force);
+      thrust::fill(thrust::cuda::par.on(stream), force_group, force_group + numberParticles, real4());
+    }
+
+    template<int step>
+    void Basic::callIntegrate(){
+      //An iterator with the global indices of my groups particles
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      //Get all necessary properties
+      auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
+      auto force = pd->getForce(access::location::gpu, access::mode::read);
+      auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
+      if(this->defaultMass > 0){
+	mass = nullptr;
       }
-      //First integration step
-      {
-	//An iterator with the global indices of my groups particles
-	auto groupIterator = pg->getIndexIterator(access::location::gpu);
-	//Get all necessary properties
-	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
-	auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
-	auto force = pd->getForce(access::location::gpu, access::mode::read);
-	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
-	if(this->defaultMass > 0){
-	  mass = nullptr;
-	}
-	/*First step integration and reset forces*/
-	Basic_ns::integrateGPU<1><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
-								    vel.raw(),
-								    force.raw(),
-								    mass,
-								    defaultMass,
-								    groupIterator,
-								    numberParticles, dt, viscosity, is2D,
-								    noiseAmplitude,
-								    steps, seed);
-      }
-      //Compute all the forces
-      for(auto forceComp: interactors) forceComp->sumForce(stream);
-      //Second integration step
-      {
-	auto groupIterator = pg->getIndexIterator(access::location::gpu);
-	auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
-	auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
-	auto force = pd->getForce(access::location::gpu, access::mode::read);
-	auto mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
-	if(this->defaultMass > 0){
-	  mass = nullptr;
-	}
-	Basic_ns::integrateGPU<2><<<Nblocks, Nthreads, 0 , stream>>>(pos.raw(),
+      int numberParticles = pg->getNumberParticles();
+      int Nthreads = 128;
+      int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+      Basic_ns::integrateGPU<step><<<Nblocks, Nthreads, 0, stream>>>(pos.raw(),
 								     vel.raw(),
 								     force.raw(),
 								     mass,
 								     defaultMass,
 								     groupIterator,
-								     numberParticles, dt, viscosity, is2D,
+								     numberParticles, dt, friction, is2D,
 								     noiseAmplitude,
 								     steps, seed);
+    }
+
+    //Move the particles in my group 1 dt in time.
+    void Basic::forwardTime(){
+      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
+      steps++;
+      sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
+      //First simulation step is special
+      if(steps==1){
+	resetForces();
+	for(auto forceComp: interactors){
+	  forceComp->updateTimeStep(dt);
+	  forceComp->updateTemperature(temperature);
+	  forceComp->sumForce(stream);
+	}
+	cudaDeviceSynchronize();
       }
+      //First integration step and force reset
+      callIntegrate<1>();
+      //Compute all the forces
+      for(auto forceComp: interactors) forceComp->sumForce(stream);
+      //Second integration step
+      callIntegrate<2>();
+    }
+
+    namespace verletnvt_ns{
+      template<class VelocityIterator, class MassIterator, class EnergyIterator>
+      __global__ void sumKineticEnergy(const VelocityIterator vel,
+				       EnergyIterator energy,
+				       const MassIterator mass,
+				       int numberParticles){
+	const int id = blockIdx.x*blockDim.x + threadIdx.x;
+	if(id >= numberParticles) return;
+	auto v = vel[id];
+	energy[id] += real(0.5)*dot(v,v)*mass[id];
+      }
+    };
+
+    real Basic::sumKineticEnergy(){
+      int numberParticles = pg->getNumberParticles();
+      auto vel_gr = pg->getPropertyIterator(pd->getVel(access::location::gpu, access::mode::read));
+      auto energy_gr = pg->getPropertyIterator(pd->getEnergy(access::location::gpu, access::mode::readwrite));
+      int Nthreads = 128;
+      int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+      if(defaultMass > 0){
+	auto mass_iterator = thrust::make_constant_iterator(defaultMass);
+	verletnvt_ns::sumKineticEnergy<<<Nblocks, Nthreads>>>(vel_gr, energy_gr, mass_iterator, numberParticles);
+      }
+      else{
+	auto mass = pd->getMassIfAllocated(access::gpu, access::read);
+	auto mass_iterator = pg->getPropertyIterator(mass);
+	verletnvt_ns::sumKineticEnergy<<<Nblocks, Nthreads>>>(vel_gr, energy_gr, mass_iterator, numberParticles);
+      }
+
+      return 0.0;
     }
   }
 }

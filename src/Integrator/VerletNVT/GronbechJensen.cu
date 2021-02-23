@@ -18,13 +18,13 @@ namespace uammd{
   namespace VerletNVT{
     namespace GronbechJensen_ns{
 
-      //Integrate the movement 1 dt and reset the forces in the first step
+      //Integrate the movement 0.5 dt and reset the forces in the first step (step==1)
       //Uses the Gronbech Jensen scheme[1]
       //  r[t+dt] = r[t] + b·dt·v[t] + b·dt^2/(2·m) + b·dt/(2·m) · noise[t+dt]
       //  v[t+dt] = a·v[t] + dt/(2·m)·(a·f[t] + f[t+dt]) + b/m·noise[t+dt]
       // b = 1/( 1 + \gamma·dt/(2·m))
       // a = (1 - \gamma·dt/(2·m) ) ·b
-      // \gamma = 6*pi*viscosity
+      // \gamma = friction*mass
       template<int step>
       __global__ void integrateGPU(real4* __restrict__ pos,
 				   real3* __restrict__ vel,
@@ -33,29 +33,26 @@ namespace uammd{
 				   real defaultMass,
 				   ParticleGroup::IndexIterator indexIterator,
 				   int N,
-				   real dt, real viscosity, bool is2D,
+				   real dt, real friction, bool is2D,
 				   real noiseAmplitude,
 				   uint stepNum, uint seed){
 	const int id = blockIdx.x*blockDim.x+threadIdx.x;
 	if(id>=N) return;
 	//Index of current particle in group
 	const int i = indexIterator[id];
-	Saru rng(id, stepNum, seed);
-	real invMass = real(1.0)/defaultMass;
-	if(mass){
-	  invMass = real(1.0)/mass[i];
-	}
-	noiseAmplitude *= invMass;
-	real3 noisei = make_real3(rng.gf(0, noiseAmplitude), is2D?real():rng.gf(0, noiseAmplitude).x);
-	const real damping = real(6.0)*real(M_PI)*viscosity;
+
+	const real invMass = real(1.0)/(defaultMass>0?defaultMass:mass[i]);
 	if(step==1){
-	  const real gdthalfinvMass = damping*dt*invMass*real(0.5);
+	  Saru rng(id, stepNum, seed);
+	  noiseAmplitude *= rsqrt(invMass); // sqrt(2*kT*mass*friction*dt)
+	  real3 noisei = make_real3(rng.gf(0, noiseAmplitude), is2D?real():rng.gf(0, noiseAmplitude).x);
+	  const real gdthalfinvMass = friction*dt*real(0.5);
 	  const real b = real(1.0)/(real(1.0) + gdthalfinvMass);
 	  const real a = (real(1.0) - gdthalfinvMass)*b;
 	  real3 p = make_real3(pos[i]);
-	  p = p + b*dt*(vel[i] + real(0.5)*((dt*invMass)*make_real3(force[i]) + noisei));
+	  p = p + b*dt*vel[i] + real(0.5)*invMass*dt*b*(dt*make_real3(force[i]) + noisei);
 	  pos[i] = make_real4(p, pos[i].w);
-	  vel[i] = a*vel[i] + dt*real(0.5)*invMass*a*make_real3(force[i]) + b*noisei;
+	  vel[i] = a*vel[i] + dt*real(0.5)*invMass*a*make_real3(force[i]) + b*invMass*noisei;
 	  force[i] = make_real4(0);
 	}
 	else{
@@ -87,7 +84,7 @@ namespace uammd{
 									   mass,
 									   defaultMass,
 									   groupIterator,
-									   numberParticles, dt, viscosity, is2D,
+									   numberParticles, dt, friction, is2D,
 									   noiseAmplitude,
 									   steps, seed);
       CudaCheckError();
@@ -101,12 +98,7 @@ namespace uammd{
       sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
       //First simulation step is special
       if(steps==1){
-	{
-	  int numberParticles = pg->getNumberParticles();
-	  auto force = pd->getForce(access::location::gpu, access::mode::write);
-	  auto force_gr = pg->getPropertyIterator(force);
-	  thrust::fill(thrust::cuda::par.on(stream), force_gr, force_gr + numberParticles, real4());
-	}
+	resetForces();
 	for(auto forceComp: interactors){
 	  forceComp->updateTemperature(temperature);
 	  forceComp->updateTimeStep(dt);
@@ -114,11 +106,11 @@ namespace uammd{
 	}
 	CudaSafeCall(cudaDeviceSynchronize());
       }
-      //First integration step
+      //First integration step and force reset
       callIntegrate<1>();
       for(auto forceComp: interactors) forceComp->sumForce(stream);
       CudaCheckError();
-      //Second integration step, does not need noise
+      //Second integration step
       callIntegrate<2>();
     }
   }

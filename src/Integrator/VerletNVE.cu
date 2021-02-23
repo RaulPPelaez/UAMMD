@@ -215,7 +215,7 @@ namespace uammd{
     int Nthreads = 128;
     int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
     auto mass = pd->getMassIfAllocated(access::gpu, access::read);
-    if(not mass.raw()){
+    if(defaultMass > 0){
       auto mass_iterator = thrust::make_constant_iterator(defaultMass);
       verletnve_ns::sumKineticEnergy<<<Nblocks, Nthreads>>>(vel_gr, energy_gr, mass_iterator, numberParticles);
     }
