@@ -224,7 +224,16 @@ namespace uammd{
     }
     template<class Method>
     real EulerMaruyama<Method>::sumEnergy(){
-      return real(0.0);
+      //Sum 1.5*kT to each particle
+      auto energy = pd->getEnergy(access::gpu, access::readwrite);
+      auto energy_gr = pg->getPropertyIterator(energy);
+      auto energy_per_particle = thrust::make_constant_iterator<real>(1.5*par.temperature);
+      thrust::transform(thrust::cuda::par,
+			energy_gr, energy_gr + pg->getNumberParticles(),
+			energy_per_particle,
+			energy_gr,
+			thrust::plus<real>());
+      return 0;
     }
   }
 }

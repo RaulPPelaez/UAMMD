@@ -81,6 +81,19 @@ namespace uammd{
 
       virtual void forwardTime() = 0;
 
+      virtual real sumEnergy() override{
+	//Sum 1.5*kT to each particle
+	auto energy = pd->getEnergy(access::gpu, access::readwrite);
+	auto energy_gr = pg->getPropertyIterator(energy);
+	auto energy_per_particle = thrust::make_constant_iterator<real>(1.5*temperature);
+	thrust::transform(thrust::cuda::par,
+			  energy_gr, energy_gr + pg->getNumberParticles(),
+			  energy_per_particle,
+			  energy_gr,
+			  thrust::plus<real>());
+	return 0;
+      }
+
     protected:
       real3 Kx, Ky, Kz; //shear matrix
       real selfMobility;
