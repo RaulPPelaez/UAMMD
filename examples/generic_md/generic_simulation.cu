@@ -450,11 +450,14 @@ void writeSimulation(UAMMD sim){
   auto energy = sim.pd->getEnergy(access::location::cpu, access::mode::read);
   fori(0, sim.par.numberParticles){
     real3 p = box.apply_pbc(make_real3(pos[id2index[i]]));
+    //real3 p = make_real3(pos[id2index[i]]);
     out<<std::setprecision(2*sizeof(real))<<p<<"\n";
     if(eout.good()) eout<<energy[id2index[i]]<<"\n";
     if(sim.pd->isVelAllocated() and vout.good()) vout<<vel[id2index[i]]<<"\n";
   }
   out<<std::flush;
+  vout<<std::flush;
+  eout<<std::flush;
 }
 
 //Create and run the simulation
@@ -595,8 +598,8 @@ void writeDefaultDatamain(std::string datamain){
   out<<""<<std::endl;
   out<<"L 32 32 32             #Domain size in the three dimensions"<<std::endl;
   out<<"outfile /dev/stdout    #Positions will be written to this file"<<std::endl;
-  out<<"#outfileVelocity /dev/null #If present velocities will be written to this file (if the integrator uses velocity)"<<std::endl;
-  out<<"#outfilEnergy /dev/null    #If present per particle energy will be written to this file for each spanshot"<<std::endl;
+  out<<"#outfileVelocities /dev/null #If present velocities will be written to this file (if the integrator uses velocity)"<<std::endl;
+  out<<"#outfileEnergy /dev/null    #If present per particle energy will be written to this file for each spanshot"<<std::endl;
   out<<"numberSteps 100000     #Number of simulation steps"<<std::endl;
   out<<"printSteps 500         #Positions will be writen to \"outfile\" every printSteps steps"<<std::endl;
   out<<"relaxSteps  100       #Run this number of steps before writting"<<std::endl;
