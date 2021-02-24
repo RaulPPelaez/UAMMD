@@ -16,7 +16,7 @@ Raul P. Pelaez 2018-2021. (raul.perez(at)uam.es)
 
 A C++14+ header-only fast generic multiscale CUDA Molecular Dynamics framework made with moduarity, expandability and generality in mind. UAMMD is intended to be hackable and copy pastable.  
 
-Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for much more than that. To this moment multiple integrators are implemented allowing it to perform:  
+Although "Molecular Dynamics" is part of the name,the UAMMD framework allows for much more than that. To this moment multiple integrators are implemented allowing it to perform:  
 
 	-Molecular dynamics (MD)  
 	-Brownian Dynamics  (BD)  
@@ -28,9 +28,9 @@ Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for 
 	-Fluctuating Hydrodynamics (coupled with particles with Immerse Boundary Method (IBM))  
 		
 
-Multiple building blocks are provided for the user to construct a certain simulation. Most are highly templated to ease adaptability.  
+Building blocks are provided for the user to construct a certain simulation. Most are highly templated to ease adaptability.  
 
-For example, there is not a harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the ExternalForces module. similar things can be done with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...   
+For example, there is no harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the ExternalForces module. Similar things can be achieved with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...   
 
 Hop on to the examples folder for an introduction or check the [wiki](https://github.com/RaulPPelaez/UAMMD/wiki) for more information.  
 
@@ -46,7 +46,7 @@ See the wiki page at https://github.com/RaulPPelaez/UAMMD/wiki for a full list o
 
 **UAMMD does not need to be compiled separatedly (it is header only)**.  
 
-Some special flags might be needed to compile some codes with certain UAMMD headers, see [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/compiling-uammd).  
+Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/compiling-uammd).  
 Here you have a short example of how a typical UAMMD code looks like:  
 
 
