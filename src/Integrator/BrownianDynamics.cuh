@@ -54,7 +54,7 @@ namespace uammd{
   namespace BD{
     struct Parameters{
       //The 3x3 shear matrix is encoded as an array of 3 real3
-      std::vector<real3> K;
+      std::vector<real3> K = std::vector<real3>(3,real3());
       real temperature = 0;
       real viscosity = 1;
       real hydrodynamicRadius = -1.0;

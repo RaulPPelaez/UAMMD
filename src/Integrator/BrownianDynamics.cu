@@ -48,13 +48,16 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Temperature: %f", temperature);
       sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] dt: %f", dt);
       if(par.K.size()==3){
-	Kx = par.K[0];
-	Ky = par.K[1];
-	Kz = par.K[2];
-	sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Shear Matrix: [ %f %f %f; %f %f %f; %f %f %f ]",
-				  Kx.x, Kx.y, Kx.z,
-				  Ky.x, Ky.y, Ky.z,
-				  Kz.x, Kz.y, Kz.z);
+	int numberNonZero = std::count_if(par.K.begin(), par.K.end(), [](real3 k){return k.x!=0 or k.y !=0 or k.z!=0;});
+	if(numberNonZero>0){
+	  Kx = par.K[0];
+	  Ky = par.K[1];
+	  Kz = par.K[2];
+	  sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Shear Matrix: [ %f %f %f; %f %f %f; %f %f %f ]",
+				    Kx.x, Kx.y, Kx.z,
+				    Ky.x, Ky.y, Ky.z,
+				    Kz.x, Kz.y, Kz.z);
+	}
       }
       if(is2D){
 	sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Starting in 2D mode");
