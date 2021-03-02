@@ -183,7 +183,7 @@ int main(int argc, char *argv[]){
   NVT::Parameters par;
   par.temperature = 0.6;
   par.dt = 0.005;
-  par.viscosity = 1.0;
+  par.friction = 1.0;
   auto verlet = make_shared<NVT>(pd, sys, par);
   auto ext = make_shared<ExternalForces<MovingWall>>(pd, sys);  
   verlet->addInteractor(ext);

@@ -22,17 +22,13 @@
 
 using namespace uammd;
 
-//Lets take some utilities from the previous tutorials. This block is just a copy paste from before
+//Lets take some utilities from the previous tutorials. This block is just a near copy paste from before
 //-------------------------------------------------------------------------------------------------------------
 //Lets group here a few parameters that our example is going to use. For the time being, lets simply hardcode some values
 struct Parameters{
   int numberParticles = 1e5;
   real boxSize = 64;
-  //We need the following parameters for a Brownian dynamics Integrator:
-  //Since the diffusion coefficient of a spherical particle in BD is D = T/(6*pi*viscosity*hydrodynamicRadius)
-  // lets choose some parameters such that D=1
-  real viscosity = 1.0/(6*M_PI);
-  real hydrodynamicRadius = 1.0;
+  real friction = 1.0;
   real temperature = 1.0;
   real dt = 0.001; //Time integration step
 };
@@ -95,7 +91,7 @@ std::shared_ptr<Integrator> createVerletNVTIntegrator(UAMMD sim){
   //Lets simply copy the parameters we hardcoded at the beginning 
   par.dt = sim.par.dt;
   par.temperature = sim.par.temperature;
-  par.viscosity = sim.par.viscosity;
+  par.friction = sim.par.friction;
   //Verlet will use particle masses in ParticleData if available, otherwise all particles will be assumed to have the mass in par.mass
   //Which defaults to 1 if not set.
   //par.mass = 2.0;

@@ -78,7 +78,7 @@ real dt;
 std::string outputFile, chosenPotential;
 int numberParticles;
 int numberSteps, printSteps;
-real temperature, viscosity;
+real temperature, friction;
 
 //Some functions to compute forces/energies
 __device__ real lj_force(real r2){
@@ -369,7 +369,7 @@ shared_ptr<Integrator> createIntegrator(shared_ptr<ParticleData> pd, shared_ptr<
   NVT::Parameters par;
   par.temperature = temperature;
   par.dt = dt;
-  par.viscosity = viscosity;
+  par.friction = friction;
   return make_shared<NVT>(pd, sys, par);
 }
 
@@ -448,7 +448,7 @@ void generateDefaultParameters(std::string file){
   default_options<<"numberSteps 500"<<std::endl;
   default_options<<"printSteps -1"<<std::endl;
   default_options<<"temperature 1.0"<<std::endl;
-  default_options<<"viscosity 1"<<std::endl;
+  default_options<<"friction 1"<<std::endl;
 }
 
 void readParameters(std::shared_ptr<System> sys, std::string file){
@@ -464,5 +464,5 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
   in.getOption("printSteps", InputFile::Required)>>printSteps;
   in.getOption("dt", InputFile::Required)>>dt;
   in.getOption("temperature", InputFile::Required)>>temperature;
-  in.getOption("viscosity", InputFile::Required)>>viscosity;
+  in.getOption("friction", InputFile::Required)>>friction;
 }
