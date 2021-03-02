@@ -22,17 +22,17 @@ namespace uammd{
   class PairForces: public Interactor, public ParameterUpdatableDelegate<Potential>{
   public:
     struct Parameters{
-      Box box;
+      Box box = Box(std::numeric_limits<real>::infinity());
       shared_ptr<NeighbourList> nl = shared_ptr<NeighbourList>(nullptr);
     };
     PairForces(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
 	       shared_ptr<System> sys,
-	       Parameters par,
+	       Parameters par = Parameters(),
 	       shared_ptr<Potential> pot = std::make_shared<Potential>());
 
     PairForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
-               Parameters par,
+               Parameters par = Parameters(),
                shared_ptr<Potential> pot = std::make_shared<Potential>())
         : PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys,
                      par, pot) {
