@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017.
+/*Raul P. Pelaez 2017-2021.
   Some utilities to create initial configurations of particles.
 
 
@@ -9,29 +9,13 @@
 #include"utils/vector.cuh"
 #include"global/defines.h"
 #include"third_party/bravais/bravais.h"
-
+#include<vector>
 namespace uammd{
-  //Available lattices:
-  //typedef enum {sc, bcc, fcc, dia, hcp, sq, tri} lattice;
-
+  //Given a box size L, a number of particles N and a lattice type this function will return a vector of real4 positions
+  //placed in said lattice.
+  //Available lattices: sc, bcc, fcc, dia, hcp, sq, tri;
   std::vector<real4> initLattice(real3 L, uint N, BRAVAISLAT lat){
-
-    // cerr<<"Starting in a ";
-
-    // switch(lat){
-    // case sc:   cerr<<"cubic";     break;
-    // case fcc:  cerr<<"FCC";       break;
-    // case bcc:  cerr<<"BCC";       break;
-    // case hcp:  cerr<<"HCP";       break;
-    // case tri:  cerr<<"triangular";break;
-    // case sq:   cerr<<"square";    break;
-    // case dia:  cerr<<"zincblende";break;
-    // }
-
-    // cerr<<" Lattice...";
     std::vector<float4> pos(N, make_float4(0));
-
-
     Bravais((float *) pos.data(),
 	    lat,/*lattice type*/
 	    N,
@@ -43,17 +27,10 @@ namespace uammd{
       pos[i] += make_float4(0.56f, 0.56f, 0.56f, 0.0f);
       if(L.z==real(0.0)) pos[i].z = 0.0f;
     }
-
     std::vector<real4> pos_real(N);
     for(uint i = 0u; i<N; i++)
       pos_real[i] = make_real4(pos[i].x, pos[i].y, pos[i].z, real(0.0));
-
-    //  cerr<<"\tDONE!"<<endl;
     return pos_real;
   }
-
-
-
-
 }
 #endif
