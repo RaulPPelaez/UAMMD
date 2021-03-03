@@ -30,6 +30,7 @@ You have examples of the usage of Nbody in NBodyForces.cuh, PairForces.cuh and B
 
 #include"utils/cxx_utils.h"
 #include"utils/TransverserUtils.cuh"
+#include "utils/debugTools.h"
 
 namespace uammd{
 
@@ -37,63 +38,14 @@ namespace uammd{
 
     /*Reference: Fast N-Body Simulation with CUDA. Chapter 31 of GPU Gems 3*/
     template<class Transverser, class Iterator>
-    __global__ void transverseGPU(const real4* __restrict__ pos,
+    __global__ void transverseGPU(const real4* pos,
 				  Iterator groupIterator,
 				  int numTiles, /*Thread paralellism level,
 						  controls how many elements are stored in
 						  shared memory and
 						  computed in parallel between synchronizations*/
-				  Transverser tr, uint N,
-				  //Requested shared memory of Transverser in bytes
-				  size_t transverserShMemSize);
-  }
-
-  class NBody{
-    shared_ptr<ParticleGroup> pg;
-    shared_ptr<ParticleData> pd;
-    shared_ptr<System> sys;
-  public:
-    NBody(shared_ptr<ParticleData> pd,
-	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){
-      sys->log<System::DEBUG>("[NBody] Created");
-    }
-    template<class Transverser>
-    inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
-      sys->log<System::DEBUG2>("[NBody] Transversing with %s", type_name<Transverser>().c_str());
-      int N = pg->getNumberParticles();
-      int Nthreads = 128<N?128:N;
-      int Nblocks  = (N+Nthreads-1)/Nthreads;
-      int numtiles = (N + Nthreads-1)/Nthreads;
-      auto groupIterator = pg->getIndexIterator(access::location::gpu);
-      //NBody will store the transverser's info in shared memory
-      size_t info_size = SFINAE::Delegator<Transverser>::sizeofInfo()+sizeof(real4);
-      //Get the transverser's shared memory needs (if any)
-      size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(a_tr);
-      sys->log<System::DEBUG4>("[NBody] %d particles", N);
-      sys->log<System::DEBUG4>("[NBody] %d sh mem", shMemorySize);
-      SFINAE::TransverserAdaptor<Transverser>::prepare(a_tr, pd);
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      NBody_ns::transverseGPU<<<Nblocks, Nthreads, Nthreads*info_size+shMemorySize, st>>>(pos.raw(),
-											  groupIterator,
-											  numtiles,
-											  a_tr,
-											  N,
-											  shMemorySize);
-    }
-  };
-
-  namespace NBody_ns{
-
-    /*Reference: Fast N-Body Simulation with CUDA. Chapter 31 of GPU Gems 3*/
-    template<class Transverser, class Iterator>
-    __global__ void transverseGPU(const real4* __restrict__ pos,
-				  Iterator groupIterator,
-				  int numTiles, /*Thread paralellism level,
-						  controls how many elements are stored in
-						  shared memory and
-						  computed in parallel between synchronizations*/
-				  Transverser tr, uint N,
+				  Transverser tr, int N,
+				  size_t sharedInfoOffset,
 				  //Requested shared memory of Transverser in bytes
 				  size_t transverserShMemSize){
       const int tid = blockIdx.x*blockDim.x+threadIdx.x;
@@ -106,11 +58,11 @@ namespace uammd{
       using Adaptor = SFINAE::TransverserAdaptor<Transverser>;
       //Each thread handles the interaction between particle id and all the others
       //Storing blockDim.x positions in shared memory and processing all of them in parallel
-      extern __shared__ char shMem[];
-      real4 *shPos = (real4*) (shMem + transverserShMemSize);
-      void *shInfo = (void*) (shMem+blockDim.x*sizeof(real4) + transverserShMemSize);
-      real4 pi;
       SFINAE::TransverserAdaptor<Transverser> adaptor;
+      extern __shared__ char shMem[];
+      real4 *shPos =  (real4*)(shMem + transverserShMemSize);
+      void *shInfo =  (void*)(shMem + sharedInfoOffset + transverserShMemSize);
+      real4 pi;
       if(active) {
 	pi = pos[id]; //My position
 	//Get additional info if needed
@@ -140,6 +92,7 @@ namespace uammd{
 	    //  -positions
 	    //  -inofi and infoj (handled by Delegator)
 	    Adaptor::accumulate(tr, quantity, adaptor.computeSharedMem(tr, pi, shPos[counter], shInfo, counter));
+	    //Adaptor::accumulate(tr, quantity, adaptor.compute(tr, cur_j, pi, shPos[counter]));
 	  }
 	}//End of particles in tile loop
 	__syncthreads();
@@ -150,6 +103,51 @@ namespace uammd{
     }
 
   }
+
+  class NBody{
+    shared_ptr<ParticleGroup> pg;
+    shared_ptr<ParticleData> pd;
+    shared_ptr<System> sys;
+  public:
+    NBody(shared_ptr<ParticleData> pd,
+	  shared_ptr<ParticleGroup> pg,
+	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){
+      sys->log<System::DEBUG>("[NBody] Created");
+    }
+    template<class Transverser>
+    inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
+      sys->log<System::DEBUG2>("[NBody] Transversing with %s", type_name<Transverser>().c_str());
+      int N = pg->getNumberParticles();
+      int Nthreads = 128<N?128:N;
+      int Nblocks  = (N+Nthreads-1)/Nthreads;
+      int numtiles = (N + Nthreads-1)/Nthreads;
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      //NBody will store the transverser's info in shared memory
+      constexpr size_t info_size = SFINAE::Delegator<Transverser>::sizeofInfo();
+      constexpr size_t info_align = alignof(typename SFINAE::Delegator<Transverser>::InfoType);
+      constexpr size_t sh_size = info_size+sizeof(real4);
+      size_t extra_alignment = (sizeof(real4))%info_align;
+      //Get the transverser's shared memory needs (if any)
+      size_t extra_sh = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(a_tr);
+      sys->log<System::DEBUG4>("[NBody] %zu particles", N);
+      sys->log<System::DEBUG4>("[NBody] %zu info_sh", info_size);
+      sys->log<System::DEBUG4>("[NBody] %zu info_align", info_align);
+      sys->log<System::DEBUG4>("[NBody] %zu extra_alignment", extra_alignment);
+      sys->log<System::DEBUG4>("[NBody] %zu sh mem", Nthreads*sh_size+extra_alignment);
+      sys->log<System::DEBUG4>("[NBody] %zu Additional sh mem", extra_sh);   
+      SFINAE::TransverserAdaptor<Transverser>::prepare(a_tr, pd);
+      auto pos = pd->getPos(access::location::gpu, access::mode::read);
+      NBody_ns::transverseGPU<<<Nblocks, Nthreads, Nthreads*sh_size+extra_sh+extra_alignment, st>>>(pos.raw(),
+										    groupIterator,
+										    numtiles,
+										    a_tr,
+										    N,
+										    extra_alignment + Nthreads*sizeof(real4),
+										    extra_sh);
+      CudaCheckError();
+    }
+  };
+
 }
 
 
