@@ -58,6 +58,7 @@ Which has a lot of information. From basic functionality to descriptions and ref
 #include"Interactor/AngularBondedForces.cuh"
 #include"Interactor/TorsionalBondedForces.cuh"
 #include"Integrator/BrownianDynamics.cuh"
+#include "Integrator/BDHI/FIB.cuh"
 #include "Integrator/BDHI/BDHI_EulerMaruyama.cuh"
 #include"Integrator/BDHI/BDHI_PSE.cuh"
 #include"Integrator/BDHI/BDHI_FCM.cuh"
@@ -203,6 +204,7 @@ UAMMD initialize(int argc, char *argv[]){
   The family of functions below are easily copy pastable and will create and return instances of Integrators/Interactors
  */
 
+//Brownian Dynamics
 using BDMethod = BD::EulerMaruyama;
 std::shared_ptr<BDMethod> createIntegratorBD(UAMMD sim){
   typename BDMethod::Parameters par;
@@ -234,6 +236,7 @@ std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
   return std::make_shared<VerletNVE>(sim.pd, pg, sim.sys, par);
 }
 
+//Dissipative Particle Dynamics
 //DPD is handled by UAMMD as a VerletNVE integrator with a special short range interaction
 std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
   using NVE = VerletNVE;
@@ -257,6 +260,7 @@ std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
   return verlet;
 }
 
+//Smoothed Particle Hydrodynamics
 std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
   using NVE = VerletNVE;
   NVE::Parameters par;
@@ -318,6 +322,20 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
   }
 }
 
+//Fluctuating Immersed Boundary
+std::shared_ptr<Integrator> createIntegratorFIB(UAMMD sim){
+  BDHI::FIB::Parameters par;
+  par.temperature = sim.par.temperature;
+  par.viscosity = sim.par.viscosity;
+  par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
+  par.dt = sim.par.dt;
+  //par.scheme = BDHI::FIB::IMPROVED_MIDPOINT;
+  par.scheme = BDHI::FIB::MIDPOINT;
+  par.box = Box(sim.par.L);
+  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
+  return std::make_shared<BDHI::FIB>(sim.pd, pg, sim.sys, par);
+}
+
 //Create the integrator as selected via data.main.
 //Notice that all Integrators can be passed around as shared_ptr<Integrator>
 std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
@@ -339,8 +357,11 @@ std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
   else if(sim.par.integrator.compare("BDHI") == 0){
     return createIntegratorBDHI(sim);
   }
+  else if(sim.par.integrator.compare("FIB") == 0){
+    return createIntegratorFIB(sim);
+  }
   else{
-    sim.sys->log<System::CRITICAL>("Invalid integrator. Choose BD, BDHI, VerletNVT, VerletNVE, SPH or DPD");
+    sim.sys->log<System::CRITICAL>("Invalid integrator. Choose BD, BDHI, FIB, VerletNVT, VerletNVE, SPH or DPD");
   }
   return nullptr;
 }
@@ -449,8 +470,8 @@ void writeSimulation(UAMMD sim){
   auto vel = sim.pd->getVelIfAllocated(access::location::cpu, access::mode::read);
   auto energy = sim.pd->getEnergy(access::location::cpu, access::mode::read);
   fori(0, sim.par.numberParticles){
-    real3 p = box.apply_pbc(make_real3(pos[id2index[i]]));
-    //real3 p = make_real3(pos[id2index[i]]);
+    //real3 p = box.apply_pbc(make_real3(pos[id2index[i]]));
+    real3 p = make_real3(pos[id2index[i]]);
     out<<std::setprecision(2*sizeof(real))<<p<<"\n";
     if(eout.good()) eout<<energy[id2index[i]]<<"\n";
     if(sim.pd->isVelAllocated() and vout.good()) vout<<vel[id2index[i]]<<"\n";
@@ -649,10 +670,8 @@ Parameters readParameters(std::string datamain){
     in.getOption("gamma_dpd", InputFile::Required)>>par.gamma_dpd;
     in.getOption("cutOff_dpd", InputFile::Required)>>par.cutOff_dpd;    
   }
-  if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0){
+  if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0 or par.integrator.compare("FIB")==0){
     in.getOption("hydrodynamicRadius", InputFile::Required)>>par.hydrodynamicRadius;
-  }
-  if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0){
     in.getOption("viscosity", InputFile::Required)>>par.viscosity;
   }
   if(par.integrator.compare("VerletNVT")==0){
