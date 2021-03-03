@@ -153,7 +153,7 @@ struct ShortRangePotential{
       box(i_box),
       rc(i_rc),
       force(i_force),
-      energy(i_energy), ep(ep), s(s){
+      energy(i_energy),mass(mass), id(id), ep(ep), s(s){
       //All members will be available in the device functions
     }
     //Place in this struct any per-particle data that you need to compute the interaction between a particle pair.
