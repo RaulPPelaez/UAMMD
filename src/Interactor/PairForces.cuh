@@ -38,6 +38,17 @@ namespace uammd{
                      par, pot) {
       }
 
+    PairForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+	       shared_ptr<ParticleGroup> pg,
+               shared_ptr<Potential> pot = std::make_shared<Potential>())
+        : PairForces(pd, pg, sys, Parameters(), pot) {
+      }
+
+    PairForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+               shared_ptr<Potential> pot = std::make_shared<Potential>())
+      : PairForces(pd, sys, Parameters(), pot) {
+    }
+
     ~PairForces(){
       sys->log<System::DEBUG>("[PairForces] Destroyed.");
     }
