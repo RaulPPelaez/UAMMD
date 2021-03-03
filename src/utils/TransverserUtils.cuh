@@ -96,15 +96,16 @@ namespace uammd{
 
       //Write the info of particle i_load to shared memory
       static inline __device__ void fillSharedMemory(T &t, void * shInfo, int i_load){
-        ((InfoType *)shInfo)[threadIdx.x] = t.getInfo(i_load);
+        static_cast<InfoType *>(shInfo)[threadIdx.x] = t.getInfo(i_load);
       }
       //Calls getInfo(j) and compute with 4 arguments, returns the type of zero(),  i.e the quantity
       inline __device__ auto compute(T &t, int j, real4 posi, real4 posj){
     	return t.compute(posi, posj, infoi, t.getInfo(j));
+	//return t.compute(posi, posj, infoi, infoi);
       }
       //Same as above, but take infoj from the element counter of a shared memory array of type myType
       inline __device__ auto computeSharedMem(T &t, real4 posi, real4 posj, void* shMem, int counter){
-    	return t.compute(posi, posj, infoi, ((InfoType*)shMem)[counter]);
+    	return t.compute(posi, posj, infoi, static_cast<InfoType *>(shMem)[counter]);
       }
 
       InfoType infoi;
@@ -113,6 +114,7 @@ namespace uammd{
     template<class T>
     class Delegator<T, false>{
     public:
+      using InfoType = char;
       static inline __device__  void getInfo(T &t, int id){}
       //I dont have any additional info
       static constexpr inline __host__ __device__ size_t sizeofInfo(){return 0;}
