@@ -11,6 +11,7 @@ Integration schemes (one must be chosen):
    * **BDHI**: Brownian dynamics with Hydrodynamic interactions (via positively split Ewald Rotne-Prager-Yamakawa or Force Coupling Method)  
    * **SPH**: Smooth Particle Hydrodynamics  
    * **DPD**: Dissipative Particle Dynamics  
+   * **FIB**: Fluctuating Immersed Boundary  
 	
 Interaction modules:  
 
