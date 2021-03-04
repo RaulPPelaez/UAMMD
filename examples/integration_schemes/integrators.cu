@@ -37,11 +37,14 @@ std::shared_ptr<Integrator> createIntegratorBD(UAMMD sim){
   par.temperature = 1.0;
   par.viscosity = 1.0;
   par.hydrodynamicRadius = 1.0; //Self diffusion coefficient will be D = T*M = T/(6*pi*vis*hydrodynamicRadius)
-  par.dt = 0.1;
+  par.dt = 0.001;
   //Optionally you can place a shear matrix, dX = M*F*dt + sqrt(2*D*dt)*dW + K*R
   //par.K = {{1,2,3},{1,2,3},{1,2,3}};
   //or
   //par.K[0] = {1,2,3};
+  //or
+  //par.K[1].x = 1;
+  //All K elements start being zero.
   auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
   return std::make_shared<BDMethod>(sim.pd, pg, sim.sys, par);
 }
