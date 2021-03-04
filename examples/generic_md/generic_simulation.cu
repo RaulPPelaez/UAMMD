@@ -59,6 +59,7 @@ Which has a lot of information. From basic functionality to descriptions and ref
 #include"Interactor/TorsionalBondedForces.cuh"
 #include"Integrator/BrownianDynamics.cuh"
 #include "Integrator/BDHI/FIB.cuh"
+#include "Integrator/Hydro/ICM.cuh"
 #include "Integrator/BDHI/BDHI_EulerMaruyama.cuh"
 #include"Integrator/BDHI/BDHI_PSE.cuh"
 #include"Integrator/BDHI/BDHI_FCM.cuh"
@@ -336,6 +337,18 @@ std::shared_ptr<Integrator> createIntegratorFIB(UAMMD sim){
   return std::make_shared<BDHI::FIB>(sim.pd, pg, sim.sys, par);
 }
 
+//Inertial Coupling Method
+std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
+  Hydro::ICM::Parameters par;
+  par.temperature = sim.par.temperature;
+  par.viscosity = sim.par.viscosity;
+  par.density = 1;
+  par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
+  par.dt = sim.par.dt;
+  par.box = Box(sim.par.L);
+  return std::make_shared<Hydro::ICM>(sim.pd, sim.sys, par);
+}
+
 //Create the integrator as selected via data.main.
 //Notice that all Integrators can be passed around as shared_ptr<Integrator>
 std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
@@ -360,8 +373,12 @@ std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
   else if(sim.par.integrator.compare("FIB") == 0){
     return createIntegratorFIB(sim);
   }
+  else if(sim.par.integrator.compare("ICM") == 0){
+    return createIntegratorICM(sim);
+  }
+
   else{
-    sim.sys->log<System::CRITICAL>("Invalid integrator. Choose BD, BDHI, FIB, VerletNVT, VerletNVE, SPH or DPD");
+    sim.sys->log<System::CRITICAL>("Invalid integrator. Choose BD, BDHI, FIB, ICM, VerletNVT, VerletNVE, SPH or DPD");
   }
   return nullptr;
 }
@@ -540,6 +557,8 @@ void writeDefaultDatamain(std::string datamain){
   out<<"#  -BDHI: Brownian dynamics with Hydrodynamic interactions (via positively split Ewald Rotne-Prager-Yamakawa or Force Coupling method)"<<std::endl;
   out<<"#  -SPH: Smooth Particle Hydrodynamics"<<std::endl;
   out<<"#  -DPD: Dissipative Particle Dynamics"<<std::endl;
+  out<<"#  -FIB: Fluctuating Immersed Boundary"<<std::endl;
+  out<<"#  -ICM: Inertial Coupling Method"<<std::endl;
   out<<"integrator VerletNVT"<<std::endl;
   out<<""<<std::endl;
   out<<"################################################################"<<std::endl;
@@ -670,7 +689,8 @@ Parameters readParameters(std::string datamain){
     in.getOption("gamma_dpd", InputFile::Required)>>par.gamma_dpd;
     in.getOption("cutOff_dpd", InputFile::Required)>>par.cutOff_dpd;    
   }
-  if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0 or par.integrator.compare("FIB")==0){
+  if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0 or
+     par.integrator.compare("FIB")==0 or par.integrator.compare("ICM")==0){
     in.getOption("hydrodynamicRadius", InputFile::Required)>>par.hydrodynamicRadius;
     in.getOption("viscosity", InputFile::Required)>>par.viscosity;
   }
