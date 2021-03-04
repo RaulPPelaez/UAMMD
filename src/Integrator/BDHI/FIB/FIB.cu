@@ -908,7 +908,6 @@ namespace uammd{
       {
 	double dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
 	real noisePrefactor = sqrt(viscosity*temperature/(dt*dV));
-	randomAdvection(noisePrefactor);
 	if(temperature!=real(0.0))
 	  CurandSafeCall(curandGenerateNormal(curng,
 					      thrust::raw_pointer_cast(random.data()),
