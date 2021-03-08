@@ -271,7 +271,7 @@ public:
 
 };
 
-
+//You can use these functions to create an interactor that can be directly added to an integrator
 std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
   using Bond = HarmonicBond;
   using BF = BondedForces<Bond>;
