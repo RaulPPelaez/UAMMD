@@ -1,16 +1,9 @@
 /* Raul P. Pelaez 2021
-   Adding interactions to an Integrator.
+   At this point you have the necessary tools to construct and run a simulation using UAMMD.
+   Just running the simulation is not very interesting, though. Typically we need to measure something from the simulation state or perform some kind of post-processing.
+   In this tutorial we will see how to print particle positions to a file and how to measure the energy of each particle.
 
-   At this point you already know how to initialize an UAMMD environment, modify particle properties and move particles using Integrators.
-   In this tutorial we will cover the last of the basic UAMMD modules: Interactor
-   Interactors can be added to Integrators and encode, well, interactions.
-   For example the Interactor called BondedForces allows to join particles pairs with springs.
-   An Interactor is able to compute forces and energies resulting from a certain interaction.
-
-   Look in the wiki pages or in other examples for a list of all available Interactors, we will cover one here, PairForces, which computes forces and energies between neighbouring particles ( such as a LJ potential interaction).
-   
-   We also need to initialize particles differently from previous tutorials, since we are going to be using a LJ interaction 
-     it is a bad idea to start with a random distribution of particles. UAMMD offers a function called initLattice that we can leverage here.
+   We will start from the LJ liquid simulation we coded in a previous tutorial and will add a couple of functions to measure particle properties.
  */
 
 #include<uammd.cuh>
@@ -26,11 +19,11 @@ using namespace uammd;
 //-------------------------------------------------------------------------------------------------------------
 //Lets group here a few parameters that our example is going to use. For the time being, lets simply hardcode some values
 struct Parameters{
-  int numberParticles = 1e5;
-  real boxSize = 64;
+  int numberParticles = 16384;
+  real boxSize = 32;
   real friction = 1.0;
-  real temperature = 1.0;
-  real dt = 0.001; //Time integration step
+  real temperature = 2.0;
+  real dt = 0.005; //Time integration step
 };
 
 //I like to place these basic UAMMD objects in a struct so it is easy to pass them around
@@ -50,18 +43,6 @@ UAMMD initializeUAMMD(int argc, char *argv[]){
   return sim;
 }
 
-//Prints the positions of particle with names from 0 to 9 using what we saw in the previous tutorial
-void printFirst10Particles(UAMMD sim){
-  auto id2index = sim.pd->getIdOrderedIndices(access::cpu);
-  auto pos = sim.pd->getPos(access::cpu, access::read);
-  //A permutation iterator takes an iterator and an index iterator and the indirection when accessed
-  auto pos_by_id = thrust::make_permutation_iterator(pos.begin(), id2index); //pos_by_id[i] is now equivalent to pos[id2index[i]]
-  std::cout<<"Particles with names from 0 to 9:"<<std::endl;
-  std::cout<<"Name\tposition"<<std::endl;
-  for(int i = 0; i<10; i++)
-    std::cout<<i<<"\t"<<pos_by_id[i]<<std::endl;
-}
-
 //This function stores a vector with the particle positions ordered by id (name) and returns it
 std::vector<real4> vector_from_pd_positions(UAMMD sim){
   auto id2index = sim.pd->getIdOrderedIndices(access::cpu);
@@ -69,8 +50,6 @@ std::vector<real4> vector_from_pd_positions(UAMMD sim){
   auto pos_by_id = thrust::make_permutation_iterator(pos.begin(), id2index);
   return std::vector<real4>(pos_by_id, pos_by_id + pos.size());
 }
-//-----------------------------------------------------------------------------------------------------------------
-
 
 //This function places particle positions forming an FCC lattice inside a cubic box of size L
 void placeParticlesInFCCLattice(UAMMD sim){
@@ -160,38 +139,96 @@ std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
   return pot;
 }
 
+//-----------------------------------------------------------------------------------------------------------------
+
+//This function will sum the current energies in pd->getEnergy
+real sumParticleEnergies(UAMMD sim){
+  //Request particle energy container
+  auto energy = sim.pd->getEnergy(access::gpu, access::read);
+  //sum every element
+  real Etot = thrust::reduce(thrust::cuda::par, energy.begin(), energy.end(), real(0.0));
+  return Etot;
+}
+
+//This function takes an integrator and computes the per particle energy from it.
+real measureEnergyPerParticle(UAMMD sim, std::shared_ptr<Integrator> integrator){
+  //We start by setting to zero the particle energies:
+  {
+    auto energy = sim.pd->getEnergy(access::gpu, access::write);
+    thrust::fill(thrust::cuda::par, energy.begin(), energy.end(), real(0.0));
+  }
+  //Then we sum the energy due to the integrator (kinetic energy in the case of verlet):
+  //Calling this function will compute, for each, particle the corresponding energy and sum it to pd->getEnergy
+  integrator->sumEnergy();
+  //Now pd->getEnergy holds the kinetic energy, which we can sum to get the total kinetic energy
+  real K = sumParticleEnergies(sim);
+  //From this we can compute, for example, the current instantaneous temperature
+  real currentTemperature = K/(1.5*sim.par.numberParticles);
+  sim.sys->log<System::MESSAGE>("Current temperature: %g", currentTemperature);
+  //Now we sum the potential energy by requesting each interactor that the integrator holds:
+  for(auto i: integrator->getInteractors()){
+    i->sumEnergy();
+  }
+  //Finally the total energy is the sum of the kinetic and potential energy
+  real totalEnergy = sumParticleEnergies(sim);
+  real energyPerParticle = totalEnergy/sim.par.numberParticles;
+  return energyPerParticle;
+}
+
+//This function will print particle positions and velocities to a file called particles.dat
+void writeSimulation(UAMMD sim){
+  //Lets store a file stream statically
+  static std::ofstream out ("particles.dat");
+  //Now we print positions and velocities as we have done in previous examples.
+  //Notice that any property inside pd can also be printed this way.
+  //Keep in mind that it is possible some properties are meaningless in a given simulation.
+  //For example, in our current MD simulation Verlet is not using particles energies and thus they are not computed.
+  //Unless you are explicitly summing energy as we are doing in this case.
+  //On the other hand, if you try to print now particle charges you will get a warning message stating that they have not been used by UAMMD. The contents of pd->getCharge will be undefined.
+  auto id2index = sim.pd->getIdOrderedIndices(access::cpu);
+  auto pos = sim.pd->getPos(access::cpu, access::read);
+  auto vel = sim.pd->getVel(access::cpu, access::read);
+  //A permutation iterator takes an iterator and an index iterator and the indirection when accessed
+  auto pos_by_id = thrust::make_permutation_iterator(pos.begin(), id2index); //pos_by_id[i] is now equivalent to pos[id2index[i]]
+  auto vel_by_id = thrust::make_permutation_iterator(vel.begin(), id2index);
+  //Lets separate each frame by a line containing #
+  out<<"#\n";
+  for(int i = 0; i<sim.par.numberParticles; i++)
+    out<<pos_by_id[i]<<" "<<vel_by_id[i]<<std::endl;
+}
+
 //We will create a LJ liquid molecular dynamics simulation by mixing a verlet NVT integrator with a LJ potential
 int main(int argc, char* argv[]){
+  //Lets construct the simulation as before:
   auto sim = initializeUAMMD(argc, argv);
   placeParticlesInFCCLattice(sim);
-  //Now lets create an Integrator just like before, to change things around, lets use a constant temperature verlet integrator: 
   auto verlet = createVerletNVTIntegrator(sim);
-  //Lets also create a PairForces Interactor set to a short range LJ potential
   auto lj_interaction = createLJInteraction(sim);
-  //Now we add the interaction to the verlet Integrator:
   verlet->addInteractor(lj_interaction);
 
-  //Interactors are relatively small interface that only expose the following functions:
-  //sumForce(); //Sums to pd->getForce() the forces acting on each particle due to the interaction
-  //sumEnergy(); //Sums to pd->getEnergy() the energies acting on each particle due to the interaction
-  //sumForceEnergy(); //Can be implemented as {sumForce(); sumEnergy();}, computes both at the same time.
-  
-  //When we call forwardTime now verlet will ask lj_interaction for the forces acting on each particle and use them when integrating the movement.
-  //Note that this integrator does not need the particle energies, so they are not computed. If you want them, you may call lj_interaction->sumEnergy(); But remember to set the contents of pd->getEnergy() to zero first!
-
-  int Nsteps = 1000;
-  for(int i = 0; i< Nsteps; i++){
+  //In order to thermalize the system we let it run for a while
+  int Nrelax = 40000;
+  for(int i = 0; i< Nrelax; i++){    
     verlet->forwardTime();
   }
-  //And there you go, a LJ liquid MD simulation.
-  //If we want to print the positions we can do it at any point like in the previous example,
-  //Lets for example write the positions of the first 10 particles:
-  printFirst10Particles(sim);
-  
-  //See the wiki for a list of all the Interactors available and how to use them.
-  //In the examples/interaction_modules folder you can also see copy-pastable examples for each one.
 
-  
+  //Now we compute the system energy and print positions to a file every Nmeasure steps.
+  int Nmeasure = 1000;
+  int Nsteps = 10000;
+  real averageEnergy = 0;
+  int averageCounter = 0;
+  for(int i = 0; i< Nsteps; i++){    
+    verlet->forwardTime();
+    if(i%Nmeasure==0){
+      real energyPerParticle = measureEnergyPerParticle(sim, verlet);
+      //If you have not changed the parameters in this tutorial the simulation has temperature=2 and density = 16384/32^3 = 0.5
+      //You can check the literature to see that for this case the total energy in equilibrium should be 0.38331
+      averageCounter++;
+      averageEnergy += (energyPerParticle - averageEnergy)/averageCounter;
+      sim.sys->log<System::MESSAGE>("Total system energy: %g (instantaneous) %g (average)", energyPerParticle, averageEnergy);
+      writeSimulation(sim);
+    }
+  }
   
   //Destroy the UAMMD environment and exit
   sim.sys->finish();
