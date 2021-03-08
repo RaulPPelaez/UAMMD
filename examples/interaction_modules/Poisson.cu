@@ -1,72 +1,51 @@
-/*Raul P. Pelaez 2019-2020. Triply periodic Poisson example.
-Computes the electric field between two opposite charges placed in a periodic box.
-USAGE:
-./poisson [L] [r] [gw]
+/*Raul P. Pelaez 2021. Triply periodic electrostatics. 
+  The Poisson Interactor in SpectralEwaldPoisson.cuh encodes two solvers for the Poisson equation in a triply periodic domain.
 
-gw: Gaussian width of the charges
-L: Box size (cubic box)
-r: distance between the charges
+  One is fully spectral and the other one has Ewald splitting. Go to the relevant wiki page if you want more information about the algorithms [1].
 
-In the limit when L->inf the field between the two particles should be:
-Ex =  exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
+  You can use this interaction module to compute electrostatic interactions between particles.
 
-*/
+  In this code you will find a copy pastable function to create a Poisson module that you can then add to an Integrator.
 
-//This include contains the basic needs for an uammd project
+
+[1] https://github.com/RaulPPelaez/UAMMD/wiki/SpectralEwaldPoisson 
+ */
+
 #include"uammd.cuh"
 #include"Interactor/SpectralEwaldPoisson.cuh"
-#include<fstream>
-
 using namespace uammd;
-using std::make_shared;
-using std::endl;
+
+//This struct contains the basic uammd modules for convenience.
+struct UAMMD{
+  std::shared_ptr<System> sys;
+  std::shared_ptr<ParticleData> pd;
+};
+
+
+//Creates an instance of a Poisson Interactor that can be added to an integrator.
+//When using Electrostatics remember to initialize particle charges via ParticleData::getCharges in addition to positions.
+std::shared_ptr<Interactor> createElectrostaticInteractor(UAMMD sim){
+  Poisson::Parameters par;
+  par.box = Box(make_real3(32,32,32));
+  //Permittivity
+  par.epsilon = 1;
+  //Poisson models charges as Gaussian sources, this is their width
+  par.gw = 1.0;
+  //Desired overall error tolerance of the algorithm.
+  par.tolerance = 1e-8;
+  //If gw << Lbox the default algorithm can become inefficient.
+  //In order to overcome this limitation an Ewald splitted implementation is also provided and will be enabled if
+  // the split parameter is set.
+  //Split controls how the load is balanced between the two sections of the algorithm
+  //A low split will be beneficial to a low density system and the other way around.
+  //An optimal split always exists and it might be a good idea to look for it in a case by case basis.
+  //par.split = 1.0;
+  auto poisson = make_shared<Poisson>(sim.pd, sim.sys, sim.par);
+}
+
 
 int main(int argc, char *argv[]){
-  int N = 2;
-  real gw = std::stod(argv[3]);
-  real L = std::stod(argv[1]);
-  real r = std::stod(argv[2]);
-  auto sys = make_shared<System>(argc, argv);
-  auto pd = make_shared<ParticleData>(N, sys);
-  Box box(L);
-  {
-    auto pos = pd->getPos(access::location::cpu, access::mode::write);
-    auto charge = pd->getCharge(access::location::cpu, access::mode::write);
-    pos[0] = make_real4(-r*0.5,0,0,0);
-    pos[1] = make_real4( r*0.5,0,0,0);
-    charge[0] = 1;
-    charge[1] = -1;
-  }
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-  Poisson::Parameters par;
-  par.box = box;
-  par.epsilon = 1;
-  par.gw = gw;
-  par.tolerance = 1e-8;
-  par.split = std::stod(argv[4]);
-  auto poisson = make_shared<Poisson>(pd, pg, sys, par);
-  {
-    auto force = pd->getForce(access::location::gpu, access::mode::write);
-    thrust::fill(thrust::cuda::par, force.begin(), force.end(), real4());
-    auto energy = pd->getEnergy(access::location::gpu, access::mode::write);
-    thrust::fill(thrust::cuda::par, energy.begin(), energy.end(), real());
-  }
-  poisson->sumForce(0);
-  //poisson->sumEnergy();
-  {
-    auto pos = pd->getPos(access::location::cpu, access::mode::read);
-    auto energy = pd->getEnergy(access::location::cpu, access::mode::read);
-    auto force = pd->getForce(access::location::cpu, access::mode::read);
-    auto charge = pd->getCharge(access::location::cpu, access::mode::read);
-    real3 p;
-    fori(0,N){
-      real4 pc = pos[i];
-      p = make_real3(pc);
-      int type = charge[i];
-      std::cout<<std::setprecision(15)<<p<<" q: "<<charge[i]<<" F: "<<force[i]<<endl;
-    }
-  }
-  sys->finish();
+
   return 0;
 }
 
