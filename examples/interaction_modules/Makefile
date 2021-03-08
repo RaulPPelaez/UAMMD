@@ -13,13 +13,16 @@ UAMMD_ROOT=../../
 INCLUDEFLAGS=-I$(CUDA_ROOT)/include -I$(UAMMD_ROOT)/src -I$(UAMMD_ROOT)/src/third_party
 NVCCFLAGS=-ccbin=$(CXX) -std=c++14 -O3 $(INCLUDEFLAGS) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DOUBLE_PRECISION) --extended-lambda --expt-relaxed-constexpr
 
-all: $(patsubst %.cu, %, $(wildcard *.cu))
+all: $(patsubst %.cu, %, $(wildcard *.cu)) 
 
 %: %.cu Makefile
 	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=)
 
-poisson: Poisson.cu
+Poisson: Poisson.cu Makefile
 	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=)	-lcufft
+
+DoublyPeriodicPoisson: DoublyPeriodicPoisson.cu Makefile
+	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=) -I/usr/include/lapacke -I/usr/include/cblas -lcufft -llapacke -lcblas
 
 clean: $(patsubst %.cu, %.clean, $(wildcard *.cu))
 

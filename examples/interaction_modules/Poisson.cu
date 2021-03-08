@@ -40,7 +40,8 @@ std::shared_ptr<Interactor> createElectrostaticInteractor(UAMMD sim){
   //A low split will be beneficial to a low density system and the other way around.
   //An optimal split always exists and it might be a good idea to look for it in a case by case basis.
   //par.split = 1.0;
-  auto poisson = make_shared<Poisson>(sim.pd, sim.sys, sim.par);
+  auto poisson = std::make_shared<Poisson>(sim.pd, sim.sys, par);
+  return poisson;
 }
 
 
