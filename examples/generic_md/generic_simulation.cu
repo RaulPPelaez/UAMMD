@@ -389,7 +389,7 @@ std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
   using Bond = Angular;
   using BF = AngularBondedForces<Bond>;
   typename BF::Parameters params;
-  params.file = sim.par.bondFile;
+  params.file = sim.par.angularBondFile;
   auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, Bond(sim.par));
   return bf;
 }
@@ -398,7 +398,7 @@ std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
   using Bond = Torsional;
   using BF = TorsionalBondedForces<Bond>;
   typename BF::Parameters params;
-  params.file = sim.par.bondFile;
+  params.file = sim.par.torsionalBondFile;
   auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, Bond(sim.par));
   return bf;
 }

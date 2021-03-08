@@ -1,254 +1,315 @@
-/*Raul P. Pelaez 2019-2021. A bonded forces usage example
+/* Raul P. Pelaez 2021
+   Copy pastable examples of bonded interactions.
+   This file contains ways to create two, three and four particle bonded interactions.
 
-  A group of dumbells interacting inside a viscous fluid (integrated with brownian dynamics). Dumbells are formed by two particles with two different types, each particle is only attracted to particles of the same type (and are repulsive otherwise).
-  Furthemore some dumbells are attracted to one wall by a gravity like potential, while the rest are attracted to the opossite wall.
-  This results in beautiful pillars with stripe like patterns.
+   UAMMD interactor modules always need some kind of specialization. 
+   For example, UAMMD offers a BondedForces module and provides some specialization (such as FENE or Harmonic bonds).
+   You can, however, specialize it with any structure that follows the necessary rules.
+   In this code you have some examples with specializations for the different bonded interactions.   
 
-Reads some parameters from a file called "data.main.bonds", if not present it will be auto generated with some default parameters.
+   Every bond interaction needs a file with a list of bonded particles and any needed data for each of them.
+   In the case of the harmonic bond below the file must have the following format:
+   
+   [number of bonds]
+   i j k r0
+   .
+   .
+   .
+   
+   The data needed for each bond (in the cas eof the harmonic bond belo k and r0) can be customized, see HarmonicBond::readBond
+   With two particle bonds (BondedForces) a special kind of bond, called fixed point bond, can also be included in the file.
+   Instead of joining two particles, a fixed bond joins a particle and a location in space. If fixed point bonds are required they must be placed after the two particle bonds (note the number of particle-particle bonds can be zero if only fixed point bonds exist):
+   [number of bonds]
+   i j Kspring r0
+   .
+   .
+   .
+   [number of fixed point bonds]
+   i x y z Kspring r0
+   .
+   .
+   .
+   
+   The file format for three and four particle bonds is similar, but instead of listing two particle ids each line must contain 3 r 4 particle names:
+   For angular bonds:
+   [number of bonds]
+   i j k Kspring ang0
+   .
+   .
+   For torsional bonds:
+   [number of bonds]
+   i j k l Kspring ang0
+   .
+   .
 
+ */
 
-You can visualize the reuslts with superpunto
-
-*/
-
-//This include contains the basic needs for an uammd project
 #include"uammd.cuh"
-//The rest can be included depending on the used modules
-#include"Integrator/BrownianDynamics.cuh"
 #include"Interactor/BondedForces.cuh"
-#include"Interactor/PairForces.cuh"
-#include"Interactor/Potential/Potential.cuh"
-#include"Interactor/ExternalForces.cuh"
-#include"utils/InitialConditions.cuh"
-#include"utils/InputFile.h"
-#include<fstream>
+#include"Interactor/AngularBondedForces.cuh"
+#include"Interactor/TorsionalBondedForces.cuh"
 using namespace uammd;
-//The particles fall due to a gravity like force until they reach a wall.
-//An Wall+Gravity functor to be used in a ExternalForces module (See ExternalForces.cuh)
-struct Wall{
-  real k = 20;
-  real3 L;
-  Wall(real3 L):L(L){
-  }
 
-  __device__ real3 force(real4 pos, int id){
-    real3 f = real3();
-    if(pos.x<-L.x*0.5f) f.x = k;  if(pos.x>L.x*0.5f) f.x = -k;
-    if(pos.y<-L.y*0.5f) f.y = k;  if(pos.y>L.y*0.5f) f.y = -k;
-    if(pos.z<-L.z*0.5f) f.z = k;  if(pos.z>L.z*0.5f) f.z = -k;
-    if((id/2)%2 == 0)
-      f.z += k/40.0f;
-    else
-      f.z -= k/40.0f;
-    return f;
-  }
-
-  //If this function is not present, energy is assumed to be zero
-  // __device__ real energy(real4 pos){
-  //   return real(0.5)*k*pow(pos.z-zwall, 2);
-  // }
-
-  auto getArrays(ParticleData* pd){
-    auto pos = pd->getPos(access::gpu, access::read);
-    auto id = pd->getId(access::gpu, access::read);
-    return std::make_tuple(pos.begin(), id.begin());
-  }
-
-};
-
-using std::make_shared;
-using std::endl;
-
-struct Parameters{
-  real3 boxSize;
-  real dt;
-  std::string outputFile;
-  int numberParticles;
-  int numberSteps, printSteps;
-  real temperature, viscosity;
-};
-
-//Let us group the UAMMD simulation in this struct that we can pass around
+//This struct contains the basic uammd modules for convenience.
 struct UAMMD{
   std::shared_ptr<System> sys;
   std::shared_ptr<ParticleData> pd;
-  Parameters par;
 };
 
-Parameters readParameters(std::string file);
 
-//Initialize the basic UAMMD structures and read parameters from the data.main.lj file
-UAMMD initializeUAMMD(int argc, char *argv[]){
-  UAMMD sim;
-  //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
-  sim.sys = make_shared<System>(argc, argv);
-  sim.par = readParameters("data.main.bonds");
-  //Let us have only an even number of particles
-  if(sim.par.numberParticles%2 != 0) sim.par.numberParticles++;
-  //Modules will ask System when they need a random number (i.e for seeding the GPU RNG).
-  auto seed = std::random_device()();
-  sim.sys->rng().setSeed(seed);
-  //ParticleData stores all particle properties the simulation will need.
-  //Needs to start with a certain number of particles
-  sim.pd = make_shared<ParticleData>(sim.par.numberParticles, sim.sys);
-  return sim;
-}
-//Set the initial positons for the particles, also write the bond file
-void initializeParticlesAndBonds(UAMMD sim){
-  //Ask pd for a property like so:
-  auto pos = sim.pd->getPos(access::cpu, access::write);
-  //Start half the particles in a fcc lattice
-  auto initial =  initLattice(sim.par.boxSize*0.8, sim.par.numberParticles/2, fcc);
-  std::ofstream out("bonds.dat");
-  out<<sim.par.numberParticles/2<<std::endl;
-  //replicate each particle to the right and place a bond between both.
-  fori(0, sim.par.numberParticles/2){
-    pos[2*i] = initial[i];
-    auto bonded = initial[i];
-    bonded.x += 1.25;
-    bonded.w = 1;
-    pos[2*i+1] = bonded;
-    out<<2*i<<" "<<2*i+1<<" 200 1.25"<<"\n";
+//Harmonic bond for pairs of particles
+struct HarmonicBond{
+  HarmonicBond(/*Parameters par*/){
+    //In this case no parameter is needed beyond whats in the bond file.
+  }
+  //Place in this struct whatever static information is needed for a given bond
+  //In this case spring constant and equilibrium distance
+  //the function readBond below takes care of reading each BondInfo from the file
+  struct BondInfo{
+    real k, r0;
+  };
+  //This function will be called for every bond read in the bond file
+  //In the case of a Fixed Point bond, j will be -1
+  //i,j: id of particles in bond
+  //r12: ri-rj
+  //bi: bond information.
+  inline __device__ real3 force(int i, int j, real3 r12, BondInfo bi){
+    real r2 = dot(r12, r12);
+    if(r2==real(0.0)) return make_real3(0.0);
+    real invr = rsqrt(r2);
+    real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
+    return f*r12;
+  }
+  
+  inline __device__ real energy(int i, int j, real3 r12, BondInfo bi){
+    real r2 = dot(r12, r12);
+    if(r2==real(0.0)) return real(0.0);
+    real r = sqrt(r2);
+    const real dr = r-bi.r0;
+    return real(0.5)*bi.k*dr*dr;
   }
 
-}
-
-std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
-  //Some modules need additional parameters, in this case BD needs dt, temperature...
-  //When additional parameters are needed, they need to be supplied in a form similar to this:
-  using BD = BD::EulerMaruyama;
-  BD::Parameters par;
-  par.temperature = sim.par.temperature;
-  par.dt = sim.par.dt;
-  par.hydrodynamicRadius = 1.0;
-  par.viscosity = sim.par.viscosity;
-  auto bd = std::make_shared<BD>(sim.pd, sim.sys, par);
-  return bd;
-}
-
-void addHarmonicBondInteraction(std::shared_ptr<Integrator> bd, UAMMD sim){
-  //Let us use Harmonic bonds
-  using BondedForces = BondedForces<BondedType::Harmonic>;
-  BondedForces::Parameters params;
-  params.file = "bonds.dat";  //We wrote this file in initializeParticles
-  auto bondedforces = make_shared<BondedForces>(sim.pd, sim.sys, params);
-  bd->addInteractor(bondedforces);
-}
-
-void addExternalPotentialInteractions(std::shared_ptr<Integrator> bd, UAMMD sim){
-  auto externalForces = make_shared<ExternalForces<Wall>>(sim.pd, sim.sys, make_shared<Wall>(sim.par.boxSize*0.9));
-  bd->addInteractor(externalForces); 
-}
-
-std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
-  //This is the general interface for setting up a potential
-  auto pot = make_shared<Potential::LJ>(sim.sys);
-  //Each Potential describes the pair interactions with certain parameters.
-  //The needed ones are in InputPairParameters inside each potential, in this case:
-  Potential::LJ::InputPairParameters par;
-  par.epsilon = 1.0;
-  par.shift = false;
-  par.sigma = 1;
-  par.cutOff = 2.5*par.sigma;
-  pot->setPotParameters(0, 0, par);
-  pot->setPotParameters(1, 1, par);
-  par.cutOff = par.sigma*pow(2, 1/6.0);
-  pot->setPotParameters(0, 1, par);
-  return pot;
-}
-
-void addShortRangeInteraction(std::shared_ptr<Integrator> bd, UAMMD sim){
-  using PairForces = PairForces<Potential::LJ>;
-  //Modules working with pairs of particles usually ask for a Potential object
-  auto pot = createLJPotential(sim);
-  PairForces::Parameters params;
-  //Some modules need a simulation box (i.e PairForces for the PBC)
-  params.box = Box(sim.par.boxSize);  //Box to work on
-  auto pairforces = make_shared<PairForces>(sim.pd, sim.sys, params, pot);
-  bd->addInteractor(pairforces);
-}
-
-
-void printSimulation(UAMMD sim, std::ofstream &out){
-  sim.sys->log<System::DEBUG1>("[System] Writing to disk...");
-  auto pos = sim.pd->getPos(access::cpu, access::read);
-  //The order of ParticleData::get* arrays might change,
-  //Accesing the arrays using this indices will ensure the traversing order is always the initial one
-  const int * index2id = sim.pd->getIdOrderedIndices(access::location::cpu);
-  Box box(sim.par.boxSize);
-  out<<"#Lx="<<0.5*box.boxSize.x<<";Ly="<<0.5*box.boxSize.y<<";Lz="<<0.5*box.boxSize.z<<";"<<endl;
-  std::for_each(index2id, index2id + pos.size(),
-		[&](int id){
-		  real4 pc = pos[id];
-		  real3 p = box.apply_pbc(make_real3(pc));
-		  int type = pc.w;
-		  out<<p<<" "<<0.5*pow(2,1/6.)<<" "<<type<<"\n";
-		});
-}
-
-void runSimulation(std::shared_ptr<Integrator> bd, UAMMD sim){
-  std::ofstream out(sim.par.outputFile);
-  //Run the simulation
-  forj(0, sim.par.numberSteps){
-    //This will instruct the integrator to take the simulation to the next time step,
-    //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
-    bd->forwardTime();
-    if(sim.par.printSteps>0 and j%sim.par.printSteps==0){
-      printSimulation(sim, out);
-    }
-    //You can ask ParticleData to sort the particles every few steps
-    //It is not an expensive thing to do really and can increase performance
-    if(j%500 == 0){
-      sim.pd->sortParticles();
-    }
+  //This function will be called for each bond in the bond file
+  //It must use the stream that is handed to it to construct a BondInfo.  
+  static __host__ BondInfo readBond(std::istream &in){
+    /*BondedForces will read i j, readBond has to read the rest of the line*/
+    BondInfo bi;
+    in>>bi.k>>bi.r0;
+    return bi;
   }
+
+};
+
+//This angular potential is similar to the HarmonicBond above, the difference is that
+//Now three particles are involved in each bond instead of two
+struct Angular{
+  Box box;
+  Angular(real3 lbox/*Parameters par*/): box(Box(lbox)){}
+  
+  struct BondInfo{
+    real ang0, k;
+  };
+  
+  inline __device__ real3 force(int i, int j, int k,
+				int bond_index,
+				real3 posi,
+				real3 posj,
+				real3 posk,
+				BondInfo bond_info){
+    const real ang0 = bond_info.ang0;
+    const real kspring = bond_info.k;
+    //         i -------- j -------- k
+    //             rij->     rjk ->
+    //Compute distances and vectors
+    //---rij---
+    const real3 rij =  box.apply_pbc(posj - posi);
+    const real rij2 = dot(rij, rij);
+    const real invsqrij = rsqrt(rij2);
+    //---rkj---
+    const real3 rjk =  box.apply_pbc(posk - posj);
+    const real rjk2 = dot(rjk, rjk);
+    const real invsqrjk = rsqrt(rjk2);
+    const real a2 = invsqrij * invsqrjk;
+    real cijk = dot(rij, rjk)*a2; //cijk = cos (theta) = rij*rkj / mod(rij)*mod(rkj)
+    //Cos must stay in range
+    if(cijk>real(1.0)) cijk = real(1.0);
+    else if (cijk<real(-1.0)) cijk = -real(1.0);
+    real ampli;
+    // //Approximation for small angle displacements
+    // real sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
+    // //sijk cant be zero to avoid division by zero
+    // if(sijk<std::numeric_limits<real>::min()) sijk = std::numeric_limits<real>::min();
+    // ampli = -kspring * (acos(cijk) - ang0)/sijk; //The force amplitude -k·(theta-theta_0)
+    //ampli = -kspring*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0; //k(1-cos(ang-ang0))
+    if(ang0 == real(0.0)){
+      ampli = -real(2.0)*kspring;
+    }
+    else{
+      const real theta = acos(cijk);
+      if(theta==real(0.0))  return make_real3(0);
+      const real sinthetao2 = sin(real(0.5)*theta);
+      ampli = -real(2.0)*kspring*(sinthetao2 - sin(ang0*real(0.5)))/sinthetao2;
+    }
+    //Magical trigonometric relations to infere the direction of the force
+    const real a11 = ampli*cijk/rij2;
+    const real a12 = ampli*a2;
+    const real a22 = ampli*cijk/rjk2;
+    //Sum according to my position in the bond
+    // i ----- j ------ k
+    if(bond_index==i){
+      return make_real3(a12*rjk -a11*rij); //Angular spring
+    }
+    else if(bond_index==j){
+      //Angular spring
+      return real(-1.0)*make_real3((-a11 - a12)*rij + (a12 + a22)*rjk);
+    }
+    else if(bond_index==k){
+      //Angular spring
+      return real(-1.0)*make_real3(a12*rij -a22*rjk);
+    }
+    return make_real3(0);
+  }
+
+  inline __device__ real energy(int i, int j, int k,
+				int bond_index,
+				real3 posi,
+				real3 posj,
+				real3 posk,
+				BondInfo bond_info){
+    return 0;
+  }
+
+  static BondInfo readBond(std::istream &in){
+    BondInfo bi;
+    in>>bi.k>>bi.ang0;
+    return bi;
+  }  
+};
+
+//This torsional potential is similar to the HarmonicBond above, the difference is that
+//Now four particles are involved in each bond instead of two
+struct Torsional{
+private:
+
+  __device__ real3 cross(real3 a, real3 b){
+    return make_real3(a.y*b.z - a.z*b.y, (-a.x*b.z + a.z*b.x), a.x*b.y - a.y*b.x);
+  }
+
+public:
+  Box box;
+  Torsional(real3 lbox /*Parameters par*/): box(Box(lbox)){}
+
+  struct BondInfo{
+    real phi0, k;
+  };
+
+  inline __device__ real3 force(int j, int k, int m, int n,
+				int bond_index,
+				real3 posj,
+				real3 posk,
+				real3 posm,
+				real3 posn,
+				BondInfo bond_info){
+    const real3 rjk = box.apply_pbc(posk - posj);
+    const real3 rkm = box.apply_pbc(posm - posk);
+    const real3 rmn = box.apply_pbc(posn - posm);
+    real3 njkm = cross(rjk, rkm);
+    real3 nkmn = cross(rkm, rmn);
+    const real n2 = dot(njkm, njkm);
+    const real nn2 = dot(nkmn, nkmn);
+    if(n2 > 0 and nn2 > 0) {
+      const real invn = rsqrt(n2);
+      const real invnn = rsqrt(nn2);
+      const real cosphi = dot(njkm, nkmn)*invn*invnn;
+      real Fmod = 0;
+      // #define SMALL_ANGLE_BENDING
+      // #ifdef SMALL_ANGLE_BENDING
+      const real phi = acos(cosphi);
+      if(cosphi*cosphi <= 1 and phi*phi > 0){
+	Fmod = -bond_info.k*(phi - bond_info.phi0)/sin(phi);
+      }
+      //#endif
+      njkm *= invn;
+      nkmn *= invnn;
+      const real3 v1 = (nkmn - cosphi*njkm)*invn;
+      const real3 fj = Fmod*cross(v1, rkm);
+      if(bond_index == j){
+	return real(-1.0)*fj;
+      }
+      const real3 v2 = (njkm - cosphi*nkmn)*invnn;
+      const real3 fk = Fmod*cross(v2, rmn);
+      const real3 fm = Fmod*cross(v1, rjk);
+      if(bond_index == k){
+	return fm + fj - fk;
+      }
+      const real3 fn = Fmod*cross(v2, rkm);
+      if(bond_index == m){
+	return fn + fk - fm;
+      }
+      if(bond_index == n){
+	return real(-1.0)*fn;
+      }
+    }
+    return real3();
+  }
+
+  inline __device__ real energy(int j, int k, int m, int n,
+				int bond_index,
+				real3 posj,
+				real3 posk,
+				real3 posm,
+				real3 posn,
+				BondInfo bond_info){
+    return 0;
+  }
+
+  static BondInfo readBond(std::istream &in){
+    BondInfo bi;
+    in>>bi.k>>bi.phi0;
+    return bi;
+  }
+
+};
+
+
+std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
+  using Bond = HarmonicBond;
+  using BF = BondedForces<Bond>;
+  typename BF::Parameters params;
+  params.file = "bondfile.dat";
+  //You can pass an instance of the bond as a shared_ptr, which will allow you to modify the bond properties at any time
+  //from outside BondedForces
+  auto bond = std::make_shared<Bond>();
+  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, bond);
+  return bf;
 }
 
-int main(int argc, char *argv[]){
-  UAMMD sim = initializeUAMMD(argc, argv);
-  initializeParticlesAndBonds(sim);
-  auto bd = createIntegrator(sim);
-  addExternalPotentialInteractions(bd, sim);
-  addHarmonicBondInteraction(bd, sim);
-  addShortRangeInteraction(bd, sim);
-  //You can issue a logging event like this, many log levels exists (see System.cuh).
-  //A maximum log level is set in System.cuh or through the MAXLOGLEVEL macro
-  //every logging event with a level superior to the max will be ignored by the compiler
-  //so dont be afraid to write System::DEBUGX log calls.
-  sim.sys->log<System::MESSAGE>("RUNNING!!!");
-  Timer tim; tim.tic();
-  runSimulation(bd, sim);
-  auto totalTime = tim.toc();
-  sim.sys->log<System::MESSAGE>("mean FPS: %.2f", sim.par.numberSteps/totalTime);
-  //sys->finish() will ensure a smooth termination of any UAMMD module.
-  sim.sys->finish();
+std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
+  using Bond = Angular;
+  using BF = AngularBondedForces<Bond>;
+  typename BF::Parameters params;
+  params.file = "angular.bonds";
+  real3 lbox = make_real3(32,32,32);
+  auto bond = std::make_shared<Bond>(lbox);
+  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, bond);
+  return bf;
+}
+
+std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
+  using Bond = Torsional;
+  using BF = TorsionalBondedForces<Bond>;
+  typename BF::Parameters params;
+  params.file = "torsional.bonds"; 
+  real3 lbox = make_real3(32,32,32);
+  auto bond = std::make_shared<Bond>(lbox);
+  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, bond);
+  return bf;
+}
+
+
+int main(){
+
+  //Just an empty main so this file can be compiled on its own
+
   return 0;
-}
-
-Parameters readParameters(std::string file){
-  {
-    if(!std::ifstream(file).good()){
-      real visco = 1/(6*M_PI);
-      std::ofstream default_options(file);
-      default_options<<"boxSize 45 45 45"<<std::endl;
-      default_options<<"numberParticles 8000"<<std::endl;
-      default_options<<"dt 0.00075"<<std::endl;
-      default_options<<"numberSteps 1000000"<<std::endl;
-      default_options<<"printSteps 1000"<<std::endl;
-      default_options<<"outputFile /dev/stdout"<<std::endl;
-      default_options<<"temperature 0.2"<<std::endl;
-      default_options<<"viscosity "<<visco<<std::endl;
-    }
-  }
-  Parameters par;
-  InputFile in(file);
-  in.getOption("boxSize", InputFile::Required)>>par.boxSize.x>>par.boxSize.y>>par.boxSize.z;
-  in.getOption("numberSteps", InputFile::Required)>>par.numberSteps;
-  in.getOption("printSteps", InputFile::Required)>>par.printSteps;
-  in.getOption("dt", InputFile::Required)>>par.dt;
-  in.getOption("numberParticles", InputFile::Required)>>par.numberParticles;
-  in.getOption("outputFile", InputFile::Required)>>par.outputFile;
-  in.getOption("temperature", InputFile::Required)>>par.temperature;
-  in.getOption("viscosity", InputFile::Required)>>par.viscosity;
-  return par;
 }
