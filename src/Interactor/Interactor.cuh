@@ -54,7 +54,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[Interactor] Acting on group %s", pg->getName().c_str());
     }
 
-    virtual void sumForce(cudaStream_t st) = 0;
+    virtual void sumForce(cudaStream_t st = 0) = 0;
 
     virtual real sumEnergy(){ return 0;}
 
