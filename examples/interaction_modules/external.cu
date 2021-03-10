@@ -54,6 +54,12 @@ struct GravityAndWall{
   
   //Energy can be ommited in the integrators this example use. It defaults to 0.
   //__device__ real energy(real4 pos){ return 0;}
+
+  //Optionally a compute function may be defined and will be called for each particle when ExternalForces::compute is called
+  // __device__ void compute(real4 pos /*, real mass */){
+  //   int id = blockIdx.x*blockDim.x + threadIdx.x;
+  //   if(id==0)printf("hello\n");
+  // }
   
   auto getArrays(ParticleData* pd){
     auto pos = pd->getPos(access::gpu, access::read);    
@@ -115,9 +121,22 @@ std::shared_ptr<Interactor> createExternalPotentialInteractor(UAMMD sim){
   return ext;  
 }
 
+//Initialize UAMMD with some arbitrary particles
+UAMMD initializeUAMMD(){
+  UAMMD sim;
+  sim.sys = std::make_shared<System>();
+  constexpr int numberParticles = 100;
+  sim.pd = std::make_shared<ParticleData>(sim.sys, numberParticles);
+  auto pos = sim.pd->getPos(access::gpu, access::write);
+  thrust::fill(thrust::cuda::par, pos.begin(), pos.end(), real4());
+  return sim;
+}
+
 int main(){
-
-  //Just an empty main so this file can be compiled on its own
-
+  // auto sim = initializeUAMMD();
+  // auto ext = createExternalPotentialInteractor(sim);
+  // ext->sumForce(0);
+  // ext->sumForce( );
+  // ext->compute();
   return 0;
 }

@@ -100,8 +100,10 @@ namespace uammd{
       ExternalForces(pd, sys, std::make_shared<Functor>(f)){}
 
     void sumForce(cudaStream_t st) override;
+
     real sumEnergy() override;
 
+    void compute(cudaStream_t st) override;
   private:
     std::shared_ptr<Functor> tr;
   };
@@ -222,5 +224,47 @@ namespace uammd{
     return 0;
   }
 
+
+  namespace ExternalForces_ns{
+    //Same tricks as with force
+    template<class Functor, class ...T, size_t ...Is>
+    __device__ inline void unpackTupleAndCallCompute_impl(Functor &f,
+							 std::tuple<T...> &arrays,
+							 int i, //Element of the array to dereference
+							 std::index_sequence<Is...>){
+      SFINAE::ComputeDelegator<Functor>().compute(f, *(std::get<Is>(arrays)+i)...);
+    }
+
+    template<class Functor, class ...T>
+    __device__ inline void unpackTupleAndCallCompute(Functor &f, int i, std::tuple<T...> &arrays){
+      constexpr int n= sizeof...(T); //Number of elements in tuple (AKA arguments in () operator in Functor)
+      unpackTupleAndCallCompute_impl(f, arrays, i, std::make_index_sequence<n>());
+    }
+
+    template<class Functor, class ...T>
+    __global__ void computeComputeGPU(Functor f,
+			       int numberParticlesInGroup,
+			       ParticleGroup::IndexIterator groupIterator,
+			       std::tuple<T...>  arrays){
+      int id = blockIdx.x*blockDim.x + threadIdx.x;
+      if(id>=numberParticlesInGroup) return;
+      const int myParticleIndex = groupIterator[id];
+      //Call f.compute(<all the requested input>)
+      unpackTupleAndCallCompute(f, myParticleIndex, arrays);
+    }
+  }
+
+  template<class Functor>
+  void ExternalForces<Functor>::compute(cudaStream_t st){
+    sys->log<System::DEBUG2>("[ExternalForces] Computing energies...");
+    int numberParticles = pg->getNumberParticles();
+    int blocksize = 128;
+    int Nthreads = blocksize<numberParticles?blocksize:numberParticles;
+    int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+    auto groupIterator = pg->getIndexIterator(access::location::gpu);
+    ExternalForces_ns::computeComputeGPU<<<Nblocks, Nthreads, 0, st>>>(*tr, numberParticles,
+							       groupIterator,
+							       ExternalForces_ns::getTuple(tr->getArrays(pd.get())));
+  }
 }
 #endif

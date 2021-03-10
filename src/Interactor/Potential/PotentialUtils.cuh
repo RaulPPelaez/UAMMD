@@ -18,7 +18,7 @@ namespace uammd{
     template<class T>
     struct getIfHasEnergyTransverser<T, true>{
       template<class ...Types>
-      static auto get(std::shared_ptr<T> t, Types... args) -> decltype(t->getEnergyTransverser(args...)){
+      static auto get(std::shared_ptr<T> t, Types... args){
 	return t->getEnergyTransverser(args...);
       }
     };
@@ -41,7 +41,7 @@ namespace uammd{
     template<class T>
     struct getIfHasForceEnergyTransverser<T, true>{
       template<class ...Types>
-      static auto get(std::shared_ptr<T> t, Types... args) -> decltype(t->getForceEnergyTransverser(args...)){
+      static auto get(std::shared_ptr<T> t, Types... args){
 	return t->getForceEnergyTransverser(args...);
       }
     };
@@ -64,13 +64,36 @@ namespace uammd{
     template<class T>
     struct getIfHasForceTransverser<T, true>{
       template<class ...Types>
-      static auto get(std::shared_ptr<T> t, Types... args) -> decltype(t->getForceTransverser(args...)){
+      static auto get(std::shared_ptr<T> t, Types... args){
 	return t->getForceTransverser(args...);
       }
     };
 
     template<class T>
     struct getIfHasForceTransverser<T, false>{
+      template<class ...Types>
+      static BasicNullTransverser get(std::shared_ptr<T> t, Types... args){
+	return BasicNullTransverser();
+      }
+
+    };
+
+    //This macro defines a struct called has_getComputeTransverser
+    SFINAE_DEFINE_HAS_MEMBER(getComputeTransverser)
+    //Calling get on this struct will provide the getComputeTransverser of a Potential if it exists, and will return a BasicNullTransverser otherwise
+    template<class T, bool hasComputeTransverser = has_getComputeTransverser<T>::value>
+    struct getIfHasComputeTransverser;
+
+    template<class T>
+    struct getIfHasComputeTransverser<T, true>{
+      template<class ...Types>
+      static auto get(std::shared_ptr<T> t, Types... args){
+	return t->getComputeTransverser(args...);
+      }
+    };
+
+    template<class T>
+    struct getIfHasComputeTransverser<T, false>{
       template<class ...Types>
       static BasicNullTransverser get(std::shared_ptr<T> t, Types... args){
 	return BasicNullTransverser();

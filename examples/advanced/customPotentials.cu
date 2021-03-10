@@ -15,6 +15,8 @@ Optional members (at least one of the following must exist):
  ForceEnergyTransverser getForceEnergyTransverser(Box box, shared_ptr<ParticleData> pd); //Provides a Transverser that computes the force and energy at the same time
  //If not present defaults to sequentially computing force and energy one after the other.
 If there is no way to compute either force or energy it will be assumed to be zero. For example energy will be assumed to be zero if the only method defined is getForceTransverser.  
+ ComputeTransverser getComputeTransverser(Box box, shared_ptr<ParticleData> pd); //Provides a Transverser that performs an arbitrary computation, will be called when PairForces::compute() is called. If not present no work will be performed.
+
 A struct/class adhering to the Potential interface can also be ParameterUpdatable[1].
 
 The type(s) returned by these functions must adhere to the Transverser interface described below.
@@ -117,18 +119,22 @@ struct SimpleLJ{
   real getCutOff(){
     return rc;
   }
-  //A Transverser for computing both energy and force, this same Transverser can be used to compute either force, energy or both at the same time. It is the simplest form of Transverser as it only provides the "compute" and "set" functions
-  //When constructed, if the i_force or i_energy pointers are null that computation will be avoided.
+  //A Transverser for computing, energy, virial and force, this same Transverser can be used to compute either force, energy or virial. The transverser can also compute force and energy at the same time (but not force and virial).
+  //It is the simplest form of Transverser, as it only provides the "compute" and "set" functions
+  //When constructed, if the i_force, i_energy or i_virial pointers are null that computation will be avoided.
   //Notice that it is not required that this struct is defined inside the Potential, it is only required that the functions get*Transverser provide it.
-  struct ForceEnergy{
+  //It is also not required that all Transversers returned are the same type, a different Transverser can be used in each case.
+  struct LJTransverser{
     real4 *force;
+    real4 *virial;
     real* energy;
     Box box;
     real rc;
-    ForceEnergy(Box i_box, real i_rc, real4* i_force, real* i_energy):
+    LJTransverser(Box i_box, real i_rc, real4* i_force, real* i_energy, real4* i_virial):
       box(i_box),
       rc(i_rc),
       force(i_force),
+      virial(i_virial),
       energy(i_energy){
       //All members will be available in the device functions
     }
@@ -137,7 +143,12 @@ struct SimpleLJ{
       const real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
       const real r2 = dot(rij, rij);
       if(r2>0 and r2< rc*rc){
-	return make_real4(force?(lj_force(r2)*rij):real3(),energy?lj_energy(r2):0);
+	real3 f = real3();
+	if(force or virial)
+	  f = lj_force(r2)*rij;
+	if(virial)
+	  f *= rij;
+	return make_real4(f,energy?lj_energy(r2):0);
       }
       return real4();
     }
@@ -147,30 +158,37 @@ struct SimpleLJ{
     __device__ void set(int id, real4 total){
       //Write the total result to memory if the pointer was provided
       if(force)  force[id] += make_real4(total.x, total.y, total.z, 0);
+      if(virial) virial[id] += make_real4(total.x, total.y, total.z, 0);
       if(energy) energy[id] += total.w;
     }
   };
 
   //Return an instance of the Transverser that will compute only the force (because the energy pointer is null)
-  ForceEnergy getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
+  LJTransverser getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();    
-    return ForceEnergy(box, rc, force, nullptr);
+    return LJTransverser(box, rc, force, nullptr, nullptr);
   }
 
   //These two functions can be ommited if one is not interested in the energy as explained in the header.
   //They provide instances of the Transverser that compute either the energy or the force and energy.
   //Notice that it is not required that the return type is the same in all three cases. Different Transversers can be used in each case.
-  ForceEnergy getEnergyTransverser(Box box, std::shared_ptr<ParticleData> pd){
+  LJTransverser getEnergyTransverser(Box box, std::shared_ptr<ParticleData> pd){
     auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite).raw();   
-    return ForceEnergy(box, rc, nullptr, energy);
+    return LJTransverser(box, rc, nullptr, energy, nullptr);
   }
   
-  ForceEnergy getForceEnergyTransverser(Box box, std::shared_ptr<ParticleData> pd){
+  LJTransverser getForceEnergyTransverser(Box box, std::shared_ptr<ParticleData> pd){
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();
     auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite).raw();
-    return ForceEnergy(box, rc, force, energy);
+    return LJTransverser(box, rc, force, energy, nullptr);
   }
-  
+
+  //This function will be used when PairForces::compute is called
+  //If it is not present then no work will be performed
+  LJTransverser getComputeTransverser(Box box, std::shared_ptr<ParticleData> pd){
+    auto virial = pd->getVirial(access::location::gpu, access::mode::readwrite).raw();
+    return LJTransverser(box, rc, nullptr, nullptr, virial);
+  }
 };
 /**------------------------------------------------------------------------------------------**/
 //Similar to the previous one, but this time the Transversers will count and store the number of neighbours in addition to computing force. For simplicity only the force is computed now.

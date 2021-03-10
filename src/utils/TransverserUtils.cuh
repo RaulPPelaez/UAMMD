@@ -62,6 +62,21 @@ namespace uammd{
       template<class ...Types> static constexpr inline __device__ __host__ real3 force(T &t, Types... args){return real3(); }
     };
 
+    //Detects if a type has a member called energy.
+    //Use with: SFINAE::has_energy<T>::value
+    SFINAE_DEFINE_HAS_MEMBER(compute)
+
+    //If an object has an energy member function it calls that function, otherwise returns real(0.0)
+    template<class T, bool general = has_compute<T>::value> struct ComputeDelegator;
+
+    template<class T> struct ComputeDelegator<T, true>{
+      template<class ...Types> static inline __device__ __host__ void compute(T &t, Types... args){t.compute(args...);}
+    };
+
+    template<class T> struct ComputeDelegator<T, false>{
+      template<class ...Types> static constexpr inline __device__ __host__ void compute(T &t, Types... args){}
+    };
+
     //For Transversers, detects if a Transverser has getInfo, therefore being a general Transverser
     //This macro defines a tempalted struct has_getInfo<T> that contains a static value=0 if T has not a getInfo method, and 1 otherwise
     SFINAE_DEFINE_HAS_MEMBER(getInfo);

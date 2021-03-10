@@ -1,6 +1,6 @@
-/*Raul P. Pelaez 2017. Interactor Base class.
+/*Raul P. Pelaez 2017-2021. Interactor Base class.
 
-Interactor is an interface for modules that can compute forces and energies.
+Interactor is an interface for modules that can compute forces, energies or perform an arbitrary computation according to a certain interaction.
 For a class to be a valid Interactor, it must override sumForces() and sumEnergy().
 
 An integrator will expect interactors to describe the interaction of particles.
@@ -11,8 +11,6 @@ See the following wiki pages for more info:
 ParameterUpdatable
 Interactor
 Integrator
-
-See PairForces.cuh or examples/LJ.cu for an example.
 
  */
 
@@ -54,16 +52,28 @@ namespace uammd{
       sys->log<System::MESSAGE>("[Interactor] Acting on group %s", pg->getName().c_str());
     }
 
+    //This function must compute the forces due to the particular interaction and add them to pd->getForces().
+    //For that it can make use of the provided CUDA stream
     virtual void sumForce(cudaStream_t st = 0) = 0;
 
+    //This function must compute the energies due to the particular interaction and add them to pd->getEnergy()
+    //The return value is unused
     virtual real sumEnergy(){ return 0;}
 
-    virtual real sumForceEnergy(cudaStream_t st){
+    //This function can be defined to compute force and energy at the same time.
+    //By default it will sequentially call sumForce and them sumEnergy.
+    virtual real sumForceEnergy(cudaStream_t st = 0){
       sumForce(st);
       return sumEnergy();
     }
 
-    std::string getName(){ return this->name;}
+    //The compute function can perform any arbitrary computation without any warranties about what it does.
+    //Look in the wiki page for each Interactor for information on how to use this function.
+    virtual void compute(cudaStream_t st = 0){
+
+    }
+
+    std::string getName(){return this->name;}
 
 };
 

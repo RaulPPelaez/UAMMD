@@ -65,6 +65,8 @@ namespace uammd{
 
     real sumForceEnergy(cudaStream_t st) override;
 
+    void compute(cudaStream_t st) override;
+
     template<class Transverser>
     void sumTransverser(Transverser &tr, cudaStream_t st);
 

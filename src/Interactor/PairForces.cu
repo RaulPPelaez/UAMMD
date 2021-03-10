@@ -120,5 +120,14 @@ namespace uammd{
     return 0;
   }
 
+  template<class MyPotential, class NL>
+  void PairForces<MyPotential, NL>::compute(cudaStream_t st){
+    sys->log<System::DEBUG1>("[PairForces] Launching compute transverser");
+    auto computeTrans = Potential::getIfHasComputeTransverser<MyPotential>::get(pot, box, pd);
+    constexpr bool hasComputeTransverser = Potential::has_getComputeTransverser<MyPotential>::value;
+    if(hasComputeTransverser){
+      this->sumTransverser(computeTrans, st);
+    }
+  }
 
 }
