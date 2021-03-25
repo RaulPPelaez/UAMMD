@@ -101,7 +101,7 @@
                             ((Id, id, int))	       \
                             ((Mass, mass, real))       \
 			    ((Force, force, real4))    \
-  			    ((Virial, virial, real4))  \
+  			    ((Virial, virial, real))  \
   			    ((Energy, energy, real))   \
 			    ((Vel, vel, real3))        \
   			    ((Radius, radius, real))   \
