@@ -113,23 +113,19 @@
 
 */
 
-namespace uammd{
-
-  template<class T>
-  using signal = typename nod::unsafe_signal<T>;
-
-  using connection = nod::connection;
-
-  //Get the Name (first letter capital) from a tuple in the property list
+//Get the Name (first letter capital) from a tuple in the property list
 #define PROPNAME_CAPS(tuple) BOOST_PP_TUPLE_ELEM(3, 0 ,tuple)
-  //Get the name (no capital) from a tuple in the property list
+//Get the name (no capital) from a tuple in the property list
 #define PROPNAME(tuple) BOOST_PP_TUPLE_ELEM(3, 1 ,tuple)
-  //Get the type from a tuple in the property list
+//Get the type from a tuple in the property list
 #define PROPTYPE(tuple) BOOST_PP_TUPLE_ELEM(3, 2 ,tuple)
-
 //This macro iterates through all properties applying some macro
 #define PROPERTY_LOOP(macro)  BOOST_PP_SEQ_FOR_EACH(macro, _, ALL_PROPERTIES_LIST)
 
+namespace uammd{
+
+  template<class T> using signal = typename nod::unsafe_signal<T>;
+  using connection = nod::connection;
   /*
     UAMMD uses this class to handle particle information, such as positions, forces, charges,...
     Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from
@@ -363,11 +359,11 @@ namespace uammd{
   }
 }
 
-#undef ALL_PROPERTIES_LIST
-#undef PROPNAME_CAPS
-#undef PROPNAME
-#undef PROPTYPE
-#undef PROPERTY_LOOP
+// #undef ALL_PROPERTIES_LIST
+// #undef PROPNAME_CAPS
+// #undef PROPNAME
+// #undef PROPTYPE
+// #undef PROPERTY_LOOP
 #undef DECLARE_PROPERTIES_T
 #undef DECLARE_PROPERTIES
 #undef DECLARE_SIGNAL_PROPERTIES_T
