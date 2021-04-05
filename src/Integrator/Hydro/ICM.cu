@@ -13,6 +13,7 @@ REFERENCES:
 #include"third_party/saruprng.cuh"
 #include"utils/cufftDebug.h"
 #include"utils/curandDebug.h"
+#include"utils/atomics.cuh"
 #include"utils/debugTools.h"
 #include"utils/cuda_lib_defines.h"
 #include<iostream>
@@ -64,24 +65,6 @@ namespace uammd{
 	}
 	return size;
       }
-
-
-#ifndef SINGLE_PRECISION
-      inline __device__ double atomicAdd(double* address, double val){
-	unsigned long long int* address_as_ull =
-	  (unsigned long long int*)address;
-	unsigned long long int old = *address_as_ull, assumed;
-	do {
-	  assumed = old;
-	  old = atomicCAS(address_as_ull, assumed,
-			  __double_as_longlong(val +
-					       __longlong_as_double(assumed)));
-	} while (assumed != old);
-	return __longlong_as_double(old);
-      }
-#endif
-
-
       //Computes S·F and adds it to gridVels
       template<class Kernel = IBM_kernels::Peskin::threePoint>
       __global__ void spreadParticleForces(real4 *pos,
@@ -328,16 +311,11 @@ namespace uammd{
 	cell.x= blockIdx.x*blockDim.x + threadIdx.x;
 	cell.y= blockIdx.y*blockDim.y + threadIdx.y;
 	cell.z= blockIdx.z*blockDim.z + threadIdx.z;
-
 	if(cell.x>grid.cellDim.x/2+1) return; //I use R2C and C2R ffts
 	if(cell.y>=grid.cellDim.y) return;
 	if(cell.z>=grid.cellDim.z) return;
-
 	/*Get my cell index (position in the array) */
 	const int icell =grid.getCellIndex(cell);
-
-	const int ncells = grid.getNumberCells();
-
 	//k=0 cannot contribute, v_cm = 0
 	if(icell==0){
 	  gridVels[0] = cufftComplex3();//{0,0 ,0,0 ,0,0};
@@ -351,17 +329,13 @@ namespace uammd{
 	real3 sink, cosk;
 	{
 	  const real3 k = cellToWaveNumber(cell, grid.cellDim, grid.box.boxSize);
-
 	  sincos(k.x*grid.cellSize.x*real(0.5), &sink.x, &cosk.x);
 	  sincos(k.y*grid.cellSize.y*real(0.5), &sink.y, &cosk.y);
 	  sincos(k.z*grid.cellSize.z*real(0.5), &sink.z, &cosk.z);
-
 	  keff = real(2.0)*grid.invCellSize*sink;
 	}
-
 	//Shift fluid forcing to cell centers
 	cufftComplex3 vk = shiftVelocity(fluidForcing[icell], cosk, real(-1.0)*sink);
-
 	{
 	  //Apply (\rho/dt·I-\eta/2·L) operator and project into divergence free space.
 	  real prefactor = real(1.0);
@@ -369,10 +343,9 @@ namespace uammd{
 	    const real L = -dot(keff, keff);
 	    prefactor = real(1.0)/(real(1.0) - (dt/density)*real(0.5)*viscosity*L);
 	  }
-
-
 	  vk = projectFourier(keff, prefactor*vk);
 	}
+	const int ncells = grid.getNumberCells();
 	//Store new velocity shifted back to cell faces, normalize FFT
 	gridVels[icell] = (real(1.0)/real(ncells))*shiftVelocity(vk, cosk, sink);
       }
@@ -383,13 +356,13 @@ namespace uammd{
       enum class Step{PREDICTOR, CORRECTOR};
       template<Step mode = Step::PREDICTOR, class Kernel>
       __global__ void midPointStep(real4 *pos,
-					      real4* posOld,
-					      const real3* gridVels,
-					      const real3* gridVelsPrediction,
-					      real dt,
-					      Grid grid,
-					      Kernel kernel,
-					      int numberParticles){
+				   real4* posOld,
+				   const real3* gridVels,
+				   const real3* gridVelsPrediction,
+				   real dt,
+				   Grid grid,
+				   Kernel kernel,
+				   int numberParticles){
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id >= numberParticles) return;
 
@@ -426,7 +399,7 @@ namespace uammd{
 	    const real3 rijx = posCurrent-make_real3(celljx)*grid.cellSize-cellPosOffset;
 	    //p += J·v = dV·\delta(p_x_i-cell_x_j)·v_x_j
 	    real v_jx = gridVels[jcellx].x;
-	    if(mode==Step::CORRECTOR) v_jx += gridVelsPrediction[jcellx].x;
+	    //if(mode==Step::CORRECTOR) v_jx += gridVelsPrediction[jcellx].x;
 	    auto r = grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.y, rijx.y, rijx.z});
 	    pnew.x += kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*v_jx*dV;
 	  }
@@ -438,7 +411,7 @@ namespace uammd{
 	    const int jcelly = grid.getCellIndex(celljy);
 	    const real3 rijy = posCurrent-make_real3(celljy)*grid.cellSize-cellPosOffset;
 	    real v_jy = gridVels[jcelly].y;
-	    if(mode==Step::CORRECTOR) v_jy += gridVelsPrediction[jcelly].y;
+	    //if(mode==Step::CORRECTOR) v_jy += gridVelsPrediction[jcelly].y;
 	    auto r = grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z});
 	    pnew.y += kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*v_jy*dV;
 	  }
@@ -450,7 +423,7 @@ namespace uammd{
 	    const int jcellz = grid.getCellIndex(celljz);
 	    const real3 rijz = posCurrent-make_real3(celljz)*grid.cellSize-cellPosOffset;
 	    real v_jz = gridVels[jcellz].z;
-	    if(mode==Step::CORRECTOR) v_jz += gridVelsPrediction[jcellz].z;
+	    //if(mode==Step::CORRECTOR) v_jz += gridVelsPrediction[jcellz].z;
 	    auto r = grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z});
 	    pnew.z += kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*v_jz*dV;
 	  }
@@ -462,7 +435,7 @@ namespace uammd{
 	  pnew = posCurrent + real(0.5)*dt*pnew;
 	}
 	if(mode==Step::CORRECTOR){
-	  pnew = make_real3(posOld[id]) + real(0.5)*dt*pnew;
+	  pnew = make_real3(posOld[id]) + dt*pnew;
 	}
 	pos[id] = make_real4(pnew, pos[id].w);
       }
@@ -478,6 +451,7 @@ namespace uammd{
 					      real noisePrefactor,
 					      //6 random numbers per cell, sorted by direction [first number for all cells, ..., second number for all cells,...]
 					      const real* random){
+	if(noisePrefactor == real(0.0)) return real3();
 	const int ncells = grid.getNumberCells();
 	//I will draw 6 random numbers for each cell
 	real3 DW = make_real3(0);
@@ -726,7 +700,7 @@ namespace uammd{
       }
 
       //Computes fluid forcing \vec{g} (except the SF and thermal drift terms) for the unperturbed velocity field (unperturbed means that m_e = 0). See eq. 36 and 41 in [1]
-      __global__ void updateCellVelocityUnperturbed(const real3 *gridVels,
+      __global__ void updateCellVelocityUnperturbed(real3 *gridVels,
 						    real3 *gridVelsPrediction,
 						    real3 *cellAdvection,
 						    Grid grid,
@@ -750,10 +724,9 @@ namespace uammd{
 	real3 DivNoise = computeNoiseDivergence(cell, icell, gridVels, grid, noiseAmp, random);
 	real3 Lv = computeVelLaplacian(cell, icell, gridVels, grid);
 	real3 advection = computeAdvection(cell, icell, gridVels, grid, density);
-	gridVelsPrediction[icell] +=
-	  gridVels[icell] +
+	gridVels[icell] += gridVelsPrediction[icell]*(dt/density) +
 	  (dt*viscosity*real(0.5)/density)*Lv +
-	  (real(1.0)/density)*DivNoise -
+	  DivNoise -
 	  (dt/density)*(real(1.5)*advection - real(0.5)*cellAdvection[icell]);
 	cellAdvection[icell] = advection;
       }
@@ -824,7 +797,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[Hydro::ICM] Random Finite Diference delta: %e", deltaRFD);
       sys->log<System::MESSAGE>("[Hydro::ICM] dt: %f", dt);
 
-      if(sumThermalDrift)
+      if(sumThermalDrift and temperature > real(0.0))
 	sys->log<System::MESSAGE>("[Hydro::ICM] Summing thermal drift");
       else
 	sys->log<System::MESSAGE>("[Hydro::ICM] Not taking into account thermal drift");
@@ -896,10 +869,10 @@ namespace uammd{
       //Required storage for the plans
       size_t cufftWorkSizef = 0, cufftWorkSizei = 0;
       /*Set up cuFFT*/
-      int3 cdtmp = {grid.cellDim.x, grid.cellDim.y, grid.cellDim.z};
+      int3 cdtmp = {grid.cellDim.z, grid.cellDim.y, grid.cellDim.x};
       /*I want to make three 3D FFTs, each one using one of the three interleaved coordinates*/
       CufftSafeCall(cufftMakePlanMany(cufft_plan_forward,
-				      3, &cdtmp.x, /*Three dimensional FFT*/
+				      3, &grid.cellDim.x, /*Three dimensional FFT*/
 				      &cdtmp.x,
 				      /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
 				      3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
@@ -913,7 +886,7 @@ namespace uammd{
       sys->log<System::DEBUG>("[Hydro::ICM] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
       /*Same as above, but with C2R for inverse FFT*/
       CufftSafeCall(cufftMakePlanMany(cufft_plan_inverse,
-				      3, &cdtmp.x, /*Three dimensional FFT*/
+				      3, &grid.cellDim.x, /*Three dimensional FFT*/
 				      &cdtmp.x,
 				      /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
 				      3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
@@ -993,14 +966,15 @@ namespace uammd{
     }
     //Sum thermal drift term using random Finite differences
     void ICM::thermalDrift(){
+      return;
       if(!sumThermalDrift) return;
-      if(temperature==real(0.0)) return;
+      if(temperature <= real(0.0)) return;
       int numberParticles = pg->getNumberParticles();
       auto d_gridVels = thrust::raw_pointer_cast(gridVelsPrediction.data());
       int BLOCKSIZE = 128;
       int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
       int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
-      real driftPrefactor = (1.0/density)*temperature/deltaRFD;
+      real driftPrefactor = (1.0/density)*temperature/deltaRFD/dt;
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       ICM_ns::addThermalDrift<<<Nblocks, Nthreads>>>(pos.raw(),
 						     (real3*)d_gridVels,
@@ -1024,7 +998,7 @@ namespace uammd{
       NblocksCells.y = grid.cellDim.y/NthreadsCells.y + ((grid.cellDim.y%NthreadsCells.y)?1:0);
       NblocksCells.z = grid.cellDim.z/NthreadsCells.z + ((grid.cellDim.z%NthreadsCells.z)?1:0);
       real dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
-      real noiseAmp = sqrt(2*temperature*viscosity/dV);
+      real noiseAmp = sqrt(2*temperature*viscosity*dt/dV)/density;
       int ncells = grid.getNumberCells();
       ICM_ns::updateCellVelocityUnperturbed<<<NblocksCells, NthreadsCells>>>(d_gridVels,
 									     d_gridVelsPrediction,
@@ -1041,7 +1015,7 @@ namespace uammd{
     //Stores \vec{\tilde{v}} in gridVelsPrediction
     void ICM::applyStokesSolutionOperator(){
       //Stored in the same array
-      cufftReal* d_gridData = (cufftReal*)thrust::raw_pointer_cast(gridVelsPrediction.data());
+      cufftReal* d_gridData = (cufftReal*)thrust::raw_pointer_cast(gridVels.data());
       cufftComplex* d_gridDataF = (cufftComplex*)thrust::raw_pointer_cast(gridVelsPredictionF.data());
       //Go to fourier space
       sys->log<System::DEBUG3>("[Hydro::ICM] Taking grid to wave space");
@@ -1122,13 +1096,13 @@ namespace uammd{
 	  forceComp->updateBox(box);
 	  forceComp->updateSimulationTime(0);
 	  forceComp->sumForce(0);
-
 	}
 	cudaDeviceSynchronize();
       }
       sys->log<System::DEBUG1>("[Hydro::ICM] Performing integration step %d", step);
       //Reset velocity prediction
       thrust::fill(gridVelsPrediction.begin(), gridVelsPrediction.end(), real3());
+      //thrust::fill(gridVels.begin(), gridVels.end(), real3());
       if(temperature!=real(0.0)){
 	sys->log<System::DEBUG2>("[Hydro::ICM] Generate random numbers");
 	CurandSafeCall(curandGenerateNormal(curng, thrust::raw_pointer_cast(random.data()), random.size(), 0.0, 1.0));
@@ -1151,14 +1125,16 @@ namespace uammd{
       //Compute \vec{\tilde{v}}^{n+1} from \vec{g}
       sys->log<System::DEBUG2>("[Hydro::ICM] Divergence free projection");
       applyStokesSolutionOperator();
+      
       CudaCheckError();
       //Given that m_e = 0, \vec{v}^{n+1} = \vec{\tilde{v}}^{n+1}
-      try{
-	gridVels.swap(gridVelsPrediction);
-      }
-      catch(thrust::system_error &e){
-	sys->log<System::CRITICAL>("[Hydro::ICM] Thrust could not swap grid velocities arrays with error: %s", e.what());
-      }
+      gridVelsPrediction = gridVels;
+      // try{
+      // 	gridVels.swap(gridVelsPrediction);
+      // }
+      // catch(thrust::system_error &e){
+      // 	sys->log<System::CRITICAL>("[Hydro::ICM] Thrust could not swap grid velocities arrays with error: %s", e.what());
+      // }
       //Take particles to t_{n+1}
       sys->log<System::DEBUG2>("[Hydro::ICM] Corrector step");
       correctorStep();
