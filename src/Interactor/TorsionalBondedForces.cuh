@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2020. Four bonded forces, AKA torsional springs.
+/*Raul P. Pelaez 2019-2021. Four bonded forces, AKA torsional springs.
 
   Joins four particles with a torsional bond i---j---k---l
 
@@ -213,7 +213,7 @@ namespace uammd{
 	  return real(0.0);
 	const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*rsqrt(v123q)*rsqrt(v234q)));
 	const real dphi = signOfPhi(r12, r23, r34)*acos(cosPhi) - bond_info.phi0;
-	return bond_info.kdih*(1+cos(dphi));  //U=kdih(1+cos(phi-phi0))
+	return real(0.25)*bond_info.kdih*(1+cos(dphi));  //U=kdih(1+cos(phi-phi0))
       }
 
     private:

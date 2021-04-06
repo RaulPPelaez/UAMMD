@@ -1,5 +1,5 @@
 /*
-  Raul P. Pelaez 2017-2020. Bonded Forces Interactor implementation. AKA two body bonds
+  Raul P. Pelaez 2017-2021. Bonded Forces Interactor implementation. AKA two body bonds
 
   This module implements an algorithm to compute the force between two particles, or a particle and a point in space) joined a bond.
 
@@ -80,7 +80,7 @@ namespace uammd{
 	if(r2==real(0.0)) return real(0.0);
 	real r = sqrt(r2);
 	const real dr = r-bi.r0;
-	return real(0.5)*bi.k*dr*dr;
+	return real(0.25)*bi.k*dr*dr;
       }
 
     };
@@ -109,7 +109,7 @@ namespace uammd{
       inline __device__ real energy(int i, int j, const real3 &r12, const BondInfo &bi){
 	real r2 = dot(r12, r12);
 	real r02 = bi.r0*bi.r0;
-	return -real(0.5)*bi.k*r02*log(real(1.0)-r2/r02);
+	return -real(0.25)*bi.k*r02*log(real(1.0)-r2/r02);
       }
 
 
