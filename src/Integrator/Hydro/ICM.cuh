@@ -1,9 +1,7 @@
 /*Raul P. Pelaez 2018-2021. Inertial Coupling Method for particles in an incompressible fluctuating fluid.
 
-
 This file implements the algorithm described in [1] for PBC using FFT to solve the stokes operator. Fluid properties are stored in a staggered grid for improved translational invariance [2]. ICM solves the incompressible fluctuating Navier-Stokes equation and couples the resulting fluid with immersed particles particles with the Immerse Boundary Method.
 Currently the case with excess mass 0 is encoded.
-
 
 USAGE:
 
@@ -20,7 +18,7 @@ par.hydrodynamicRadius = 1.0;
 //In any case a message will be issued with the used hydrodynamic radius.
 par.dt = 0.01;
 par.box = Box(64);
-//par.sumThermalDrift = false; //Default is true, controls if the thermal drift is taken into account or not.
+//par.sumThermalDrift = false; //Default is false, controls if the thermal drift is taken into account or not.
 
 auto bdhi = make_shared<BDHI::FIB>(pd, sys, par);
 
@@ -30,9 +28,6 @@ bdhi->forwardTime();
 
 The function getSelfMobility() will return the self mobility of the particles.
 The function getHydrodynamicRadius() will return the used hydrodynamic radius. You should expect a variation of +- 1% between this value and the one you measure from simulations.
-
-
-
 ---------------
 
 A brief summary of the algorithm:
@@ -59,7 +54,6 @@ On the other hand the particles and fluid are coupled with:
 Where J is the interpolation operator defined as J^T = dV·S
 Where dV is the volume of a grid cell.
 
-
 The particles are updated following the mid point (predictor-corrector) scheme developed in [1].
 
 About J and S:
@@ -68,9 +62,8 @@ S_cellj = sum_i=0^N{\delta(ri-r_cellj)} ->particles to fluid
 J_i = dV·sum_j=0^ncells{\delta(ri-r_cellj)}->fluid to particles
 
 Where \delta is an spreading kernel (smeared delta).
-The default kernel used is the 3-point Peskin kernel, see IBM_kernels.cuh. 
+The default kernel used is the 3-point Peskin kernel, see IBM_kernels.cuh.
 But others can be selected with arbitrary support to better describe or satisfy certain conditions.
-
 
 The thermal drift is computed using random finite diferences as explained in [3].
 
@@ -112,13 +105,13 @@ namespace uammd{
 	real dt;
 	Box box;
 	int3 cells={-1, -1, -1}; //Default is compute the closest number of cells that is a FFT friendly number
-	bool sumThermalDrift = true;
+	bool sumThermalDrift = false; //Thermal drift has a neglegible contribution in ICM
       };
 
       ICM(shared_ptr<ParticleData> pd,
-	  shared_ptr<System> sys,		       
+	  shared_ptr<System> sys,
 	  Parameters par);
-      				     
+
       ~ICM();
 
       void forwardTime() override;
@@ -139,44 +132,44 @@ namespace uammd{
       using Kernel = IBM_kernels::Peskin::threePoint;
       real temperature, viscosity, density;
       bool sumThermalDrift;
-      
-      shared_ptr<CellList> cl;
-      
+
       Grid grid;
       Box box;
-      
+
+      cudaStream_t st;
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
-
       //Grid forces/velocities in fourier/real space
       thrust::device_vector<real3> gridVels;
-      thrust::device_vector<real3> gridVelsPrediction;
-      thrust::device_vector<cufftComplex> gridVelsPredictionF; 
+      //thrust::device_vector<real3> gridVelsPrediction;
+      thrust::device_vector<cufftComplex> gridVelsPredictionF;
       thrust::device_vector<real3> cellAdvection;
       curandGenerator_t curng;
-      thrust::device_vector<real> random;           
+      thrust::device_vector<real> random;
       real deltaRFD;
-      
-      //Temporal integration variables
-      real dt;           
-      
+      real dt;
+
       thrust::device_vector<real4> posOld; //q^n
-    
-      ullint step = 0;
-      
-      ullint seed = 1234;
-      
+
+      uint step = 0;
+
+      uint seed = 1234;
+
+      void initializeGrid(Parameters par);
+      void printMessages(Parameters par);
       void initCuFFT();
       void initFluid();
+      void initCuRAND();
+      void resizeContainers();
       void spreadParticleForces();
       void thermalDrift();
       void unperturbedFluidForcing();
 
       void applyStokesSolutionOperator();
-    
+
       void predictorStep();
       void correctorStep();
-    
+
     };
 
   }
