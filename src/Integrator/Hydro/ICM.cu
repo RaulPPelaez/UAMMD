@@ -695,6 +695,16 @@ namespace uammd{
 	return advection;
       }
 
+      //Any external force acting on the fluid
+      __device__ real3 externalFluidForcing(int3 cell, int icell,
+					    const real3* gridVels,
+					    Grid grid){
+	real3 f = real3();
+	// real pos = (cell.x-real(0.5)*grid.cellDim.x + real(0.5))*grid.cellSize.x;
+	// f.y = -sin(real(2.0*M_PI*2)*pos);
+	return f;
+      }
+
       //Computes fluid forcing \vec{g} (except the SF and thermal drift terms) for the unperturbed velocity field (unperturbed means that m_e = 0). See eq. 36 and 41 in [1]
       __global__ void updateCellVelocityUnperturbed(real3 *gridVels,
 						    real3 *cellAdvection,
@@ -721,7 +731,8 @@ namespace uammd{
 	real3 advection = computeAdvection(cell, icell, gridVels, grid, density);
 	gridVels[icell] += (dt*viscosity*real(0.5)/density)*Lv +
 	  DivNoise -
-	  (dt/density)*(real(1.5)*advection - real(0.5)*cellAdvection[icell]);
+	  (dt/density)*(real(1.5)*advection - real(0.5)*cellAdvection[icell])
+	  + dt/density*externalFluidForcing(cell, icell, gridVels, grid);
 	cellAdvection[icell] = advection;
       }
     }

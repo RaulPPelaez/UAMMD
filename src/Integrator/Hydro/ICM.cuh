@@ -84,9 +84,7 @@ REFERENCES:
 #include"utils/cufftComplex3.cuh"
 #include"Integrator/Integrator.cuh"
 #include<thrust/device_vector.h>
-
 #include "utils/utils.h"
-#include"Interactor/NeighbourList/CellList.cuh"
 #include"utils/cufftPrecisionAgnostic.h"
 #include"utils/Grid.cuh"
 #include<curand.h>
@@ -128,6 +126,16 @@ namespace uammd{
       real getHydrodynamicRadius(){
 	return 0.91*box.boxSize.x/(real)grid.cellDim.x;
       }
+
+      const real3* getFluidVelocities(){
+	real3* gridData = thrust::raw_pointer_cast(gridVels.data());
+	return gridData;
+      }
+
+      int3 getNumberFluidCells(){
+	return grid.cellDim;
+      }
+
     private:
       using Kernel = IBM_kernels::Peskin::threePoint;
       real temperature, viscosity, density;
