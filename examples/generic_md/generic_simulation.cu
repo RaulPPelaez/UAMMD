@@ -485,7 +485,7 @@ void writeSimulation(UAMMD sim){
   out<<"#Lx="<<L.x*0.5<<";Ly="<<L.y*0.5<<";Lz="<<L.z*0.5<<";\n";
   auto pos = sim.pd->getPos(access::location::cpu, access::mode::read);
   auto vel = sim.pd->getVelIfAllocated(access::location::cpu, access::mode::read);
-  auto energy = sim.pd->getEnergy(access::location::cpu, access::mode::read);
+  auto energy = sim.pd->getEnergyIfAllocated(access::location::cpu, access::mode::read);
   fori(0, sim.par.numberParticles){
     //real3 p = box.apply_pbc(make_real3(pos[id2index[i]]));
     real3 p = make_real3(pos[id2index[i]]);
