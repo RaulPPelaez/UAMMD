@@ -1,7 +1,7 @@
 #The target CUDA compute capability(s), if set to AUTO it will be autodetected, if empty no arch will be specified
 #ARCH ?= 50 52 60 61 70 75
 #ARCH=AUTO
-ARCH=75
+ARCH=
 #C++ compiler, I tested up to clang++-9.0
 #CXX=clang++-9.0
 CXX=g++
