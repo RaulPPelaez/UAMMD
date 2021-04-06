@@ -12,6 +12,7 @@ Integration schemes (one must be chosen):
    * **SPH**: Smooth Particle Hydrodynamics  
    * **DPD**: Dissipative Particle Dynamics  
    * **FIB**: Fluctuating Immersed Boundary  
+   * **ICM**: Inertial Coupling Method  
 	
 Interaction modules:  
 
