@@ -79,10 +79,11 @@ namespace uammd{
 	const real3 pi = make_real3(pos[id]);
 	const real3 spreadQuantity = make_real3(force[id])*prefactor;
 	//Corresponding cell of each direction in the staggered grid
-	const int3 cellix = grid.getCell(make_real3(pi.x - real(0.5)*grid.cellSize.x, pi.y, pi.z));
-	const int3 celliy = grid.getCell(make_real3(pi.x, pi.y - real(0.5)*grid.cellSize.y, pi.z));
-	const int3 celliz = grid.getCell(make_real3(pi.x, pi.y, pi.z - real(0.5)*grid.cellSize.z));
-	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize); //Cell index to cell center position
+	const real3 h = grid.cellSize;
+	const int3 cellix = grid.getCell(make_real3(pi.x - real(0.5)*h.x, pi.y, pi.z));
+	const int3 celliy = grid.getCell(make_real3(pi.x, pi.y - real(0.5)*h.y, pi.z));
+	const int3 celliz = grid.getCell(make_real3(pi.x, pi.y, pi.z - real(0.5)*h.z));
+	const real3 cellPosOffset = real(0.5)*(h - grid.box.boxSize); //Cell index to cell center position
 	constexpr int P = Kernel::support/2;
 	constexpr int supportCells = Kernel::support;
 	constexpr int numberNeighbourCells = supportCells*supportCells*supportCells;
@@ -97,9 +98,9 @@ namespace uammd{
 
 	    const int jcellx = grid.getCellIndex(celljx);
 	    /*Staggered distance from q - noise to center of cell j*/
-	    const real3 rijx = pi-make_real3(celljx)*grid.cellSize-cellPosOffset;
+	    const real3 rijx = pi-make_real3(celljx)*h-cellPosOffset;
 	    //Spread Wx
-	    auto r = grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.x, rijx.y, rijx.z});
+	    auto r = grid.box.apply_pbc({rijx.x - real(0.5)*h.x, rijx.y, rijx.z});
 	    real fx = kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*spreadQuantity.x;
 	    atomicAdd(&gridData[jcellx].x, fx);
 	  }
@@ -110,8 +111,8 @@ namespace uammd{
 				    celliy.z + i/(supportCells*supportCells) - P );
 	    celljy = grid.pbc_cell(celljy);
 	    const int jcelly = grid.getCellIndex(celljy);
-	    const real3 rijy = pi - make_real3(celljy)*grid.cellSize-cellPosOffset;
-	    auto r = grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z});
+	    const real3 rijy = pi - make_real3(celljy)*h-cellPosOffset;
+	    auto r = grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*h.y, rijy.z});
 	    real fy = kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*spreadQuantity.y;
 	    atomicAdd(&gridData[jcelly].y, fy);
 	  }
@@ -122,8 +123,8 @@ namespace uammd{
 				    celliz.z + i/(supportCells*supportCells) - P );
 	    celljz = grid.pbc_cell(celljz);
 	    const int jcellz = grid.getCellIndex(celljz);
-	    const real3 rijz = pi-make_real3(celljz)*grid.cellSize-cellPosOffset;
-	    auto r = grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z});
+	    const real3 rijz = pi-make_real3(celljz)*h-cellPosOffset;
+	    auto r = grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*h.z});
 	    real fz = kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*spreadQuantity.z;
 	    atomicAdd(&gridData[jcellz].z, fz);
 	  }
@@ -860,7 +861,7 @@ namespace uammd{
       int3 cdtmp = {grid.cellDim.z, grid.cellDim.y, grid.cellDim.x};
       /*I want to make three 3D FFTs, each one using one of the three interleaved coordinates*/
       CufftSafeCall(cufftMakePlanMany(cufft_plan_forward,
-				      3, &grid.cellDim.x, /*Three dimensional FFT*/
+				      3, &cdtmp.x, /*Three dimensional FFT*/
 				      &cdtmp.x,
 				      /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
 				      3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
@@ -873,7 +874,7 @@ namespace uammd{
       sys->log<System::DEBUG>("[Hydro::ICM] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
       /*Same as above, but with C2R for inverse FFT*/
       CufftSafeCall(cufftMakePlanMany(cufft_plan_inverse,
-				      3, &grid.cellDim.x, /*Three dimensional FFT*/
+				      3, &cdtmp.x, /*Three dimensional FFT*/
 				      &cdtmp.x,
 				      /*Each FFT starts in 1+previous FFT index. FFTx in 0*/
 				      3, 1, //Each element separated by three others x0 y0 z0 x1 y1 z1...
