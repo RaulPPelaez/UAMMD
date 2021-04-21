@@ -103,13 +103,15 @@ namespace uammd{
 	  updatable->updateTimeStep(dt);
 	}
 	for(auto forceComp: interactors){
-	  forceComp->sumForce(stream);
+	  forceComp->sum({.force = true, .energy= false, .virial = false}, stream);
 	}
 	CudaSafeCall(cudaDeviceSynchronize());
       }
       //First integration step and force reset
       callIntegrate<1>();
-      for(auto forceComp: interactors) forceComp->sumForce(stream);
+      for(auto forceComp: interactors){
+	forceComp->sum({.force = true, .energy= false, .virial = false}, stream);
+      }
       CudaCheckError();
       //Second integration step
       callIntegrate<2>();

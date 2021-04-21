@@ -27,6 +27,12 @@ Integrator
 #include"third_party/type_names.h"
 #include"misc/ParameterUpdatable.h"
 namespace uammd{
+  struct Computables{
+    bool force = false;
+    bool energy = false;
+    bool virial = false;
+  };
+  
   class Interactor: public virtual ParameterUpdatable{
   protected:
     string name;
@@ -79,6 +85,18 @@ namespace uammd{
       return sumEnergy();
     }
 
+    virtual void sum(Computables comp, cudaStream_t st){
+      if(comp.force and comp.energy){
+	sumForceEnergy(st);
+      }
+      else if (comp.force){
+	sumForce(st);
+      }
+      else if(comp.energy){
+	sumEnergy();
+      }
+    }
+    
     //The compute function can perform any arbitrary computation without any warranties about what it does.
     //Look in the wiki page for each Interactor for information on how to use this function.
     virtual void compute(cudaStream_t st = 0){
