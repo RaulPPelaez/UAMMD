@@ -82,7 +82,15 @@ namespace uammd{
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
+	computeMFNearField(MF, st);
+	computeMFFarField(MF, st);
+      }
+
+      void computeMFNearField(real3* MF, cudaStream_t st){
 	nearField->Mdot(MF, st);
+      }
+
+      void computeMFFarField(real3* MF, cudaStream_t st){
 	farField->Mdot(MF, st);
       }
 
