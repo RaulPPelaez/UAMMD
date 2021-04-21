@@ -874,8 +874,9 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::FIB] Corrector");
       // //q^n+1 = q^n + dt·J^{n+1/2}·v
       correctorStep();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime((step+1)*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime((step+1)*dt);
     }
+
     //forwards the simulation to the next time step with the improved midpoint scheme in [1]
     void FIB::forwardImprovedMidpoint(){
       sys->log<System::DEBUG2>("[BDHI::FIB] Reset fluid velocity");
@@ -901,7 +902,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::FIB] Predictor step");
       //q^{n+1/2} = q^n + dt/2·J^n·v
       predictorStep();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime((step+0.5)*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime((step+0.5)*dt);
       //Clean velocity for next half step
       thrust::fill(gridVels.begin(), gridVels.end(), real3());
       //sqrt(vis·kT/(dt·dV))·\hat{D}(\bf{W}^{n,1}+\bf{W}^{n,2})
@@ -928,7 +929,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::FIB] Corrector");
       //q^n+1 = q^n + dt·J^{n+1/2}·v
       correctorStep();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime((step+1)*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime((step+1)*dt);
     }
 
     //Takes the simulation to the nxt time step
@@ -936,14 +937,14 @@ namespace uammd{
       CudaCheckError();
       step++;
       if(step==1){
-	for(auto forceComp: interactors){
-	  forceComp->updateSimulationTime(0);
-	  forceComp->updateTimeStep(dt);
-	  forceComp->updateTemperature(temperature);
-	  forceComp->updateBox(box);
+	for(auto updatable: updatables){
+	  updatable->updateSimulationTime(0);
+	  updatable->updateViscosity(viscosity);
+	  updatable->updateTimeStep(dt);
+	  updatable->updateTemperature(temperature);
+	  updatable->updateBox(box);
 	}
       }
-
       sys->log<System::DEBUG1>("[BDHI::FIB] Performing step");
       switch(scheme){
       case Scheme::MIDPOINT:

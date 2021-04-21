@@ -154,15 +154,17 @@ namespace uammd{
 
     //Move the particles in my group 1 dt in time.
     void Basic::forwardTime(){
-      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime(steps*dt);
       steps++;
       sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
       //First simulation step is special
       if(steps==1){
 	resetForces();
+	for(auto updatable: updatables){
+	  updatable->updateTimeStep(dt);
+	  updatable->updateTemperature(temperature);
+	}
 	for(auto forceComp: interactors){
-	  forceComp->updateTimeStep(dt);
-	  forceComp->updateTemperature(temperature);
 	  forceComp->sumForce(stream);
 	}
 	cudaDeviceSynchronize();

@@ -125,13 +125,13 @@ namespace uammd{
       sys->log<System::DEBUG1>("[BDHI::EulerMaruyama] Performing integration step %d", steps);
       //dR = dt(KR+MF) + sqrt(2*T*dt)·BdW
       steps++;
-
-      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*par.dt);
-
+      for(auto updatable: updatables) updatable->updateSimulationTime(steps*par.dt);
       if(steps==1){
+	for(auto updatable: updatables){
+	  updatable->updateTimeStep(par.dt);
+	  updatable->updateTemperature(par.temperature);
+	}
 	for(auto forceComp: interactors){
-	  forceComp->updateTimeStep(par.dt);
-	  forceComp->updateTemperature(par.temperature);
 	  forceComp->updateBox(par.box);
 	}
       }

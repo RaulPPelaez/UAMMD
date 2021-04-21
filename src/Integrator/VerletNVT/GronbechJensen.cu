@@ -88,20 +88,21 @@ namespace uammd{
 									   noiseAmplitude,
 									   steps, seed);
       CudaCheckError();
-
     }
     //Move the particles in my group 1 dt in time.
     void GronbechJensen::forwardTime(){
       CudaCheckError();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime(steps*dt);
       steps++;
       sys->log<System::DEBUG1>("[%s] Performing integration step %d", name.c_str(), steps);
       //First simulation step is special
       if(steps==1){
 	resetForces();
+	for(auto updatable: updatables){
+	  updatable->updateTemperature(temperature);
+	  updatable->updateTimeStep(dt);
+	}
 	for(auto forceComp: interactors){
-	  forceComp->updateTemperature(temperature);
-	  forceComp->updateTimeStep(dt);
 	  forceComp->sumForce(stream);
 	}
 	CudaSafeCall(cudaDeviceSynchronize());

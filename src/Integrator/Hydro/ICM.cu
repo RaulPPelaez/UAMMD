@@ -1094,19 +1094,20 @@ namespace uammd{
     void ICM::forwardTime(){
       step++;
       if(step==1){
-	for(auto forceComp: interactors){
-	  forceComp->updateTemperature(temperature);
-	  forceComp->updateTimeStep(dt);
-	  forceComp->updateBox(box);
-	  forceComp->updateSimulationTime(0);
-	  forceComp->sumForce(0);
+	for(auto updatable: updatables){
+	  updatable->updateTemperature(temperature);
+	  updatable->updateTimeStep(dt);
+	  updatable->updateViscosity(viscosity);
+	  updatable->updateBox(box);
+	  updatable->updateSimulationTime(0);
 	}
+	for(auto forceComp: interactors) forceComp->sumForce(0);
 	cudaDeviceSynchronize();
       }
       sys->log<System::DEBUG1>("[Hydro::ICM] Performing integration step %d", step);
       //Take particles to t_{n+1/2}
       predictorStep();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime((step-0.5)*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime((step-0.5)*dt);
       //Compute unperturbed fluid forcing \vec{g}
       unperturbedFluidForcing();
       spreadParticleForces(); //Sum SF
@@ -1117,7 +1118,7 @@ namespace uammd{
       //gridVelsPrediction = gridVels;
       //Take particles to t_{n+1}
       correctorStep();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime(step*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime(step*dt);
       CudaCheckError();
     }
   }
