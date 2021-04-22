@@ -60,7 +60,8 @@ namespace uammd{
 	currentNeighbourCounter++;
 	currentNeighbourCounter = currentNeighbourCounter>=numberNeighbours?noMoreNeighbours:currentNeighbourCounter;
 	int counter = currentNeighbourCounter;
-	int index = counter!=noMoreNeighbours?nl.neighbourList[firstNeighbourIndex + counter]:noMoreNeighbours;
+	//int index = counter!=noMoreNeighbours?nl.neighbourList[firstNeighbourIndex + counter]:noMoreNeighbours;
+	int index = counter!=noMoreNeighbours?nl.neighbourList[counter*firstNeighbourIndex + particleIndex]:noMoreNeighbours;
 	currentNeighbourIndex = index;
       }
 

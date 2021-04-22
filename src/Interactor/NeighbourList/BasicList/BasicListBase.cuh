@@ -43,7 +43,7 @@ namespace uammd{
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=numberParticles) return;
       int nneigh = 0;
-      const int offset = id*maxNeighboursPerParticle;
+      //const int offset = id*maxNeighboursPerParticle;
       const real3 pi = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + id));
       ni.set(id);
       auto it = ni.begin();
@@ -58,7 +58,7 @@ namespace uammd{
 	    atomicMax(tooManyNeighboursFlag, nneigh);
 	    return;
 	  }
-	  neighbourList[offset + nneigh-1] = cur_j;
+	  neighbourList[(nneigh-1)*numberParticles + id] = cur_j;
 	}
       }
       numberNeighbours[id] = nneigh;
@@ -80,7 +80,8 @@ namespace uammd{
 	stride(str){}
       int stride;
       inline __host__ __device__ int operator()(const int &index) const{
-	return index*stride;
+	//return index*stride;
+	return stride;
       }
     };
 
@@ -142,13 +143,14 @@ namespace uammd{
       nl.numberNeighbours = thrust::raw_pointer_cast(numberNeighbours.data());
       nl.sortPos = cld.sortPos;
       nl.groupIndex = cld.groupIndex;
-      nl.particleStride = StrideIterator(CountingIterator(0), NeighbourListOffsetFunctor(maxNeighboursPerParticle));
+      //nl.particleStride = StrideIterator(CountingIterator(0), NeighbourListOffsetFunctor(maxNeighboursPerParticle));
+      nl.particleStride = StrideIterator(CountingIterator(0), NeighbourListOffsetFunctor(numberNeighbours.size()));
       return nl;
     }
 
   private:
     void resizeNeighbourListToCurrent(int numberParticles){
-      neighbourList.resize(numberParticles*maxNeighboursPerParticle);
+      neighbourList.resize(numberParticles*(maxNeighboursPerParticle+1));
       numberNeighbours.resize(numberParticles);
     }
 

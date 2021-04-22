@@ -54,6 +54,7 @@ Which has a lot of information. From basic functionality to descriptions and ref
 //Each UAMMD module has its own header, with uammd.cuh being the header with the basic structures
 #include"uammd.cuh"
 #include"Interactor/PairForces.cuh"
+#include"Interactor/NeighbourList/VerletList.cuh"
 #include"Interactor/Potential/Potential.cuh"
 #include"Interactor/ExternalForces.cuh"
 #include"Interactor/BondedForces.cuh"
@@ -81,6 +82,7 @@ Which has a lot of information. From basic functionality to descriptions and ref
 //The header with the Potentials/Parameters used in this code
 #include"customizations.cuh"
 
+using NeighbourList = VerletList;
 using namespace uammd;
 
 //Lets use this struct to pass around the basic uammd environment
@@ -248,7 +250,7 @@ std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
   par.initVelocities = false;
   auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
   auto verlet = std::make_shared<NVE>(sim.pd, pg, sim.sys, par);
-  using DPD = PairForces<Potential::DPD>;
+  using DPD = PairForces<Potential::DPD, NeighbourList>;
   Potential::DPD::Parameters dpd_params;
   dpd_params.cutOff = sim.par.cutOff_dpd;
   dpd_params.temperature = sim.par.temperature;
@@ -388,7 +390,7 @@ std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
 std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim){
   //The potential used is defined in customizations.cuh and describes an LJ interaction by default
   auto pot = std::make_shared<ShortRangePotential>(sim.par);
-  using SR = PairForces<ShortRangePotential>;
+  using SR = PairForces<ShortRangePotential, NeighbourList>;
   typename SR::Parameters params;
   params.box = Box(sim.par.L);
   auto pairForces = std::make_shared<SR>(sim.pd, sim.sys, params, pot);
