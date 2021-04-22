@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017.
+/*Raul P. Pelaez 2017-2021.
 
   A parameter communication interface, anything that inherits from ParameterUpdatable can be called through update* to communicate a parameter change using a common interface. Parameters related with the particle data are communicated using ParticleData (like number of particles).
 
@@ -20,13 +20,16 @@
 #include"utils/Box.cuh"
 
 
+#ifndef EXTRA_UPDATABLE_PARAMETERS
+#define EXTRA_UPDATABLE_PARAMETERS 
+#endif
 //Add here any parameter you want along its type, after adding it here the function updateWHATEVER(type) will
 //be available for all ParameterUpdatable modules
 #define PARAMETER_LIST ((TimeStep, real)) \
                        ((SimulationTime, real)) \
                        ((Box, Box)) \
                        ((Temperature, real)) \
-                       ((Viscosity, real))
+                       ((Viscosity, real)) EXTRA_UPDATABLE_PARAMETERS
 
 
 
