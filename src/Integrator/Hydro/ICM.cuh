@@ -105,6 +105,7 @@ namespace uammd{
 	Box box;
 	int3 cells={-1, -1, -1}; //Default is compute the closest number of cells that is a FFT friendly number
 	bool sumThermalDrift = false; //Thermal drift has a neglegible contribution in ICM
+	bool removeTotalMomemtum = true; //Set the total fluid momentum to zero in each step
       };
 
       ICM(shared_ptr<ParticleData> pd,
@@ -153,7 +154,7 @@ namespace uammd{
       using Kernel = IBM_kernels::Peskin::threePoint;
       real temperature, viscosity, density;
       bool sumThermalDrift;
-
+      bool removeTotalMomemtum;
       Grid grid;
       Box box;
 
