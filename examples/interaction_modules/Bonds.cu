@@ -100,7 +100,6 @@ struct HarmonicBond{
 
 //This angular potential is similar to the HarmonicBond above, the difference is that
 //Now three particles are involved in each bond instead of two
-
 struct Angular{
   Box box;
   Angular(real3 lbox/*Parameters par*/): box(Box(lbox)){}

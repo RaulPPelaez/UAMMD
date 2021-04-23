@@ -2,6 +2,7 @@
 
   Joins four particles with a torsional bond i---j---k---l
 
+  This Interactor is just an specialization of BondedForces for the case of 4 particles per bond.
   Needs an input file containing the bond information as:
   nbonds
   i j k l BONDINFO
@@ -34,41 +35,38 @@
 #ifndef TORSIONALBONDEDFORCES_CUH
 #define TORSIONALBONDEDFORCES_CUH
 
-#include"Interactor.cuh"
-#include"global/defines.h"
-#include<thrust/device_vector.h>
-#include<vector>
-#include"utils/exception.h"
-#include<limits>
+#include"Interactor/BondedForces.cuh"
 
 namespace uammd{
 
   namespace BondedType{
+    //An harmonic torsional bond
     struct Torsional{
     private:
-
+      
       __device__ real3 cross(real3 a, real3 b){
 	return make_real3(a.y*b.z - a.z*b.y, (-a.x*b.z + a.z*b.x), a.x*b.y - a.y*b.x);
       }
 
     public:
       Box box;
-      Torsional(Box box): box(box){}
-
+      Torsional(real3 lbox /*Parameters par*/): box(Box(lbox)){}
+      //Place in this struct whatever static information is needed for a given bond
+      //In this case spring constant and equilibrium distance
+      //the function readBond below takes care of reading each BondInfo from the file
       struct BondInfo{
 	real phi0, k;
       };
-
-      inline __device__ real3 force(int j, int k, int m, int n,
-				    int bond_index,
-				    const real3 &posj,
-				    const real3 &posk,
-				    const real3 &posm,
-				    const real3 &posn,
-				    const BondInfo &bond_info){
-	const real3 rjk = box.apply_pbc(posk - posj);
-	const real3 rkm = box.apply_pbc(posm - posk);
-	const real3 rmn = box.apply_pbc(posn - posm);
+      //This function will be called for every bond read in the bond file and is expected to compute force/energy and or virial
+      //bond_index: The index of the particle to compute force/energy/virial on
+      //ids: list of indexes of the particles involved in the current bond
+      //pos: list of positions of the particles involved in the current bond
+      //comp: computable targets (wether force, energy and or virial are needed).
+      //bi: bond information for the current bond (as returned by readBond)
+      inline __device__ ComputeType compute(int bond_index, int ids[4], real3 pos[4], Interactor::Computables comp, BondInfo bi){
+	const real3 rjk = box.apply_pbc(pos[1] - pos[0]);
+	const real3 rkm = box.apply_pbc(pos[2] - pos[1]);
+	const real3 rmn = box.apply_pbc(pos[3] - pos[2]);
 	real3 njkm = cross(rjk, rkm);
 	real3 nkmn = cross(rkm, rmn);
 	const real n2 = dot(njkm, njkm);
@@ -82,43 +80,39 @@ namespace uammd{
 	  // #ifdef SMALL_ANGLE_BENDING
 	  const real phi = acos(cosphi);
 	  if(cosphi*cosphi <= 1 and phi*phi > 0){
-	    Fmod = -bond_info.k*(phi - bond_info.phi0)/sin(phi);
+	    Fmod = -bi.k*(phi - bi.phi0)/sin(phi);
 	  }
 	  //#endif
 	  njkm *= invn;
 	  nkmn *= invnn;
+	  ComputeType ct{};
 	  const real3 v1 = (nkmn - cosphi*njkm)*invn;
 	  const real3 fj = Fmod*cross(v1, rkm);
-	  if(bond_index == j){
-	    return real(-1.0)*fj;
+	  if(bond_index == ids[1]){
+	    ct.force = real(-1.0)*fj;
+	    return ct;
 	  }
 	  const real3 v2 = (njkm - cosphi*nkmn)*invnn;
 	  const real3 fk = Fmod*cross(v2, rmn);
 	  const real3 fm = Fmod*cross(v1, rjk);
-	  if(bond_index == k){
-	    return fm + fj - fk;
+	  if(bond_index == ids[2]){
+	    ct.force = fm + fj - fk;
+	    return ct;
 	  }
 	  const real3 fn = Fmod*cross(v2, rkm);
-	  if(bond_index == m){
-	    return fn + fk - fm;
+	  if(bond_index == ids[3]){
+	    ct.force = fn + fk - fm;
+	    return ct;
 	  }
-	  if(bond_index == n){
-	    return real(-1.0)*fn;
+	  else if(bond_index == ids[4]){
+	    ct.force = real(-1.0)*fn;
+	    return ct;
 	  }
 	}
-        return real3();
+	return ComputeType{};
       }
-
-      inline __device__ real energy(int j, int k, int m, int n,
-				    int bond_index,
-				    const real3 &posj,
-				    const real3 &posk,
-				    const real3 &posm,
-				    const real3 &posn,
-				    const BondInfo &bond_info){
-	return 0;
-      }
-
+      //This function will be called for each bond in the bond file and read the information of a bond
+      //It must use the stream that is handed to it to construct a BondInfo.
       static BondInfo readBond(std::istream &in){
 	BondInfo bi;
 	in>>bi.k>>bi.phi0;
@@ -135,88 +129,87 @@ namespace uammd{
       Box box;
       FourierLAMMPS(Box box): box(box){}
 
+      //Place in this struct whatever static information is needed for a given bond
+      //In this case spring constant and equilibrium distance
+      //the function readBond below takes care of reading each BondInfo from the file
       struct BondInfo{
 	real phi0, kdih;
       };
 
+      //This function will be called for each bond in the bond file and read the information of a bond
+      //It must use the stream that is handed to it to construct a BondInfo.
       static BondInfo readBond(std::istream &in){
 	BondInfo bi;
 	in>>bi.kdih>>bi.phi0;
 	return bi;
       }
 
-      inline __device__ real3 force(int i1, int i2, int i3, int i4,
-                                    int bond_index,
-                                    real3 pos1,
-                                    real3 pos2,
-                                    real3 pos3,
-                                    real3 pos4,
-                                    BondInfo bond_info){
+      //This function will be called for every bond read in the bond file and is expected to compute force/energy and or virial
+      //bond_index: The index of the particle to compute force/energy/virial on
+      //ids: list of indexes of the particles involved in the current bond
+      //pos: list of positions of the particles involved in the current bond
+      //comp: computable targets (wether force, energy and or virial are needed).
+      //bi: bond information for the current bond (as returned by readBond)
+      inline __device__ ComputeType compute(int bond_index, int ids[4], real3 pos[4], Interactor::Computables comp, BondInfo bi){
 	//define useful quantities
-	  const real3 r12 = box.apply_pbc(pos2 - pos1);
-	  const real3 r23 = box.apply_pbc(pos3 - pos2);
-	  const real3 r34 = box.apply_pbc(pos4 - pos3);
-	  const real3 v123 = cross(r12, r23);
-	  const real3 v234 = cross(r23, r34);
-	  const real v123q = dot(v123, v123);
-	  const real v234q = dot(v234, v234);
-	  if(v123q < real(1e-15) or v234q < real(1e-15)){
-	    return make_real3(0);
-	  }
-	  const real invsqv123 = rsqrt(v123q);
-	  const real invsqv234 = rsqrt(v234q);
-	  const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*invsqv123 * invsqv234));
-	  const real phi = signOfPhi(r12, r23, r34)*acos(cosPhi);
-	  if(fabs(phi)<real(1e-10) or real(M_PI) - fabs(phi) < real(1e-10)){
-	    return make_real3(0);
-	  }
-	  /// in order to change the potential, you just need to modify this with (dU/dphi)/sin(phi)
-	  const real pref = -bond_info.kdih*sin(phi-bond_info.phi0)/sin(phi);
-	  //compute force
-	  const real3 vu234 = v234*invsqv234;
-	  const real3 vu123 = v123*invsqv123;
-	  const real3 w1 = (vu234 - cosPhi*vu123)*invsqv123;
-	  const real3 w2 = (vu123 - cosPhi*vu234)*invsqv234;
-	  if (bond_index == i1){
-	    return pref*make_real3(cross(w1, r23));
-	  }
-	  else if (bond_index == i2){
-	    const real3 r13 = box.apply_pbc(pos3 - pos1);
-	    return pref*make_real3(cross(w2, r34) - cross(w1, r13));
-	  }
-	  else if (bond_index == i3){
-	    const real3 r24 = box.apply_pbc(pos4 - pos2);
-	    return pref*make_real3(cross(w1, r12) - cross(w2, r24));
-	  }
-	  else if (bond_index == i4){
-	    return pref*make_real3(cross(w2, r23));
-	  }
-	  return make_real3(0);
-      }
-
-      inline __device__ real energy(int i1, int i2, int i3, int i4,
-                                    int bond_index,
-                                    real3 pos1,
-                                    real3 pos2,
-                                    real3 pos3,
-                                    real3 pos4,
-                                    BondInfo &bond_info){
-	//define useful quantities
-	const real3 r12 = box.apply_pbc(pos2 - pos1);
-	const real3 r23 = box.apply_pbc(pos3 - pos2);
-	const real3 r34 = box.apply_pbc(pos4 - pos3);
+	const real3 r12 = box.apply_pbc(pos[1] - pos[0]);
+	const real3 r23 = box.apply_pbc(pos[2] - pos[1]);
+	const real3 r34 = box.apply_pbc(pos[3] - pos[2]);
 	const real3 v123 = cross(r12, r23);
 	const real3 v234 = cross(r23, r34);
 	const real v123q = dot(v123, v123);
 	const real v234q = dot(v234, v234);
-	if (v123q < real(1e-15) || v234q < real(1e-15))
-	  return real(0.0);
-	const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*rsqrt(v123q)*rsqrt(v234q)));
-	const real dphi = signOfPhi(r12, r23, r34)*acos(cosPhi) - bond_info.phi0;
-	return real(0.25)*bond_info.kdih*(1+cos(dphi));  //U=kdih(1+cos(phi-phi0))
+	ComputeType ct{};
+	if(v123q < real(1e-15) or v234q < real(1e-15)){
+	  return ct;
+	}
+	if(comp.energy){
+	  const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*rsqrt(v123q)*rsqrt(v234q)));
+	  const real dphi = signOfPhi(r12, r23, r34)*acos(cosPhi) - bi.phi0;
+	  ct.energy = real(0.25)*bi.kdih*(1+cos(dphi));  //U=kdih(1+cos(phi-phi0))
+	}
+	if(not comp.force and not comp.virial) return ct;
+	const real invsqv123 = rsqrt(v123q);
+	const real invsqv234 = rsqrt(v234q);
+	const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*invsqv123 * invsqv234));
+	const real phi = signOfPhi(r12, r23, r34)*acos(cosPhi);
+	if(fabs(phi)<real(1e-10) or real(M_PI) - fabs(phi) < real(1e-10)){
+	  return ct;
+	}
+	/// in order to change the potential, you just need to modify this with (dU/dphi)/sin(phi)
+	const real pref = -bi.kdih*sin(phi-bi.phi0)/sin(phi);
+	//compute force
+	const real3 vu234 = v234*invsqv234;
+	const real3 vu123 = v123*invsqv123;
+	const real3 w1 = (vu234 - cosPhi*vu123)*invsqv123;
+	const real3 w2 = (vu123 - cosPhi*vu234)*invsqv234;
+	if (bond_index == ids[0]){
+	  ct.force = pref*make_real3(cross(w1, r23));
+	  ct.virial = comp.virial?:dot(ct.force, r23):0;
+	}
+	else if (bond_index == ids[1]){
+	  const real3 r13 = box.apply_pbc(pos3 - pos1);
+	  const real3 c34 = cross(w2, r34);
+	  const real3 c13 = cross(w1, r13);
+	  ct.force = pref*(cr34 - c13);
+	  ct.virial = comp.virial?:(dot(pref*c34, r34) - dot(pref*c13, r13)):0;
+	}
+	else if (bond_index == ids[2]){
+	  const real3 r24 = box.apply_pbc(pos4 - pos2);
+	  const real3 c12 = cross(w1, r12);
+	  const real3 c24 = cross(w2, r24);
+	  ct.force = pref*(c12 - c24);
+	  ct.virial = comp.virial?:(dot(pref*c12, r12) - dot(pref*c24, r24)):0;
+	}
+	else if (bond_index == ids[3]){
+	  ct.force = pref*(cross(w2, r23));
+	  ct.virial = comp.virial?:dot(ct.force, r23):0;
+	}
+	return ct;
       }
 
     private:
+
       inline __device__ real signOfPhi(real3 r12, real3 r23, real3 r34){
 	const real3 ru23 = r23*rsqrt(dot(r23, r23));
 	const real3 uloc1 = r12*rsqrt(dot(r12, r12));
@@ -231,138 +224,8 @@ namespace uammd{
 
   namespace TorsionalBondedForces_ns{
     using TorsionalBond = BondedType::Torsional;
-    template<class Bond>
-    class BondProcessor{
-      int numberParticles;
-      std::vector<std::vector<int>> isInBonds;
-      std::vector<Bond> bondList;
-      std::set<int> particlesWithBonds;
-
-      void registerParticleInBond(int particleIndex, int b){
-	isInBonds[particleIndex].push_back(b);
-	particlesWithBonds.insert(particleIndex);
-
-      }
-    public:
-
-      BondProcessor(int numberParticles):
-      numberParticles(numberParticles),
-	isInBonds(numberParticles){
-      }
-
-      void hintNumberBonds(int nbonds){
-	bondList.reserve(nbonds);
-      }
-
-      void registerBond(Bond b){
-	int bondIndex = bondList.size();
-	bondList.push_back(b);
-	registerParticleInBond(b.i, bondIndex);
-	registerParticleInBond(b.j, bondIndex);
-	registerParticleInBond(b.k, bondIndex);
-	registerParticleInBond(b.l, bondIndex);
-      }
-
-      std::vector<int> getParticlesWithBonds() const{
-	std::vector<int> pwb;
-	pwb.assign(particlesWithBonds.begin(), particlesWithBonds.end());
-	return std::move(pwb);
-      }
-
-      std::vector<Bond> getBondListOfParticle(int index) const{
-	std::vector<Bond> blst;
-	blst.resize(isInBonds[index].size());
-	fori(0, blst.size()){
-	  blst[i] = bondList[isInBonds[index][i]];
-	}
-	return std::move(blst);
-      }
-
-      void  checkDuplicatedBonds(){
-	//TODO
-      }
-    };
-
-    class BondReader{
-      std::ifstream in;
-      int nbonds = 0;
-    public:
-      BondReader(std::string bondFile): in(bondFile){
-	if(!in){
-	  throw std::runtime_error("[BondReader] File " + bondFile + " cannot be opened.");
-	}
-	in>>nbonds;
-      }
-
-      int getNumberBonds(){
-	return nbonds;
-      }
-
-      template<class Bond, class BondType>
-      Bond readNextBond(){
-	int i, j, k, l;
-	if(!(in>>i>>j>>k>>l)){
-	  throw std::ios_base::failure("File unreadable");
-	}
-	Bond bond;
-	bond.i = i;
-	bond.j = j;
-	bond.k = k;
-	bond.l = l;
-	bond.bond_info = BondType::readBond(in);
-	return bond;
-      }
-
-    };
-
   }
-
   template<class BondType>
-  class TorsionalBondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
-  public:
-
-    struct __align__(16) Bond{
-      int i,j,k,l;
-      typename BondType::BondInfo bond_info;
-    };
-
-    struct Parameters{
-      std::string file;
-    };
-
-    explicit TorsionalBondedForces(shared_ptr<ParticleData> pd,
-				   shared_ptr<System> sys,
-				   Parameters par,
-				   std::shared_ptr<BondType> bondType = std::make_shared<BondType>());
-    
-    explicit TorsionalBondedForces(shared_ptr<ParticleData> pd,
-				   shared_ptr<System> sys,
-				   Parameters par,
-				   BondType bondType):
-      TorsionalBondedForces(pd, sys, par, std::make_shared<BondType>(bondType)){}
-
-    ~TorsionalBondedForces() = default;
-
-    void sumForce(cudaStream_t st) override;
-    real sumEnergy() override;
-
-  private:
-    static constexpr int numberParticlesPerBond = 4;
-    using BondProcessor = TorsionalBondedForces_ns::BondProcessor<Bond>;
-    using BondReader = TorsionalBondedForces_ns::BondReader;
-
-    BondProcessor readBondFile(std::string bondFile);
-    void generateBondList(const BondProcessor &bondProcessor);
-
-    int nbonds;
-    thrust::device_vector<Bond> bondList;   //[All bonds involving the first particle with bonds, involving the second...] each bonds stores the id of the three particles in the bond. The id of the first/second... particle  with bonds is particlesWithBonds[i]
-    thrust::device_vector<int> bondStart, bondEnd; //bondStart[i], Where the list of bonds of particle with bond number i start (the id of particle i is particlesWithBonds[i].
-    thrust::device_vector<int> particlesWithBonds; //List of particle ids with at least one bond
-    int TPP; //Threads per particle
-
-    std::shared_ptr<BondType> bondType;
-  };
-
+  using TorsionalBondedForces = BondedForces<BondType, 4>;
 }
-#include"TorsionalBondedForces.cu"
 #endif
