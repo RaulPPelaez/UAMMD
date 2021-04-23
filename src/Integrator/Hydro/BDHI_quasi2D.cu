@@ -37,7 +37,7 @@ namespace uammd{
       if(!hydroKernel){
 	hydroKernel = std::make_shared<HydroKernel>();
       }
-      seed = sys->rng().next();
+      seed = sys->rng().next32();
       checkInputParametersValidity(par);
       box = Box(make_real3(par.box.boxSize.x, par.box.boxSize.y, 0));
       initializeGrid(par);

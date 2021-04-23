@@ -196,8 +196,8 @@ namespace uammd{
 
 
     private:
-      ullint seed;
-
+      uint seed;
+      int step = 0;
       real temperature;
       real dt;
       real viscosity;
