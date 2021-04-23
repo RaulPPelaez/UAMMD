@@ -81,9 +81,10 @@ namespace uammd{
       sys->log<System::MESSAGE>("[Integrator] %s created.", name.c_str());
       sys->log<System::MESSAGE>("[Integrator] Acting on group %s", pg->getName().c_str());
     }
-
+    //Take the simulation to the next time step
     virtual void forwardTime() = 0;
 
+    //Add to each particle (via ParticleData::getEnergy) the energy due to the Integrator (typically the kinetic energy)
     virtual real sumEnergy(){ return 0.0;}
 
     //Add an Interactor to the Integrator.
@@ -108,8 +109,7 @@ namespace uammd{
       return {updatables.begin(), updatables.end()};
     }
 
-};
-
+  };
 }
 
 #endif
