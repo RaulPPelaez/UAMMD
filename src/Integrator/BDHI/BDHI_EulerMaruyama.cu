@@ -130,9 +130,8 @@ namespace uammd{
 	for(auto updatable: updatables){
 	  updatable->updateTimeStep(par.dt);
 	  updatable->updateTemperature(par.temperature);
-	}
-	for(auto forceComp: interactors){
-	  forceComp->updateBox(par.box);
+	  updatable->updateBox(par.box);
+	  updatable->updateViscosity(par.viscosity);
 	}
       }
       resetForces();

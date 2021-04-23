@@ -173,9 +173,10 @@ namespace uammd{
       initializeVelocities();
     }
     resetForces();
+    for(auto updatable: updatables){
+      updatable->updateTimeStep(dt);
+    }
     for(auto forceComp: interactors){
-      forceComp->updateTimeStep(dt);
-      forceComp->sumForce(stream);
     }
   }
 
@@ -187,9 +188,10 @@ namespace uammd{
       firstStepPreparation();
     callIntegrate<1>();
     resetForces();
+    for(auto updatable: updatables){
+      updatable->updateSimulationTime(steps*dt);
+    }
     for(auto forceComp: interactors){
-      forceComp->updateSimulationTime(steps*dt);
-      forceComp->sumForce(stream);
     }
     callIntegrate<2>();
   }

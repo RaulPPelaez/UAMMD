@@ -183,6 +183,18 @@ namespace uammd{
 
     template<class HydroKernel>
     void BDHI2D<HydroKernel>::forwardTime(){
+      for(auto updatable: updatables){
+	updatable->updateSimulationTime(step*dt);
+      }
+      step++;
+      if(step==1){
+	for(auto updatable: updatables){
+	  updatable->updateTemperature(temperature);
+	  updatable->updateBox(box);
+	  updatable->updateTimeStep(dt);
+	  updatable->updateViscosity(viscosity);
+	}
+      }
       sys->log<System::DEBUG1>("[BDHI::BDHI2D] Performing step");
       resetContainers();
       for(auto inter: interactors){

@@ -95,6 +95,7 @@ namespace uammd{
       this->addUpdatable(an_interactor);
     }
 
+    //Get a list of the Interactors that have been added to the Integrator
     std::vector<std::shared_ptr<Interactor>> getInteractors(){
       return interactors;
     }
@@ -105,6 +106,8 @@ namespace uammd{
       updatables.emplace(an_updatable);
     }
 
+    //Get a list of the ParameterUpdatables that have been added to the Integrator
+    //Note that this also includes the Interactors
     std::vector<std::shared_ptr<ParameterUpdatable>> getUpdatables(){
       return {updatables.begin(), updatables.end()};
     }

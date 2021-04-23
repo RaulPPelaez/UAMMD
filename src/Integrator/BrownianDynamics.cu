@@ -71,13 +71,13 @@ namespace uammd{
     }
 
     void BaseBrownianIntegrator::updateInteractors(){
-      for(auto forceComp: interactors){
-	forceComp->updateSimulationTime(steps*dt);
+      for(auto updatable: updatables){
+        updatable->updateSimulationTime(steps*dt);
       }
       if(steps==1){
-	for(auto forceComp: interactors){
-	  forceComp->updateTimeStep(dt);
-	  forceComp->updateTemperature(temperature);
+	for(auto updatable: updatables){
+	  updatable->updateTemperature(temperature);
+	  updatable->updateTimeStep(dt);
 	}
       }
       CudaCheckError();
