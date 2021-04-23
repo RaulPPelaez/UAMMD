@@ -93,9 +93,7 @@ namespace uammd{
 
     void BaseBrownianIntegrator::computeCurrentForces(){
       resetForces();
-      for(auto forceComp: interactors){
-	forceComp->sumForce(st);
-      }
+      for(auto forceComp: interactors) forceComp->sum({.force =true, .energy = false, .virial = false}, st);
       CudaCheckError();
     }
 

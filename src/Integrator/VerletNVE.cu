@@ -177,6 +177,7 @@ namespace uammd{
       updatable->updateTimeStep(dt);
     }
     for(auto forceComp: interactors){
+      forceComp->sum({.force = true, .energy = false, .virial = false}, stream);
     }
   }
 
@@ -192,6 +193,7 @@ namespace uammd{
       updatable->updateSimulationTime(steps*dt);
     }
     for(auto forceComp: interactors){
+      forceComp->sum({.force = true, .energy = false, .virial = false}, stream);
     }
     callIntegrate<2>();
   }

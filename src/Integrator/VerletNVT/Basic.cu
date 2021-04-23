@@ -164,15 +164,13 @@ namespace uammd{
 	  updatable->updateTimeStep(dt);
 	  updatable->updateTemperature(temperature);
 	}
-	for(auto forceComp: interactors){
-	  forceComp->sumForce(stream);
-	}
+	for(auto forceComp: interactors) forceComp->sum({.force =true, .energy = false, .virial = false}, 0);
 	cudaDeviceSynchronize();
       }
       //First integration step and force reset
       callIntegrate<1>();
       //Compute all the forces
-      for(auto forceComp: interactors) forceComp->sumForce(stream);
+      for(auto forceComp: interactors) forceComp->sum({.force =true, .energy = false, .virial = false}, stream);
       //Second integration step
       callIntegrate<2>();
     }

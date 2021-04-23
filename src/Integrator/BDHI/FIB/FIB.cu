@@ -736,7 +736,7 @@ namespace uammd{
 	thrust::fill(thrust::cuda::par, force_gr, force_gr + numberParticles, real4());
       }
       /*Compute new force*/
-      for(auto forceComp: interactors) forceComp->sumForce(0);
+      for(auto forceComp: interactors) forceComp->sum({.force = true, .energy= false, .virial = false}, 0);
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       auto d_gridVels = thrust::raw_pointer_cast(gridVels.data());

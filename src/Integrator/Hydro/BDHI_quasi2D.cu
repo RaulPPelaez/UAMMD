@@ -198,7 +198,7 @@ namespace uammd{
       sys->log<System::DEBUG1>("[BDHI::BDHI2D] Performing step");
       resetContainers();
       for(auto inter: interactors){
-	inter->sumForce(st2);
+	inter->sum({.force = true, .energy= false, .virial = false}, st2);
       }
       CudaSafeCall(cudaStreamSynchronize(st2));
       spreadParticles();
