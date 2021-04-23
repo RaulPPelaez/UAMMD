@@ -40,6 +40,11 @@
 #include<thrust/device_vector.h>
 #include"third_party/type_names.h"
 namespace uammd{
+  struct ComputeType{
+    real3 force;
+    real virial;
+    real energy;      
+  };
   //Functors with different bond potentials
   namespace BondedType{
     //BondedForces needs a functor that computes the force of a pair,
@@ -134,27 +139,7 @@ namespace uammd{
 
   }
 
-  namespace BondedForces_ns{
-    enum class ComputeMode{force, energy};
-    template<ComputeMode mode>  struct ComputeDispatch;
-    template<> struct ComputeDispatch<ComputeMode::force>{
-      using type = real4;
-      template<class BondType, class ...T>
-      __device__ static inline type compute(BondType &bond, T...args){
-	return make_real4(bond.force(args...), 0);
-      }
-    };
-    template<> struct ComputeDispatch<ComputeMode::energy>{
-      using type = real;
-      template<class BondType, class ...T>
-      __device__ static inline type compute(BondType &bond, T...args){
-	return bond.energy(args...);
-      }
-    };
-  }
-
-  //Two body bonded forces. Handles particle-particle and particle.point bonds
-  template<class BondType>
+  template<class BondType, int particlesPerBond>
   class BondedForces: public Interactor, public ParameterUpdatableDelegate<BondType>{
   public:
 
@@ -162,15 +147,8 @@ namespace uammd{
       std::string file; //File containing the bonds
     };
     //Aligning these really improves performance
-    //A particle-particle bond
     struct __align__(16)  Bond{
-      int i,j;
-      typename BondType::BondInfo bond_info;
-    };
-    //A fixed point bond
-    struct __align__(16) BondFP{
-      int i;
-      real3 pos;
+      int ids[particlesPerBond];
       typename BondType::BondInfo bond_info;
     };
 
@@ -185,35 +163,28 @@ namespace uammd{
 			  BondType bondType):
       BondedForces(pd, sys, par, std::make_shared<BondType>(bondType)){}
 
-    ~BondedForces();
+    ~BondedForces(){
+      cudaDeviceSynchronize();
+      sys->log<System::MESSAGE>("[BondedForces] Destroyed");
+    }
 
-    template<BondedForces_ns::ComputeMode mode, class ResultType>
-    void callComputeBonded(ResultType* result, cudaStream_t st);
+    void sumForce(cudaStream_t st = 0) override{
+      this->sum({.force=true}, st);
+    }
 
-    void sumForce(cudaStream_t st = 0) override;
-
-    real sumEnergy() override;
-    //real sumVirial() override;
+    void sum(Computables comp, cudaStream_t st) override;
 
   private:
-    void init();
-    void initParticleParticle();
-    void initFixedPoint();
-
+    void readBonds(std::string);
     int nbonds;
-    thrust::device_vector<Bond> bondList;
-    thrust::device_vector<Bond*> bondStart;
-    thrust::device_vector<int> nbondsPerParticle;
-
-    int nbondsFP; //Fixed Point
-    thrust::device_vector<BondFP> bondListFP;
-    thrust::device_vector<BondFP*> bondStartFP;
-    thrust::device_vector<int> nbondsPerParticleFP;
-
+    thrust::device_vector<Bond> bondList;   //[All bonds involving the first particle with bonds, involving the second...] each bonds stores the id of the three particles in the bond. The id of the first/second... particle  with bonds is particlesWithBonds[i]
+    thrust::device_vector<int> bondStart, bondEnd; //bondStart[i], Where the list of bonds of particle with bond number i start (the id of particle i is particlesWithBonds[i].
+    thrust::device_vector<int> particlesWithBonds; //List of particle ids with at least one bond
+    //Positions for fixed point bonds in the case of particlesPerBond==2
+    thrust::device_vector<real4> fixedPointPositions;
     std::shared_ptr<BondType> bondCompute;
-
     int TPP; // Threads per particle
-
+    void callComputeBonded(real4* f, real*e, real*v, cudaStream_t st);
   };
 }
 

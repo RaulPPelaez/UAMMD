@@ -46,8 +46,9 @@
 
 #include"uammd.cuh"
 #include"Interactor/BondedForces.cuh"
-#include"Interactor/AngularBondedForces.cuh"
-#include"Interactor/TorsionalBondedForces.cuh"
+#include <fstream>
+// #include"Interactor/AngularBondedForces.cuh"
+// #include"Interactor/TorsionalBondedForces.cuh"
 using namespace uammd;
 
 //This struct contains the basic uammd modules for convenience.
@@ -55,7 +56,6 @@ struct UAMMD{
   std::shared_ptr<System> sys;
   std::shared_ptr<ParticleData> pd;
 };
-
 
 //Harmonic bond for pairs of particles
 struct HarmonicBond{
@@ -68,28 +68,26 @@ struct HarmonicBond{
   struct BondInfo{
     real k, r0;
   };
-  //This function will be called for every bond read in the bond file
-  //In the case of a Fixed Point bond, j will be -1
-  //i,j: id of particles in bond
-  //r12: ri-rj
-  //bi: bond information.
-  inline __device__ real3 force(int i, int j, real3 r12, BondInfo bi){
+  //This function will be called for every bond read in the bond file and is expected to compute force/energy and or virial
+  //bond_index: The index of the particle to compute force/energy/virial on
+  //ids: list of indexes of the particles involved in the current bond
+  //pos: list of positions of the particles involved in the current bond
+  //comp: computable targets (wether force, energy and or virial are needed).
+  //bi: bond information for the current bond (as returned by readBond)
+  inline __device__ real sq (real a){ return a*a;}
+  inline __device__ ComputeType compute(int bond_index, int ids[2], real3 pos[2], Interactor::Computables comp, BondInfo bi){
+    real3 r12 = pos[1]-pos[0];
     real r2 = dot(r12, r12);
-    if(r2==real(0.0)) return make_real3(0.0);
-    real invr = rsqrt(r2);
-    real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
-    return f*r12;
-  }
-  
-  inline __device__ real energy(int i, int j, real3 r12, BondInfo bi){
-    real r2 = dot(r12, r12);
-    if(r2==real(0.0)) return real(0.0);
-    real r = sqrt(r2);
-    const real dr = r-bi.r0;
-    return real(0.5)*bi.k*dr*dr;
+    const real invr = rsqrt(r2);
+    const real f = -bi.k*(real(1.0)-bi.r0*invr); //F = -k·(r-r0)·rvec/r
+    ComputeType ct;
+    ct.force = f*r12;
+    ct.energy = comp.energy?(real(0.5)*bi.k*sq(real(1.0)/invr-bi.r0)):real(0.0);
+    ct.virial = comp.virial?dot(ct.force,r12):real(0.0);
+    return (r2==real(0.0))?(ComputeType{}):ct;
   }
 
-  //This function will be called for each bond in the bond file
+  //This function will be called for each bond in the bond file and read the information of a bond
   //It must use the stream that is handed to it to construct a BondInfo.  
   static __host__ BondInfo readBond(std::istream &in){
     /*BondedForces will read i j, readBond has to read the rest of the line*/
@@ -102,31 +100,36 @@ struct HarmonicBond{
 
 //This angular potential is similar to the HarmonicBond above, the difference is that
 //Now three particles are involved in each bond instead of two
+
 struct Angular{
   Box box;
   Angular(real3 lbox/*Parameters par*/): box(Box(lbox)){}
-  
+
+  //Place in this struct whatever static information is needed for a given bond
+  //In this case spring constant and equilibrium distance
+  //the function readBond below takes care of reading each BondInfo from the file
   struct BondInfo{
     real ang0, k;
   };
-  
-  inline __device__ real3 force(int i, int j, int k,
-				int bond_index,
-				real3 posi,
-				real3 posj,
-				real3 posk,
-				BondInfo bond_info){
-    const real ang0 = bond_info.ang0;
-    const real kspring = bond_info.k;
+
+  //This function will be called for every bond read in the bond file and is expected to compute force/energy and or virial
+  //bond_index: The index of the particle to compute force/energy/virial on
+  //ids: list of indexes of the particles involved in the current bond
+  //pos: list of positions of the particles involved in the current bond
+  //comp: computable targets (wether force, energy and or virial are needed).
+  //bi: bond information for the current bond (as returned by readBond)
+  inline __device__ ComputeType compute(int bond_index, int ids[3], real3 pos[3], Interactor::Computables comp, BondInfo bi){
+    const real ang0 = bi.ang0;
+    const real kspring = bi.k;    
     //         i -------- j -------- k
     //             rij->     rjk ->
     //Compute distances and vectors
     //---rij---
-    const real3 rij =  box.apply_pbc(posj - posi);
+    const real3 rij =  box.apply_pbc(pos[1] - pos[0]);
     const real rij2 = dot(rij, rij);
     const real invsqrij = rsqrt(rij2);
     //---rkj---
-    const real3 rjk =  box.apply_pbc(posk - posj);
+    const real3 rjk =  box.apply_pbc(pos[2] - pos[1]);
     const real rjk2 = dot(rjk, rjk);
     const real invsqrjk = rsqrt(rjk2);
     const real a2 = invsqrij * invsqrjk;
@@ -135,6 +138,7 @@ struct Angular{
     if(cijk>real(1.0)) cijk = real(1.0);
     else if (cijk<real(-1.0)) cijk = -real(1.0);
     real ampli;
+    ComputeType ct{};
     // //Approximation for small angle displacements
     // real sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
     // //sijk cant be zero to avoid division by zero
@@ -146,7 +150,7 @@ struct Angular{
     }
     else{
       const real theta = acos(cijk);
-      if(theta==real(0.0))  return make_real3(0);
+      if(theta==real(0.0))  return ComputeType{};
       const real sinthetao2 = sin(real(0.5)*theta);
       ampli = -real(2.0)*kspring*(sinthetao2 - sin(ang0*real(0.5)))/sinthetao2;
     }
@@ -156,29 +160,20 @@ struct Angular{
     const real a22 = ampli*cijk/rjk2;
     //Sum according to my position in the bond
     // i ----- j ------ k
-    if(bond_index==i){
-      return make_real3(a12*rjk -a11*rij); //Angular spring
+    if(bond_index==ids[0]){
+      ct.force = make_real3(a12*rjk -a11*rij);
     }
-    else if(bond_index==j){
-      //Angular spring
-      return real(-1.0)*make_real3((-a11 - a12)*rij + (a12 + a22)*rjk);
+    else if(bond_index==ids[1]){
+      ct.force = real(-1.0)*make_real3((-a11 - a12)*rij + (a12 + a22)*rjk);
     }
-    else if(bond_index==k){
-      //Angular spring
-      return real(-1.0)*make_real3(a12*rij -a22*rjk);
+    else if(bond_index==ids[2]){
+      ct.force = real(-1.0)*make_real3(a12*rij -a22*rjk);
     }
-    return make_real3(0);
+    return ct;
   }
 
-  inline __device__ real energy(int i, int j, int k,
-				int bond_index,
-				real3 posi,
-				real3 posj,
-				real3 posk,
-				BondInfo bond_info){
-    return 0;
-  }
-
+  //This function will be called for each bond in the bond file and read the information of a bond
+  //It must use the stream that is handed to it to construct a BondInfo.  
   static BondInfo readBond(std::istream &in){
     BondInfo bi;
     in>>bi.k>>bi.ang0;
@@ -186,8 +181,8 @@ struct Angular{
   }  
 };
 
-//This torsional potential is similar to the HarmonicBond above, the difference is that
-//Now four particles are involved in each bond instead of two
+// //This torsional potential is similar to the HarmonicBond above, the difference is that
+// //Now four particles are involved in each bond instead of two
 struct Torsional{
 private:
 
@@ -198,21 +193,22 @@ private:
 public:
   Box box;
   Torsional(real3 lbox /*Parameters par*/): box(Box(lbox)){}
-
+  //Place in this struct whatever static information is needed for a given bond
+  //In this case spring constant and equilibrium distance
+  //the function readBond below takes care of reading each BondInfo from the file
   struct BondInfo{
     real phi0, k;
   };
-
-  inline __device__ real3 force(int j, int k, int m, int n,
-				int bond_index,
-				real3 posj,
-				real3 posk,
-				real3 posm,
-				real3 posn,
-				BondInfo bond_info){
-    const real3 rjk = box.apply_pbc(posk - posj);
-    const real3 rkm = box.apply_pbc(posm - posk);
-    const real3 rmn = box.apply_pbc(posn - posm);
+  //This function will be called for every bond read in the bond file and is expected to compute force/energy and or virial
+  //bond_index: The index of the particle to compute force/energy/virial on
+  //ids: list of indexes of the particles involved in the current bond
+  //pos: list of positions of the particles involved in the current bond
+  //comp: computable targets (wether force, energy and or virial are needed).
+  //bi: bond information for the current bond (as returned by readBond)
+  inline __device__ ComputeType compute(int bond_index, int ids[4], real3 pos[4], Interactor::Computables comp, BondInfo bi){
+    const real3 rjk = box.apply_pbc(pos[1] - pos[0]);
+    const real3 rkm = box.apply_pbc(pos[2] - pos[1]);
+    const real3 rmn = box.apply_pbc(pos[3] - pos[2]);
     real3 njkm = cross(rjk, rkm);
     real3 nkmn = cross(rkm, rmn);
     const real n2 = dot(njkm, njkm);
@@ -226,43 +222,39 @@ public:
       // #ifdef SMALL_ANGLE_BENDING
       const real phi = acos(cosphi);
       if(cosphi*cosphi <= 1 and phi*phi > 0){
-	Fmod = -bond_info.k*(phi - bond_info.phi0)/sin(phi);
+	Fmod = -bi.k*(phi - bi.phi0)/sin(phi);
       }
       //#endif
       njkm *= invn;
       nkmn *= invnn;
+      ComputeType ct{};
       const real3 v1 = (nkmn - cosphi*njkm)*invn;
       const real3 fj = Fmod*cross(v1, rkm);
-      if(bond_index == j){
-	return real(-1.0)*fj;
+      if(bond_index == ids[1]){
+	ct.force = real(-1.0)*fj;
+	return ct;
       }
       const real3 v2 = (njkm - cosphi*nkmn)*invnn;
       const real3 fk = Fmod*cross(v2, rmn);
       const real3 fm = Fmod*cross(v1, rjk);
-      if(bond_index == k){
-	return fm + fj - fk;
+      if(bond_index == ids[2]){
+	ct.force = fm + fj - fk;
+	return ct;
       }
       const real3 fn = Fmod*cross(v2, rkm);
-      if(bond_index == m){
-	return fn + fk - fm;
+      if(bond_index == ids[3]){
+	ct.force = fn + fk - fm;
+	return ct;
       }
-      if(bond_index == n){
-	return real(-1.0)*fn;
+      else if(bond_index == ids[4]){
+	ct.force = real(-1.0)*fn;
+	return ct;
       }
     }
-    return real3();
+    return ComputeType{};
   }
-
-  inline __device__ real energy(int j, int k, int m, int n,
-				int bond_index,
-				real3 posj,
-				real3 posk,
-				real3 posm,
-				real3 posn,
-				BondInfo bond_info){
-    return 0;
-  }
-
+  //This function will be called for each bond in the bond file and read the information of a bond
+  //It must use the stream that is handed to it to construct a BondInfo.
   static BondInfo readBond(std::istream &in){
     BondInfo bi;
     in>>bi.k>>bi.phi0;
@@ -274,9 +266,9 @@ public:
 //You can use these functions to create an interactor that can be directly added to an integrator
 std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
   using Bond = HarmonicBond;
-  using BF = BondedForces<Bond>;
+  using BF = BondedForces<Bond,2>;
   typename BF::Parameters params;
-  params.file = "bondfile.dat";
+  params.file = "bonds.dat";
   //You can pass an instance of the bond as a shared_ptr, which will allow you to modify the bond properties at any time
   //from outside BondedForces
   auto bond = std::make_shared<Bond>();
@@ -286,7 +278,7 @@ std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
 
 std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
   using Bond = Angular;
-  using BF = AngularBondedForces<Bond>;
+  using BF = BondedForces<Bond,3>;
   typename BF::Parameters params;
   params.file = "angular.bonds";
   real3 lbox = make_real3(32,32,32);
@@ -297,7 +289,7 @@ std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
 
 std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
   using Bond = Torsional;
-  using BF = TorsionalBondedForces<Bond>;
+  using BF = BondedForces<Bond, 4>;
   typename BF::Parameters params;
   params.file = "torsional.bonds"; 
   real3 lbox = make_real3(32,32,32);
@@ -307,9 +299,73 @@ std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
 }
 
 
+//Initialize UAMMD with some arbitrary particles
+UAMMD initializeUAMMD(){
+  UAMMD sim;
+  sim.sys = std::make_shared<System>();
+  constexpr int numberParticles = 50000;
+  sim.pd = std::make_shared<ParticleData>(sim.sys, numberParticles);
+  auto pos = sim.pd->getPos(access::cpu, access::write);
+  std::generate(pos.begin(), pos.end(), [&](){return make_real4(sim.sys->rng().uniform3(-0.5, 0.5)*32,0);});
+  return sim;
+}
+
 int main(){
 
   //Just an empty main so this file can be compiled on its own
+  auto sim = initializeUAMMD();
+  {//Create some random bonds between the particles, averaging 500 bonds/particle
+    std::vector<int2> bs;
+    std::ofstream out("bonds.dat");
+    int N = sim.pd->getNumParticles();
+    std::default_random_engine generator;
+    std::uniform_int_distribution<int> n_dist(0,N-1);
+    std::uniform_int_distribution<int> n_bonds(0,1000);
+    fori(0, N){
+      forj(0, n_bonds(generator)){
+	int jj = n_dist(generator);
+	bs.push_back({i,jj});
+      }
+    }
+    
+    out<<bs.size()<<std::endl;
+    fori(0, bs.size()){       
+      out<<bs[i].x<<" "<<bs[i].y<<" 10 0\n";
+    }
+  }
+  auto bonds = createBondInteractor(sim);
 
+  fori(0,20)
+    bonds->sum({.force=true}, 0);
+  //Measure the time of the different sum modes
+  cudaStream_t st;
+  cudaStreamCreate(&st);
+  Timer tim;
+  int ntest= 1000;
+  cudaDeviceSynchronize();
+  tim.tic();
+  fori(0,ntest)
+    bonds->sum({.force=true, .energy=false, .virial=false}, st);
+  cudaDeviceSynchronize();
+  sim.sys->log<System::MESSAGE>("Time per update (force): %g ms", tim.toc()/ntest*1e3);
+  cudaDeviceSynchronize();
+  tim.tic();
+  fori(0,ntest)
+    bonds->sum({.force=true, .energy=true}, st);
+  cudaDeviceSynchronize();
+  sim.sys->log<System::MESSAGE>("Time per update (force+ener): %g ms", tim.toc()/ntest*1e3);
+  cudaDeviceSynchronize();
+  tim.tic();
+  fori(0,ntest)
+    bonds->sum({.force=true, .energy=false, .virial=true}, st);
+  cudaDeviceSynchronize();
+  sim.sys->log<System::MESSAGE>("Time per update (force+virial): %g ms", tim.toc()/ntest*1e3);
+  cudaDeviceSynchronize();
+  tim.tic();
+  fori(0,ntest)
+    bonds->sum({.force=true, .energy=true, .virial = true}, st);
+  cudaDeviceSynchronize();
+  sim.sys->log<System::MESSAGE>("Time per update (force+ener+vir): %g ms", tim.toc()/ntest*1e3);
+  sim.sys->finish();
   return 0;
 }
