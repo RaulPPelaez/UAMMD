@@ -318,9 +318,12 @@ namespace uammd{
 	if(cell.z>=grid.cellDim.z) return;
 	/*Get my cell index (position in the array) */
 	const int icell =grid.getCellIndex(cell);
+	const int ncells = grid.getNumberCells();
 	if(icell==0){
 	  if(removeTotalMomentum)
 	    gridVels[0] = cufftComplex3();//{0,0 ,0,0 ,0,0};
+	  else
+	    gridVels[0]/=(real(1.0)/real(ncells));
 	  return;
 	}
 	//Staggered grid requires to define an effective k -> keff_\alpha = 2/d\alpha*sin(k_\alpha*d\alpha/2)
@@ -347,7 +350,6 @@ namespace uammd{
 	  }
 	  vk = projectFourier(keff, prefactor*vk);
 	}
-	const int ncells = grid.getNumberCells();
 	//Store new velocity shifted back to cell faces, normalize FFT
 	gridVels[icell] = (real(1.0)/real(ncells))*shiftVelocity(vk, cosk, sink);
       }
