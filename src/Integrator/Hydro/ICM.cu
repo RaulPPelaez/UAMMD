@@ -323,7 +323,7 @@ namespace uammd{
 	  if(removeTotalMomentum)
 	    gridVels[0] = cufftComplex3();//{0,0 ,0,0 ,0,0};
 	  else
-	    gridVels[0]/=(real(1.0)/real(ncells));
+	    gridVels[0]/=real(ncells);
 	  return;
 	}
 	//Staggered grid requires to define an effective k -> keff_\alpha = 2/d\alpha*sin(k_\alpha*d\alpha/2)
