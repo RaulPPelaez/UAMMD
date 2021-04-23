@@ -306,7 +306,7 @@ namespace uammd{
 					 real viscosity,
 					 real density,
 					 real dt,
-					 Grid grid, bool removeTotalMomemtum){
+					 Grid grid, bool removeTotalMomentum){
 	/*I expect a 3D grid of threads, one for each fourier node/grid cell*/
 	/*Get my cell*/
 	int3 cell;
@@ -319,7 +319,7 @@ namespace uammd{
 	/*Get my cell index (position in the array) */
 	const int icell =grid.getCellIndex(cell);
 	if(icell==0){
-	  if(removeTotalMomemtum)
+	  if(removeTotalMomentum)
 	    gridVels[0] = cufftComplex3();//{0,0 ,0,0 ,0,0};
 	  return;
 	}
@@ -748,7 +748,7 @@ namespace uammd{
       density(par.density),
       viscosity(par.viscosity),
       box(par.box),
-      removeTotalMomemtum(par.removeTotalMomemtum),
+      removeTotalMomentum(par.removeTotalMomentum),
       sumThermalDrift(par.sumThermalDrift){
       sys->log<System::MESSAGE>("[Hydro::ICM] Initialized");
       CudaCheckError();
@@ -1040,7 +1040,7 @@ namespace uammd{
 									 density,
 									 dt,
 									 grid,
-									 removeTotalMomemtum);
+									 removeTotalMomentum);
       sys->log<System::DEBUG3>("[Hydro::ICM] Going back to real space");
       //Go back to real space
       CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, d_gridDataF, d_gridData));
