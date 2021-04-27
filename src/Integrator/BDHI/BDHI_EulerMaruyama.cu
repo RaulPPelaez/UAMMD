@@ -135,7 +135,7 @@ namespace uammd{
 	}
       }
       resetForces();
-      for(auto forceComp: interactors) forceComp->sumForce({.force = true, .energy = false, .virial = false}, stream);
+      for(auto forceComp: interactors) forceComp->sum({.force = true, .energy = false, .virial = false}, stream);
       bdhi->setup_step(stream);
       auto d_MF = thrust::raw_pointer_cast(MF.data());
       bdhi->computeMF(d_MF, stream);
