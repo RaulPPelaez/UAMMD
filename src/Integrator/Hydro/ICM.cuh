@@ -94,6 +94,42 @@ REFERENCES:
 namespace uammd{
   namespace Hydro{
 
+    namespace icm_ns{
+
+      //This kernel takes velocities in a staggered grid and interpolates them to the cell centers.
+      //Input: gridVelsStaggered, grid
+      //Output: gridVelsCollocated
+      //Must be launched in a 3D grid of threads with at least grid.cellDim threads.
+      __global__ void interpolateVelocitiesToCellCentersD(const real3 *gridVelsStaggered, real3 *gridVelsCollocated, Grid grid){
+        const int3 cell = make_int3(blockIdx.x*blockDim.x + threadIdx.x,
+			      blockIdx.y*blockDim.y + threadIdx.y,
+			      blockIdx.z*blockDim.z + threadIdx.z);
+	const int3 n = grid.cellDim;
+	if(cell.x >=n.x or cell.y >= n.y or cell.z >= n.z)
+	  return;
+	const int icell = grid.getCellIndex(cell);
+	const real3 v0 = gridVelsStaggered[icell];
+	const int icelljx = grid.getCellIndex(grid.pbc_cell(cell - make_int3(1,0,0)));
+	const real vx = real(0.5)*(v0.x + gridVelsStaggered[icelljx].x);
+	const int icelljy = grid.getCellIndex(grid.pbc_cell(cell - make_int3(0,1,0)));
+	const real vy = real(0.5)*(v0.y + gridVelsStaggered[icelljy].y);
+	const int icelljz = grid.getCellIndex(grid.pbc_cell(cell - make_int3(0,0,1)));
+	const real vz = real(0.5)*(v0.z + gridVelsStaggered[icelljz].z);
+	gridVelsCollocated[icell] = {vx, vy, vz};
+      }
+
+      //This function takes GPU velocities in a staggered grid and interpolates them to the cell centers.
+      //Input: gridVelsStaggered, grid
+      //Output: gridVelsCollocated
+      void interpolateVelocitiesToCellCenters(const real3* gridVelsStaggered, real3* gridVelsCollocated, Grid grid){
+	const auto n = grid.cellDim;
+        dim3 blockSize = {8,8,8};
+	dim3 Nblocks = {n.x/blockSize.x + 1, n.y/blockSize.y + 1, n.z/blockSize.z + 1};
+	interpolateVelocitiesToCellCentersD<<<blockSize, Nblocks>>>(gridVelsStaggered, gridVelsCollocated, grid);
+      }
+
+    }
+
     class ICM: public Integrator{
     public:
       struct Parameters{
@@ -129,15 +165,22 @@ namespace uammd{
 	return 0.91*box.boxSize.x/(real)grid.cellDim.x;
       }
 
+      //Interpolates the grid velocities to the cell centers and returns a pointer to them
+      //The velocity assigned to cell (i,j,k) is located at i+(j+k*n.y)*n.x
+      //Where n, the number of fluid cells in each direction, is returned by getNumberFluidCells
       const real3* getFluidVelocities(access::location dev){
+	gridVels_collocated.resize(gridVels.size());
+	icm_ns::interpolateVelocitiesToCellCenters(thrust::raw_pointer_cast(gridVels.data()),
+						   thrust::raw_pointer_cast(gridVels_collocated.data()),
+						   grid);
 	real3* ptr = nullptr;
 	switch(dev){
 	case access::gpu:
-	  ptr = thrust::raw_pointer_cast(gridVels.data());
+	  ptr = thrust::raw_pointer_cast(gridVels_collocated.data());
 	  break;
 	case access::cpu:
-	  h_gridVels = gridVels;
-	  ptr = thrust::raw_pointer_cast(h_gridVels.data());
+	  h_gridVels_collocated = gridVels_collocated;
+	  ptr = thrust::raw_pointer_cast(h_gridVels_collocated.data());
 	  break;
 	default:
 	  System::log<System::EXCEPTION>("Invalid device in ICM::getFluidVelocities");
@@ -146,6 +189,7 @@ namespace uammd{
 	return ptr;
       }
 
+      //Returns the number of fluid cells in each direction
       int3 getNumberFluidCells(){
 	return grid.cellDim;
       }
@@ -164,8 +208,10 @@ namespace uammd{
       //Grid forces/velocities in fourier/real space
       thrust::device_vector<real3> gridVels;
       thrust::device_vector<cufftComplex> gridVelsPredictionF;
-      //Host version of grid velocities for getFluidVelocities
-      thrust::host_vector<real3> h_gridVels;
+      //Host and device versions of grid velocities for getFluidVelocities (with velocities defined in the centers of the cells)
+      thrust::host_vector<real3> h_gridVels_collocated;
+      thrust::device_vector<real3> gridVels_collocated;
+
       thrust::device_vector<real3> cellAdvection;
       curandGenerator_t curng;
       thrust::device_vector<real> random;
