@@ -125,7 +125,7 @@ namespace uammd{
 	const auto n = grid.cellDim;
         dim3 blockSize = {8,8,8};
 	dim3 Nblocks = {n.x/blockSize.x + 1, n.y/blockSize.y + 1, n.z/blockSize.z + 1};
-	interpolateVelocitiesToCellCentersD<<<blockSize, Nblocks>>>(gridVelsStaggered, gridVelsCollocated, grid);
+	interpolateVelocitiesToCellCentersD<<<Nblocks, blockSize>>>(gridVelsStaggered, gridVelsCollocated, grid);
       }
 
     }
