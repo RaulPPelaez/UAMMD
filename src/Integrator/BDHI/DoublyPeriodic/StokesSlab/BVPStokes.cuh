@@ -194,6 +194,7 @@ namespace uammd{
       //Zero mode is added as a correction when there are walls
       if(id == 0){
 	//If there are no walls the zero mode is just zero
+	//In other modes we need the forces stored in the zero mode, so do not overwrite.
 	if(mode == WallMode::none){
 	  fori(0, nz){
 	    gridVels[i] = cufftComplex4();
@@ -226,8 +227,8 @@ namespace uammd{
 	//VELOCITY X
 	rhsCompute.parallelVelocityX(mu, pressure, rightHandSide);
 	{
-	  const cufftComplex alpha = rhs_bc.computeTopParallel(waveVector.x, mu);
-	  const cufftComplex beta = rhs_bc.computeBottomParallel(waveVector.x, mu);
+	  const cufftComplex alpha = rhs_bc.computeTopParallel((not isUnpairedX)*waveVector.x, mu);
+	  const cufftComplex beta = rhs_bc.computeBottomParallel((not isUnpairedX)*waveVector.x, mu);
 	  bvp.solve(id, rightHandSide,  alpha, beta,  an, velocity);
 	}
 	fori(0, nz){
@@ -236,8 +237,8 @@ namespace uammd{
 	//VELOCITY Y
 	rhsCompute.parallelVelocityY(mu, pressure, rightHandSide);
 	{
-	  const cufftComplex alpha = rhs_bc.computeTopParallel(waveVector.y, mu);
-	  const cufftComplex beta = rhs_bc.computeBottomParallel(waveVector.y, mu);
+	  const cufftComplex alpha = rhs_bc.computeTopParallel((not isUnpairedY)*waveVector.y, mu);
+	  const cufftComplex beta = rhs_bc.computeBottomParallel((not isUnpairedY)*waveVector.y, mu);
 	  bvp.solve(id, rightHandSide,  alpha, beta,  an, velocity);
 	}
 	fori(0, nz){

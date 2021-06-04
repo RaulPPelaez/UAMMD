@@ -68,6 +68,8 @@ namespace uammd{
     }
     
     namespace detail{
+      //BCs are H*du/dz(k, +-H) +- k*H*H*u(k, +-H) = RHS
+      //"u" is the second integral and du/dz the first integral
       class TopBoundaryConditions{
 	real k, H;
       public:

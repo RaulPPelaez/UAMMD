@@ -72,12 +72,12 @@ namespace uammd{
       //Solves the zero mode of the BVP y''= fn with Boundary conditions given by C and D
       //C and D are the Boundary condition matrices
       //an is temporal storage for the cheb coefficients of y''
-      __global__ void correctZeroMode(cufftComplex4* gridForce, cufftComplex4* insideSolution,
+      __global__ void correctZeroMode(cufftComplex4* correction, cufftComplex4* gridForce,
 				      cufftComplex* an, real4 D, real*C, int nkx, int nky, int nz, real H, real mu){
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id!=0) return;
 	auto fn = make_third_index_iterator(gridForce, 0, 0, Index3D(nkx/2+1, nky, 2*nz-2));
-	auto gridVels = make_third_index_iterator(insideSolution, 0, 0, Index3D(nkx/2+1, nky, 2*nz-2));
+	auto corr = make_third_index_iterator(correction, 0, 0, Index3D(nkx/2+1, nky, 2*nz-2));
 	{//X VELOCITY
 	  cufftComplex b1 = cufftComplex();
 	  cufftComplex b2 = cufftComplex();
@@ -90,7 +90,7 @@ namespace uammd{
 	  auto c0d0 = BVP::solve2x2System(-D, thrust::make_pair(b1,b2));
 	  BVP::SecondIntegralMatrix si(nz);
 	  for(int i = 0; i<nz; i++){
-	    gridVels[i].x = si.computeSecondIntegralCoefficient(i, an, c0d0.first, c0d0.second)*H*H;
+	    corr[i].x = si.computeSecondIntegralCoefficient(i, an, c0d0.first, c0d0.second)*H*H;
 	  }
 	}
 	{//Y VELOCITY
@@ -105,12 +105,21 @@ namespace uammd{
 	  auto c0d0 = BVP::solve2x2System(-D, thrust::make_pair(b1,b2));
 	  BVP::SecondIntegralMatrix si(nz);
 	  for(int i = 0; i<nz; i++){
-	    gridVels[i].y = si.computeSecondIntegralCoefficient(i, an, c0d0.first, c0d0.second)*H*H;
-	    gridVels[i].z *=0; //Z velocity does is zero
-	    gridVels[i].w *=0; //Do not correct pressure
+	    corr[i].y = si.computeSecondIntegralCoefficient(i, an, c0d0.first, c0d0.second)*H*H;
+	    corr[i].z *=0; //Z velocity zero mode correction is zero in both bottom and slit modes
+	    corr[i].w *=0; //Do not correct pressure
 	  }
 	}
+      }
 
+      //Set the zero mode of the inside solution to zero. It is used to store the grid forces for the zero mode before the correction
+      __global__ void cleanSolutionZeroMode(cufftComplex4* insideSolution, int nkx, int nky, int nz){
+	int id = blockIdx.x*blockDim.x + threadIdx.x;
+	if(id!=0) return;
+	auto fn = make_third_index_iterator(insideSolution, 0, 0, Index3D(nkx/2+1, nky, 2*nz-2));
+	for(int i = 0; i<nz; i++){
+	  fn[i] *= 0;
+	}
       }
 
     }
@@ -125,7 +134,7 @@ namespace uammd{
 			insideSolution.begin(), insideSolution.begin()+size,
 			correction.begin(), insideSolution.begin(),
 			thrust::plus<cufftComplex4>());
-    }
+}
 
     class Correction{
       real H;
@@ -139,7 +148,7 @@ namespace uammd{
       real4 zeroModeDMatrix;
       cufftHandle cufft_plan_forward;
 
-      void initializeCorrectionMatrix();
+      void initializeSlitCorrectionMatrix();
       void initializeCufft();
       void initializeZeroModeBVPSolver();
       cached_vector<cufftComplex4> computeAnalyticalCorrectionFourierSpace(const cufftComplex4 *insideSolution, cudaStream_t st);
@@ -154,7 +163,7 @@ namespace uammd{
 
       Correction(real H, real2 Lxy, int3 cells, real viscosity, WallMode mode):
       	H(H), Lxy(Lxy), cells(cells), viscosity(viscosity), mode(mode){
-	initializeCorrectionMatrix();
+	initializeSlitCorrectionMatrix();
 	initializeCufft();
 	initializeZeroModeBVPSolver();
       }
@@ -173,8 +182,8 @@ namespace uammd{
         takeAnalyticalCorrectionToChebyshevSpace(analyticalCorrection, st);
 	const int3 n = cells;
 	const int size = (n.x/2+1)*n.y*n.z;
-	addZeroModeCorrection(insideSolution, gridForces, st);
-	sumCorrectionToInsideSolution(analyticalCorrection, insideSolution, size, st);
+	correctZeroMode(analyticalCorrection, gridForces, st);
+        sumCorrectionToInsideSolution(analyticalCorrection, insideSolution, size, st);
       }
 
     private:
@@ -194,9 +203,9 @@ namespace uammd{
 
 
       template<class Container>
-      void addZeroModeCorrection(Container &insideSolution, Container &gridForces, cudaStream_t st){
+      void correctZeroMode(Container &correction,  Container &gridForces, cudaStream_t st){
 	System::log<System::DEBUG>("Correcting zero mode");
-	//Only the zero mode is needed for the correction, in this case the second integral matrix is the identity
+	//Only the zero mode BVP is needed for the correction, in this case the second integral matrix is the identity
 	//Additionally only the velocities in the plane have to be corrected
 	//The equation to solve is y'' = f
 	//Furthermore the BCs in this case are that either y(k=0, z=0,H) = 0 (slit channel) or  y'(k=0, z=H) =0 (bottom wall)
@@ -206,11 +215,12 @@ namespace uammd{
 	//We just need to compute the BCs, solve the 2x2 system above to get c0 and d0 and then use them to integrate y'' twice.
 	auto n = cells;
 	auto gf = thrust::raw_pointer_cast(gridForces.data());
-	auto is = thrust::raw_pointer_cast(insideSolution.data());
+	auto corr = thrust::raw_pointer_cast(correction.data());
 	cached_vector<cufftComplex> an(n.z);
 	auto an_ptr = thrust::raw_pointer_cast(an.data());
 	auto C_ptr  = thrust::raw_pointer_cast(zeroModeCMatrix.data());
-	correction_ns::correctZeroMode<<<1,1,0,st>>>(gf, is, an_ptr, zeroModeDMatrix, C_ptr, n.x, n.y, n.z, 0.5*H, viscosity);
+	correction_ns::correctZeroMode<<<1,1,0,st>>>(corr, gf, an_ptr, zeroModeDMatrix, C_ptr, n.x, n.y, n.z, 0.5*H, viscosity);
+	correction_ns::cleanSolutionZeroMode<<<1,1,0,st>>>(gf, n.x, n.y, n.z);
       }
 
     };
@@ -218,10 +228,21 @@ namespace uammd{
     namespace correction_ns{
 
       template<class Iterator>
+      __device__ cufftComplex4 evaluateSolutionAtAngle(Iterator insideSolution, real theta, int nz){
+	cufftComplex4 solution{};
+	for(int i=0; i<nz; i++){
+	  solution += insideSolution[i]*cos(i*theta);
+	}
+	return solution;
+      }
+
+      template<class Iterator>
       __device__ cufftComplex4 computeBottomSolution(Iterator insideSolution, int nz){
 	cufftComplex4 bottomSolution{};
+	int sign = 1;
 	for(int i=0; i<nz; i++){
-	  bottomSolution += insideSolution[i]*pow(-1,i);
+	  bottomSolution += insideSolution[i]*sign;
+	  sign *= -1;
 	}
 	return bottomSolution;
       }
@@ -258,8 +279,10 @@ namespace uammd{
 	auto uH = -solutionTop.x;
 	auto vH = -solutionTop.y;
 	auto wH = -solutionTop.z;
-	rhs[8*id] = {kvec.x*u0.y + kvec.y*v0.y, -kvec.x*u0.x - kvec.y*v0.x};
-	rhs[8*id+1] = {kvec.x*uH.y + kvec.y*vH.y, -kvec.x*uH.x - kvec.y*vH.x};
+	rhs[8*id] = {kvec.x*u0.y + kvec.y*v0.y,
+	            -kvec.x*u0.x - kvec.y*v0.x};
+	rhs[8*id+1] = {kvec.x*uH.y + kvec.y*vH.y,
+	              -kvec.x*uH.x - kvec.y*vH.x};
 	rhs[8*id+2] = u0;
 	rhs[8*id+3] = v0;
 	rhs[8*id+4] = w0;
@@ -286,14 +309,15 @@ namespace uammd{
       }
 
       __global__ void computeAnalyticalCorrectionFourierSlit(cufftComplex4* d_correction, const cufftComplex4* insideSolution,
-							     real H, real2 Lxy, real viscosity, cufftComplex* invA, cufftComplex* b, int3 n){
+							     real H, real2 Lxy, real viscosity,
+							     cufftComplex* invA, cufftComplex* b, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	int2 ik = make_int2(id%(n.x/2+1), id/(n.x/2+1));
 	if(id >= n.y*(n.x/2+1)){
 	  return;
 	}
 	auto corr = make_third_index_iterator(d_correction, ik.x, ik.y, Index3D(n.x/2+1, n.y, n.z));
-	//zero mode is not corrected, BVP solve takes care of zero mode
+	//zero mode is not corrected, a BVP solve takes care of zero mode
 	if(id==0){
 	  for(int i = 0; i<n.z; i++){
 	    corr[i] = cufftComplex4();
@@ -308,7 +332,7 @@ namespace uammd{
 	complexmatvecprod(invA+8*8*id, b+8*id, C, 8);
 	const real halfmu = real(0.5)/viscosity;
 	for(int i = 0; i<n.z; i++){
-	  const real z =  (real(-0.5)*H)*cospi(i/real(n.z-1))+real(0.5)*H; //from 0 to H
+	  const real z =  H-(real(-0.5)*H*cospi(i/real(n.z-1))+real(0.5)*H); //from H to 0
 	  const real ekzmH = exp(k*(z-H));
 	  const real ekz = exp(-k*z);
 	  const cufftComplex ucorr =
@@ -324,14 +348,14 @@ namespace uammd{
       }
 
       __global__ void computeAnalyticalCorrectionFourierBottomWall(cufftComplex4* d_correction, const cufftComplex4* insideSolution,
-								  real H, real2 Lxy, real viscosity, int3 n){
+								  real H, real2 Lxy, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	int2 ik = make_int2(id%(n.x/2+1), id/(n.x/2+1));
 	if(id >= n.y*(n.x/2+1)){
 	  return;
 	}
 	auto corr = make_third_index_iterator(d_correction, ik.x, ik.y, Index3D(n.x/2+1, n.y, n.z));
-	//zero mode is not corrected, BVP solve takes care of zero mode
+	//zero mode is not corrected, a BVP solve takes care of zero mode
 	if(id==0){
 	  for(int i = 0; i<n.z; i++){
 	    corr[i] = cufftComplex4();
@@ -342,22 +366,21 @@ namespace uammd{
 	WaveNumberToWaveVector wn2wv(Lxy);
 	const real2 kvec = wn2wv(id2wn(id));
 	const real k = sqrt(dot(kvec, kvec));
-	const real halfmu = real(0.5)/viscosity;
 	auto sol = make_third_index_iterator(insideSolution, ik.x, ik.y, Index3D(n.x/2+1, n.y, n.z));
 	auto solutionBottom = computeBottomSolution(sol, n.z);
+	//auto solutionBottom = evaluateSolutionAtAngle(sol, M_PI, n.z);
 	auto u0 = -solutionBottom.x;
 	auto v0 = -solutionBottom.y;
 	auto w0 = -solutionBottom.z;
 	for(int i = 0; i<n.z; i++){
-	  const real z =  (real(-0.5)*H)*cospi(i/real(n.z-1))+real(0.5)*H; //from 0 to H
-	  const real ekzmH = exp(k*(z-H));
+	  const real z = H-((real(-0.5)*H)*cospi(i/real(n.z-1))+real(0.5)*H); //from H to 0
 	  const real ekz = exp(-k*z);
 	  const cufftComplex ucorr = { -kvec.x/k*(-k*w0.y + kvec.x*u0.x + kvec.y*v0.x)*z*ekz + u0.x*ekz,
 	                               -kvec.x/k*(k*w0.x + kvec.x*u0.y + kvec.y*v0.y)*z*ekz + u0.y*ekz};
 	  const cufftComplex vcorr = { -kvec.y/k*(-k*w0.y + kvec.x*u0.x + kvec.y*v0.x)*z*ekz + v0.x*ekz,
 	                               -kvec.y/k*(k*w0.x + kvec.x*u0.y + kvec.y*v0.y)*z*ekz + v0.y*ekz};
 	  const cufftComplex wcorr = { (k*w0.x + kvec.x*u0.y + kvec.y*v0.y)*z*ekz + w0.x*ekz,
-	                               (k*w0.x - kvec.x*u0.x - kvec.y*v0.x)*z*ekz + w0.y*ekz};
+	                               (k*w0.y - kvec.x*u0.x - kvec.y*v0.x)*z*ekz + w0.y*ekz};
 	  const cufftComplex pcorr = cufftComplex();
 	  corr[i] = {ucorr, vcorr, wcorr, pcorr};
 	}
@@ -367,7 +390,6 @@ namespace uammd{
 
     cached_vector<cufftComplex4> Correction::computeAnalyticalCorrectionFourierSpace(const cufftComplex4 *insideSolution,
 										     cudaStream_t st){
-      IndexToWaveVector i2wv(cells.x, cells.y, Lxy);
       int3 n = cells;
       int nk = (n.x/2+1)*n.y;
       cached_vector<cufftComplex4> analyticalCorrection(nk*(2*n.z-2));
@@ -384,7 +406,7 @@ namespace uammd{
       }
       else if(mode == WallMode::bottom){
 	correction_ns::computeAnalyticalCorrectionFourierBottomWall<<<nblocks, blockSize, 0, st>>>(d_corr, insideSolution,
-											    H, Lxy, viscosity, n);
+											    H, Lxy, n);
       }
       else{
 	thrust::fill(thrust::cuda::par.on(st), analyticalCorrection.begin(), analyticalCorrection.end(), cufftComplex4());
@@ -392,7 +414,7 @@ namespace uammd{
       return analyticalCorrection;
     }
 
-    std::vector<cufftComplex> evaluateCorrectionMatrix(real2 kvec, real viscosity, real H){
+    std::vector<cufftComplex> evaluateSlitCorrectionMatrix(real2 kvec, real viscosity, real H){
       const cufftComplex o = {1,0};
       const cufftComplex i = {0,1};
       const cufftComplex z = {0,0};
@@ -411,7 +433,7 @@ namespace uammd{
       return A;
     }
 
-    void Correction::initializeCorrectionMatrix(){
+    void Correction::initializeSlitCorrectionMatrix(){
       //No need to solve a system in non-slit mode
       if(mode != WallMode::slit){
 	return;
@@ -424,7 +446,7 @@ namespace uammd{
       std::for_each(it+1, it + nk, //The zero mode is excluded
 		      [&](int i){
 			real2 kvec = i2wv(i);
-			auto A = evaluateCorrectionMatrix(kvec, viscosity, H);
+			auto A = evaluateSlitCorrectionMatrix(kvec, viscosity, H);
 			auto h_invA_i = BVP::invertSquareMatrix(A, 8);
 			std::copy(h_invA_i.begin(), h_invA_i.end(), h_invA.begin()+8*8*i);
 		      }

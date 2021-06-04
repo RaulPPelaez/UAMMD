@@ -29,15 +29,15 @@ namespace uammd{
       }
 
       template<class T>
-      __global__ void scaleFFTToForwardChebyshevTransform(T* signal, int3 n){
+      __global__ void scaleFFTToForwardChebyshevTransform(T* signalin, T*signalout, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>= n.x*n.y*n.z) return;
 	const int iz  = id/(n.x*n.y);
 	const int ikx = id%n.x;
 	const int iky = (id/n.x)%n.y;
-	if(not(iz==0 or iz == n.z-1))
-	  signal[id] += signal[ikx+n.x*(iky+n.y*(2*n.z-2-iz))];
-	signal[id] *= real(0.5)/real(n.z-1);       
+	if(iz>0 and iz < (n.z-1))
+	  signalout[id] = signalin[id] + signalin[ikx+n.x*(iky+n.y*(2*n.z-2-iz))];
+	signalout[id] *= real(0.5)/real(n.z-1);
       }
 
       template<class T>
@@ -113,9 +113,11 @@ namespace uammd{
         cufftComplex4* d_gridDataFourier = thrust::raw_pointer_cast(gridDataFourier.data());
 	fct_ns::pack<<<((n.x/2+1)*n.y*(2*n.z-2))/blockSize+1, blockSize, 0, st>>>(d_gridDataFouR, d_gridDataFourier,
 										  make_int3(n.x/2+1, n.y, 2*n.z-2));
+	auto gridDataFourier2 = gridDataFourier;
+	cufftComplex4* d_gridDataFourier2 = thrust::raw_pointer_cast(gridDataFourier2.data());
 	CudaCheckError();
 	nblocks = ((n.x/2+1)*n.y*n.z)/blockSize+1;
-	fct_ns::scaleFFTToForwardChebyshevTransform<<<nblocks, blockSize, 0, st>>>(d_gridDataFourier, make_int3((n.x/2+1), n.y, n.z));
+	fct_ns::scaleFFTToForwardChebyshevTransform<<<nblocks, blockSize, 0, st>>>(d_gridDataFourier2, d_gridDataFourier, make_int3((n.x/2+1), n.y, n.z));
 	cudaDeviceSynchronize();
 	CudaCheckError();
 	System::log<System::DEBUG2>("[DPStokesSlab] Taking forces to wave/Chebyshev space");

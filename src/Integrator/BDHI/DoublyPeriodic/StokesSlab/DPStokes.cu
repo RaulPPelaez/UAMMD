@@ -24,7 +24,7 @@ namespace uammd{
       System::log<System::DEBUG2>("[DPStokes] Spreading forces");
       const int3 n = grid.cellDim;
       cached_vector<real4> gridForce(2*(n.x/2+1)*n.y*(2*n.z-2));
-      std::fill(gridForce.begin(), gridForce.end(), real4());
+      thrust::fill(gridForce.begin(), gridForce.end(), real4());
       auto d_gridForce = thrust::raw_pointer_cast(gridForce.data());
       IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
       ibm.spread(pos, forces, d_gridForce, numberParticles, st);
