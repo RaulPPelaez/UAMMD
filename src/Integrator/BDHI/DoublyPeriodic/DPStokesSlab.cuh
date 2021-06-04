@@ -92,7 +92,8 @@ namespace uammd{
     //Tabulated parameters for the BM kernel, this map returns, for a given support, beta and the normalization
     //BM_params[w] -> {beta, norm}
     static const std::map<int, double2> BM_params({ {4, {1.785,1.471487792829305}},
-						    {5, {1.886,1.456086423397354}}});
+						    {5, {1.886,1.456086423397354}},
+						    {6, {1.714,1.452197522749675}}});
     struct BarnettMagland{
       int3 support;      
       real beta;
