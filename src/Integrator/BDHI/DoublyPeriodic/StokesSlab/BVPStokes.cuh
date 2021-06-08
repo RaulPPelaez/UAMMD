@@ -29,18 +29,7 @@ namespace uammd{
       return tmp;
     }
 
-    __device__ int2 computeWaveNumber(int id, int nkx, int nky){
-      IndexToWaveNumber id2wn(nkx, nky);
-      const auto waveNumber = id2wn(id);
-      return waveNumber;
-    }
-
-    __device__ real2 computeWaveVector(int2 waveNumber, real2 Lxy){
-      WaveNumberToWaveVector wn2wv(Lxy);
-      const auto waveVector = wn2wv(waveNumber);
-      return waveVector;
-    }
-
+    //Computes the right hand side for the different PDEs (velocity xyz and pressure)
     template<class ForceIterator>
     class RightHandSideCompute{
       const int nz;
@@ -51,6 +40,7 @@ namespace uammd{
       __device__ RightHandSideCompute(int nz, real H, real2 i_waveVector, const ForceIterator fn,
 				      bool isUnpairedX, bool isUnpairedY):
 	nz(nz), H(H), fn(fn), waveVector(i_waveVector){
+	//ik differentiation is 0 in unpaired modes
 	waveVector.x = isUnpairedX?0:waveVector.x;
 	waveVector.y = isUnpairedY?0:waveVector.y;
       }
@@ -121,6 +111,7 @@ namespace uammd{
 
     };
 
+    //Computes the right hand side for the velocity BCs.
     class VelocityBoundaryConditionsRightHandSide{
       cufftComplex pH;
       cufftComplex pmH;
@@ -204,6 +195,7 @@ namespace uammd{
       }
       const auto waveNumber = computeWaveNumber(id, nkx, nky);
       const auto waveVector = computeWaveVector(waveNumber, Lxy);
+      //ik differentiation is 0 in unpaired modes
       const bool isUnpairedX = waveNumber.x == (nkx - waveNumber.x);
       const bool isUnpairedY = waveNumber.y == (nky - waveNumber.y);
       RightHandSideCompute<decltype(fn)> rhsCompute(nz, H, waveVector, fn, isUnpairedX, isUnpairedY);
@@ -252,8 +244,8 @@ namespace uammd{
 	const cufftComplex beta = rhs_bc.computeBottomPerpendicular(mu);
 	bvp.solve(id, rightHandSide, alpha, beta,  an, velocity);
       }
-      //PRESSURE LINEAR CORRECTION
-      if(id == 0){
+      //PRESSURE LINEAR CORRECTION, only in open boundaries case
+      if(mode == WallMode::none and id == 0){
 	cufftComplex linearCorrection = cufftComplex();
 	fori(0, nz){
 	  linearCorrection += precomputedPressureChebyshevIntegrals[i]*fn[i].z;

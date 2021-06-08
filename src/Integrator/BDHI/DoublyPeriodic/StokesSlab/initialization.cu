@@ -56,6 +56,7 @@ namespace uammd{
 				     grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
       }
       this->kernel = std::make_shared<Kernel>(tolerance, gw, h, H, supportxy, grid.cellDim.z);
+      this->kernelTorque = std::make_shared<KernelTorque>(tolerance, gw, h, H, supportxy, grid.cellDim.z, true);
     }
 
     void DPStokes::printStartingMessages(Parameters par){

@@ -29,7 +29,7 @@ namespace uammd{
       }
 
       template<class T>
-      __global__ void scaleFFTToForwardChebyshevTransform(T* signalin, T*signalout, int3 n){
+      __global__ void scaleFFTToForwardChebyshevTransform(const T* signalin, T*signalout, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>= n.x*n.y*n.z) return;
 	const int iz  = id/(n.x*n.y);
@@ -50,7 +50,7 @@ namespace uammd{
       }
 
       template<class Tin, class Tout>
-      __global__ void unpack(Tin* in, Tout* out, int3 n){
+      __global__ void unpack(const Tin* in, Tout* out, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	int nel = n.x*n.y*n.z;
 	if(id>= nel) return;
@@ -62,7 +62,7 @@ namespace uammd{
       }
       
       template<class Tin, class Tout>
-      __global__ void pack(Tin* in, Tout* out, int3 n){
+      __global__ void pack(const Tin* in, Tout* out, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	int nel = n.x*n.y*n.z;
 	if(id>= nel) return;
@@ -89,7 +89,7 @@ namespace uammd{
       //In order to use cufft correctly I have to go back and forth between a AoS and SoA layout, there has to be a better way. 
       template<class Real4Container>
       cached_vector<cufftComplex4> forwardTransform(Real4Container &gridData, cudaStream_t st){
-	System::log<System::DEBUG2>("[DPStokesSlab] Taking forces to wave/Chebyshev space");
+	System::log<System::DEBUG2>("[DPStokesSlab] Transforming to wave/Chebyshev space");
 	CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
 	const int3 n = gridSize;
 	real4* d_gridData = (real4*)thrust::raw_pointer_cast(gridData.data());
@@ -126,10 +126,10 @@ namespace uammd{
 
       template<class Cufft4Container>
       cached_vector<real4> inverseTransform(Cufft4Container & gridDataFourier, cudaStream_t st){
-	System::log<System::DEBUG2>("[DPStokesSlab] Velocity and pressure to real space");
+	System::log<System::DEBUG2>("[DPStokesSlab] Transforming to real space");
 	CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
 	const int3 n = gridSize;
-	cufftComplex4* d_gridDataFourier = thrust::raw_pointer_cast(gridDataFourier.data());
+	auto d_gridDataFourier = thrust::raw_pointer_cast(gridDataFourier.data());
 	const int blockSize = 128;
 	const int nblocks = ((n.x/2+1)*n.y*n.z)/blockSize+1;
 	fct_ns::scaleFFTToInverseChebyshevTransform<<<nblocks, blockSize, 0, st>>>(d_gridDataFourier, make_int3(n.x, n.y, n.z));

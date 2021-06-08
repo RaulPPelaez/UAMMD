@@ -1,6 +1,7 @@
 #ifndef DOUBLYPERIODIC_STOKESSLAB_UTILS_CUH
 #define DOUBLYPERIODIC_STOKESSLAB_UTILS_CUH
 #include "global/defines.h"
+#include "third_party/managed_allocator.h"
 #include "utils/utils.h"
 #include "System/System.h"
 #include <thrust/device_vector.h>
@@ -160,6 +161,18 @@ namespace uammd{
 				   WaveNumberToWaveVectorModulus(Lxy));
       auto klist = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), i2k);
       return klist;
+    }
+
+    __device__ int2 computeWaveNumber(int id, int nkx, int nky){
+      IndexToWaveNumber id2wn(nkx, nky);
+      const auto waveNumber = id2wn(id);
+      return waveNumber;
+    }
+
+    __device__ real2 computeWaveVector(int2 waveNumber, real2 Lxy){
+      WaveNumberToWaveVector wn2wv(Lxy);
+      const auto waveVector = wn2wv(waveNumber);
+      return waveVector;
     }
 
     class Index3D{
