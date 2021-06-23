@@ -10,7 +10,6 @@ namespace uammd{
     DPStokes::DPStokes(DPStokes::Parameters par):
       viscosity(par.viscosity),
       H(par.H), Lxy(par.Lxy),
-      gw(par.gw),
       tolerance(par.tolerance),
       mode(par.mode){
       setUpGrid(par);
@@ -18,7 +17,7 @@ namespace uammd{
       if(par.mode != WallMode::none){ //Correction is only needed for walls
 	this->correction = std::make_shared<Correction>(H, make_real2(Lxy), grid.cellDim, viscosity, par.mode);
       }
-      initializeKernel(par.support);
+      initializeKernel(par);
       printStartingMessages(par);
       initializeBoundaryValueProblemSolver();
       initializeQuadratureWeights();
@@ -48,22 +47,24 @@ namespace uammd{
       System::log<System::MESSAGE>("[DPStokes] Selected h: %g", grid.cellSize.x);
     }
 
-    void DPStokes::initializeKernel(int supportxy){
+    void DPStokes::initializeKernel(Parameters par){
       System::log<System::DEBUG>("[DPStokes] Initialize kernel");
       double h = grid.cellSize.x;
-      if(supportxy >= grid.cellDim.x){
-	System::log<System::WARNING>("[DPStokes] Support is too big, cell dims: %d %d %d, requested support: %d",
-				     grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
-      }
-      this->kernel = std::make_shared<Kernel>(tolerance, gw, h, H, supportxy, grid.cellDim.z);
-      this->kernelTorque = std::make_shared<KernelTorque>(tolerance, gw, h, H, supportxy, grid.cellDim.z, true);
+      // if(supportxy >= grid.cellDim.x){
+      // 	System::log<System::WARNING>("[DPStokes] Support is too big, cell dims: %d %d %d, requested support: %d",
+      // 				     grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
+      //}
+      this->kernel = std::make_shared<Kernel>(par.w, par.beta, par.alpha, grid.cellSize.x, H, grid.cellDim.z);
+      this->kernelTorque = std::make_shared<KernelTorque>(par.w_d, par.beta_d, par.alpha_d, grid.cellSize.x, H, grid.cellDim.z);
+      // this->kernel = std::make_shared<Kernel>(tolerance, gw, h, H, supportxy, grid.cellDim.z);
+      // this->kernelTorque = std::make_shared<KernelTorque>(tolerance, gw, h, H, supportxy, grid.cellDim.z, true);
     }
 
     void DPStokes::printStartingMessages(Parameters par){
       System::log<System::MESSAGE>("[DPStokes] tolerance: %g", par.tolerance);
       System::log<System::MESSAGE>("[DPStokes] support: %d", kernel->support);
       System::log<System::MESSAGE>("[DPStokes] viscosity: %g", viscosity);
-      System::log<System::MESSAGE>("[DPStokes] Gaussian source width: %g", par.gw);
+      //System::log<System::MESSAGE>("[DPStokes] Gaussian source width: %g", par.gw);
       System::log<System::MESSAGE>("[DPStokes] cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
       System::log<System::MESSAGE>("[DPStokes] box size: %g %g %g", Lxy, Lxy, H);
     }

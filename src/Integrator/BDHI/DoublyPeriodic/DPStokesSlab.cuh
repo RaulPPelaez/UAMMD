@@ -8,6 +8,7 @@
 #include"Integrator/Integrator.cuh"
 
 
+#include "misc/IBM_kernels.cuh"
 #include "utils/utils.h"
 #include "global/defines.h"
 #include"misc/BoundaryValueProblem/BVPSolver.cuh"
@@ -95,35 +96,66 @@ namespace uammd{
       real a2 = alpha*alpha;
       return -beta*r*bm(r,alpha, beta, norm)/(a2*sqrt(real(1.0)-r*r/a2));
     }
+
+    namespace detail{
+      template<class Foo>
+      real integrate(Foo foo, real rmin, real rmax, int Nr){
+	double integral = foo(rmin)*0.5;
+	for(int i = 1; i<Nr; i++){
+	  integral += foo(rmin+i*(rmax-rmin)/Nr);
+	}
+	integral += foo(rmax)*0.5;
+	integral *= (rmax-rmin)/(real)Nr;
+	return integral;
+      }
+      real suggestBetaBM(real w){
+	throw std::runtime_error("Beta<0 Not implemented yet, please give me a value");
+	return 0;
+      }
+    }
     //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
     struct BarnettMagland{
       int3 support;      
       real beta;
       real alpha;
       real norm;
+      real computeNorm() const{
+	auto foo=[=](real r){return bm(r, alpha, beta, 1.0);};
+	real norm = detail::integrate(foo, -alpha, alpha, 100000);
+	return norm;
+      }
 
-      BarnettMagland(real tolerance_ignored, real width_ignored, real h, real H, int supportxy, int nz, bool torqueMode = false):
-	H(H), nz(nz){
-	this->rmax = supportxy*h*0.5*2;
+      BarnettMagland(real w, real beta, real i_alpha, real h, real H, int nz):
+      //real tolerance_ignored, real width_ignored, real h, real H, int supportxy, int nz, bool torqueMode = false):
+	H(H), nz(nz), beta(beta), alpha(i_alpha){
+	int supportxy = w/h+0.5;
+	this->rmax = w;
 	support.x = support.y = supportxy+1;
 	int ct = int(nz*(acos(-2*(-H*0.5+rmax)/H)/M_PI));
 	support.z = 2*ct+1;
-	this->alpha = supportxy*0.5*h;
+	this->norm = this->computeNorm();
+	if(alpha>w*h*0.5){
+	  throw std::runtime_error("BM: alpha has to be less or equal to w*h/2 ("+std::to_string(w*h*0.5)+"), found" +std::to_string(alpha));
+	}
+	if(alpha<0) this->alpha = w*h*0.5;
+	if(beta<0) this->beta = detail::suggestBetaBM(w);
+
+	//this->alpha = supportxy*0.5*h;	
 	//If the support is not tabulated an exception will be thrown
-	try{
-	  if(torqueMode){
-	    this->beta = supportxy*BM_torque_params.at(supportxy).x;
-	    this->norm = BM_torque_params.at(supportxy).y;
-	  }
-	  else{
-	    this->beta = supportxy*BM_params.at(supportxy).x;
-	    this->norm = BM_params.at(supportxy).y;
-	  }
-	}
-	catch(...){
-	  System::log<System::EXCEPTION>("BM kernel: Untabulated support: %d", supportxy);
-	  throw std::runtime_error("BM kernel: Untabulated support");
-	}
+	// try{
+	//   if(torqueMode){
+	//     this->beta = supportxy*BM_torque_params.at(supportxy).x;
+	//     this->norm = BM_torque_params.at(supportxy).y;
+	//   }
+	//   else{
+	//     this->beta = supportxy*BM_params.at(supportxy).x;
+	//     this->norm = BM_params.at(supportxy).y;
+	//   }
+	// }
+	// catch(...){
+	//   System::log<System::EXCEPTION>("BM kernel: Untabulated support: %d", supportxy);
+	//   throw std::runtime_error("BM kernel: Untabulated support");
+	// }
       }
       
       inline __host__  __device__ int3 getMaxSupport() const{
@@ -173,15 +205,21 @@ namespace uammd{
       using Grid = chebyshev::doublyperiodic::Grid;
       using QuadratureWeights = chebyshev::doublyperiodic::QuadratureWeights;
 
+      //Parameters, -1 means that it will be autocomputed if not present
       struct Parameters{
-	int nxy, nz;
+	int nxy;
+	int nz = -1;
 	real dt;
 	real viscosity;
 	real Lxy;
 	real H;
 	real tolerance = 1e-7;
-	real gw;
-	int support = -1; //-1 means auto compute from tolerance
+	real w, w_d;
+	real hydrodynamicRadius;
+	real beta = -1;
+	real beta_d = -1;
+	real alpha = -1;
+	real alpha_d = -1;
 	//Can be either none, bottom or slit
 	WallMode mode = WallMode::none;
       };
@@ -209,7 +247,7 @@ namespace uammd{
       gpu_container<real> zeroModePressureChebyshevIntegrals;
     
       void setUpGrid(Parameters par);
-      void initializeKernel(int supportxy);
+      void initializeKernel(Parameters par);
       void printStartingMessages(Parameters par);
       void resizeVectors();
       void initializeBoundaryValueProblemSolver();
