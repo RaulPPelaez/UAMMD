@@ -9,13 +9,13 @@ namespace uammd{
   namespace DPStokesSlab_ns{
     DPStokes::DPStokes(DPStokes::Parameters par):
       viscosity(par.viscosity),
-      H(par.H), Lxy(par.Lxy),
+      H(par.H), Lx(par.Lx),Ly(par.Ly),
       tolerance(par.tolerance),
       mode(par.mode){
       setUpGrid(par);
       this->fct = std::make_shared<FastChebyshevTransform>(grid.cellDim);
       if(par.mode != WallMode::none){ //Correction is only needed for walls
-	this->correction = std::make_shared<Correction>(H, make_real2(Lxy), grid.cellDim, viscosity, par.mode);
+	this->correction = std::make_shared<Correction>(H, make_real2(Lx, Ly), grid.cellDim, viscosity, par.mode);
       }
       initializeKernel(par);
       printStartingMessages(par);
@@ -34,16 +34,16 @@ namespace uammd{
 
     void DPStokes::setUpGrid(Parameters par){
       System::log<System::DEBUG>("[DPStokes] setUpGrid");
-      int3 cellDim = {par.nxy, par.nxy, par.nz};
+      int3 cellDim = {par.nx, par.ny, par.nz};
       if(cellDim.x < 0){
 	double h = DPStokes_ns::proposeCellSize(par.tolerance, gw);
 	constexpr int minimumNumberCells = 16;
-	h = std::min(h, Lxy/double(minimumNumberCells));
+	h = std::min(h, Lx/double(minimumNumberCells));
 	System::log<System::MESSAGE>("[DPStokes] Proposed h: %g", h);
-	cellDim = make_int3(make_real3(Lxy, Lxy, H)/h);
+	cellDim = make_int3(make_real3(Lx, Ly, H)/h);
 	cellDim = nextFFTWiseSize3D(cellDim);
       }
-      this->grid = Grid(Box(make_real3(Lxy, Lxy, H)), cellDim);
+      this->grid = Grid(Box(make_real3(Lx, Ly, H)), cellDim);
       System::log<System::MESSAGE>("[DPStokes] Selected h: %g", grid.cellSize.x);
     }
 
@@ -66,7 +66,9 @@ namespace uammd{
       System::log<System::MESSAGE>("[DPStokes] viscosity: %g", viscosity);
       //System::log<System::MESSAGE>("[DPStokes] Gaussian source width: %g", par.gw);
       System::log<System::MESSAGE>("[DPStokes] cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
-      System::log<System::MESSAGE>("[DPStokes] box size: %g %g %g", Lxy, Lxy, H);
+      System::log<System::MESSAGE>("[DPStokes] box size: %g %g %g", Lx, Ly, H);
+      if(Lx!=Ly)
+	System::log<System::WARNING>("[DPStokes] Domains with Lx=Ly are largely untested");
     }
     
     namespace detail{
@@ -119,7 +121,7 @@ namespace uammd{
     void DPStokes::initializeBoundaryValueProblemSolver(){
       System::log<System::DEBUG>("[DPStokes] Initializing BVP solver");
       const int2 nk = {grid.cellDim.x, grid.cellDim.y};
-      auto klist = DPStokesSlab_ns::make_wave_vector_modulus_iterator(nk, make_real2(Lxy, Lxy));
+      auto klist = DPStokesSlab_ns::make_wave_vector_modulus_iterator(nk, make_real2(Lx, Ly));
       real halfH = H*0.5;
       auto topdispatch = detail::BoundaryConditionsDispatch<detail::TopBoundaryConditions, decltype(klist)>(klist, halfH);
       auto topBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), topdispatch);

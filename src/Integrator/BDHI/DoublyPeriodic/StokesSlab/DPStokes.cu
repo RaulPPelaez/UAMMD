@@ -137,7 +137,7 @@ namespace uammd{
       const int numberSystems = n.y*(n.x/2+1);
       const int numberBlocks = numberSystems/blockSize+1;
       detail::addTorqueCurlCheb<<<numberBlocks, blockSize, 0, st>>>(d_gridTorqueCheb, d_gridForceCheb,
-								    make_real3(Lxy, Lxy, H), n);      
+								    make_real3(Lx, Ly, H), n);      
       CudaCheckError();
     }
 
@@ -154,7 +154,7 @@ namespace uammd{
       const int blockSize = 64;
       const int numberBlocks = numberSystems/blockSize+1;
       solveBVPVelocityD<<<numberBlocks, blockSize, 0,st>>>(bvpSolver->getGPUSolver(), n.x, n.y, n.z,
-							   make_real2(Lxy), H*0.5,
+							   make_real2(Lx, Ly), H*0.5,
 							   d_gridForceFourier,
 							   d_gridVelocityFourier,
 							   tmp,
@@ -233,7 +233,7 @@ namespace uammd{
       cached_vector<cufftComplex4> gridAngVelsCheb(gridVelsChebCopy.size());
       auto d_gridAngVelsCheb = thrust::raw_pointer_cast(gridAngVelsCheb.data());
       detail::computeVelocityCurlCheb<<<numberBlocks, blockSize, 0, st>>>(d_gridVelsCheb, d_gridAngVelsCheb,
-									  make_real3(Lxy, Lxy, H), n);
+									  make_real3(Lx, Ly, H), n);
       CudaCheckError();
       return gridAngVelsCheb;
     }

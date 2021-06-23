@@ -207,11 +207,11 @@ namespace uammd{
 
       //Parameters, -1 means that it will be autocomputed if not present
       struct Parameters{
-	int nxy;
+	int nx, ny;
 	int nz = -1;
 	real dt;
 	real viscosity;
-	real Lxy;
+	real Lx, Ly;
 	real H;
 	real tolerance = 1e-7;
 	real w, w_d;
@@ -266,7 +266,7 @@ namespace uammd{
 						      cudaStream_t st);
       cached_vector<real4> interpolateAngularVelocity(cached_vector<real4> &gridData,
 						      real4* pos, int N, cudaStream_t st);
-      real Lxy;
+      real Lx, Ly;
       real H;
       Grid grid;   
       real viscosity;
