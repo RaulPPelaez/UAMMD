@@ -9,6 +9,7 @@ References:
 [2] Staggered Schemes for Fluctuating Hydrodynamics. Florencio Balboa, et.al. 2012.
  */
 #include"FIB.cuh"
+#include "global/defines.h"
 #include"utils/cufftDebug.h"
 #include"utils/curandDebug.h"
 #include"utils/debugTools.h"
@@ -83,7 +84,7 @@ namespace uammd{
       if(par.cells.x<0){
 	if(par.hydrodynamicRadius<0)
 	  sys->log<System::CRITICAL>("[BHDI::FIB] I need either the hydrodynamic radius or the number of cells!");
-	real hgrid = par.hydrodynamicRadius/0.91;
+	real hgrid = Kernel::adviseGridSize(par.hydrodynamicRadius, par.tolerance);
 	cellDim = make_int3(box.boxSize/hgrid);
 	/*FFT likes a number of cells as cellDim.i = 2^n·3^l·5^m */
 	cellDim = FIB_ns::nextFFTWiseSize3D(cellDim);
@@ -94,14 +95,18 @@ namespace uammd{
       if(cellDim.x <3)cellDim.x = 3;
       if(cellDim.y <3)cellDim.y = 3;
       if(cellDim.z==2)cellDim.z = 3;
-      double rh = 0.91*box.boxSize.x/cellDim.x;
+      /*Store grid parameters in a Mesh object*/
+      this->grid = Grid(box, cellDim);
+      real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
+      this->kernel = std::make_shared<Kernel>(h, par.tolerance);
+      this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h, grid.cellSize.x);
+      double rh = this->hydrodynamicRadius;
 #ifndef SINGLE_PRECISION
       this->deltaRFD = 1e-6*rh;
 #else
       this->deltaRFD = 1e-4*rh;
 #endif
-      /*Store grid parameters in a Mesh object*/
-      this->grid = Grid(box, cellDim);
+
       /*Print information*/
       sys->log<System::MESSAGE>("[BDHI::FIB] Closest possible hydrodynamic radius: %f", rh);
       sys->log<System::MESSAGE>("[BDHI::FIB] Box Size: %f %f %f", box.boxSize.x, box.boxSize.y, box.boxSize.z);
@@ -434,6 +439,19 @@ namespace uammd{
 
       }
 
+      template<class Grid>
+      __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int support){
+	int3 P = make_int3(support/2);
+	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
+	const bool shift = support%2==0;
+	if(shift){
+	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
+	  const real3 pi_pbc = grid.box.apply_pbc(pos);
+	  P -= make_int3((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5));
+	}
+	return P;
+      }
+
       //Computes S·F and adds it to gridVels
       template<class Kernel = IBM_kernels::Peskin::threePoint, class IndexIterator>
       __global__ void spreadParticleForces(real4 *pos,
@@ -449,51 +467,56 @@ namespace uammd{
 	const real3 pi = make_real3(pos[id]);
 	const real3 forcei = make_real3(force[id]);
 	//Corresponding cell of each direction in the staggered grid
-	const int3 cellix = grid.getCell(make_real3(pi.x - real(0.5)*grid.cellSize.x, pi.y, pi.z));
-	const int3 celliy = grid.getCell(make_real3(pi.x, pi.y - real(0.5)*grid.cellSize.y, pi.z));
-	const int3 celliz = grid.getCell(make_real3(pi.x, pi.y, pi.z - real(0.5)*grid.cellSize.z));
-	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize); //Cell index to cell center position
-	constexpr int P = Kernel::support/2;
+	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize);
 	constexpr int supportCells = Kernel::support;
+	const real3 pix = make_real3(pi.x - real(0.5)*grid.cellSize.x, pi.y, pi.z);
+	const int3 cellix = grid.getCell(pix);
+	const int3 Px = computeSupportShift(pix, cellix, grid, supportCells);
+	const real3 piy =  make_real3(pi.x, pi.y - real(0.5)*grid.cellSize.y, pi.z);
+	const int3 celliy = grid.getCell(piy);
+	const int3 Py = computeSupportShift(piy, celliy, grid, supportCells);
+	const real3 piz = make_real3(pi.x, pi.y, pi.z - real(0.5)*grid.cellSize.z);
+	const int3 celliz = grid.getCell(piz);
+	const int3 Pz = computeSupportShift(piz, celliz, grid, supportCells);
 	constexpr int numberNeighbourCells = supportCells*supportCells*supportCells;
 	for(int i = 0; i<numberNeighbourCells; i++){
 	  //Contribution to vx
 	  {
 	    //Compute neighbour cell index
-	    int3 celljx = make_int3(cellix.x + i%supportCells - P,
-				    cellix.y + (i/supportCells)%supportCells - P,
-				    cellix.z + i/(supportCells*supportCells) - P );
+	    int3 celljx = make_int3(cellix.x + i%supportCells,
+				    cellix.y + (i/supportCells)%supportCells,
+				    cellix.z + i/(supportCells*supportCells)) -Px;
 	    celljx = grid.pbc_cell(celljx);
-
 	    const int jcellx = grid.getCellIndex(celljx);
 	    /*Staggered distance from q - noise to center of cell j*/
-	    const real3 rijx = pi-make_real3(celljx)*grid.cellSize-cellPosOffset;
+	    const real3 r = grid.distanceToCellCenter(pi - make_real3(real(0.5)*grid.cellSize.x,0,0),
+							celljx);
 	    //Spread Wx
-	    const auto r = grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.x, rijx.y, rijx.z});
 	    real fx = kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*forcei.x;
 	    atomicAdd(&gridVels[jcellx].x, fx);
 	  }
 	  //Contribution to vy
 	  {
-	    int3 celljy = make_int3(celliy.x + i%supportCells - P,
-				    celliy.y + (i/supportCells)%supportCells - P,
-				    celliy.z + i/(supportCells*supportCells) - P );
+	    int3 celljy = make_int3(celliy.x + i%supportCells,
+				    celliy.y + (i/supportCells)%supportCells,
+				    celliy.z + i/(supportCells*supportCells)) - Py;
 	    celljy = grid.pbc_cell(celljy);
 	    const int jcelly = grid.getCellIndex(celljy);
-	    const real3 rijy = pi - make_real3(celljy)*grid.cellSize-cellPosOffset;
-	    const auto r = grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z});
+	    const real3 r = grid.distanceToCellCenter(pi - make_real3(0, real(0.5)*grid.cellSize.y,0),
+						      celljy);
+
 	    real fy = kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*forcei.y;
 	    atomicAdd(&gridVels[jcelly].y, fy);
 	  }
 	  //Contribution to vz
 	  {
-	    int3 celljz = make_int3(celliz.x + i%supportCells - P,
-				    celliz.y + (i/supportCells)%supportCells - P,
-				    celliz.z + i/(supportCells*supportCells) - P );
+	    int3 celljz = make_int3(celliz.x + i%supportCells,
+				    celliz.y + (i/supportCells)%supportCells,
+				    celliz.z + i/(supportCells*supportCells))-Pz;
 	    celljz = grid.pbc_cell(celljz);
 	    const int jcellz = grid.getCellIndex(celljz);
-	    const real3 rijz = pi-make_real3(celljz)*grid.cellSize-cellPosOffset;
-	    const auto r = grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z});
+	    const real3 r = grid.distanceToCellCenter(pi - make_real3(0,0, real(0.5)*grid.cellSize.z),
+						      celljz);
 	    real fz = kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*forcei.z;
 	    atomicAdd(&gridVels[jcellz].z, fz);
 	  }
@@ -629,15 +652,20 @@ namespace uammd{
 	//Store q^n
 	if(mode==Step::PREDICTOR) posOld[id] = pos[id];
 	//Staggered grid cells for interpolating each velocity coordinate
-	const int3 cellix = grid.getCell(make_real3(posCurrent.x - real(0.5)*grid.cellSize.x, posCurrent.y, posCurrent.z));
-	const int3 celliy = grid.getCell(make_real3(posCurrent.x, posCurrent.y - real(0.5)*grid.cellSize.y, posCurrent.z));
-	const int3 celliz = grid.getCell(make_real3(posCurrent.x, posCurrent.y, posCurrent.z - real(0.5)*grid.cellSize.z));
+	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize);
+	constexpr int supportCells = Kernel::support;
+	const real3 pix = make_real3(posCurrent.x - real(0.5)*grid.cellSize.x, posCurrent.y, posCurrent.z);
+	const int3 cellix = grid.getCell(pix);
+	const int3 Px = computeSupportShift(pix, cellix, grid, supportCells);
+	const real3 piy =  make_real3(posCurrent.x, posCurrent.y - real(0.5)*grid.cellSize.y, posCurrent.z);
+	const int3 celliy = grid.getCell(piy);
+	const int3 Py = computeSupportShift(piy, celliy, grid, supportCells);
+	const real3 piz = make_real3(posCurrent.x, posCurrent.y, posCurrent.z - real(0.5)*grid.cellSize.z);
+	const int3 celliz = grid.getCell(piz);
+	const int3 Pz = computeSupportShift(piz, celliz, grid, supportCells);
 	real prefactor = dt;
 	//Half step in predictor mode
 	if(mode==Step::PREDICTOR) prefactor *= real(0.5);
-	const real3 cellPosOffset = real(0.5)*(grid.cellSize - grid.box.boxSize);
-	constexpr int P = Kernel::support/2;
-	constexpr int supportCells = Kernel::support;
 	constexpr int numberNeighbourCells = supportCells*supportCells*supportCells;
 	//J = dV·S
 	const real dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
@@ -646,42 +674,39 @@ namespace uammd{
 	  //Apply J to the velocity of the current cell.
 	  {
 	    //Neighbour cell in the x direction
-	    int3 celljx = make_int3(cellix.x + i%supportCells - P,
-				    cellix.y + (i/supportCells)%supportCells - P,
-				    cellix.z + i/(supportCells*supportCells) - P );
+	    int3 celljx = make_int3(cellix.x + i%supportCells,
+				    cellix.y + (i/supportCells)%supportCells,
+				    cellix.z + i/(supportCells*supportCells)) - Px;
 	    celljx = grid.pbc_cell(celljx);
 	    //Cel lindex of neighbour
 	    const int jcellx = grid.getCellIndex(celljx);
 	    //Distance from particle i to center of cell j
-	    const real3 rijx = posCurrent-make_real3(celljx)*grid.cellSize-cellPosOffset;
 	    //p += J·v = dV·\delta(p_x_i-cell_x_j)·v_x_j
 	    const real v_jx = gridVels[jcellx].x;
-	    const auto r = grid.box.apply_pbc({rijx.x - real(0.5)*grid.cellSize.y, rijx.y, rijx.z});
+	    const real3 r = grid.distanceToCellCenter(posCurrent - make_real3(real(0.5)*grid.cellSize.x, 0, 0),
+						      celljx);
 	    pnew.x += kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*v_jx*dV;
 	  }
 	  {
-	    int3 celljy = make_int3(celliy.x + i%supportCells - P,
-				    celliy.y + (i/supportCells)%supportCells - P,
-				    celliy.z + i/(supportCells*supportCells) - P );
+	    int3 celljy = make_int3(celliy.x + i%supportCells,
+				    celliy.y + (i/supportCells)%supportCells,
+				    celliy.z + i/(supportCells*supportCells)) - Py;
 	    celljy = grid.pbc_cell(celljy);
-
 	    const int jcelly = grid.getCellIndex(celljy);
-	    const real3 rijy = posCurrent-make_real3(celljy)*grid.cellSize-cellPosOffset;
-
 	    const real v_jy = gridVels[jcelly].y;
-	    const auto r = grid.box.apply_pbc({rijy.x, rijy.y - real(0.5)*grid.cellSize.y, rijy.z});
+	    const real3 r = grid.distanceToCellCenter(posCurrent - make_real3(0, real(0.5)*grid.cellSize.y, 0),
+						      celljy);
 	    pnew.y += kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*v_jy*dV;
 	  }
 	  {
-	    int3 celljz = make_int3(celliz.x + i%supportCells - P,
-				    celliz.y + (i/supportCells)%supportCells - P,
-				    celliz.z + i/(supportCells*supportCells) - P );
+	    int3 celljz = make_int3(celliz.x + i%supportCells,
+				    celliz.y + (i/supportCells)%supportCells,
+				    celliz.z + i/(supportCells*supportCells)) - Pz;
 	    celljz = grid.pbc_cell(celljz);
-
 	    const int jcellz = grid.getCellIndex(celljz);
-	    const real3 rijz = posCurrent-make_real3(celljz)*grid.cellSize-cellPosOffset;
 	    const real v_jz = gridVels[jcellz].z;
-	    const auto r = grid.box.apply_pbc({rijz.x, rijz.y, rijz.z - real(0.5)*grid.cellSize.z});
+	    const real3 r = grid.distanceToCellCenter(posCurrent - make_real3(0, 0, real(0.5)*grid.cellSize.z),
+							      celljz);
 	    pnew.z += kernel.phi(r.x)*kernel.phi(r.y)*kernel.phi(r.z)*v_jz*dV;
 	  }
 	}
@@ -722,7 +747,7 @@ namespace uammd{
        							  indexIter,
        							  grid,
        							  numberParticles,
-       							  Kernel(grid.cellSize.x));
+       							  *kernel);
     }
     //v += prefactor·\tilde{D}·W
     //Prefactor will be proportional to sqrt(4*viscosity*temperature/(dt*dV)) depending on the integration method
@@ -759,7 +784,7 @@ namespace uammd{
 						     driftPrefactor,
 						     deltaRFD,
 						     numberParticles,
-						     Kernel(grid.cellSize.x),
+						     *kernel,
 						     (uint)seed, (uint)step);
     }
 
@@ -801,7 +826,7 @@ namespace uammd{
 									   d_posOld,
 									   d_gridVels,
 									   grid,
-									   Kernel(grid.cellSize.x),
+									   *kernel,
 									   dt,
 									   numberParticles);
     }
@@ -819,7 +844,7 @@ namespace uammd{
 									   d_posOld,
 									   d_gridVels,
 									   grid,
-									   Kernel(grid.cellSize.x),
+									   *kernel,
 									   dt,
 									   numberParticles);
     }
@@ -837,7 +862,7 @@ namespace uammd{
 								       d_posOld,
 								       d_gridVels,
 								       grid,
-								       Kernel(grid.cellSize.x),
+								       *kernel,
 								       dt,
 								       numberParticles);
     }
