@@ -78,6 +78,10 @@ namespace uammd{
       return bdhi->getHydrodynamicRadius();
     }
 
+    auto getScheme(){
+      return bdhi;
+    }
+
     real getSelfMobility(){
       return bdhi->getSelfMobility();
     }
