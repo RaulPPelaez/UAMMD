@@ -48,7 +48,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", M0);
       pse_ns::checkInputValidity(par);
       nearField = std::make_shared<pse_ns::NearField>(par, sys, pd, pg);
-      farField = std::make_shared<pse_ns::FarField>(par, sys, pd, pg);
+      farField = std::make_shared<pse_ns::FarField>(par, sys);
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
     }
