@@ -28,6 +28,7 @@ namespace uammd{
   namespace BDHI{
     class FCM{
     public:
+      //Choose a different kernel by uncommenting the line
       using Kernel = FCM_ns::Kernels::Gaussian;
       //using Kernel = FCM_ns::Kernels::BarnettMagland;
       //using Kernel = FCM_ns::Kernels::Peskin::threePoint;
@@ -55,6 +56,10 @@ namespace uammd{
 
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
+      }
+
+      real getCellSize(){
+	return grid.cellSize.x;
       }
 
       real getSelfMobility(){

@@ -14,21 +14,23 @@ namespace uammd{
 	  static real computeUpsampling(real tolerance){
 	    real amin = 0.55;
 	    real amax = 1.65;
-	    real x = -log10(2*tolerance)/10.0;
+	    real x = -log10(3*tolerance)/10.0;
 	    real factor = std::min(amin + x*(amax-amin), amax);
 	    return factor;
 	  }
 	  real a;
 	public:
 	  int support;
+	  real rmax;
 	  Gaussian(real h, real tolerance):
 	    kern(h*computeUpsampling(tolerance)){
-	    const real dr = 1e-5*h;
+	    const real dr = 0.5*h;
 	    real r = dr;
-	    while(this->phi(r)>tolerance){
-	      r+=dr;
+	    while(kern.phi(r)>tolerance){
+	      r += dr;
 	    }
 	    this->support = std::max(3, int(2*r/h + 0.5));
+	    rmax = support*h;
 	    a=h*computeUpsampling(tolerance)*sqrt(M_PI);
 	  }
 
@@ -42,11 +44,7 @@ namespace uammd{
 	  }
 
 	  __host__ __device__ real phi(real r) const{
-	    return kern.phi(r);
-	  }
-
-	  __host__ __device__ real delta(real3 r, real3 h) const{
-	    return phi(r.x)*phi(r.y)*phi(r.z);
+	    return r>=rmax?0:kern.phi(r);
 	  }
 
 	};
@@ -56,7 +54,7 @@ namespace uammd{
 
 	  IBM_kernels::BarnettMagland initBM(real tolerance){
 	    real w = computeW(tolerance);
-	    real beta=sqrt(2*M_PI)*w*2;
+	    real beta=1.8*w*2;
 	    return IBM_kernels::BarnettMagland(w, beta);
 	  }
 	  static real computeW(real tolerance){
@@ -86,7 +84,7 @@ namespace uammd{
 	  BarnettMagland(real h, real tolerance):
 	    bm(initBM(tolerance)){
 	    support = int(2*bm.w + 0.5);
-	    a = h;
+	    this->a = h;
 	  }
 
 	  static real adviseGridSize(real hydrodynamicRadius, real tolerance){
@@ -104,9 +102,6 @@ namespace uammd{
 	    return bm.phi(r/a)/a;
 	  }
 
-	  __host__ __device__ real delta(real3 r, real3 h) const{
-	    return phi(r.x)*phi(r.y)*phi(r.z);
-	  }
 	};
 
 	namespace Peskin{
@@ -120,19 +115,15 @@ namespace uammd{
 	    }
 
 	    static real adviseGridSize(real hydrodynamicRadius, real tolerance){
-	      return hydrodynamicRadius/0.975;
+	      return hydrodynamicRadius;
 	    }
 
 	    real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
-	      return h*0.975;
+	      return h;
 	    }
 
 	    __host__ __device__ real phi(real r) const{
 	      return kern.phi(r);
-	    }
-
-	    __host__ __device__ real delta(real3 r, real3 h) const{
-	      return kern.phi(r.x)*kern.phi(r.y)*kern.phi(r.z);
 	    }
 
 	  };
@@ -144,21 +135,17 @@ namespace uammd{
 
 	    fourPoint(real h, real tolerance): kern(h){
 	    }
-
-	    static real adviseGridSize(real hydrodynamicRadius, real tolerance){
-	      return hydrodynamicRadius/1.3157892485;
+	    static constexpr real fac = 1.31;
+	    static constexpr real adviseGridSize(real hydrodynamicRadius, real tolerance){
+	      return hydrodynamicRadius/fac;
 	    }
 
-	    real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
-	      return h*1.3157892485;
+	    static constexpr real fixHydrodynamicRadius(real hydrodynamicRadius, real h){
+	      return h*fac;
 	    }
 
-	    __host__ __device__ real phi(real r) const{
+	    __device__ real phi(real r) const{
 	      return kern.phi(r);
-	    }
-
-	    __host__ __device__ real delta(real3 r, real3 h) const{
-	      return kern.phi(r.x)*kern.phi(r.y)*kern.phi(r.z);
 	    }
 
 	  };
@@ -172,21 +159,17 @@ namespace uammd{
 
 	    sixPoint(real h, real tolerance): kern(h, tolerance){
 	    }
-
-	    static real adviseGridSize(real hydrodynamicRadius, real tolerance){
-	      return hydrodynamicRadius/1.519854;
+	    static constexpr real fac = 1.5195;
+	    static constexpr real adviseGridSize(real hydrodynamicRadius, real tolerance){
+	      return hydrodynamicRadius/fac;
 	    }
 
-	    real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
-	      return h*1.519854;
+	    static constexpr real fixHydrodynamicRadius(real hydrodynamicRadius, real h){
+	      return h*fac;
 	    }
 
-	    __host__ __device__ real phi(real r) const{
+	    __device__ real phi(real r) const{
 	      return kern.phi_tabulated(r);
-	    }
-
-	    __host__ __device__ real delta(real3 r, real3 h) const{
-	      return phi(r.x)*phi(r.y)*phi(r.z);
 	    }
 
 	  };
