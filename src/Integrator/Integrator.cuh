@@ -57,16 +57,27 @@ namespace uammd{
 
   public:
 
+    Integrator(shared_ptr<ParticleData> pd, std::string name="noName"):
+      Integrator(pd, std::make_shared<ParticleGroup>(pd, "All"), pd->getSystem(), name){}
+
+    Integrator(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg,
+	       std::string name="noName"):
+      Integrator(pd, pg, pd->getSystem(), name){}
+
     Integrator(shared_ptr<ParticleData> pd,
 	       shared_ptr<System> sys,
 	       std::string name="noName"):
-      Integrator(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, name){}
+      Integrator(pd, std::make_shared<ParticleGroup>(pd, "All"), sys, name){}
 
     Integrator(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
+	       shared_ptr<System> i_sys,
 	       std::string name="noName"):
-      pd(pd), pg(pg), sys(sys), name(name){
+      pd(pd), pg(pg), sys(i_sys), name(name){
+      if(i_sys != pd->getSystem()){
+	sys->log<System::EXCEPTION>("[Integrator] Cannot work with a different System than ParticleData");
+	throw std::invalid_argument("[Integrator] Invalid System");
+      }
       sys->log<System::MESSAGE>("[Integrator] %s created.", name.c_str());
       sys->log<System::MESSAGE>("[Integrator] Acting on group %s", pg->getName().c_str());
     }

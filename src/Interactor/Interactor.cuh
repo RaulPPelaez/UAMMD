@@ -22,6 +22,7 @@ Integrator
 #include"ParticleData/ParticleGroup.cuh"
 
 #include<memory>
+#include <stdexcept>
 #include<vector>
 #include"third_party/type_names.h"
 #include"misc/ParameterUpdatable.h"
@@ -38,16 +39,27 @@ namespace uammd{
 
   public:
 
+    Interactor(shared_ptr<ParticleData> pd, std::string name="noName"):
+      Interactor(pd, std::make_shared<ParticleGroup>(pd, "All"), pd->getSystem(), name){}
+
+    Interactor(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg,
+	       std::string name="noName"):
+      Interactor(pd, pg, pd->getSystem(), name){}
+
     Interactor(shared_ptr<ParticleData> pd,
 	       shared_ptr<System> sys,
 	       std::string name="noName"):
-      Interactor(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, name){}
+      Interactor(pd, std::make_shared<ParticleGroup>(pd, "All"), sys, name){}
 
     Interactor(shared_ptr<ParticleData> pd,
 	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
+	       shared_ptr<System> i_sys,
 	       std::string name="noName"):
-      pd(pd), pg(pg), sys(sys), name(name){
+      pd(pd), pg(pg), sys(i_sys), name(name){
+      if(i_sys != pd->getSystem()){
+	sys->log<System::EXCEPTION>("[Interactor] Cannot work with a different System than ParticleData");
+	throw std::invalid_argument("[Interactor] Invalid System");
+      }
       sys->log<System::MESSAGE>("[Interactor] %s created.", name.c_str());
       sys->log<System::MESSAGE>("[Interactor] Acting on group %s", pg->getName().c_str());
     }
