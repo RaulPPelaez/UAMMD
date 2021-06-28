@@ -30,6 +30,9 @@ USAGE:
  nl->update([A box or a grid], cutOff);
 
  //THE DIFFERENT INTERFACE METHODS
+ 
+ //Set the cut off multiplier (verlet radius = rcut*multiplier)
+ nl->setCutOffMultiplier(multiplier);
 
  //Traverse the list using the internal CellList mechanism(Method 1)
  nl->transverseList([A transverser],cudaStream);
@@ -143,6 +146,11 @@ namespace uammd{
     VerletListBase_ns::NeighbourContainer getNeighbourContainer(){
       auto listData = this->getVerletList();
       return VerletListBase_ns::NeighbourContainer(listData);
+    }
+
+    void setCutOffMultiplier(real newMultiplier){
+      forceNextUpdate = true;
+      nl.setCutOffMultiplier(newMultiplier);
     }
 
   private:
