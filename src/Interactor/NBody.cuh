@@ -37,6 +37,10 @@ namespace uammd{
       sys->log<System::DEBUG>("[NBody] Created");
     }
 
+    NBody(shared_ptr<ParticleData> pd):
+      NBody(pd, std::make_shared<ParticleGroup>(pd), pd->getSystem()){
+    }
+
     template<class Transverser>
     inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
       int N = pg->getNumberParticles();
