@@ -61,7 +61,6 @@ namespace uammd{
 		  shared_ptr<ParticleGroup> pg,
 		  shared_ptr<System> sys,
 		  Parameters par);
-
     EulerMaruyama(shared_ptr<ParticleData> pd,
 		  shared_ptr<System> sys,
 		  Parameters par):
@@ -71,15 +70,13 @@ namespace uammd{
     ~EulerMaruyama();
 
     void forwardTime() override;
-
     real sumEnergy() override;
+
+
+
 
     real getHydrodynamicRadius(){
       return bdhi->getHydrodynamicRadius();
-    }
-
-    auto getScheme(){
-      return bdhi;
     }
 
     real getSelfMobility(){
@@ -89,19 +86,21 @@ namespace uammd{
   private:
 
     thrust::device_vector<real3> MF;  /*Result of M·F*/
+    thrust::device_vector<real3> MT;  /*Result of M·T*/
     thrust::device_vector<real3> BdW;  /*Result of B·dW*/
+    thrust::device_vector<real3> BdWr;  /*Result of B·dWr*/
+    thrust::device_vector<real3> divM;/*Divergence of the mobility Matrix, only in 2D*/
     thrust::device_vector<real3> K; /*Shear 3x3 matrix*/
+
 
     cudaStream_t stream, stream2;
     /*The method for computing the hydrodynamic interactions.
-      Mainly in charge of computing MF, BdW*/
+      Mainly in charge of computing MF, BdW and divM*/
     shared_ptr<Method> bdhi;
 
     Parameters par;
 
     int steps;
-
-    void resetForces();
   };
 
   }
