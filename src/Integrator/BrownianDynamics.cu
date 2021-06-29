@@ -3,6 +3,8 @@
 #include"BrownianDynamics.cuh"
 #include"third_party/saruprng.cuh"
 #include"utils/debugTools.h"
+
+
 namespace uammd{
   namespace BD{
 
@@ -24,8 +26,10 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Initialized");
       int numberParticles = pg->getNumberParticles();
       this->selfMobility = 1.0/(6.0*M_PI*par.viscosity);
+      this->rotSelfMobility = 1.0/(8.0*M_PI*par.viscosity);
       if(par.hydrodynamicRadius != real(-1.0)){
 	this->selfMobility /= par.hydrodynamicRadius;
+	this->rotSelfMobility /= pow(par.hydrodynamicRadius,3);
 	this->hydrodynamicRadius = par.hydrodynamicRadius;
 	if(pd->isRadiusAllocated()){
 	  sys->log<System::WARNING>("[BD::BaseBrownianIntegrator] Assuming all particles have hydrodynamic radius %f",
@@ -91,8 +95,20 @@ namespace uammd{
       CudaCheckError();
     }
 
+    
+      void BaseBrownianIntegrator::resetTorques(){
+	int numberParticles = pg->getNumberParticles();
+	auto torque = pd->getTorque(access::location::gpu, access::mode::write);
+	auto torqueGroup = pg->getPropertyIterator(torque);
+	thrust::fill(thrust::cuda::par.on(st), torqueGroup, torqueGroup + numberParticles, real4());
+        CudaCheckError();
+      }
+      
+
     void BaseBrownianIntegrator::computeCurrentForces(){
       resetForces();
+      if (pd->isDirAllocated()) resetTorques();
+      
       for(auto forceComp: interactors){
 	forceComp->sumForce(st);
       }
@@ -143,14 +159,43 @@ namespace uammd{
 	  pos[i].z = R.z;
       }
 
+      __global__ void integrateRotationGPU(real4* dir,
+					   ParticleGroup::IndexIterator indexIterator,
+					   const real4* tor,
+					   real rotSelfMobility,
+					   real* radius,
+					   real dt,
+					   real temperature,
+					   int N,
+					   uint stepNum, uint seed){
+	uint id = blockIdx.x*blockDim.x+threadIdx.x;
+	if(id>=N) return;
+	int i = indexIterator[id];
+	Quat oldDir = dir[i];
+	real3 T = make_real3(tor[i]);
+	real Mr = rotSelfMobility*(radius?(real(1.0)/(radius[i]*radius[i]*radius[i])):real(1.0));
+	real3 dphi = dt*Mr*T;
+	if(temperature > 0){
+	  Saru rng(id, stepNum, seed+N);
+	  real Br = sqrt(real(2.0)*temperature*Mr*dt);
+	  real3 dWr = make_real3(rng.gf(0, Br), rng.gf(0, Br).x);
+	  dphi += dWr;
+	}
+	Quat newDir = rotVec2Quaternion(dphi)*oldDir;
+	dir[i] = newDir.to_real4();	
+	}
     }
 
     void EulerMaruyama::forwardTime(){
       steps++;
       sys->log<System::DEBUG1>("[BD::EulerMaruyama] Performing integration step %d", steps);
+      
       updateInteractors();
       computeCurrentForces();
       updatePositions();
+      if (pd->isDirAllocated()){
+	updateOrientations();
+      }
     }
 
     void EulerMaruyama::updatePositions(){
@@ -173,19 +218,41 @@ namespace uammd{
 								   temperature,
 								   numberParticles,
 								   steps, seed);
+	
+      }
+    void EulerMaruyama::updateOrientations(){
+
+      int numberParticles = pg->getNumberParticles();
+      int BLOCKSIZE = 128;
+      uint Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
+      uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
+      real * d_radius = getParticleRadiusIfAvailable();
+      auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      auto dir = pd->getDir(access::location::gpu, access::mode::readwrite);
+      auto tor = pd->getTorque(access::location::gpu, access::mode::read);
+      EulerMaruyama_ns::integrateRotationGPU<<<Nblocks, Nthreads, 0, st>>>(dir.raw(),
+								   groupIterator,
+								   tor.raw(),
+								   rotSelfMobility,
+								   d_radius,
+								   dt,
+								   temperature,
+								   numberParticles,
+								   steps, seed);
 
     }
 
-    void MidPoint::forwardTime(){
-      steps++;
-      sys->log<System::DEBUG1>("[BD::MidPoint] Performing integration step %d", steps);
-      updateInteractors();
-      computeCurrentForces();
-      updatePositionsFirstStep();
-      computeCurrentForces();
-      updatePositionsSecondStep();
-      CudaCheckError();
-    }
+
+  void MidPoint::forwardTime(){
+    steps++;
+    sys->log<System::DEBUG1>("[BD::MidPoint] Performing integration step %d", steps);
+    updateInteractors();
+    computeCurrentForces();
+    updatePositionsFirstStep();
+    computeCurrentForces();
+    updatePositionsSecondStep();
+    CudaCheckError();
+  }
 
     void MidPoint::updatePositionsFirstStep(){
       updatePositions<0>();

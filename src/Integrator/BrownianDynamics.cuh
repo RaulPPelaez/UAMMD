@@ -49,11 +49,12 @@ References:
 #define BROWNIANDYNAMICSINTEGRATOR_CUH
 #include"global/defines.h"
 #include"Integrator.cuh"
+#include"utils/quaternion.cuh"
 
 namespace uammd{
   namespace BD{
     struct Parameters{
-      //The 3x3 shear matrix is encoded as an array of 3 real3
+      //The 3x3 shear matrix is encoded as an array of 3 real
       std::vector<real3> K = std::vector<real3>(3,real3());
       real temperature = 0;
       real viscosity = 1;
@@ -97,6 +98,7 @@ namespace uammd{
     protected:
       real3 Kx, Ky, Kz; //shear matrix
       real selfMobility;
+      real rotSelfMobility;
       real hydrodynamicRadius = real(-1.0);
       real temperature = real(0.0);
       real dt;
@@ -107,6 +109,7 @@ namespace uammd{
 
       void updateInteractors();
       void resetForces();
+      void resetTorques();
       void computeCurrentForces();
       real* getParticleRadiusIfAvailable();
     };
@@ -130,6 +133,7 @@ namespace uammd{
 
     protected:
       void updatePositions();
+      void updateOrientations();
     };
 
     //Implements the algorithm in [1]
