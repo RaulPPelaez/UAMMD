@@ -8,6 +8,22 @@
      K - Shear matrix
      dW- Noise vector
      B - sqrt(M)
+     
+   Rotational differential equation:
+      dphi = dt(Mr·Tor[t])+sqrt(2·T·dt)·dW·Br
+      Q[t+dt] = dQ*Q[t+dt]
+      
+   Being:
+      dphi - Rotation vector
+      dQ - Quaternion encoding the rotation vector
+      *  - Product between quaternions
+      Q  - Quaternion encoding the orientation of the particles
+      Mr - Rotational Self Diffusion coefficient -> 1/(8·pi·vis·radius^3)
+      Br - sqrt(Mr)
+   
+   Given two quaternions q1(n1,v1) and q2(n2,v2) the product q3(n3,v3) = q1*q2 is defined as:
+   q3 = q1*q2 = (n1·n2 - v1·v2, n1·v2 + n2·v1 + v1 x v2)
+
 
 
 OPTIONS:
