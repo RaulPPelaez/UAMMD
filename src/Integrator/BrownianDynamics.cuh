@@ -2,6 +2,7 @@
 
   Solves the following differential equation:
       X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*Tdt)·dW·B
+      
    Being:
      X - Positions
      M - Self Diffusion  coefficient -> 1/(6·pi·vis·radius)
