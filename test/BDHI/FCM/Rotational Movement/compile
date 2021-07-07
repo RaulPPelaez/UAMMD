@@ -1,0 +1,2 @@
+module load cuda/10.2 gcc/8.4
+nvcc -O3 testFCM.cu -I../../src -I../../src/third_party -arch=sm_60 -o test -lcublas -lcufft -lcurand -lcusolver 

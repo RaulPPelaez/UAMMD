@@ -1,0 +1,10 @@
+dt 0.001
+radius 1
+temperature 1
+viscosity 1
+nsteps 100000
+nsave 500
+lbox 30
+tolerance 0.001
+nParticles 1000
+rot 1
