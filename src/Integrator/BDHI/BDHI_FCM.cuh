@@ -17,18 +17,20 @@ You can choose different Kernels by changing the "using Kernel" below. A bunch o
 */
 #ifndef BDHI_FCM_CUH
 #define BDHI_FCM_CUH
-#include"uammd.cuh"
+#include "uammd.cuh"
+#include "Integrator/Integrator.cuh"
 #include "BDHI.cuh"
+#include"utils/quaternion.cuh"
 #include "utils/cufftPrecisionAgnostic.h"
 #include "utils/cufftComplex3.cuh"
-#include"utils/Grid.cuh"
+#include "utils/container.h"
+#include "utils/Grid.cuh"
 #include "FCM_kernels.cuh"
 
 namespace uammd{
   namespace BDHI{
-    class FCM{
+    class FCM: public Integrator{
     public:
-      //Choose a different kernel by uncommenting the line
       using Kernel = FCM_ns::Kernels::Gaussian;
       //using Kernel = FCM_ns::Kernels::BarnettMagland;
       //using Kernel = FCM_ns::Kernels::Peskin::threePoint;
@@ -40,6 +42,8 @@ namespace uammd{
 
       struct Parameters: BDHI::Parameters{
 	int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
+	int steps = 0;
+	uint seed;
       };
 
       FCM(shared_ptr<ParticleData> pd,
@@ -53,13 +57,10 @@ namespace uammd{
       void computeMF(real3* MF,     cudaStream_t st = 0);
       void computeBdW(real3* BdW,   cudaStream_t st = 0);
       void finish_step(             cudaStream_t st = 0){}
-
+      void forwardTime() override;
+      
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
-      }
-
-      real getCellSize(){
-	return grid.cellSize.x;
       }
 
       real getSelfMobility(){
@@ -81,14 +82,17 @@ namespace uammd{
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
       shared_ptr<System> sys;
+      cudaStream_t st;
       uint seed;
 
       real temperature;
       real dt;
       real viscosity;
       real hydrodynamicRadius;
-
+      int steps;
+      
       std::shared_ptr<Kernel> kernel;
+      std::shared_ptr<Kernel> kernelTorque;
 
       Box box;
 
@@ -100,22 +104,42 @@ namespace uammd{
       thrust::device_vector<cufftComplex> gridVelsFourier;
       thrust::device_vector<real3> gridVels;
 
+      thrust::device_vector<real3> K; /*Shear 3x3 matrix*/
+
+      Parameters par;
+      
       template<typename vtype>
       void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
 
+      std::pair<cached_vector<real3>, cached_vector<real3>>
+      Mdot(real4* pos, real4* force, real4* torque, cudaStream_t st);
+      
       void initializeGrid(Parameters par);
       void initializeKernel(Parameters par);
+      void initializeKernelTorque(Parameters par);
       void printMessages(Parameters par);
 
       void initCuFFT();
       template<typename vtype>
       void spreadForces(vtype *v, cudaStream_t st);
-      void forwardTransformForces(cudaStream_t st);
+      void spreadForces(real4* pos, real4* force, cudaStream_t st);
+      void forwardTransform(real* gridReal, cufftComplex* gridFourier, cudaStream_t st);
+      void forwardTransformForces(cudaStream_t st); 
+      void addSpreadTorquesFourier(real4* pos, real4* torque, cudaStream_t st);
       void convolveFourier(cudaStream_t st);
       void addBrownianNoise(cudaStream_t st);
+      void inverseTransform(cufftComplex* gridFourier, real* gridReal, cudaStream_t st);
       void inverseTransformVelocity(cudaStream_t st);
       void interpolateVelocity(real3 *Mv, cudaStream_t st);
+      cached_vector<real3> interpolateVelocity(real4* pos, cudaStream_t st);
+      cached_vector<cufftComplex> computeGridAngularVelocityFourier(cudaStream_t st);
+      cached_vector<real3> interpolateAngularVelocity(real4* pos, cached_vector<cufftComplex>& gridAngVelsFourier, cudaStream_t st);
+      
 
+      void updateInteractors();
+      void resetForces();
+      void resetTorques();
+      void computeCurrentForces();
     };
   }
 }

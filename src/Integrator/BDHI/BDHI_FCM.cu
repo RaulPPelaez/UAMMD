@@ -16,19 +16,24 @@ namespace uammd{
 	     shared_ptr<ParticleGroup> pg,
 	     shared_ptr<System> sys,
 	     Parameters par):
+      Integrator(pd,pg,sys,"BDHI:FCM"),
       pd(pd), pg(pg), sys(sys),
       dt(par.dt),
+      par(par),
       temperature(par.temperature),
       viscosity(par.viscosity),
       hydrodynamicRadius(par.hydrodynamicRadius),
+      steps(par.steps),
       box(par.box){
       sys->log<System::MESSAGE>("[BDHI::FCM] Initialized");
       if(box.boxSize.x == real(0.0) && box.boxSize.y == real(0.0) && box.boxSize.z == real(0.0)){
 	sys->log<System::CRITICAL>("[BDHI::FCM] Box of size zero detected, cannot work without a box! (make sure a box parameter was passed)");
       }
+      cudaStreamCreate(&st);
       seed = sys->rng().next32();
       initializeGrid(par);
       initializeKernel(par);
+      initializeKernelTorque(par);
       printMessages(par);
       int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
       gridVelsFourier.resize(3*ncells, cufftComplex());
@@ -57,6 +62,12 @@ namespace uammd{
     void FCM::initializeKernel(Parameters par){
       real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
       kernel = std::make_shared<Kernel>(h, par.tolerance);
+      this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h, grid.cellSize.x);
+    }
+
+    void FCM::initializeKernelTorque(Parameters par){
+      real h = pow(M_PI/6.0,real(1.0)/real(3.0))*std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
+      kernelTorque = std::make_shared<Kernel>(h, par.tolerance);
       this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h, grid.cellSize.x);
     }
 
@@ -147,6 +158,69 @@ namespace uammd{
       Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
       = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
     */
+
+
+    namespace EulerMaruyama_ns{
+      /*
+	dR = dt(KR+MF) + sqrt(2*T*dt)·BdW +T·divM·dt -> divergence is commented out for the moment
+      */
+      /*With all the terms computed, update the positions*/
+      /*T=0 case is templated*/
+      template<class IndexIterator>
+      __global__ void integrateGPUD(real4* pos,
+				    real4* dir,
+				    IndexIterator indexIterator,
+				    const real3* linearV,
+				    const real3* angularV,
+				    const real3* K,
+				    //const real3* __restrict__ divM,
+				    int N,
+				    real dt, bool is2D){
+	uint id = blockIdx.x*blockDim.x+threadIdx.x;
+	if(id>=N) return;
+	int i = indexIterator[id];
+
+	/*Position and color*/
+	real4 pc = pos[i];
+	real3 p = make_real3(pc);
+	real c = pc.w;
+
+	/*Shear stress*/
+	if(K){
+	  real3 KR = make_real3(0);
+	  KR.x = dot(K[0], p);
+	  KR.y = dot(K[1], p);
+	  /*2D clause. Although K[2] should be 0 in 2D anyway...*/
+	  if(!is2D)
+	    KR.z = dot(K[2], p);
+	  p += KR*dt;
+	}
+
+	/*Update the position*/
+	p += linearV[id]*dt;
+
+	/*Write to global memory*/
+	pos[i] = make_real4(p,c);
+	
+	/*Update the orientation*/
+	if(dir){ 
+	  Quat dirc = dir[i];
+	  real3 dphi = angularV[id]*dt;
+	  dirc = rotVec2Quaternion(dphi)*dirc;
+	  dir[i] = dirc.to_real4();
+	}
+	
+	/*If we are in q2D and the divergence term exists*/
+	// if(divM){
+	//   real3 divm = divM[id];
+	//   //divm.z = real(0.0);
+	//   //p += params.T*divm*params.invDelta*params.invDelta*params.dt; //For RFD
+	//   p += T*dt*divm;
+	// }
+      }
+    }
+
+    
     template<typename vtype>
     void FCM::Mdot(real3 *Mv, vtype *v, cudaStream_t st){
       sys->log<System::DEBUG1>("[BDHI::FCM] Mdot....");
@@ -157,12 +231,40 @@ namespace uammd{
       forwardTransformForces(st);
       convolveFourier(st);
       addBrownianNoise(st);
-      inverseTransformVelocity(st);
+      inverseTransformVelocity(st);      
       interpolateVelocity(Mv, st);
       sys->log<System::DEBUG2>("[BDHI::FCM] MF wave space Done");
+    }    
+    
+    std::pair<cached_vector<real3>, cached_vector<real3>>
+    FCM::Mdot(real4* pos, real4* force, real4* torque, cudaStream_t st){
+      
+      sys->log<System::DEBUG2>("[BDHI::FCM] Setting vels to zero...");
+      thrust::fill(thrust::cuda::par.on(st), gridVels.begin(), gridVels.end(), real3());
+      spreadForces(force, st);
+      forwardTransformForces(st);
+      if (torque){
+	addSpreadTorquesFourier(pos, torque, st);
+      }
+      convolveFourier(st);
+      addBrownianNoise(st);
+      inverseTransformVelocity(st);      
+      int numberParticles = pg->getNumberParticles();
+      cached_vector<real3> angularVelocities(numberParticles);
+      cached_vector<real3> linearVelocities = interpolateVelocity(pos,st);      
+      
+      if (torque){
+	auto gridAngVelFourier = computeGridAngularVelocityFourier(st);
+	angularVelocities = interpolateAngularVelocity(pos, gridAngVelFourier,st);
+      }
+      sys->log<System::DEBUG2>("[BDHI::FCM] MDot wave space Done");
+      CudaCheckError();
+      
+      return {linearVelocities, angularVelocities};
     }
-
+    
     namespace FCM_ns{
+
       using cufftComplex3 = FCM::cufftComplex3;
 
       __device__ int3 indexToWaveNumber(int i, int3 nk){
@@ -202,7 +304,39 @@ namespace uammd{
 	}
 	return res;
       }
-
+	
+      __global__ void addTorqueCurl(cufftComplex3 *gridTorquesFourier, cufftComplex3* gridVelsFourier, Grid grid){
+	  
+	int id = blockDim.x*blockIdx.x + threadIdx.x;
+	
+	const int3 nk = grid.cellDim; 
+	if(id >= (nk.z*nk.y*(nk.x/2+1))) return; /* Por quen.x/2?*/
+	const int3 cell = make_int3(id%(nk.x/2+1), (id/(nk.x/2+1))%nk.y, id/((nk.x/2+1)*nk.y));
+	  
+	const int3 ik = indexToWaveNumber(id, nk);
+	const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
+	
+	const real half = real(0.5);
+	  
+	const bool isUnpairedX = ik.x == (nk.x - ik.x);
+	const bool isUnpairedY = ik.y == (nk.y - ik.y);	
+	const bool isUnpairedZ = ik.y == (nk.z - ik.z);	
+	real Dx = isUnpairedX?0:k.x;
+	real Dy = isUnpairedY?0:k.y;
+	real Dz = isUnpairedZ?0:k.z;
+	  
+	auto gridi = gridTorquesFourier[id];
+	auto gridVeli = gridVelsFourier[id];
+	  
+	gridVeli.x += {half*(-Dy*gridi.z.y+Dz*gridi.y.y),
+	    half*(Dy*gridi.z.x-Dz*gridi.y.x)};
+	gridVeli.y += {half*(-Dz*gridi.x.y+Dy*gridi.z.y),
+	    half*(-Dz*gridi.x.x-Dx*gridi.z.x)};
+	gridVeli.z += {half*(-Dx*gridi.y.y + Dy*gridi.x.y),
+	    half*(Dx*gridi.y.x - Dy*gridi.x.x)};
+	gridVelsFourier[id] = gridVeli; 
+      }
+    
       /*Scales fourier transformed forces in the regular grid to obtain velocities,
 	(Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F
 	 Input: gridForces = FFTf·S·F
@@ -235,8 +369,7 @@ namespace uammd{
 
       	/*Compute gaussian complex noise dW, std = prefactor -> ||z||^2 = <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
 	/*A complex random number for each direction*/
-	__device__ cufftComplex3 generateNoise(real prefactor, uint id, uint seed1, uint seed2){
-	  //Uncomment to use uniform numbers instead of gaussian
+	__device__ cufftComplex3 generateNoise(real prefactor, uint id, uint seed1, uint seed2){	  //Uncomment to use uniform numbers instead of gaussian
 	  Saru saru(id, seed1, seed2);
 	  cufftComplex3 noise;
 	  const real complex_gaussian_sc = real(0.707106781186547)*prefactor; //1/sqrt(2)
@@ -378,6 +511,7 @@ namespace uammd{
 
     }
 
+    
     template<typename vtype>
     void FCM::spreadForces(vtype *quantity, cudaStream_t st){
       /*Spread force on particles to grid positions -> S·F*/
@@ -391,16 +525,63 @@ namespace uammd{
       ibm.spread(pos.begin(), force_r3, d_gridVels, numberParticles, st);
       CudaCheckError();
     }
+    
+    /*
+    void FCM::spreadForces(real4* pos, real4* force, cudaStream_t st){
+      /*Spread force on particles to grid positions -> S·F* /
+      sys->log<System::DEBUG2>("[BDHI::FCM] Particles to grid");
+      int numberParticles = pg->getNumberParticles();
+      auto force_r3 = thrust::make_transform_iterator(force, FCM_ns::ToReal3());
+      auto d_gridVels = (real3*)thrust::raw_pointer_cast(gridVels.data());
+      IBM<Kernel> ibm(sys, kernel, grid);
+      ibm.spread(pos, force_r3, d_gridVels, numberParticles, st);
+      CudaCheckError();
+    }
+  */
 
+    void FCM::forwardTransform(real* gridReal, cufftComplex* gridFourier, cudaStream_t st){
+      cufftSetStream(cufft_plan_forward, st);
+      /*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
+      CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, gridReal, gridFourier));
+    }
+    
     void FCM::forwardTransformForces(cudaStream_t st){
       sys->log<System::DEBUG2>("[BDHI::FCM] Taking grid to wave space");
       auto d_gridVels = (real*)thrust::raw_pointer_cast(gridVels.data());
       auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
-      cufftSetStream(cufft_plan_forward, st);
-      /*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
-      CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, d_gridVels, d_gridVelsFourier));
+      forwardTransform(d_gridVels, d_gridVelsFourier, st);
     }
+ 
 
+    void FCM::addSpreadTorquesFourier(real4* pos, real4* torque, cudaStream_t st){
+      /*Spread force on particles to grid positions -> S·F*/
+      sys->log<System::DEBUG2>("[BDHI::FCM] Spreading torques");
+      int numberParticles = pg->getNumberParticles();
+      auto torque_r3 = thrust::make_transform_iterator(torque, FCM_ns::ToReal3());
+
+      cached_vector<cufftComplex> gridTorquesFourier(gridVelsFourier.size());    
+      thrust::device_vector<real3> gridTorques(gridVels.size()); // Si uso cached_vector no corre bien, "illegal memory access"
+      
+      auto d_gridTorques3 = thrust::raw_pointer_cast(gridTorques.data());
+      IBM<Kernel> ibm(sys, kernelTorque, grid);
+      ibm.spread(pos, torque_r3, d_gridTorques3, numberParticles, st);
+      
+      auto d_gridTorquesFourier = thrust::raw_pointer_cast(gridTorquesFourier.data());
+      
+      auto d_gridTorques = (real*) thrust::raw_pointer_cast(gridTorques.data());
+      forwardTransform(d_gridTorques, d_gridTorquesFourier, st);
+      
+      
+      int BLOCKSIZE = 128;
+      uint Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
+      uint Nblocks = numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
+      
+      auto d_gridVelsFourier = (cufftComplex3*) thrust::raw_pointer_cast(gridVelsFourier.data());
+      auto d_gridTorquesFourier3 = (cufftComplex3*) thrust::raw_pointer_cast(gridTorquesFourier.data());
+      FCM_ns::addTorqueCurl<<<Nblocks, Nthreads,0,st>>>(d_gridTorquesFourier3,d_gridVelsFourier, grid);
+      CudaCheckError();
+    }
+  
     void FCM::convolveFourier(cudaStream_t st){
       sys->log<System::DEBUG2>("[BDHI::FCM] Wave space velocity scaling");
       /*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
@@ -409,6 +590,7 @@ namespace uammd{
       int Nthreads = 128;
       int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
       FCM_ns::forceFourier2Vel<<<Nblocks, Nthreads, 0, st>>> (d_gridVelsFourier, d_gridVelsFourier, viscosity, grid);
+    
       CudaCheckError();
     }
 
@@ -434,16 +616,20 @@ namespace uammd{
 	CudaCheckError();
       }
     }
+  void FCM::inverseTransform(cufftComplex* gridFourier, real* gridReal, cudaStream_t st){
+    cufftSetStream(cufft_plan_inverse, st);
+    /*Take the fourier velocities back to real space ->  FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
+    CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse,gridFourier, gridReal));
+  }
+      
+  void FCM::inverseTransformVelocity(cudaStream_t st){
+    sys->log<System::DEBUG2>("[BDHI::FCM] Going back to real space");
+    auto d_gridVels = (real*)thrust::raw_pointer_cast(gridVels.data());      
+    auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
+    inverseTransform(d_gridVelsFourier, d_gridVels, st);
+  }
 
-    void FCM::inverseTransformVelocity(cudaStream_t st){
-      sys->log<System::DEBUG2>("[BDHI::FCM] Going back to real space");
-      auto d_gridVels = (real*)thrust::raw_pointer_cast(gridVels.data());
-      auto d_gridVelsFourier = thrust::raw_pointer_cast(gridVelsFourier.data());
-      cufftSetStream(cufft_plan_inverse, st);
-      /*Take the fourier velocities back to real space ->  FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
-      CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse,d_gridVelsFourier, d_gridVels));
-    }
-
+  
     void FCM::interpolateVelocity(real3* MF, cudaStream_t st){
       sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");
       /*Interpolate the real space velocities back to the particle positions ->
@@ -455,16 +641,205 @@ namespace uammd{
       ibm.gather(pos.begin(), MF, d_gridVels, numberParticles, st);
       CudaCheckError();
     }
+  
 
-    void FCM::computeMF(real3* MF, cudaStream_t st){
-      sys->log<System::DEBUG1>("[BDHI::FCM] Computing MF....");
-      auto force = pd->getForce(access::location::gpu, access::mode::read);
-      Mdot<real4>(MF, force.begin(), st);
+    cached_vector<real3> FCM::interpolateVelocity(real4* pos, cudaStream_t st){
+      sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");
+      /*Interpolate the real space velocities back to the particle positions ->
+	Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
+      int numberParticles = pg->getNumberParticles();
+      auto d_gridVels = (real3*)thrust::raw_pointer_cast(gridVels.data());
+      IBM<Kernel> ibm(sys, kernel, grid);
+      cached_vector<real3> linearVelocities(numberParticles);
+      thrust::fill(thrust::cuda::par.on(st), linearVelocities.begin(), linearVelocities.end(), real3());
+      
+      auto d_linearVelocities = thrust::raw_pointer_cast(linearVelocities.data());
+      ibm.gather(pos, d_linearVelocities, d_gridVels, numberParticles, st);
+      CudaCheckError();
+      return linearVelocities;
     }
 
+    namespace FCM_ns{
+
+      //Compute the curl of the velocity, V, in chebyshev space. This is equal to the angular velocity
+      // 0.5\nabla \times V = 0.5 (i*k_x i*k_y \partial_z)\times (V_x V_y V_z) =
+      // = 0.5( i*k_y*V_z - \partial_z(V_y), \partial_z(V_x) - i*k_x*V_z, i*k_x*V_y - i*k_y*V_x)
+      //Overwrite the output vector with the angular velocities in Cheb space
+      //The input velocity vector is overwritten
+
+      using cufftComplex3 = FCM::cufftComplex3;
+
+      __global__ void computeVelocityCurlFourier(cufftComplex3 *gridVelsFourier, cufftComplex3* gridAngVelsFourier, Grid grid){
+	
+	int id = blockDim.x*blockIdx.x + threadIdx.x;
+	const int3 nk = grid.cellDim;
+	if(id >= nk.z*nk.y*(nk.x/2+1)){
+	return;
+	}
+	
+	const int3 cell = make_int3(id%(nk.x/2+1), (id/(nk.x/2+1))%nk.y, id/((nk.x/2+1)*nk.y));
+
+	
+	const int3 ik = indexToWaveNumber(id, nk);
+	const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
+	const real half = real(0.5);
+	
+	const bool isUnpairedX = ik.x == (nk.x - ik.x);
+	const bool isUnpairedY = ik.y == (nk.y - ik.y);	
+	const bool isUnpairedZ = ik.y == (nk.z - ik.z);	
+	real Dx = isUnpairedX?0:k.x;
+	real Dy = isUnpairedY?0:k.y;
+	real Dz = isUnpairedZ?0:k.z;
+      
+	auto gridAng = gridAngVelsFourier[id];
+	auto gridLinear = gridVelsFourier[id];
+	
+	gridAng.x = {half*(-Dy*gridLinear.z.y+Dz*gridLinear.y.y),
+	  half*(Dy*gridLinear.z.x-Dz*gridLinear.y.x)};
+	gridAng.y = {half*(-Dz*gridLinear.x.y+Dy*gridLinear.z.y),
+	  half*(-Dz*gridLinear.x.x-Dx*gridLinear.z.x)};
+	gridAng.z = {half*(-Dx*gridLinear.y.y + Dy*gridLinear.x.y),
+	  half*(Dx*gridLinear.y.x - Dy*gridLinear.x.x)};
+      
+	gridAngVelsFourier[id] = gridAng;
+      }
+    }
+    
+    cached_vector<cufftComplex> FCM::computeGridAngularVelocityFourier(cudaStream_t st){
+
+      const int3 n = grid.cellDim;
+      const int blockSize = 128;
+      const int numberSystems = n.z*n.y*(n.x/2+1);
+      const int numberBlocks = numberSystems/blockSize+1;
+      
+      auto d_gridVelsFourier = (cufftComplex3*) thrust::raw_pointer_cast(gridVelsFourier.data());
+      cached_vector<cufftComplex> gridAngVelsFourier(gridVelsFourier.size());
+      auto d_gridAngVelsFourier = (cufftComplex3*) thrust::raw_pointer_cast(gridAngVelsFourier.data());
+      FCM_ns::computeVelocityCurlFourier<<<numberBlocks, blockSize, 0, st>>>(d_gridVelsFourier, d_gridAngVelsFourier,
+									     grid);
+      CudaCheckError();
+      return gridAngVelsFourier;
+    }
+    
+    cached_vector<real3> FCM::interpolateAngularVelocity(real4* pos, cached_vector<cufftComplex>& gridAngVelsFourier, cudaStream_t st){
+      
+      cached_vector<real3> gridAngVels(gridVels.size());
+      thrust::fill(thrust::cuda::par.on(st), gridAngVels.begin(), gridAngVels.end(), real3());
+
+      int numberParticles = pg->getNumberParticles();
+      auto d_gridAngVels = (real*)thrust::raw_pointer_cast(gridAngVels.data());
+      auto d_gridAngVelsFourier = thrust::raw_pointer_cast(gridAngVelsFourier.data());
+    
+      inverseTransform(d_gridAngVelsFourier, d_gridAngVels, st);
+      IBM<Kernel> ibm(sys, kernelTorque, grid);
+      cached_vector<real3> angularVelocities(numberParticles);
+      thrust::fill(thrust::cuda::par.on(st), angularVelocities.begin(), angularVelocities.end(), real3());
+      auto d_angularVelocities = thrust::raw_pointer_cast(angularVelocities.data());
+      ibm.gather(pos, d_angularVelocities, d_gridAngVels, numberParticles, st);
+      CudaCheckError();
+      return angularVelocities;
+    }
+
+    
+    void FCM::computeMF(real3* linearVelocities, cudaStream_t st){
+      sys->log<System::DEBUG1>("[BDHI::FCM] Computing MF....");
+      auto force = pd->getForce(access::location::gpu, access::mode::read);
+      Mdot<real4>(linearVelocities, force.begin(), st);
+    }
+    
     void FCM::computeBdW(real3* BdW, cudaStream_t st){
       //This part is included in Fourier space when computing MF
     }
 
-  }
+    void FCM::updateInteractors(){
+
+      for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*par.dt);
+      
+      if(steps==1){
+	for(auto forceComp: interactors){
+	  forceComp->updateTimeStep(par.dt);
+	  forceComp->updateTemperature(par.temperature);
+	  forceComp->updateBox(par.box);
+	}
+      }
+    }
+
+    void FCM::resetForces(){
+      int numberParticles = pg->getNumberParticles();
+      auto force = pd->getForce(access::location::gpu, access::mode::write);
+      auto forceGroup = pg->getPropertyIterator(force);
+      thrust::fill(thrust::cuda::par.on(st), forceGroup, forceGroup + numberParticles, real4());
+      CudaCheckError();
+    }
+
+    void FCM::resetTorques(){
+      int numberParticles = pg->getNumberParticles();
+      auto torque = pd->getTorque(access::location::gpu, access::mode::write);
+      auto torqueGroup = pg->getPropertyIterator(torque);
+      thrust::fill(thrust::cuda::par.on(st), torqueGroup, torqueGroup + numberParticles, real4());
+      CudaCheckError();
+    }
+
+    void FCM::computeCurrentForces(){
+      resetForces();
+      if (pd->isDirAllocated()) resetTorques();
+      for(auto forceComp: interactors) forceComp->sumForce(st);
+      CudaCheckError();
+    }
+    
+    void FCM::forwardTime(){
+      steps++;
+      sys->log<System::DEBUG1>("[BDHI::FCM] Performing integration step %d", steps);
+      updateInteractors();
+      computeCurrentForces(); //Compute forces and torques
+      
+      int numberParticles = pg->getNumberParticles();
+      cached_vector<real3> linearVelocities(numberParticles);
+      cached_vector<real3> angularVelocities(numberParticles);
+
+      {
+      auto pos = pd->getPos(access::location::gpu, access::mode::read);
+      auto force = pd->getForce(access::location::gpu, access::mode::read);
+      auto torque = pd -> getTorqueIfAllocated(access::location::gpu, access::mode::read);
+      auto dir = pd->getDirIfAllocated(access::location::gpu, access::mode::readwrite);
+      
+      std::tie(linearVelocities,angularVelocities) = Mdot(pos.raw(),
+							  force.raw(),
+							  torque.raw(),
+							  st);
+      CudaCheckError();
+      }
+  
+  
+      auto indexIter = pg->getIndexIterator(access::location::gpu);
+      auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
+      auto dir = pd->getDirIfAllocated(access::location::gpu, access::mode::readwrite);
+      
+      real3* d_linearV = thrust::raw_pointer_cast(linearVelocities.data());
+
+      real3* d_angularV = nullptr;
+      if(dir.raw()) d_angularV = thrust::raw_pointer_cast(angularVelocities.data());
+      
+      real3* d_K = nullptr;
+      if(par.K.size() > 0) d_K = thrust::raw_pointer_cast(K.data());
+      
+      int BLOCKSIZE = 128; /*threads per block*/
+      int nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
+      int nblocks = numberParticles/nthreads +  ((numberParticles%nthreads!=0)?1:0);
+
+      
+      
+      EulerMaruyama_ns::integrateGPUD<<<nblocks, nthreads, 0, st>>>(pos.raw(),
+								    dir.raw(),
+								    indexIter,
+								    d_linearV,
+								    d_angularV,
+								    d_K,
+								    //d_divM,
+								    numberParticles,
+								    par.dt, par.is2D);
+      CudaCheckError();
+    }
+  }    
 }
+
