@@ -66,9 +66,10 @@ namespace uammd{
     }
 
     void FCM::initializeKernelTorque(Parameters par){
-      real h = pow(M_PI/6.0,real(1.0)/real(3.0))*std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
+      real prefactor = pow(M_PI/6.0,real(1.0)/real(3.0)); 
+      real h = prefactor*std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
       kernelTorque = std::make_shared<Kernel>(h, par.tolerance);
-      this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h, grid.cellSize.x);
+      this->hydrodynamicRadius = kernelTorque->fixHydrodynamicRadius(h, grid.cellSize.x);
     }
 
     void FCM::printMessages(Parameters par){
