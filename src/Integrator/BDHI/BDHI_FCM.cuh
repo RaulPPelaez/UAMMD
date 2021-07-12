@@ -100,17 +100,13 @@ namespace uammd{
 
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea;
-
-      thrust::device_vector<cufftComplex> gridVelsFourier;
-      thrust::device_vector<real3> gridVels;
-
       thrust::device_vector<real3> K; /*Shear 3x3 matrix*/
 
       Parameters par;
       
       template<typename vtype>
       void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
-
+      
       std::pair<cached_vector<real3>, cached_vector<real3>>
       Mdot(real4* pos, real4* force, real4* torque, cudaStream_t st);
       
@@ -118,24 +114,19 @@ namespace uammd{
       void initializeKernel(Parameters par);
       void initializeKernelTorque(Parameters par);
       void printMessages(Parameters par);
-
       void initCuFFT();
-      template<typename vtype>
-      void spreadForces(vtype *v, cudaStream_t st);
-      void spreadForces(real4* pos, real4* force, cudaStream_t st);
-      void forwardTransform(real* gridReal, cufftComplex* gridFourier, cudaStream_t st);
-      void forwardTransformForces(cudaStream_t st); 
-      void addSpreadTorquesFourier(real4* pos, real4* torque, cudaStream_t st);
-      void convolveFourier(cudaStream_t st);
-      void addBrownianNoise(cudaStream_t st);
-      void inverseTransform(cufftComplex* gridFourier, real* gridReal, cudaStream_t st);
-      void inverseTransformVelocity(cudaStream_t st);
-      void interpolateVelocity(real3 *Mv, cudaStream_t st);
-      cached_vector<real3> interpolateVelocity(real4* pos, cudaStream_t st);
-      cached_vector<cufftComplex> computeGridAngularVelocityFourier(cudaStream_t st);
-      cached_vector<real3> interpolateAngularVelocity(real4* pos, cached_vector<cufftComplex>& gridAngVelsFourier, cudaStream_t st);
       
-
+      cached_vector<real3> spreadForces(real4* pos, real4* force, cudaStream_t st);
+      cached_vector<cufftComplex3> forwardTransform(cached_vector<real3>& gridReal, cudaStream_t st);
+      void addSpreadTorquesFourier(real4* pos, real4* torque, cached_vector<cufftComplex3>& gridVelsFourier, cudaStream_t st);
+      void convolveFourier(cached_vector<cufftComplex3>& gridVelsFourier, cudaStream_t st);
+      void addBrownianNoise(cached_vector<cufftComplex3>& gridVelsFourier, cudaStream_t st);
+      cached_vector<real3> inverseTransform(cached_vector<cufftComplex3>& gridFourier, cudaStream_t st);
+      cached_vector<real3> interpolateVelocity(real4* pos, cached_vector<real3>& gridVels, cudaStream_t st);
+      void interpolateVelocity(real4* pos, real3* linearVelocities, cached_vector<real3>& gridVels, cudaStream_t st);
+      cached_vector<cufftComplex3> computeGridAngularVelocityFourier(cached_vector<cufftComplex3>& gridVelsFourier, cudaStream_t st);
+      cached_vector<real3> interpolateAngularVelocity(real4* pos, cached_vector<cufftComplex3>& gridAngVelsFourier, cudaStream_t st);
+      
       void updateInteractors();
       void resetForces();
       void resetTorques();
