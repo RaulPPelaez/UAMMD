@@ -35,9 +35,6 @@ namespace uammd{
       initializeKernel(par);
       initializeKernelTorque(par);
       printMessages(par);
-      //int ncells = grid.cellDim.x*grid.cellDim.y*grid.cellDim.z;
-      //gridVelsFourier.resize(3*ncells, cufftComplex());
-      //gridVels.resize(ncells, real3());
       initCuFFT();
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
@@ -214,13 +211,11 @@ namespace uammd{
       convolveFourier(gridVelsFourier, st);
       addBrownianNoise(gridVelsFourier,st);
       }
-      auto gridVels = inverseTransform(gridVelsFourier,st);      
-      //interpolateVelocity(pos.begin(), Mv, gridVels,st);
-      /*
+      auto gridVels = inverseTransform(gridVelsFourier,st);            
       auto linearVelocities = interpolateVelocity(pos.begin(), gridVels, st);
       auto d_linearVelocities = thrust::raw_pointer_cast(linearVelocities.data());
-      thrust::copy(d_linearVelocities, d_linearVelocities+numberParticles,Mv);
-      */      
+      thrust::copy(thrust::cuda::par.on(st), d_linearVelocities, d_linearVelocities+numberParticles, Mv);
+            
       sys->log<System::DEBUG2>("[BDHI::FCM] MF wave space Done");
     }    
 
@@ -605,20 +600,7 @@ namespace uammd{
       CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, d_gridFourier, d_gridReal));
       return gridReal;
     }
-    
-    
-    void FCM::interpolateVelocity(real4* pos, real3* linearVelocities, cached_vector<real3>& gridVels, cudaStream_t st){
-      sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");
-      /*Interpolate the real space velocities back to the particle positions ->
-	Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
-      int numberParticles = pg->getNumberParticles();
-      real3* d_gridVels = thrust::raw_pointer_cast(gridVels.data());
-      IBM<Kernel> ibm(sys, kernel, grid);
-      ibm.gather(pos, linearVelocities, d_gridVels, numberParticles, st);
-      CudaCheckError();
-    }
-
-    
+        
     cached_vector<real3> FCM::interpolateVelocity(real4* pos, cached_vector<real3>& gridVels, cudaStream_t st){
       sys->log<System::DEBUG2>("[BDHI::FCM] Grid to particles");
       /*Interpolate the real space velocities back to the particle positions ->
