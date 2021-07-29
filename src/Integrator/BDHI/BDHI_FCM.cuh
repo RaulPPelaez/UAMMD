@@ -14,6 +14,9 @@ You can choose different Kernels by changing the "using Kernel" below. A bunch o
   References:
   [1] Fluctuating force-coupling method for simulations of colloidal suspensions. Eric E. Keaveny. 2014.
   [2]  Rapid Sampling of Stochastic Displacements in Brownian Dynamics Simulations. Fiore, Balboa, Donev and Swan. 2017.
+
+Contributors:
+Pablo Palacios - 2021: Introduce the torques functionality.
 */
 #ifndef BDHI_FCM_CUH
 #define BDHI_FCM_CUH
@@ -29,6 +32,14 @@ You can choose different Kernels by changing the "using Kernel" below. A bunch o
 
 namespace uammd{
   namespace BDHI{
+#ifdef UAMMD_DEBUG
+    template<class T> using gpu_container = thrust::device_vector<T>;
+    template<class T>  using cached_vector = detail::UninitializedCachedContainer<T>;
+#else
+    template<class T> using gpu_container = thrust::device_vector<T, managed_allocator<T>>;
+    template<class T> using cached_vector = thrust::device_vector<T, managed_allocator<T>>;
+#endif
+    
     class FCM: public Integrator{
     public:
       using Kernel = FCM_ns::Kernels::Gaussian;
@@ -36,7 +47,7 @@ namespace uammd{
       //using Kernel = FCM_ns::Kernels::Peskin::threePoint;
       //using Kernel = FCM_ns::Kernels::Peskin::fourPoint;
       //using Kernel = FCM_ns::Kernels::GaussianFlexible::sixPoint;
-
+      using KernelTorque =  FCM_ns::Kernels::GaussianTorque;
       using cufftComplex = cufftComplex_t<real>;
       using cufftComplex3 = cufftComplex3_t<real>;
 
@@ -50,6 +61,11 @@ namespace uammd{
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys,
 	  Parameters par);
+
+      FCM(shared_ptr<ParticleData> pd,
+	  shared_ptr<System> sys,
+	  Parameters par):
+	FCM(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
 
       ~FCM();
 
@@ -78,10 +94,15 @@ namespace uammd{
 	return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-c*a+(4.0l/3.0l)*M_PIl*a3-a6pref*a3*a3);
       }
 
+      //Computes the velocities given the forces
+      template<typename vtype> void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
+
+      //Computes the velocities and angular velocities given the forces and torques
+      std::pair<cached_vector<real3>, cached_vector<real3>>
+      Mdot(real4* pos, real4* force, real4* torque, cudaStream_t st);
+
     private:
-      shared_ptr<ParticleData> pd;
-      shared_ptr<ParticleGroup> pg;
-      shared_ptr<System> sys;
+      
       cudaStream_t st;
       uint seed;
 
@@ -92,23 +113,16 @@ namespace uammd{
       int steps;
       
       std::shared_ptr<Kernel> kernel;
-      std::shared_ptr<Kernel> kernelTorque;
-
+      std::shared_ptr<KernelTorque> kernelTorque;
+      
       Box box;
-
       Grid grid;
 
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea;
-      thrust::device_vector<real3> K; /*Shear 3x3 matrix*/
+      //thrust::device_vector<real3> K; /*Shear 3x3 matrix*/
 
       Parameters par;
-      
-      template<typename vtype>
-      void Mdot(real3 *Mv, vtype *v, cudaStream_t st);
-      
-      std::pair<cached_vector<real3>, cached_vector<real3>>
-      Mdot(real4* pos, real4* force, real4* torque, cudaStream_t st);
       
       void initializeGrid(Parameters par);
       void initializeKernel(Parameters par);
@@ -125,11 +139,12 @@ namespace uammd{
       cached_vector<real3> interpolateVelocity(real4* pos, cached_vector<real3>& gridVels, cudaStream_t st);
       void interpolateVelocity(real4* pos, real3* linearVelocities, cached_vector<real3>& gridVels, cudaStream_t st);
       cached_vector<cufftComplex3> computeGridAngularVelocityFourier(cached_vector<cufftComplex3>& gridVelsFourier, cudaStream_t st);
-      cached_vector<real3> interpolateAngularVelocity(real4* pos, cached_vector<cufftComplex3>& gridAngVelsFourier, cudaStream_t st);
-      
+      cached_vector<real3> interpolateAngularVelocity(real4* pos, cached_vector<real3>& gridAngVels, cudaStream_t st);
+
       void updateInteractors();
       void resetForces();
       void resetTorques();
+      auto computeHydrodynamicDisplacements();
       void computeCurrentForces();
     };
   }

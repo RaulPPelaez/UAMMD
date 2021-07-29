@@ -49,6 +49,29 @@ namespace uammd{
 
 	};
 
+	class GaussianTorque{
+	  IBM_kernels::Gaussian kern;
+	  real a;
+	public:
+	  int support;
+	  real rmax;
+	  GaussianTorque(real width, real h, real tolerance):
+	    kern(width){
+	    const real dr = 0.5*h;
+	    real r = dr;
+	    while(kern.phi(r)>tolerance){
+	      r += dr;
+	    }
+	    this->support = std::max(3, int(2*r/h + 0.5));
+	    rmax = support*h;
+	  }
+
+	  __host__ __device__ real phi(real r) const{
+	    return r>=rmax?0:kern.phi(r);
+	  }
+
+	};
+
 	class BarnettMagland{
 	  IBM_kernels::BarnettMagland bm;
 
