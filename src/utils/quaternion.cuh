@@ -12,8 +12,6 @@ Notation:
 #define QUATTR inline __host__ __device__
 
 namespace uammd{
-
-
   class Quat{
   public:
     
@@ -40,7 +38,7 @@ namespace uammd{
     QUATTR real3 getVx(); //Returns the first vector of the reference system encoded by the quaternion
     QUATTR real3 getVy(); //Returns the second vector of the reference system encoded by the quaternion
     QUATTR real3 getVz(); //Returns the third vector of the reference system encoded by the quaternion
-      QUATTR real4 to_real4();
+    QUATTR real4 to_real4();
   };
   
   QUATTR Quat::Quat(){
@@ -126,7 +124,7 @@ namespace uammd{
     v.y = q.z;
     v.z = q.w;
   }
-
+  
   QUATTR real3 Quat::getVx(){
     real a = n;
     real b = v.x;
@@ -159,6 +157,10 @@ namespace uammd{
     r4.z = v.y;
     r4.w = v.z;
     return r4;
+  }
+  
+  QUATTR real4 make_real4(Quat q){
+    return q.to_real4();
   }
   
   QUATTR Quat rotVec2Quaternion(real3 vrot, real phi){
