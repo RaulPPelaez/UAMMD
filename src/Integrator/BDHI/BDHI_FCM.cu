@@ -80,7 +80,7 @@ namespace uammd{
 	  //printf("V %f %f %f\n", linearV[id].x, linearV[id].y, linearV[id].z);
 	  real3 dphi = angularV[id]*dt;
 	  dirc = rotVec2Quaternion(dphi)*dirc;
-	  dir[i] = dirc.to_real4();
+	  dir[i] = make_real4(dirc);
 	}
       }
     }
