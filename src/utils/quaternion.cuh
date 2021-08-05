@@ -39,6 +39,8 @@ namespace uammd{
     QUATTR real3 getVy(); //Returns the second vector of the reference system encoded by the quaternion
     QUATTR real3 getVz(); //Returns the third vector of the reference system encoded by the quaternion
     QUATTR real4 to_real4();
+
+    QUATTR Quat getConjugate();
   };
   
   QUATTR Quat::Quat(){
@@ -162,13 +164,20 @@ namespace uammd{
   QUATTR real4 make_real4(Quat q){
     return q.to_real4();
   }
-  
+
+  QUATTR Quat Quat::getConjugate(){
+    return Quat(n,-v);
+  }
+
+  /* 
+     Returns the quaternion that encondes a rotation of ang radians 
+     around the axis vrot 	 
+     q = (cos(phi/2),vrot·sin(phi/2))
+  */
   QUATTR Quat rotVec2Quaternion(real3 vrot, real phi){
-    /* Returns the quaternion that encondes a rotation of ang radians 
-       around the axis vrot 	 
-       q = (cos(phi/2),vrot·sin(phi/2))
-    */
-    vrot*=rsqrt(dot(vrot,vrot)); // The rotation axis must be a unitary vector
+    real norm = (dot(vrot,vrot));
+    if (norm==0) return Quat(1.0,0.,0.,0.);
+    vrot*=rsqrt(norm); // The rotation axis must be a unitary vector
     real cphi2, sphi2;
     real* cphi2_ptr = &cphi2;
     real* sphi2_ptr = &sphi2;
@@ -181,6 +190,17 @@ namespace uammd{
     // If no angle is given the rotation angle is the modulus of vrot
     real phi = sqrt(dot(vrot,vrot));
     return rotVec2Quaternion(vrot,phi);
+  }
+
+  /* Rotates a vector v, with the rotation encoded by the quaternion q, the formula
+     of the rotation is p' = q*p*q^1, being p a quaternion of the form [0,v].
+     To speed up the computation, we write the rotation in the next form:
+     v' = v + 2*q_n*(q_v x v) + 2*q_v * (q_v x v).
+     See https://fgiesen.wordpress.com/2019/02/09/rotating-a-single-vector-using-a-quaternion/
+  */
+  QUATTR real3 rotateVector(Quat q, real3 v){
+    real3 aux = 2*cross(q.v,v);
+    return v+q.n*aux+cross(q.v,aux);    
   }
 }
 
