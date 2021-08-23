@@ -36,9 +36,9 @@ struct Gravity{
     return f;
   }
 
-  std::tuple<const real4 *> getArrays(ParticleData *pd){
+  auto getArrays(ParticleData *pd){
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
-    return std::make_tuple(pos.raw());
+    return pos.begin();
   }
 };
 

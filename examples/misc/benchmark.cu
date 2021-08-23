@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019. A short range forces example.
+/*Raul P. Pelaez 2019-2021. A short range forces example.
 
 Describes a LJ liquid simulation in a periodic box.
 
@@ -14,7 +14,7 @@ You can visualize the reuslts with superpunto
 #include"uammd.cuh"
 //The rest can be included depending on the used modules
 #include"Integrator/VerletNVT.cuh"
-#include"Interactor/NeighbourList/CellList.cuh"
+#include"Interactor/NeighbourList/VerletList.cuh"
 #include"Interactor/PairForces.cuh"
 #include"Interactor/Potential/Potential.cuh"
 #include"utils/InitialConditions.cuh"
@@ -31,7 +31,7 @@ real dt;
 std::string outputFile;
 int numberParticles;
 int numberSteps, printSteps;
-real temperature, viscosity;
+real temperature, friction, rcutmult;
 void readParameters(std::shared_ptr<System> sys, std::string file);
 bool periodicityX, periodicityY, periodicityZ;
 int main(int argc, char *argv[]){
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]){
   NVT::Parameters par;
   par.temperature = temperature;
   par.dt = dt;
-  par.viscosity = viscosity;
+  par.friction = friction;
   auto verlet = make_shared<NVT>(pd, sys, par);
 
   {
@@ -75,8 +75,9 @@ int main(int argc, char *argv[]){
     //PairForces decides if it should use a neighbour list or treat the system as NBody,
     //You can force the use of a certain neighbour list passing its name as a second template argument
 
-    using PairForces = PairForces<Potential::LJ>;
-
+    using PairForces = PairForces<Potential::LJ, VerletList>;
+    auto nl = std::make_shared<VerletList>(pd, sys);
+    nl->setCutOffMultiplier(rcutmult);
     //This is the general interface for setting up a potential
     auto pot = make_shared<Potential::LJ>(sys);
     {
@@ -95,6 +96,7 @@ int main(int argc, char *argv[]){
 
     PairForces::Parameters params;
     params.box = box;  //Box to work on
+    params.nl = nl;
     auto pairforces = make_shared<PairForces>(pd, sys, params, pot);
     //You can add as many modules as necessary
     verlet->addInteractor(pairforces);
@@ -119,6 +121,9 @@ int main(int argc, char *argv[]){
   Timer tim;
   tim.tic();
   //Run the simulation
+  forj(0, 500)
+    verlet->forwardTime();
+
   forj(0, numberSteps){
     //This will instruct the integrator to take the simulation to the next time step,
     //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
@@ -168,7 +173,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
       default_options<<"printSteps -1"<<std::endl;
       default_options<<"outputFile /dev/stdout"<<std::endl;
       default_options<<"temperature 1.0"<<std::endl;
-      default_options<<"viscosity 1"<<std::endl;
+      default_options<<"friction 1"<<std::endl;
       default_options<<"periodicity 1 1 1"<<std::endl;
     }
   }
@@ -182,6 +187,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
   in.getOption("numberParticles", InputFile::Required)>>numberParticles;
   in.getOption("outputFile", InputFile::Required)>>outputFile;
   in.getOption("temperature", InputFile::Required)>>temperature;
-  in.getOption("viscosity", InputFile::Required)>>viscosity;
+  in.getOption("friction", InputFile::Required)>>friction;
+  in.getOption("rcutmult", InputFile::Required)>>rcutmult;
   in.getOption("periodicity", InputFile::Required)>>periodicityX>>periodicityY>>periodicityZ;
 }
