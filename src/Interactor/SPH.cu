@@ -1,4 +1,4 @@
-/*Raul P.Pelaez 2017. Smoothed Particle Hydrodynamics
+/*Raul P.Pelaez 2017-2021. Smoothed Particle Hydrodynamics
 
   SPH is an Interactor module, any simplectic integrator can be used with it (i.e VerletNVE).
 
@@ -64,7 +64,7 @@ namespace uammd{
   }
   namespace SPH_ns{
 
-    //This is a Transverser, see CellList.cuh, PairForces.cuh or NBodyForces.cuh for a guide on this concept
+    //This is a Transverser, see NeighbourList.cuh, PairForces.cuh or NBodyForces.cuh for a guide on this concept
     //Computes the density on each particle
     template<class Kernel>
     struct DensityTransverser{
@@ -163,14 +163,10 @@ namespace uammd{
       //Compute Fij
       inline __device__ real3 compute(real4 ri, real4 rj, InfoType infoi, InfoType infoj){
 	real3 rij = box.apply_pbc(make_real3(rj) - make_real3(ri));
-
         real3 vij = infoj.vel - infoi.vel;
-
 	const real mi = infoi.mass;
 	const real mj = infoj.mass;
-
 	const real vis = viscosity(vij, rij, support);
-
 	return mi*mj*(infoi.Pdivrhosq + infoj.Pdivrhosq + vis)*kernel.gradient(rij, support);
       }
 
@@ -184,59 +180,33 @@ namespace uammd{
 
   }
 
-  void SPH::sumForce(cudaStream_t st){
+  void SPH::sum(Interactor::Computables comp, cudaStream_t st){
     sys->log<System::DEBUG1>("[SPH] Summing forces");
     int numberParticles = pg->getNumberParticles();
-
     using Kernel = SPH_ns::Kernel::M4CubicSpline;
-
     if(!nl){
-      sys->log<System::MESSAGE>("[SPH] Initializing NeighbourList");
-      //A neighbour list must know just my system information at construction
-      nl = std::make_shared<CellList>(pd, pg, sys);
+      nl = std::make_shared<NeighbourList>(pd, pg, sys);
     }
-
-
     real rcut = Kernel::getCutOff(support);
     sys->log<System::DEBUG3>("[SPH] Using cutOff: %f", rcut);
-
-    //Update neighbour list. It is smart enough to do it only when it is necessary,
-    // so do not fear calling it several times.
+    //Update neighbour list.
     nl->update(box, rcut, st);
-
     sys->log<System::DEBUG3>("[SPH] Computing density");
-
     density.resize(numberParticles);
-
     auto d_density = thrust::raw_pointer_cast(density.data());
     //If mass is not allocated assume all masses are 1
-    real *d_mass = nullptr;
-    if(pd->isMassAllocated())
-      d_mass = pd->getMass(access::location::gpu, access::mode::read).raw();
-
-
-
+    real *d_mass = pd->getMassIfAllocated(access::location::gpu, access::mode::read).raw();
     auto densityTrans = SPH_ns::DensityTransverser<Kernel>(box, d_density, d_mass, support);
-
     //Compute Density
     nl->transverseList(densityTrans, st);
-
     sys->log<System::DEBUG3>("[SPH] Computing Pressure");
     pressure.resize(numberParticles);
-
     //Compute Pressure
-    cub::TransformInputIterator<real, SPH_ns::Density2Pressure, real*> d2p(d_density,
-									SPH_ns::Density2Pressure(gasStiffness, restDensity));
-
-    int BLOCKSIZE = 128;
-    int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-    int Nblocks  =  numberParticles/Nthreads +  ((numberParticles%Nthreads!=0)?1:0);
-
-    copyGPU<<<Nblocks, Nthreads, 0 , st>>>(d2p, pressure.begin(), numberParticles);
-
-
+    thrust::transform(thrust::cuda::par.on(st),
+		      d_density, d_density + numberParticles,
+		      pressure.begin(),
+		      SPH_ns::Density2Pressure(gasStiffness, restDensity));
     sys->log<System::DEBUG3>("[SPH] Computing Force");
-
     auto d_pressure = thrust::raw_pointer_cast(pressure.data());
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
     auto vel = pd->getVel(access::location::gpu, access::mode::readwrite);
@@ -248,11 +218,6 @@ namespace uammd{
 						       support);
     //Compute Force
     nl->transverseList(forceTrans, st);
-  }
-
-
-  real SPH::sumEnergy(){
-    return 0;
   }
 
 }

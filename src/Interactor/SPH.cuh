@@ -36,19 +36,20 @@ References:
 #define SPH_CUH
 
 #include"Interactor/Interactor.cuh"
-#include"Interactor/NeighbourList/CellList.cuh"
+#include"Interactor/NeighbourList/VerletList.cuh"
 #include"third_party/type_names.h"
 
 namespace uammd{
   class SPH: public Interactor{
   public:
+    using NeighbourList = VerletList;
     struct Parameters{
       Box box;
       real support = 1.0;
       real viscosity = 50.0;
       real gasStiffness = 100.0;
       real restDensity = 0.4;
-      std::shared_ptr<CellList> nl = nullptr;
+      std::shared_ptr<NeighbourList> nl = nullptr;
     };
     SPH(shared_ptr<ParticleData> pd,
 	shared_ptr<ParticleGroup> pg,
@@ -61,12 +62,11 @@ namespace uammd{
       SPH(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){
     }
     ~SPH();
-    void sumForce(cudaStream_t st) override;
-    real sumEnergy() override;
-    //real sumVirial() override{ return 0;}
+
+    virtual void sum(Interactor::Computables comp, cudaStream_t st) override;
 
   private:
-    shared_ptr<CellList> nl;
+    shared_ptr<NeighbourList> nl;
     Box box;
     real support;
     real gasStiffness;
