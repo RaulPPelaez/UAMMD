@@ -232,13 +232,12 @@ std::shared_ptr<Verlet> createIntegratorVerletNVT(UAMMD sim){
 }
 
 std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
-  typename VerletNVE::Parameters par;
+  VerletNVE::Parameters par;
   par.dt = sim.par.dt;
-  par.energy = 1; //Optionally a target energy can be passed that VerletNVE will set according to velocities keep constant
-  //par.initVelocities = false; //If true, velocities will be initialized by the module to ensure the desired energy
+  //par.energy = 1; //Optionally a target energy can be passed that VerletNVE will set according to velocities keep constant
+  par.initVelocities = false; //If true, velocities will be initialized by the module to ensure the desired energy
   //Note that it does not make sense to pass an energy and prevent VerletNVE from initializing velocities to match it.
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<VerletNVE>(sim.pd, pg, sim.sys, par);
+  return std::make_shared<VerletNVE>(sim.pd, sim.sys, par);
 }
 
 //Dissipative Particle Dynamics
@@ -399,7 +398,7 @@ std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim){
 
 std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
   using Bond = HarmonicBond;
-  using BF = BondedForces<Bond>;
+  using BF = BondedForces<Bond,2>;
   typename BF::Parameters params;
   params.file = sim.par.bondFile;
   auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, Bond(sim.par));
@@ -461,7 +460,7 @@ double sumTotalEnergy(std::shared_ptr<Integrator> integrator, std::shared_ptr<Pa
   }
   integrator->sumEnergy();
   for(auto interactor: integrator->getInteractors()){
-    interactor->sumEnergy();
+    interactor->sum({.force=false, .energy=true}, 0);
   }
   auto energy = particles->getEnergy(access::location::gpu, access::mode::read);
   double totalEnergy = thrust::reduce(thrust::cuda::par, energy.begin(), energy.end(), 0.0);
@@ -489,6 +488,7 @@ void writeSimulation(UAMMD sim){
   out<<"#Lx="<<L.x*0.5<<";Ly="<<L.y*0.5<<";Lz="<<L.z*0.5<<";\n";
   auto pos = sim.pd->getPos(access::location::cpu, access::mode::read);
   auto vel = sim.pd->getVelIfAllocated(access::location::cpu, access::mode::read);
+  
   auto energy = sim.pd->getEnergyIfAllocated(access::location::cpu, access::mode::read);
   fori(0, sim.par.numberParticles){
     //real3 p = box.apply_pbc(make_real3(pos[id2index[i]]));

@@ -185,25 +185,25 @@ namespace uammd{
 	const real3 w2 = (vu123 - cosPhi*vu234)*invsqv234;
 	if (bond_index == ids[0]){
 	  ct.force = pref*make_real3(cross(w1, r23));
-	  ct.virial = comp.virial?:dot(ct.force, r23):0;
+	  ct.virial = comp.virial?dot(ct.force, r23):0;
 	}
 	else if (bond_index == ids[1]){
-	  const real3 r13 = box.apply_pbc(pos3 - pos1);
+	  const real3 r13 = box.apply_pbc(pos[2] - pos[0]);
 	  const real3 c34 = cross(w2, r34);
 	  const real3 c13 = cross(w1, r13);
-	  ct.force = pref*(cr34 - c13);
-	  ct.virial = comp.virial?:(dot(pref*c34, r34) - dot(pref*c13, r13)):0;
+	  ct.force = pref*(c34 - c13);
+	  ct.virial = comp.virial?(dot(pref*c34, r34) - dot(pref*c13, r13)):0;
 	}
 	else if (bond_index == ids[2]){
-	  const real3 r24 = box.apply_pbc(pos4 - pos2);
+	  const real3 r24 = box.apply_pbc(pos[3] - pos[1]);
 	  const real3 c12 = cross(w1, r12);
 	  const real3 c24 = cross(w2, r24);
 	  ct.force = pref*(c12 - c24);
-	  ct.virial = comp.virial?:(dot(pref*c12, r12) - dot(pref*c24, r24)):0;
+	  ct.virial = comp.virial?(dot(pref*c12, r12) - dot(pref*c24, r24)):0;
 	}
 	else if (bond_index == ids[3]){
 	  ct.force = pref*(cross(w2, r23));
-	  ct.virial = comp.virial?:dot(ct.force, r23):0;
+	  ct.virial = comp.virial?dot(ct.force, r23):0;
 	}
 	return ct;
       }
