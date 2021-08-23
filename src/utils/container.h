@@ -1,5 +1,7 @@
 /*Raul P. Pelaez 2021. Useful containers for UAMMD
  */
+#ifndef UAMMD_CONTAINER_H
+#define UAMMD_CONTAINER_H
 #include"global/defines.h"
 #include"System/System.h"
 #include"misc/allocator.h"
@@ -78,3 +80,4 @@ namespace uammd{
 
   template<class T>  using uninitialized_cached_vector = detail::UninitializedCachedContainer<T>;
 }
+#endif
