@@ -80,22 +80,31 @@ namespace uammd{
 
     public:
       using Parameters = FCM_super::Parameters;
+
+      FCMIntegrator(shared_ptr<ParticleData> pd,
+		    shared_ptr<ParticleGroup> pg,
+		    Parameters par):
+	FCMIntegrator(pd, pg, pd->getSystem(), par){}
+
+      FCMIntegrator(shared_ptr<ParticleData> pd, Parameters par):
+	FCMIntegrator(pd, std::make_shared<ParticleGroup>(pd, "All"), par){}
+
+      FCMIntegrator(shared_ptr<ParticleData> pd,
+		    shared_ptr<System> sys,
+		    Parameters par):
+	FCMIntegrator(pd, par){}
+
       FCMIntegrator(shared_ptr<ParticleData> pd,
 		    shared_ptr<ParticleGroup> pg,
 		    shared_ptr<System> sys,
 		    Parameters par):
-	Integrator(pd, pg, sys,"BDHI::FCMIntegrator"),	
+	Integrator(pd, pg,"BDHI::FCMIntegrator"),
 	dt(par.dt){
 	if(par.seed == 0)
 	  par.seed = sys->rng().next32();
 	this->fcm = std::make_shared<FCM_super>(par);
 	cudaStreamCreate(&st);
       }
-
-      FCMIntegrator(shared_ptr<ParticleData> pd,
-		    shared_ptr<System> sys,
-		    Parameters par):
-	FCMIntegrator(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}	
 
       ~FCMIntegrator(){
 	cudaStreamDestroy(st);
