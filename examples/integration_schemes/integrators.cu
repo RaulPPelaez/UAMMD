@@ -178,6 +178,23 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
   }
 }
 
+
+std::shared_ptr<Integrator> createIntegratorFCM(UAMMD sim){
+  //The FCM module also works as an standalone Integrator.
+  //In this mode, FCM can also compute angular displacements due to torques acting on the particles
+  //See the wiki for more information about these modules
+  real3 L = make_real3(32,32,32);
+  real hydrodynamicRadius = 1.0;
+  BDHI::FCMIntegrator::Parameters par;
+  par.box = Box(L);
+  par.temperature = 1.0;
+  par.viscosity = 1.0;
+  par.dt = 0.1;
+  par.hydrodynamicRadius = hydrodynamicRadius;
+  par.tolerance = 1e-4;
+  auto bdhi = std::make_shared<BDHI::FCMIntegrator>(sim.pd, par);
+  return bdhi;
+}
 int main(int argc, char* argv[]){
   int N = 16384;
   auto sim = initializeUAMMD(argc, argv, N);
