@@ -133,6 +133,33 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
   return verlet;
 }
 
+#include "Integrator/Hydro/ICM.cuh"
+//Inertial Coupling Method
+std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
+  using ICM = Hydro::ICM;
+  ICM::Parameters par;
+  par.dt = 0.1;
+  real3 L = make_real3(32,32,32);
+  par.box = Box(L);
+  par.hydrodynamicRadius = 1;
+  //You may specify either the hydrodynamic radius or the number of fluid cells
+  //par.cells = make_int3(L);
+  par.density = 1; //fluid density
+  par.viscosity = 1; //fluid viscosity
+  par.temperature = 1;
+  //Choose if the thermal drift should be taken into account. Best leave it at the default.
+  //par.sumThermalDrift = true;
+  //Additionally you can choose if the total momemtum of the fluid should be substracted each step or not
+  //par.sumTotalMomemtum = true;
+  auto icm = std::make_shared<ICM>(sim.pd, sim.sys, par);
+  //You can request the fluid velocities and the number of fluid cells from this integrator
+  auto ptr = icm->getFluidVelocities(access::cpu);
+  auto n = icm->getNumberFluidCells();
+  //The velocity of cell i,j,k is located at ptr[i+(j+k*n.y)*n.x]
+  //Note that the velocities are defined in a staggered grid, corresponding to cell face centers.
+  return icm;
+}
+
 #include"Integrator/BDHI/BDHI_EulerMaruyama.cuh"
 #include"Integrator/BDHI/BDHI_PSE.cuh"
 #include"Integrator/BDHI/BDHI_FCM.cuh"
