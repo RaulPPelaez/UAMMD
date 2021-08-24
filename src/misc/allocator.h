@@ -11,6 +11,7 @@ namespace uammd{
 
   namespace detail{
     template<class T> using cuda_ptr = thrust::cuda::pointer<T>;
+
     template<class T>
     class memory_resource{
     public:
@@ -37,12 +38,12 @@ namespace uammd{
       }
 
     };
+  }
 
-    template<class MR>
-    MR* get_default_resource(){
-      static MR default_resource;
-      return &default_resource;
-    }
+  template<class MR>
+  MR* get_default_resource(){
+    static MR default_resource;
+    return &default_resource;
   }
 
   //A device memory resource, with cuda raw pointers
@@ -100,7 +101,7 @@ namespace uammd{
     }
 
     pool_memory_resource_adaptor(MR* resource): res(resource){}
-    pool_memory_resource_adaptor(): res(detail::get_default_resource<MR>()){}
+    pool_memory_resource_adaptor(): res(get_default_resource<MR>()){}
 
     using FreeBlocks =  std::multimap<std::ptrdiff_t, void*>;
     using AllocatedBlocks =  std::map<void*, std::ptrdiff_t>;
@@ -204,7 +205,7 @@ namespace uammd{
 
     polymorphic_allocator(MR * resource) : res(resource){}
 
-    polymorphic_allocator() : res(detail::get_default_resource<MR>()){}
+    polymorphic_allocator() : res(get_default_resource<MR>()){}
 
     MR* resource() const { return this->res;}
 
