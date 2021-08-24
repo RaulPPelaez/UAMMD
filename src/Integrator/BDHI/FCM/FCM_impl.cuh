@@ -147,25 +147,22 @@ namespace uammd{
 	else{
 	  cellDim = par.cells;
 	}
-	h = box.boxSize.x/cellDim.x;
 	this->grid = Grid(box, cellDim);
       }
 
       void initializeKernel(Parameters par){
 	real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
 	if(not par.kernel)
-	  this->kernel = std::make_shared<Kernel>(h, par.tolerance);
+	  this->kernel = Kernel::createForForce(h, par.tolerance);
 	else
 	  this->kernel = par.kernel;
-	this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h, grid.cellSize.x);
+	this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h);
       }
 
       void initializeKernelTorque(Parameters par){
 	if(not par.kernelTorque){
-	  real a = this->getHydrodynamicRadius();
-	  real width = a/(pow(6*sqrt(M_PI), 1/3.));
 	  real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
-	  this->kernelTorque = std::make_shared<KernelTorque>(width, h, par.tolerance);
+	  this->kernelTorque = KernelTorque::createForTorque(h, par.tolerance);
 	}
 	else{
 	  this->kernelTorque = par.kernelTorque;

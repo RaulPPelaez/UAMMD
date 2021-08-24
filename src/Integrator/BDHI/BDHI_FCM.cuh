@@ -25,7 +25,7 @@ namespace uammd{
   namespace BDHI{
     class FCM{
       using Kernel = FCM_ns::Kernels::Gaussian;
-      using KernelTorque = FCM_ns::Kernels::GaussianTorque;
+      using KernelTorque = FCM_ns::Kernels::Gaussian;
       using FCM_super = FCM_impl<Kernel, KernelTorque>;      
       std::shared_ptr<FCM_super> fcm;
       shared_ptr<ParticleData> pd;
@@ -74,7 +74,7 @@ namespace uammd{
 
     class FCMIntegrator: public Integrator{
       using Kernel = FCM_ns::Kernels::Gaussian;
-      using KernelTorque = FCM_ns::Kernels::GaussianTorque;
+      using KernelTorque = FCM_ns::Kernels::Gaussian;
       using FCM_super = FCM_impl<Kernel, KernelTorque>;
       std::shared_ptr<FCM_super> fcm;
 

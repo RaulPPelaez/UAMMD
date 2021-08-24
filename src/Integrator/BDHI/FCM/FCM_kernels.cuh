@@ -27,43 +27,11 @@ namespace uammd{
 	    return factor;
 	  }
 	  real a;
+	  real upsampling;
 	public:
 	  int support;
 	  real rmax;
-	  Gaussian(real h, real tolerance):
-	    kern(h*computeUpsampling(tolerance)){
-	    const real dr = 0.5*h;
-	    real r = dr;
-	    while(kern.phi(r)>tolerance){
-	      r += dr;
-	    }
-	    this->support = std::max(3, int(2*r/h + 0.5));
-	    rmax = support*h;
-	    a=h*computeUpsampling(tolerance)*sqrt(M_PI);
-	  }
-
-	  static real adviseGridSize(real hydrodynamicRadius, real tolerance){
-	    real factor = computeUpsampling(tolerance);
-	    return hydrodynamicRadius/(sqrt(M_PI)*factor);
-	  }
-
-	  real fixHydrodynamicRadius(real hydrodynamicRadius, real h){
-	    return a;
-	  }
-
-	  __host__ __device__ real phi(real r) const{
-	    return r>=rmax?0:kern.phi(r);
-	  }
-
-	};
-
-	class GaussianTorque{
-	  IBM_kernels::Gaussian kern;
-	  real a;
-	public:
-	  int support;
-	  real rmax;
-	  GaussianTorque(real width, real h, real tolerance):
+	  Gaussian(real width, real h, real tolerance):
 	    kern(width){
 	    const real dr = 0.5*h;
 	    real r = dr;
@@ -72,6 +40,26 @@ namespace uammd{
 	    }
 	    this->support = std::max(3, int(2*r/h + 0.5));
 	    rmax = support*h;
+	    this->upsampling = computeUpsampling(tolerance);
+	  }
+
+	  static real adviseGridSize(real hydrodynamicRadius, real tolerance){
+	    real factor = computeUpsampling(tolerance);
+	    return hydrodynamicRadius/(sqrt(M_PI)*factor);
+	  }
+
+	  real fixHydrodynamicRadius(real h){
+	    return h*upsampling;
+	  }
+
+	  static auto createForForce(real h, real tolerance){
+	    real width = h*computeUpsampling(tolerance)/sqrt(M_PI);
+	    return std::make_shared<Gaussian>(width, h, tolerance);
+	  }
+	  
+	  static auto createForTorque(real h, real tolerance){
+	    real width = h*computeUpsampling(tolerance)/(pow(6*sqrt(M_PI), 1/3.));
+	    return std::make_shared<Gaussian>(width, h, tolerance);
 	  }
 
 	  __host__ __device__ real phi(real r) const{
@@ -83,16 +71,12 @@ namespace uammd{
 	class BarnettMagland{
 	  IBM_kernels::BarnettMagland bm;
 
-	  IBM_kernels::BarnettMagland initBM(real tolerance){
-	    real w = computeW(tolerance);
-	    real beta=1.8*w*2;
-	    return IBM_kernels::BarnettMagland(w, beta);
-	  }
 	  static real computeW(real tolerance){
-	    real w = std::max(1.5, int(-log10(tolerance) + 2)/2.0);
+	    real w = 2*std::max(1.5, int(-log10(tolerance) + 2)/2.0);
 	    w = std::min(real(9.0), w);
 	    return w;
 	  }
+
 	  static real computeUpsampling(real w){
 	    //Empirical fit from the taylor expansion of the BM kernel, the first term goes with x^2
 	    //Which allows to make a simil with a gaussian such that \sigma = w/sqrt(beta)
@@ -108,14 +92,14 @@ namespace uammd{
 	    //fac = 6.525743222080990e-01; //w=4
 	    //fac = 5.269758326738209e-01; //w=6
 	  }
-	  real a;
+	  real h;
 	public:
 	  int support;
 
-	  BarnettMagland(real h, real tolerance):
-	    bm(initBM(tolerance)){
-	    support = int(2*bm.w + 0.5);
-	    this->a = h;
+	  BarnettMagland(real w, real alpha, real beta, real h):
+	    bm(w, alpha, beta){
+	    support = int(bm.w + 0.5);
+	    this->h = h;
 	  }
 
 	  static real adviseGridSize(real hydrodynamicRadius, real tolerance){
@@ -124,13 +108,29 @@ namespace uammd{
 	    return hydrodynamicRadius*upsampling;
 	  }
 
-	  real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
+	  real fixHydrodynamicRadius(real h) const{
 	    real upsampling = computeUpsampling(bm.w);
 	    return h/upsampling;
 	  }
 
+	  static auto createForForce(real h, real tolerance){
+	    real w = computeW(tolerance);
+	    real beta=1.8*w;
+	    real alpha = w*0.5;
+	    real width = h*computeUpsampling(tolerance)/sqrt(M_PI);
+	    return std::make_shared<BarnettMagland>(w, alpha, beta, h);
+	  }
+	  
+	  static auto createForTorque(real h, real tolerance){
+	    real w = computeW(tolerance);
+	    real beta=1.8*w;
+	    real alpha = w*0.5;
+	    real width = h*computeUpsampling(tolerance)/sqrt(M_PI);
+	    return std::make_shared<BarnettMagland>(w, alpha, beta, h);
+	  }
+
 	  __host__ __device__ real phi(real r) const{
-	    return bm.phi(r/a)/a;
+	    return bm.phi(r/h)/h;
 	  }
 
 	};
