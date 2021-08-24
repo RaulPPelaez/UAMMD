@@ -62,7 +62,7 @@ namespace uammd{
 
     void DPStokes::printStartingMessages(Parameters par){
       System::log<System::MESSAGE>("[DPStokes] tolerance: %g", par.tolerance);
-      System::log<System::MESSAGE>("[DPStokes] support: %d", kernel->support);
+      System::log<System::MESSAGE>("[DPStokes] support: %d", kernel->support.x);
       System::log<System::MESSAGE>("[DPStokes] viscosity: %g", viscosity);
       //System::log<System::MESSAGE>("[DPStokes] Gaussian source width: %g", par.gw);
       System::log<System::MESSAGE>("[DPStokes] cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);

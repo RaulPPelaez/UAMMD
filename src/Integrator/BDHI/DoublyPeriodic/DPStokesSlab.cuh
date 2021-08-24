@@ -133,13 +133,13 @@ namespace uammd{
 	support.x = support.y = supportxy+1;
 	int ct = int(nz*(acos(-2*(-H*0.5+rmax)/H)/M_PI));
 	support.z = 2*ct+1;
-	this->norm = this->computeNorm();
 	if(alpha>w*h*0.5){
 	  throw std::runtime_error("BM: alpha has to be less or equal to w*h/2 ("+std::to_string(w*h*0.5)+"), found" +std::to_string(alpha));
 	}
 	if(alpha<0) this->alpha = w*h*0.5;
 	if(beta<0) this->beta = detail::suggestBetaBM(w);
-
+	this->norm = this->computeNorm();
+	System::log<System::MESSAGE>("BM kernel: beta: %g, alpha: %g, w: %g, norm: %g", beta, alpha, w, norm);
 	//this->alpha = supportxy*0.5*h;	
 	//If the support is not tabulated an exception will be thrown
 	// try{
