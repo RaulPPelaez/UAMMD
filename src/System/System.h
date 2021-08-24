@@ -165,7 +165,7 @@ namespace uammd{
       log<DEBUG2>("[System] finish");
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
-      detail::get_default_resource<device_temporary_memory_resource>()->free_all();
+      get_default_resource<device_temporary_memory_resource>()->free_all();
       this->printFarewell();
     }
 
