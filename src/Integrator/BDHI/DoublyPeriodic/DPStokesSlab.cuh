@@ -231,11 +231,11 @@ namespace uammd{
       }      
 
       //Computes the velocities and angular velocities given the forces and torques
-      std::pair<cached_vector<real4>, cached_vector<real4>>
+      std::pair<cached_vector<real3>, cached_vector<real3>>
       Mdot(real4* pos, real4* forces, real4* torque, int N, cudaStream_t st);
 
       //Computes the velocities given the forces
-      cached_vector<real4> Mdot(real4* pos, real4* forces, int N, cudaStream_t st);
+      cached_vector<real3> Mdot(real4* pos, real4* forces, int N, cudaStream_t st);
 
     private:
       shared_ptr<Kernel> kernel;
@@ -260,11 +260,11 @@ namespace uammd{
 				   cached_vector<cufftComplex4> &gridData, cudaStream_t st);
       void solveBVPVelocity(cached_vector<cufftComplex4> &gridDataFourier, cudaStream_t st);
       void resizeTmpStorage(size_t size);
-      cached_vector<real4> interpolateVelocity(cached_vector<real4> &gridData, real4* pos,
+      cached_vector<real3> interpolateVelocity(cached_vector<real4> &gridData, real4* pos,
 					       int N, cudaStream_t st);
       cached_vector<cufftComplex4> computeGridAngularVelocityCheb(cached_vector<cufftComplex4> &gridVelsCheb,
 						      cudaStream_t st);
-      cached_vector<real4> interpolateAngularVelocity(cached_vector<real4> &gridData,
+      cached_vector<real3> interpolateAngularVelocity(cached_vector<real4> &gridData,
 						      real4* pos, int N, cudaStream_t st);
       real Lx, Ly;
       real H;

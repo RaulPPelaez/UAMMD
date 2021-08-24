@@ -90,7 +90,6 @@ namespace uammd{
       //In order to use cufft correctly I have to go back and forth between a AoS and SoA layout, there has to be a better way. 
       template<class Real4Container>
       cached_vector<cufftComplex4> forwardTransform(Real4Container &gridData, cudaStream_t st){
-	PUSH_RANGE("FFTPrep",3);
 	System::log<System::DEBUG2>("[DPStokesSlab] Transforming to wave/Chebyshev space");
 	CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
 	const int3 n = gridSize;
@@ -108,13 +107,9 @@ namespace uammd{
 	  real* d_gridDataR = thrust::raw_pointer_cast(gridDataR.data());
 	  fct_ns::unpack<<<(2*(n.x/2+1)*n.y*(2*n.z-2))/blockSize+1, blockSize, 0, st>>>(d_gridData, d_gridDataR,
 											make_int3(2*(n.x/2+1), n.y, 2*n.z-2));
-	  POP_RANGE;
-	  PUSH_RANGE("FFTCall",3);
 	  CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, d_gridDataR, d_gridDataFouR));
 	  CudaCheckError();
-	  POP_RANGE;
 	}
-	PUSH_RANGE("FFTprep",3);
 	cached_vector<cufftComplex4> gridDataFourier(2*(2*n.z-2)*n.y*(n.x/2+1));
 	System::log<System::DEBUG2>("[DPStokesSlab] Taking forces to wave/Chebyshev space");
         cufftComplex4* d_gridDataFourier = thrust::raw_pointer_cast(gridDataFourier.data());
@@ -128,7 +123,6 @@ namespace uammd{
 	cudaDeviceSynchronize();
 	CudaCheckError();
 	System::log<System::DEBUG2>("[DPStokesSlab] Taking forces to wave/Chebyshev space");
-	POP_RANGE;
 	return gridDataFourier;
       }
 

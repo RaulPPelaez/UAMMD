@@ -11,7 +11,7 @@ namespace uammd{
 
     //Computes the hydrodynamic displacements (velocities) coming from the forces
     // acting on a group of positions.
-    cached_vector<real4> DPStokes::Mdot(real4* pos, real4* forces, int numberParticles, cudaStream_t st){
+    cached_vector<real3> DPStokes::Mdot(real4* pos, real4* forces, int numberParticles, cudaStream_t st){
       auto M = Mdot(pos, forces, nullptr, numberParticles, st);
       return M.first;
     }
@@ -20,54 +20,30 @@ namespace uammd{
     // the forces and torques acting on a group of positions
     //If the torques pointer is null, the function will only compute and return the translational part
     // of the mobility
-    std::pair<cached_vector<real4>, cached_vector<real4>>
+    std::pair<cached_vector<real3>, cached_vector<real3>>
     DPStokes::Mdot(real4* pos, real4* forces, real4* torques, int numberParticles, cudaStream_t st){
       cudaDeviceSynchronize();
-      PUSH_RANGE("Mdot",0);
       System::log<System::DEBUG2>("[DPStokes] Computing displacements");
-      PUSH_RANGE("SpreadForces",1);
       auto gridData = spreadForces(pos, forces, numberParticles, st);
-      POP_RANGE;
-      PUSH_RANGE("FCT_Forces",2);
       auto gridDataCheb = fct->forwardTransform(gridData, st);
-      POP_RANGE;
       if(torques){//Torques are added in Cheb space
-	PUSH_RANGE("SpreadTorques",3);
 	addSpreadTorquesFourier(pos, torques, numberParticles, gridDataCheb, st);
-	POP_RANGE;
       }      
-      PUSH_RANGE("BVP",4);
       solveBVPVelocity(gridDataCheb, st);
-      POP_RANGE;
-      PUSH_RANGE("Correction",5);
       if(mode != WallMode::none){
       	correction->correctSolution(gridDataCheb, gridDataCheb, st);
       }
-      POP_RANGE;
-      cached_vector<real4> particleAngularVelocities;
-      PUSH_RANGE("InterpolateTorques",6);
+      cached_vector<real3> particleAngularVelocities;
       if(torques){
 	//Ang. velocities are interpolated from the curl of the velocity, which is
 	// computed in Cheb space.
-	PUSH_RANGE("InterpolateTorquesCurl",7);
 	auto gridAngVelsCheb = computeGridAngularVelocityCheb(gridDataCheb, st);
-	POP_RANGE;
-	PUSH_RANGE("InterpolateTorquesIFCT",8);
 	auto gridAngVels = fct->inverseTransform(gridAngVelsCheb, st);
-	POP_RANGE;
-	PUSH_RANGE("InterpolateTorquesInterp",9);
 	particleAngularVelocities = interpolateAngularVelocity(gridAngVels, pos, numberParticles, st);
-	POP_RANGE;
       }
-      POP_RANGE;
-      PUSH_RANGE("IFCT",10);
       gridData = fct->inverseTransform(gridDataCheb, st);
-      POP_RANGE;
-      PUSH_RANGE("InterpolateVelocities",11);
       auto particleVelocities = interpolateVelocity(gridData, pos, numberParticles, st);
-      POP_RANGE;
       CudaCheckError();
-      POP_RANGE;
       return {particleVelocities, particleAngularVelocities};
     }
 
@@ -151,17 +127,12 @@ namespace uammd{
       if(torques == nullptr) return;
       System::log<System::DEBUG2>("[DPStokes] Spreading torques");      
       const int3 n = grid.cellDim;
-      PUSH_RANGE("SpreadTorquesSpread",3);
       cached_vector<real4> gridTorque(2*(n.x/2+1)*n.y*(2*n.z-2));
       thrust::fill(thrust::cuda::par.on(st), gridTorque.begin(), gridTorque.end(), real4());
       auto d_gridTorque = thrust::raw_pointer_cast(gridTorque.data());
       IBM<KernelTorque, Grid> ibm(kernelTorque, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
       ibm.spread(pos, torques, d_gridTorque, numberParticles, st);
-      POP_RANGE;
-      PUSH_RANGE("SpreadTorquesFCT",3);
       auto gridTorqueCheb = fct->forwardTransform(gridTorque, st);
-      POP_RANGE;
-      PUSH_RANGE("SpreadTorquesCurl",3);
       auto d_gridForceCheb = thrust::raw_pointer_cast(gridForceCheb.data());
       auto d_gridTorqueCheb = thrust::raw_pointer_cast(gridTorqueCheb.data());
       const int blockSize = 128;
@@ -169,7 +140,6 @@ namespace uammd{
       const int numberBlocks = numberSystems/blockSize+1;
       detail::addTorqueCurlCheb<<<numberBlocks, blockSize, 0, st>>>(d_gridTorqueCheb, d_gridForceCheb,
 								    make_real3(Lx, Ly, H), n);
-      POP_RANGE;
       CudaCheckError();
     }
 
@@ -196,18 +166,28 @@ namespace uammd{
       CudaCheckError();
       System::log<System::DEBUG2>("[DPStokes] BVP solve done");
     }
+    namespace detail{
+      struct ToReal3{
+	template<class T>
+	__host__ __device__ uammd::real3 operator()(T i){
+	  auto pr3 = uammd::make_real3(i);
+	  return pr3;
+	}
+      };
 
-    cached_vector<real4> DPStokes::interpolateVelocity(cached_vector<real4> &gridData, real4* pos,
+    }
+    cached_vector<real3> DPStokes::interpolateVelocity(cached_vector<real4> &gridData, real4* pos,
 						       int numberParticles, cudaStream_t st){
       System::log<System::DEBUG2>("[DPStokes] Interpolating forces and energies");
-      cached_vector<real4> particleVelsAndPressure(numberParticles);
-      thrust::fill(thrust::cuda::par.on(st), particleVelsAndPressure.begin(), particleVelsAndPressure.end(), real4());
+      cached_vector<real3> particleVels(numberParticles);
+      thrust::fill(thrust::cuda::par.on(st), particleVels.begin(), particleVels.end(), real3());
       real4* d_gridVelocity = thrust::raw_pointer_cast(gridData.data());
+      auto dgrid3 = thrust::make_transform_iterator(d_gridVelocity, detail::ToReal3());
       const int3 n = grid.cellDim;
       IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-      ibm.gather(pos, thrust::raw_pointer_cast(particleVelsAndPressure.data()), d_gridVelocity, *qw, numberParticles, st);
+      ibm.gather(pos, thrust::raw_pointer_cast(particleVels.data()), dgrid3, *qw, numberParticles, st);
       CudaCheckError();
-      return particleVelsAndPressure;
+      return particleVels;
     }
 
     namespace detail{
@@ -270,16 +250,17 @@ namespace uammd{
       return gridAngVelsCheb;
     }
 
-    cached_vector<real4> DPStokes::interpolateAngularVelocity(cached_vector<real4> &gridAngVels,
+    cached_vector<real3> DPStokes::interpolateAngularVelocity(cached_vector<real4> &gridAngVels,
 							      real4* pos,
 							      int numberParticles, cudaStream_t st){
       System::log<System::DEBUG2>("[DPStokes] Interpolating angular velocities");
       const int3 n = grid.cellDim;
-      cached_vector<real4> particleAngVels(numberParticles);
-      thrust::fill(thrust::cuda::par.on(st), particleAngVels.begin(), particleAngVels.end(), real4());
+      cached_vector<real3> particleAngVels(numberParticles);
+      thrust::fill(thrust::cuda::par.on(st), particleAngVels.begin(), particleAngVels.end(), real3());
       real4* d_gridAngVelocity = thrust::raw_pointer_cast(gridAngVels.data());
+      auto dgrid3 = thrust::make_transform_iterator(d_gridAngVelocity, detail::ToReal3());
       IBM<KernelTorque, Grid> ibm(kernelTorque, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-      ibm.gather(pos, thrust::raw_pointer_cast(particleAngVels.data()), d_gridAngVelocity, *qw, numberParticles, st);
+      ibm.gather(pos, thrust::raw_pointer_cast(particleAngVels.data()), dgrid3, *qw, numberParticles, st);
       CudaCheckError();
       return particleAngVels;
     }
