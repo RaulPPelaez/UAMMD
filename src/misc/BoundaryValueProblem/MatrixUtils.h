@@ -10,7 +10,7 @@
 #ifdef USE_MKL
 #include<mkl.h>
 #else
-#include<lapacke/lapacke.h>
+#include<lapacke.h>
 #endif
 
 namespace uammd{
