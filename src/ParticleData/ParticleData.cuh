@@ -90,6 +90,7 @@
 #include<third_party/boost/preprocessor/seq/for_each.hpp>
 #include<third_party/boost/preprocessor/tuple/elem.hpp>
 #include<thrust/device_vector.h>
+#include<thrust/host_vector.h>
 #include <thrust/system_error.h>
 
 #include"utils/vector.cuh"
