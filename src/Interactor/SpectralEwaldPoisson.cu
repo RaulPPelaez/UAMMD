@@ -270,12 +270,6 @@ namespace uammd{
     }
   }
 
-  void Poisson::sumForce(cudaStream_t st){
-    sys->log<System::DEBUG2>("[Poisson] Sum Force");
-    farField(st);
-    nearFieldForce(st);
-  }
-
   void Poisson::nearFieldEnergy(cudaStream_t st){
     if(split>0){
       int numberParticles = pg->getNumberParticles();
@@ -287,14 +281,6 @@ namespace uammd{
       auto tr = Poisson_ns::NearFieldEnergyTransverser(energy.begin(), charge.begin(), *nearFieldPotentialGreensFunction, box);
       nl->transverseList(tr, st);
     }
-  }
-
-  real Poisson::sumEnergy(){
-    sys->log<System::DEBUG2>("[Poisson] Sum Energy");
-    cudaStream_t st = 0;
-    farField(st);
-    nearFieldEnergy(st);
-    return 0;
   }
 
   namespace Poisson_ns{

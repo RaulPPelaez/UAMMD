@@ -99,11 +99,8 @@ namespace uammd{
     ExternalForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys, Functor f):
       ExternalForces(pd, sys, std::make_shared<Functor>(f)){}
 
-    void sumForce(cudaStream_t st) override;
+    void sum(Computables comp, cudaStream_t st = 0) override;
 
-    real sumEnergy() override;
-
-    void compute(cudaStream_t st) override;
   private:
     std::shared_ptr<Functor> tr;
   };
@@ -125,146 +122,58 @@ namespace uammd{
   }
 
   namespace ExternalForces_ns{
-    //Variadic template magic, these two functions allow to transform a tuple into a list of comma separated
-    // arguments to a function.
-    //It also allows to modify each element.
-    //In this case, the pointers to the ith element in each array are dereferenced and passed fo f.force
-    //Learn about this in [1]
     template<class Functor, class ...T, size_t ...Is>
-    __device__ inline real3 unpackTupleAndCallForce_impl(Functor &f,
-							 std::tuple<T...> &arrays,
-							 int i, //Element of the array to dereference
-							 //This list allows to expand the tuple into a comma
-							 //separated list of elements
-							 std::index_sequence<Is...>){
-      return SFINAE::ForceDelegator<Functor>::force(f,*(std::get<Is>(arrays)+i)...);
-    }
-
-    //This function allows to call unpackTuple hiding the make_index_sequence trick
-    template<class Functor, class ...T>
-    __device__ real3 unpackTupleAndCallForce(Functor &f, int i, std::tuple<T...> &arrays){
-      constexpr int n= sizeof...(T); //Number of elements in tuple (AKA arguments in force in Functor)
-      return unpackTupleAndCallForce_impl(f, arrays, i, std::make_index_sequence<n>());
-    }
-
-    //For each particle, calls the force function of Functor f with the corresponding elements of the provided arrays
-    template<class Functor, class ...T>
-    __global__ void computeForceGPU(Functor f,
-				    int numberParticlesInGroup,
-				    ParticleGroup::IndexIterator groupIterator,
-				    real4 * __restrict__ force,
-				    std::tuple<T...>  arrays){
-      int id = blockIdx.x*blockDim.x + threadIdx.x;
-      if(id>=numberParticlesInGroup) return;
-      const int myParticleIndex = groupIterator[id];
-      //Sum the result of calling f.force(<all the requested input>)
-      force[myParticleIndex] += make_real4(unpackTupleAndCallForce(f, myParticleIndex, arrays));
-    }
-
-  }
-
-  template<class Functor>
-  void ExternalForces<Functor>::sumForce(cudaStream_t st){
-    sys->log<System::DEBUG1>("[ExternalForces] Computing forces...");
-    int numberParticles = pg->getNumberParticles();
-    int blocksize = 128;
-    int Nthreads = blocksize<numberParticles?blocksize:numberParticles;
-    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-    auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
-    auto groupIterator = pg->getIndexIterator(access::location::gpu);
-    ExternalForces_ns::computeForceGPU<<<Nblocks, Nthreads, 0, st>>>(*tr, numberParticles,
-							groupIterator, force.raw(),
-							ExternalForces_ns::getTuple(tr->getArrays(pd.get())));
-  }
-
-  namespace ExternalForces_ns{
-    //Same tricks as with force
-    template<class Functor, class ...T, size_t ...Is>
-    __device__ inline real unpackTupleAndCallEnergy_impl(Functor &f,
-							 std::tuple<T...> &arrays,
-							 int i, //Element of the array to dereference
-							 std::index_sequence<Is...>){
-      return SFINAE::EnergyDelegator<Functor>().energy(f, *(std::get<Is>(arrays)+i)...);
+    __device__ inline auto unpackTupleAndCallSum_impl(Functor &f,
+						      Interactor::Computables comp,
+						      std::tuple<T...> &arrays,
+						      int i, //Element of the array to dereference
+						      std::index_sequence<Is...>){
+      return SFINAE::SumDelegator<Functor>().sum(f, comp, *(std::get<Is>(arrays)+i)...);
     }
 
     template<class Functor, class ...T>
-    __device__ inline real unpackTupleAndCallEnergy(Functor &f, int i, std::tuple<T...> &arrays){
+    __device__ inline auto unpackTupleAndCallSum(Functor &f,
+						 Interactor::Computables comp,
+						 int i, std::tuple<T...> &arrays){
       constexpr int n= sizeof...(T); //Number of elements in tuple (AKA arguments in () operator in Functor)
-      return unpackTupleAndCallEnergy_impl(f, arrays, i, std::make_index_sequence<n>());
+      return unpackTupleAndCallSum_impl(f, comp, arrays, i,
+					std::make_index_sequence<n>());
     }
 
     template<class Functor, class ...T>
-    __global__ void computeEnergyGPU(Functor f,
-			       int numberParticlesInGroup,
-			       ParticleGroup::IndexIterator groupIterator,
-			       real * __restrict__ energy,
-			       std::tuple<T...>  arrays){
+    __global__ void computeSumGPU(Functor f,
+				  int numberParticlesInGroup,
+				  ParticleGroup::IndexIterator groupIterator,
+				  Interactor::Computables comp,
+				  real4* force, real* energy, real* virial,
+				  std::tuple<T...>  arrays){
       int id = blockIdx.x*blockDim.x + threadIdx.x;
       if(id>=numberParticlesInGroup) return;
       const int myParticleIndex = groupIterator[id];
-      //Sum the result of calling f.energy(<all the requested input>)
-      energy[myParticleIndex] += unpackTupleAndCallEnergy(f, myParticleIndex, arrays);
+      auto res = unpackTupleAndCallSum(f, comp, myParticleIndex, arrays);
+      if(comp.force)  force [myParticleIndex] += res.force;
+      if(comp.energy) energy[myParticleIndex] += res.energy;
+      if(comp.virial) virial[myParticleIndex] += res.virial;
+      
     }
   }
-
+  
   template<class Functor>
-  real ExternalForces<Functor>::sumEnergy(){
-    sys->log<System::DEBUG2>("[ExternalForces] Computing energies...");
-    int numberParticles = pg->getNumberParticles();
-    int blocksize = 128;
-    int Nthreads = blocksize<numberParticles?blocksize:numberParticles;
-    int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-    auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
-    auto groupIterator = pg->getIndexIterator(access::location::gpu);
-    ExternalForces_ns::computeEnergyGPU<<<Nblocks, Nthreads>>>(*tr, numberParticles,
-							       groupIterator, energy.begin(),
-							       ExternalForces_ns::getTuple(tr->getArrays(pd.get())));
-
-
-    return 0;
-  }
-
-
-  namespace ExternalForces_ns{
-    //Same tricks as with force
-    template<class Functor, class ...T, size_t ...Is>
-    __device__ inline void unpackTupleAndCallCompute_impl(Functor &f,
-							 std::tuple<T...> &arrays,
-							 int i, //Element of the array to dereference
-							 std::index_sequence<Is...>){
-      SFINAE::ComputeDelegator<Functor>().compute(f, *(std::get<Is>(arrays)+i)...);
-    }
-
-    template<class Functor, class ...T>
-    __device__ inline void unpackTupleAndCallCompute(Functor &f, int i, std::tuple<T...> &arrays){
-      constexpr int n= sizeof...(T); //Number of elements in tuple (AKA arguments in () operator in Functor)
-      unpackTupleAndCallCompute_impl(f, arrays, i, std::make_index_sequence<n>());
-    }
-
-    template<class Functor, class ...T>
-    __global__ void computeComputeGPU(Functor f,
-			       int numberParticlesInGroup,
-			       ParticleGroup::IndexIterator groupIterator,
-			       std::tuple<T...>  arrays){
-      int id = blockIdx.x*blockDim.x + threadIdx.x;
-      if(id>=numberParticlesInGroup) return;
-      const int myParticleIndex = groupIterator[id];
-      //Call f.compute(<all the requested input>)
-      unpackTupleAndCallCompute(f, myParticleIndex, arrays);
-    }
-  }
-
-  template<class Functor>
-  void ExternalForces<Functor>::compute(cudaStream_t st){
-    sys->log<System::DEBUG2>("[ExternalForces] Computing energies...");
+  void ExternalForces<Functor>::sum(Computables comp, cudaStream_t st){
+    sys->log<System::DEBUG1>("[ExternalForces] Computing...");
     int numberParticles = pg->getNumberParticles();
     int blocksize = 128;
     int Nthreads = blocksize<numberParticles?blocksize:numberParticles;
     int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
+    auto force  = comp.force?pd->getForce(access::gpu, access::readwrite).begin():nullptr;
+    auto energy = comp.energy?pd->getEnergy(access::gpu, access::readwrite).begin():nullptr;
+    auto virial = comp.virial?pd->getVirial(access::gpu, access::readwrite).begin():nullptr;
     auto groupIterator = pg->getIndexIterator(access::location::gpu);
-    ExternalForces_ns::computeComputeGPU<<<Nblocks, Nthreads, 0, st>>>(*tr, numberParticles,
-							       groupIterator,
-							       ExternalForces_ns::getTuple(tr->getArrays(pd.get())));
+    ExternalForces_ns::computeSumGPU<<<Nblocks, Nthreads, 0, st>>>(*tr, numberParticles,
+								groupIterator,
+								comp, force, energy, virial,
+								ExternalForces_ns::getTuple(tr->getArrays(pd.get())));
   }
+
 }
 #endif

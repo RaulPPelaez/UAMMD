@@ -168,10 +168,6 @@ namespace uammd{
       sys->log<System::MESSAGE>("[BondedForces] Destroyed");
     }
 
-    void sumForce(cudaStream_t st = 0) override{
-      this->sum({.force=true}, st);
-    }
-
     void sum(Computables comp, cudaStream_t st) override;
 
   private:

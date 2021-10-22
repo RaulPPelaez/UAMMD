@@ -59,13 +59,7 @@ namespace uammd{
       ParameterUpdatableDelegate<Potential>::updateBox(box);
     }
 
-    void sumForce(cudaStream_t st) override;
-
-    real sumEnergy() override;
-
-    real sumForceEnergy(cudaStream_t st) override;
-
-    void compute(cudaStream_t st) override;
+    void sum(Computables comp, cudaStream_t st) override;
 
     template<class Transverser>
     void sumTransverser(Transverser &tr, cudaStream_t st);

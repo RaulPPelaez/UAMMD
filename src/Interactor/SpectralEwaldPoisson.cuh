@@ -102,18 +102,20 @@ namespace uammd{
 	    shared_ptr<ParticleGroup> pg,
 	    shared_ptr<System> sys,
 	    Parameters par);
+
     ~Poisson();
 
-    void sumForce(cudaStream_t st) override;
-
-    real sumEnergy() override;
-
-    real sumForceEnergy(cudaStream_t st) override{
-      sys->log<System::DEBUG2>("[Poisson] Sum Force and Energy");
+    void sum(Computables comp, cudaStream_t st = 0) override{
+      sys->log<System::DEBUG2>("[Poisson] Summing interaction");
       farField(st);
-      nearFieldForce(st);
-      nearFieldEnergy(st);
-      return 0;
+      if(comp.force)
+	nearFieldForce(st);
+      if(comp.energy)
+	nearFieldEnergy(st);
+      if(comp.virial){
+	sys->log<System::EXCEPTION>("[Poisson] Virial functionality not implemented.");
+	throw std::runtime_error("[Poisson] not implemented");
+      }
     }
 
   private:

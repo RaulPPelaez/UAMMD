@@ -70,64 +70,10 @@ namespace uammd{
   }
 
   template<class MyPotential, class NL>
-  void PairForces<MyPotential, NL>::sumForce(cudaStream_t st){
+  void PairForces<MyPotential, NL>::sum(Computables comp, cudaStream_t st){
     //Try to use getForceTransverser, if not present try to use getForceEnergyTransverser, if also not present assume zero force
-    sys->log<System::DEBUG1>("[PairForces] Summing forces");
-    constexpr bool hasForceTransverser = Potential::has_getForceTransverser<MyPotential>::value;
-    constexpr bool hasForceEnergyTransverser = Potential::has_getForceEnergyTransverser<MyPotential>::value;
-    if(hasForceTransverser){
-      auto ft = Potential::getIfHasForceTransverser<MyPotential>::get(pot, box, pd);
-      this->sumTransverser(ft, st);
-    }
-    else if(hasForceEnergyTransverser){
-      auto ft = Potential::getIfHasForceEnergyTransverser<MyPotential>::get(pot, box, pd);
-      this->sumTransverser(ft, st);
-    }
+    sys->log<System::DEBUG1>("[PairForces] Summing interaction");
+    auto ft = Potential::getIfHasTransverser<MyPotential>::get(pot, comp, box, pd);
+    this->sumTransverser(ft, st);
   }
-
-  template<class MyPotential, class NL>
-  real PairForces<MyPotential, NL>::sumEnergy(){
-    sys->log<System::DEBUG1>("[PairForces] Summing Energy");
-    cudaStream_t st = 0;
-    constexpr bool hasEnergyTransverser = Potential::has_getForceTransverser<MyPotential>::value;
-    constexpr bool hasForceEnergyTransverser = Potential::has_getForceEnergyTransverser<MyPotential>::value;
-    if(hasEnergyTransverser){
-      auto et = Potential::getIfHasEnergyTransverser<MyPotential>::get(pot, box, pd);      
-      this->sumTransverser(et, st);
-    }
-    else if(hasForceEnergyTransverser){
-      auto et = Potential::getIfHasForceEnergyTransverser<MyPotential>::get(pot, box, pd);
-      this->sumTransverser(et, st);
-    }
-    else{
-      return 0;
-    }
-    return 0;
-  }
-
-  template<class MyPotential, class NL>
-  real PairForces<MyPotential, NL>::sumForceEnergy(cudaStream_t st){
-    sys->log<System::DEBUG1>("[PairForces] Summing Force and Energy");
-    auto fet = Potential::getIfHasForceEnergyTransverser<MyPotential>::get(pot, box, pd);
-    constexpr bool hasForceEnergyTransverser = Potential::has_getForceEnergyTransverser<MyPotential>::value;
-    if(not hasForceEnergyTransverser){
-      sumForce(st);
-      sumEnergy();
-    }
-    else{
-      this->sumTransverser(fet, st);
-    }
-    return 0;
-  }
-
-  template<class MyPotential, class NL>
-  void PairForces<MyPotential, NL>::compute(cudaStream_t st){
-    sys->log<System::DEBUG1>("[PairForces] Launching compute transverser");
-    auto computeTrans = Potential::getIfHasComputeTransverser<MyPotential>::get(pot, box, pd);
-    constexpr bool hasComputeTransverser = Potential::has_getComputeTransverser<MyPotential>::value;
-    if(hasComputeTransverser){
-      this->sumTransverser(computeTrans, st);
-    }
-  }
-
 }

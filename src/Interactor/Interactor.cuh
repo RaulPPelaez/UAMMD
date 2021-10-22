@@ -1,9 +1,7 @@
 /*Raul P. Pelaez 2017-2021. Interactor Base class.
 
-Interactor is an interface for modules that can compute forces, energies or perform an arbitrary computation according to a certain interaction.
-For a class to be a valid Interactor, it must override sumForces() and sumEnergy().
-
-An integrator will expect interactors to describe the interaction of particles.
+Interactor is an interface for modules that can compute forces, energies and/or virials according to a certain interaction.
+For a class to be a valid Interactor, it must override sum() member function.
 
 Interactor is also ParameterUpdatable, which means that any Interactor can override any of the available update*() functions.
 
@@ -20,10 +18,7 @@ Integrator
 #include"System/System.h"
 #include"ParticleData/ParticleData.cuh"
 #include"ParticleData/ParticleGroup.cuh"
-
 #include<memory>
-#include <stdexcept>
-#include<vector>
 #include"third_party/type_names.h"
 #include"misc/ParameterUpdatable.h"
 namespace uammd{
@@ -87,7 +82,7 @@ namespace uammd{
       bool virial = false;
     };
 
-    virtual void sum(Computables comp, cudaStream_t st){
+    virtual void sum(Computables comp, cudaStream_t st = 0){
       if(comp.force and comp.energy){
 	sumForceEnergy(st);
       }
