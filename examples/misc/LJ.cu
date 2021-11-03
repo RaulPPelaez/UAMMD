@@ -16,7 +16,6 @@ You can visualize the reuslts with superpunto
 //The rest can be included depending on the used modules
 #include"Integrator/VerletNVT.cuh"
 #include"Interactor/ExternalForces.cuh"
-#include"Interactor/NBodyForces.cuh"
 #include"Interactor/NeighbourList/CellList.cuh"
 #include"Interactor/NeighbourList/VerletList.cuh"
 #include"Interactor/PairForces.cuh"
@@ -36,8 +35,8 @@ struct HarmonicWall: public ParameterUpdatable{
   real k = 0.1;
   HarmonicWall(real zwall):zwall(zwall){}
 
-  __device__ real3 force(real4 pos){
-    return {0.0f, 0.0f, -k*(pos.z-zwall)};
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, real4 pos){
+    return {{0.0f, 0.0f, -k*(pos.z-zwall)}, 0, 0};
   }
 
   //If this function is not present, energy is assumed to be zero
@@ -66,7 +65,7 @@ struct Parameters{
   std::string outputFile;
   int numberParticles;
   int numberSteps, printSteps;
-  real temperature, viscosity;
+  real temperature, friction;
 };
 
 //Let us group the UAMMD simulation in this struct that we can pass around
@@ -112,8 +111,8 @@ std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
   NVT::Parameters par;
   par.temperature = sim.par.temperature;
   par.dt = sim.par.dt;
-  par.viscosity = sim.par.viscosity;
-  auto verlet = std::make_shared<NVT>(sim.pd, sim.sys, par);
+  par.friction = sim.par.friction;
+  auto verlet = std::make_shared<NVT>(sim.pd, par);
   return verlet;
 }
 
@@ -121,16 +120,16 @@ void addExternalPotentialInteractions(std::shared_ptr<Integrator> verlet, UAMMD 
   //Modules can work on a certain subset of particles if needed, the particles can be grouped following any criteria
   //The builtin ones will generally work faster than a custom one. See ParticleGroup.cuh for a list
   //A group created with no criteria will contain all the particles
-  auto pg = make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  auto pg2 = make_shared<ParticleGroup>(particle_selector::Type(0), sim.pd, sim.sys, "12");
-  auto pg3 = make_shared<ParticleGroup>(particle_selector::Type(1), sim.pd, sim.sys, "11");
+  auto pg = make_shared<ParticleGroup>(sim.pd, "All");
+  auto pg2 = make_shared<ParticleGroup>(particle_selector::Type(0), sim.pd, "12");
+  auto pg3 = make_shared<ParticleGroup>(particle_selector::Type(1), sim.pd, "11");
   //Harmonic walls acting on different particle groups
   //This two interactors will cause particles in group pg2 to stick to a wall in -Lz/4
   //And the ones in pg3 to +Lz/4
   real Lz = sim.par.boxSize.z;
-  auto extForces = make_shared<ExternalForces<HarmonicWall>>(sim.pd, pg2, sim.sys,
+  auto extForces = make_shared<ExternalForces<HarmonicWall>>(pg2,
 							     make_shared<HarmonicWall>(-Lz*0.25));
-  auto extForces2 = make_shared<ExternalForces<HarmonicWall>>(sim.pd, pg3, sim.sys,
+  auto extForces2 = make_shared<ExternalForces<HarmonicWall>>(pg3,
 							      make_shared<HarmonicWall>(Lz*0.25));
   //Add interactors to integrator.
   verlet->addInteractor(extForces);
@@ -139,7 +138,7 @@ void addExternalPotentialInteractions(std::shared_ptr<Integrator> verlet, UAMMD 
 
 std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
   //This is the general interface for setting up a potential
-  auto pot = make_shared<Potential::LJ>(sim.sys);
+  auto pot = make_shared<Potential::LJ>();
   //Each Potential describes the pair interactions with certain parameters.
   //The needed ones are in InputPairParameters inside each potential, in this case:
   Potential::LJ::InputPairParameters par;
@@ -170,7 +169,7 @@ void addShortRangeInteraction(std::shared_ptr<Integrator> verlet, UAMMD sim){
   PairForces::Parameters params;
   //Some modules need a simulation box (i.e PairForces for the PBC)
   params.box = Box(sim.par.boxSize);  //Box to work on
-  auto pairforces = make_shared<PairForces>(sim.pd, sim.sys, params, pot);
+  auto pairforces = make_shared<PairForces>(sim.pd, params, pot);
   verlet->addInteractor(pairforces);
 }
 
@@ -242,7 +241,7 @@ Parameters readParameters(std::string file){
       default_options<<"printSteps 100"<<std::endl;
       default_options<<"outputFile /dev/stdout"<<std::endl;
       default_options<<"temperature 0.1"<<std::endl;
-      default_options<<"viscosity "<<visco<<std::endl;
+      default_options<<"friction "<<visco<<std::endl;
     }
   }
   Parameters par;
@@ -254,6 +253,6 @@ Parameters readParameters(std::string file){
   in.getOption("numberParticles", InputFile::Required)>>par.numberParticles;
   in.getOption("outputFile", InputFile::Required)>>par.outputFile;
   in.getOption("temperature", InputFile::Required)>>par.temperature;
-  in.getOption("viscosity", InputFile::Required)>>par.viscosity;
+  in.getOption("friction", InputFile::Required)>>par.friction;
   return par;
 }

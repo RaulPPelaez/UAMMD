@@ -44,7 +44,7 @@ namespace uammd{
     void FCMIntegrator::computeCurrentForces(){
       resetForces();
       if (pd->isDirAllocated()) resetTorques();
-      for(auto forceComp: interactors) forceComp->sumForce(st);
+      for(auto forceComp: interactors) forceComp->sum({.force=true},st);
       CudaCheckError();
     }
 
@@ -101,7 +101,7 @@ namespace uammd{
       real3* d_angularV = dir.raw()?thrust::raw_pointer_cast(angularVelocities.data()):nullptr;
       int BLOCKSIZE = 128; /*threads per block*/
       int nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-      int nblocks = numberParticles/nthreads +  ((numberParticles%nthreads!=0)?1:0);      
+      int nblocks = numberParticles/nthreads + ((numberParticles%nthreads!=0)?1:0);      
       FCM_ns::integrateEulerMaruyamaD<<<nblocks, nthreads, 0, st>>>(pos.raw(),
 								    dir.raw(),
 								    indexIter,
@@ -111,6 +111,6 @@ namespace uammd{
 								    dt);
       CudaCheckError();
     }
-  }    
+  }
 }
 

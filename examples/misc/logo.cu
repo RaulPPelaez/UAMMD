@@ -30,13 +30,13 @@ struct Faller: public ParameterUpdatable{
   Faller(real zwall):zwall(zwall){
   }
 
-  __device__ __forceinline__ real3 force(const real4 &pos){
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, const real4 &pos){
     real fz = 0;
     if(pos.z<=zwall)fz += k*pow(fabs(pos.z-zwall),2.0f);
-    return make_real3(0.0f, 0.0f, fz-g);
+    return {make_real3(0.0f, 0.0f, fz-g), 0, 0};
   }
 
-  std::tuple<const real4 *> getArrays(ParticleData *pd){
+  auto getArrays(ParticleData *pd){
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     return std::make_tuple(pos.raw());
   }
@@ -56,12 +56,12 @@ int numberParticles;
 int numberSteps, printSteps;
 real temperature, viscosity, hydrodynamicRadius;
 real tolerance = 1e-2;
-void readParameters(std::shared_ptr<System> sys, std::string file);
+void readParameters(std::string file);
 
 int main(int argc, char *argv[]){
 
   auto sys = make_shared<System>(argc, argv);
-  readParameters(sys, "data.main.logo");
+  readParameters("data.main.logo");
 
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
@@ -107,27 +107,20 @@ int main(int argc, char *argv[]){
   par.box = box;
   par.tolerance = tolerance;
   //par.psi=0.3;
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, par);
   {
-    auto extForces = make_shared<ExternalForces<Faller>>(pd, sys,
-							 make_shared<Faller>(-box.boxSize.z*0.5));
-
+    auto extForces = make_shared<ExternalForces<Faller>>(pd, make_shared<Faller>(-box.boxSize.z*0.5));
     bdhi->addInteractor(extForces);
   }
   sys->log<System::MESSAGE>("RUNNING!!!");
-
   Timer tim;
   tim.tic();
-
   forj(0, numberSteps){
     if(j%printSteps==0)
     {
       sys->log<System::DEBUG1>("[System] Writing to disk...");
-
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
-
       out<<"#Lx="<<boxSize.x*0.5<<";Ly="<<boxSize.y*0.5<<";Lz="<<boxSize.z*0.5<<";"<<endl;
       real3 p;
       fori(0, numberParticles){
@@ -137,23 +130,18 @@ int main(int argc, char *argv[]){
 	out<<p<<" "<<radius<<" "<<type<<"\n";
       }
     }
-
     if(j%500 == 0){
       pd->sortParticles();
     }
-
     bdhi->forwardTime();
   }
-
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", numberSteps/totalTime);
-
   sys->finish();
-
   return 0;
 }
 
-void readParameters(std::shared_ptr<System> sys, std::string file){
+void readParameters(std::string file){
 
   {
     if(!std::ifstream(file).good()){
@@ -171,7 +159,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
     }
   }
 
-  InputFile in(file, sys);
+  InputFile in(file);
 
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("numberSteps", InputFile::Required)>>numberSteps;

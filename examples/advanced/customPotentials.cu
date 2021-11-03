@@ -126,11 +126,11 @@ struct SimpleLJ{
   //It is also not required that all Transversers returned are the same type, a different Transverser can be used in each case.
   struct LJTransverser{
     real4 *force;
-    real4 *virial;
+    real *virial;
     real* energy;
     Box box;
     real rc;
-    LJTransverser(Box i_box, real i_rc, real4* i_force, real* i_energy, real4* i_virial):
+    LJTransverser(Box i_box, real i_rc, real4* i_force, real* i_energy, real* i_virial):
       box(i_box),
       rc(i_rc),
       force(i_force),
@@ -138,57 +138,39 @@ struct SimpleLJ{
       energy(i_energy){
       //All members will be available in the device functions
     }
-    //For each pair computes and returns the LJ force and/or energy based only on the positions
-    __device__ real4 compute(real4 pi, real4 pj){
+    //For each pair computes and returns the LJ force and/or energy and/or virial based only on the positions
+    __device__ ForceEnergyVirial compute(real4 pi, real4 pj){
       const real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
       const real r2 = dot(rij, rij);
       if(r2>0 and r2< rc*rc){
-	real3 f = real3();
-	if(force or virial)
-	  f = lj_force(r2)*rij;
-	if(virial)
-	  f *= rij;
-	return make_real4(f,energy?lj_energy(r2):0);
+	real3 f;
+	real v, e;        
+	f = (force or virial)?lj_force(r2)*rij:real3();	
+	v = virial?dot(f, rij):0;
+	e = energy?lj_energy(r2):0;
+	return {f,e,v};
       }
-      return real4();
+      return {};
     }
     //There is no "accumulate" function so, for each particle, the result of compute for every neighbour will be summed
     //There is no "zero" function so the total result starts being real4() (or {0,0,0,0}).
     //The "set" function will be called with the accumulation of the result of "compute" for all neighbours. 
-    __device__ void set(int id, real4 total){
+    __device__ void set(int id, ForceEnergyVirial total){
       //Write the total result to memory if the pointer was provided
-      if(force)  force[id] += make_real4(total.x, total.y, total.z, 0);
-      if(virial) virial[id] += make_real4(total.x, total.y, total.z, 0);
-      if(energy) energy[id] += total.w;
+      if(force)  force[id] += make_real4(total.force, 0);
+      if(virial) virial[id] += total.virial;
+      if(energy) energy[id] += total.energy;
     }
   };
-
-  //Return an instance of the Transverser that will compute only the force (because the energy pointer is null)
-  LJTransverser getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
-    auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();    
-    return LJTransverser(box, rc, force, nullptr, nullptr);
-  }
-
-  //These two functions can be ommited if one is not interested in the energy as explained in the header.
-  //They provide instances of the Transverser that compute either the energy or the force and energy.
-  //Notice that it is not required that the return type is the same in all three cases. Different Transversers can be used in each case.
-  LJTransverser getEnergyTransverser(Box box, std::shared_ptr<ParticleData> pd){
-    auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite).raw();   
-    return LJTransverser(box, rc, nullptr, energy, nullptr);
+  
+  auto getTransverser(Interactor::Computables comp, Box box, std::shared_ptr<ParticleData> pd){
+    auto force = comp.force?pd->getForce(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto energy = comp.energy?pd->getEnergy(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto virial = comp.virial?pd->getVirial(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    return LJTransverser(box, rc, force, energy, virial);
   }
   
-  LJTransverser getForceEnergyTransverser(Box box, std::shared_ptr<ParticleData> pd){
-    auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();
-    auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite).raw();
-    return LJTransverser(box, rc, force, energy, nullptr);
-  }
 
-  //This function will be used when PairForces::compute is called
-  //If it is not present then no work will be performed
-  LJTransverser getComputeTransverser(Box box, std::shared_ptr<ParticleData> pd){
-    auto virial = pd->getVirial(access::location::gpu, access::mode::readwrite).raw();
-    return LJTransverser(box, rc, nullptr, nullptr, virial);
-  }
 };
 /**------------------------------------------------------------------------------------------**/
 //Similar to the previous one, but this time the Transversers will count and store the number of neighbours in addition to computing force. For simplicity only the force is computed now.
@@ -240,8 +222,8 @@ struct SimpleLJWithNeighbourCounting{
     }
   };
 
-  //Return an instance of the Transverser that will compute only the force, also will print the average number of neighbours based on the previous time it was called.
-  Force getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
+  //Return an instance of the Transverser that will compute only the force, regardless of what was requested in comp also will print the average number of neighbours based on the previous time it was called.
+  auto getTransverser(Interactor::Computables comp, Box box, std::shared_ptr<ParticleData> pd){
     int N = pd->getNumParticles();
     numberNeighboursPerParticle.resize(N,0);
     int avgneigh = int(thrust::reduce(numberNeighboursPerParticle.begin(), numberNeighboursPerParticle.end())/double(N));
@@ -298,8 +280,8 @@ public:
       force[index] += make_real4(total);
     }
   };
-  //Return an instance of the Transverser that will compute only the force (because the energy pointer is null)
-  Force getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
+  //Return an instance of the Transverser that will compute only the force, regardless of what was requested in comp
+  auto getTransverser(Interactor::Computables comp, Box box, std::shared_ptr<ParticleData> pd){
     return Force(box);
   }
 };
@@ -318,19 +300,21 @@ public:
     currentStep = newTime/dt; //dt is a global variable 
   }
   
-  struct Force{
+  struct Transverser{
     real4 *force;
     real* mass;
     int *index2id;
     Box box;
     int currentStep;
-    Force(Box i_box, int cs):
-      box(i_box),currentStep(cs){
+    Transverser(real4* force, real* energy, real* virial, Box i_box, int cs):
+      box(i_box), currentStep(cs),
+      force(force){
       //All members will be available in the device functions
+      //In principle, the Transverser should also take care of computing the energy and virial if requested.
+      //Since this is a weird, non analytical force computation, lets just ignore energy and virial in the rest of the class.
     }
     //Get the mass of the particles, notice that this could also be donde via the constructor. 
     void prepare(std::shared_ptr<ParticleData> pd){
-      this->force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();
       this->mass = pd->getMass(access::location::gpu, access::mode::read).raw();
       this->index2id = pd->getId(access::location::gpu, access::mode::read).raw();
     }
@@ -355,6 +339,7 @@ public:
       bool areIdsEven = infoi.id%2== 0 and infoj.id%2==0;
       bool isGravity = ((currentStep/1000)%2==0)?areIdsEven:true;      
       fmod += (r2>0 and isGravity)?(gravity_force(r2)*infoi.mass*infoj.mass):0;
+      
       return rij*fmod;
     }
     //There is no "accumulate" function so, for each particle, the result of compute for every neighbour will be summed
@@ -365,9 +350,12 @@ public:
       force[index] += make_real4(total);
     }
   };
-  //Return an instance of the Transverser that will compute only the force (because the energy pointer is null)
-  Force getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
-    return Force(box, currentStep);
+  //Return an instance of the Transverser that will compute force, energy and/or virial
+  auto getTransverser(Interactor::Computables comp, Box box, std::shared_ptr<ParticleData> pd){
+    auto force = comp.force?pd->getForce(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto energy = comp.energy?pd->getEnergy(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto virial = comp.virial?pd->getVirial(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    return Transverser(force, energy, virial, box, currentStep);
   }
 };
 /**------------------------------------------------------------------------------------------**/
@@ -382,35 +370,35 @@ void initializeParticles(std::shared_ptr<ParticleData> pd){
   std::fill(mass.begin(), mass.end(), 1.0);
 }
 
-shared_ptr<Integrator> createIntegrator(shared_ptr<ParticleData> pd, shared_ptr<System> sys){
+auto createIntegrator(shared_ptr<ParticleData> pd){
   using NVT = VerletNVT::GronbechJensen;
   NVT::Parameters par;
   par.temperature = temperature;
   par.dt = dt;
   par.friction = friction;
-  return make_shared<NVT>(pd, sys, par);
+  return make_shared<NVT>(pd, par);
 }
 
 template<class UsePotential>
-shared_ptr<Interactor> createPairForcesWithPotential(shared_ptr<ParticleData> pd, shared_ptr<System> sys){
+shared_ptr<Interactor> createPairForcesWithPotential(shared_ptr<ParticleData> pd){
   using PF = PairForces<UsePotential>;
   typename PF::Parameters par;
   par.box = Box(boxSize);
   auto pot = std::make_shared<UsePotential>();
-  return std::make_shared<PF>(pd, sys, par, pot);  
+  return std::make_shared<PF>(pd, par, pot);  
 }
 
-shared_ptr<Interactor> createInteraction(shared_ptr<ParticleData> pd, shared_ptr<System> sys){
+shared_ptr<Interactor> createInteraction(shared_ptr<ParticleData> pd){
   if(chosenPotential.compare("SimpleLJ") == 0)
-    return createPairForcesWithPotential<SimpleLJ>(pd, sys);
+    return createPairForcesWithPotential<SimpleLJ>(pd);
   if(chosenPotential.compare("SimpleLJWithNeighbourCounting") == 0)
-    return createPairForcesWithPotential<SimpleLJWithNeighbourCounting>(pd, sys);
+    return createPairForcesWithPotential<SimpleLJWithNeighbourCounting>(pd);
   if(chosenPotential.compare("GravityPotential") == 0)
-    return createPairForcesWithPotential<GravityPotential>(pd, sys);
+    return createPairForcesWithPotential<GravityPotential>(pd);
   if(chosenPotential.compare("CustomIntricatePotential") == 0)
-    return createPairForcesWithPotential<CustomIntricatePotential>(pd, sys);
+    return createPairForcesWithPotential<CustomIntricatePotential>(pd);
   else
-    sys->log<System::CRITICAL>("Invalid Potential selected in data.main.potentials!");
+    System::log<System::CRITICAL>("Invalid Potential selected in data.main.potentials!");
   return nullptr;
 }
 
@@ -448,8 +436,8 @@ int main(int argc, char *argv[]){
   readParameters(sys, "data.main.potentials");
   auto pd = std::make_shared<ParticleData>(numberParticles, sys);
   initializeParticles(pd);
-  auto verlet = createIntegrator(pd, sys);
-  verlet->addInteractor(createInteraction(pd, sys));
+  auto verlet = createIntegrator(pd);
+  verlet->addInteractor(createInteraction(pd));
   runSimulation(verlet, pd, sys);
   sys->finish();
   return 0;

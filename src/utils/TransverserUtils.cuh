@@ -85,11 +85,11 @@ namespace uammd{
     template<class T, bool general = has_sum<T>::value> struct SumDelegator;
 
     template<class T> struct SumDelegator<T, true>{
-      template<class ...Types> static inline __device__ __host__ void sum(T &t, Types... args){t.sum(args...);}
+      template<class ...Types> static inline __device__ __host__ auto sum(T &t, Types... args){return t.sum(args...);}
     };
 
     template<class T> struct SumDelegator<T, false>{
-      template<class ...Types> static constexpr inline __device__ __host__ void sum(T &t, Types... args){}
+      template<class ...Types> static constexpr inline __device__ __host__ auto sum(T &t, Types... args){return 0;}
     };
 
 

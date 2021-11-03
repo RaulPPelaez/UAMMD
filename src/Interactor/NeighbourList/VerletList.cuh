@@ -80,7 +80,7 @@ namespace uammd{
 
     VerletList(shared_ptr<ParticleData> pd,
 	       shared_ptr<System> sys):
-      VerletList(pd, std::make_shared<ParticleGroup>(pd, sys), sys){}
+      VerletList(pd, std::make_shared<ParticleGroup>(pd, "All"), sys){}
 
     VerletList(shared_ptr<ParticleData> pd,
 	     shared_ptr<ParticleGroup> pg,

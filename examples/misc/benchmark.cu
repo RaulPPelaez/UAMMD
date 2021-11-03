@@ -68,7 +68,7 @@ int main(int argc, char *argv[]){
   par.temperature = temperature;
   par.dt = dt;
   par.friction = friction;
-  auto verlet = make_shared<NVT>(pd, sys, par);
+  auto verlet = make_shared<NVT>(pd, par);
 
   {
     //Modules working with pairs of particles usually ask for a Potential object
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]){
     auto nl = std::make_shared<VerletList>(pd, sys);
     nl->setCutOffMultiplier(rcutmult);
     //This is the general interface for setting up a potential
-    auto pot = make_shared<Potential::LJ>(sys);
+    auto pot = make_shared<Potential::LJ>();
     {
       //Each Potential describes the pair interactions with certain parameters.
       //The needed ones are in InputPairParameters inside each potential, in this case:
@@ -97,7 +97,7 @@ int main(int argc, char *argv[]){
     PairForces::Parameters params;
     params.box = box;  //Box to work on
     params.nl = nl;
-    auto pairforces = make_shared<PairForces>(pd, sys, params, pot);
+    auto pairforces = make_shared<PairForces>(pd, params, pot);
     //You can add as many modules as necessary
     verlet->addInteractor(pairforces);
   }

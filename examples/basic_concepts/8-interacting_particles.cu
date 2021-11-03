@@ -63,7 +63,7 @@ void printFirst10Particles(UAMMD sim){
 }
 
 //This function stores a vector with the particle positions ordered by id (name) and returns it
-std::vector<real4> vector_from_pd_positions(UAMMD sim){
+auto vector_from_pd_positions(UAMMD sim){
   auto id2index = sim.pd->getIdOrderedIndices(access::cpu);
   auto pos = sim.pd->getPos(access::cpu, access::read);
   auto pos_by_id = thrust::make_permutation_iterator(pos.begin(), id2index);
@@ -83,7 +83,7 @@ void placeParticlesInFCCLattice(UAMMD sim){
 }
 
 //This function constructs and returns a Verlet NVT integrator, you will notice it is quite similar to the BD one in the previous example.
-std::shared_ptr<Integrator> createVerletNVTIntegrator(UAMMD sim){
+auto createVerletNVTIntegrator(UAMMD sim){
   //There are a couple of NVT verlet integration algorithms, see the wiki page for more info.
   using Verlet = VerletNVT::GronbechJensen;
   //Integrators always have a Parameters type inside of them that their constructor needs:
@@ -97,7 +97,7 @@ std::shared_ptr<Integrator> createVerletNVTIntegrator(UAMMD sim){
   //par.mass = 2.0;
   //You should check the relevant wiki page for information on how to construct each integrator, but 99% of the time you will see
   //The arguments are the same as for this one:
-  auto verlet = std::make_shared<Verlet>(sim.pd, sim.sys, par);
+  auto verlet = std::make_shared<Verlet>(sim.pd, par);
   //I like to store Integrators in shared pointers to easily pass them around.
   //You might have noticed that the we are returning a pointer to "Integrator" instead of BD
   //This is ok because all integrators in UAMMD inherit from the base class Integrator. Meaning that they can maskarade as one
@@ -110,7 +110,7 @@ std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim);
 
 //In a similar way to Integrator theres the Interactor base class, all Interactors can pass as a pointer to Interactor.
 //This function will create and return a PairForces module specialized for a LJ potential
-std::shared_ptr<Interactor> createLJInteraction(UAMMD sim){
+auto createLJInteraction(UAMMD sim){
   //LJ potential is encoded under this name
   using LJ = Potential::LJ;
   //We first create the potential using some hardcoded values
@@ -132,13 +132,13 @@ std::shared_ptr<Interactor> createLJInteraction(UAMMD sim){
   par.box = box;
   //Similar to an Integrator we can create this module now:
   //Now we have to also pass the lj potential instance as an argument
-  auto pairForces = std::make_shared<PairForces>(sim.pd, sim.sys, par, lj_pot);
+  auto pairForces = std::make_shared<PairForces>(sim.pd, par, lj_pot);
   return pairForces;
 }
 
 //Lets see how to create and configure the LJ potential
 std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
-  auto pot = std::make_shared<Potential::LJ>(sim.sys);
+  auto pot = std::make_shared<Potential::LJ>();
   //We must instruct the potential with parameters for each interaction pair type
   //LJ will interpret the fouth component of the position as type, in this example all particles have zero type.  
   Potential::LJ::InputPairParameters par;

@@ -80,24 +80,15 @@ namespace uammd{
   class ExternalForces: public Interactor, public ParameterUpdatableDelegate<Functor>{
   public:
 
-    ExternalForces(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg, shared_ptr<System> sys,
-		   std::shared_ptr<Functor> tr = std::make_shared<Functor>()):
-      Interactor(pd, pg, sys,"ExternalForces/"+type_name<Functor>()),
-			       tr(tr){
+    ExternalForces(shared_ptr<ParticleGroup> pg, std::shared_ptr<Functor> tr = std::make_shared<Functor>()):
+      Interactor(pg, "ExternalForces/"+type_name<Functor>()), tr(tr){
       //ExternalForces does not care about any parameter update, but the Functor might.
       this->setDelegate(this->tr.get());
     }
     //If no group is provided, a group with all particles is assumed
-    ExternalForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
-		   std::shared_ptr<Functor> tr = std::make_shared<Functor>()):
-      ExternalForces(pd, std::make_shared<ParticleGroup>(pd, sys), sys, tr){
+    ExternalForces(shared_ptr<ParticleData> pd, std::shared_ptr<Functor> tr = std::make_shared<Functor>()):
+      ExternalForces(std::make_shared<ParticleGroup>(pd, "All"), tr){
     }
-    //Alternative using an instance of Functor instead of a pointer
-    ExternalForces(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg, shared_ptr<System> sys, Functor f):
-      ExternalForces(pd, pg, sys, std::make_shared<Functor>(f)){}
-
-    ExternalForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys, Functor f):
-      ExternalForces(pd, sys, std::make_shared<Functor>(f)){}
 
     void sum(Computables comp, cudaStream_t st = 0) override;
 
@@ -151,7 +142,7 @@ namespace uammd{
       if(id>=numberParticlesInGroup) return;
       const int myParticleIndex = groupIterator[id];
       auto res = unpackTupleAndCallSum(f, comp, myParticleIndex, arrays);
-      if(comp.force)  force [myParticleIndex] += res.force;
+      if(comp.force)  force [myParticleIndex] += make_real4(res.force);
       if(comp.energy) energy[myParticleIndex] += res.energy;
       if(comp.virial) virial[myParticleIndex] += res.virial;
       

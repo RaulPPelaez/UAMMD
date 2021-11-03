@@ -24,18 +24,10 @@ namespace uammd{
       }
     }
 
-    Basic::Basic(shared_ptr<ParticleData> pd,
-		 shared_ptr<ParticleGroup> pg,
-		 shared_ptr<System> sys,
-		 Basic::Parameters par):
-      Basic(pd, pg, sys, par, "VerletNVT::Basic"){}
-
-      Basic::Basic(shared_ptr<ParticleData> pd,
-		   shared_ptr<ParticleGroup> pg,
-		   shared_ptr<System> sys,
-		   Basic::Parameters par,
-		   std::string name):
-      Integrator(pd, pg, sys, name),
+    Basic::Basic(shared_ptr<ParticleGroup> pg,
+		 Basic::Parameters par,
+		 std::string name):
+      Integrator(pg, name),
       dt(par.dt), temperature(par.temperature), friction(par.friction), is2D(par.is2D),
       steps(0){
       sys->rng().next32();

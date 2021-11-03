@@ -26,14 +26,14 @@ struct Gravity{
   real m_Kwall;
   real3 L;
   Gravity(real3 L ): m_g(g),m_Kwall(in_Kwall), L(L*0.8){}
-  __device__ __forceinline__ real3 force(const real4 &pos){
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, const real4 &pos){
     real3 f = real3();
     if(pos.x<-L.x*0.5) f.x = m_Kwall;  if(pos.x>L.x*0.5) f.x = -m_Kwall;
     if(pos.y<-L.y*0.5) f.y = m_Kwall;  if(pos.y>L.y*0.5) f.y = -m_Kwall;
     if(pos.z<-L.z*0.5) f.z = m_Kwall;  if(pos.z>L.z*0.5) f.z = -m_Kwall;
 
     f.z += m_g;
-    return f;
+    return {f,0,0};
   }
 
   auto getArrays(ParticleData *pd){
@@ -63,7 +63,6 @@ int main(int argc, char *argv[]){
   sys->rng().setSeed(seed);
 
   auto pd = make_shared<ParticleData>(numberParticles, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
 
   Box box(boxSize);
   {//Initial positions
@@ -87,7 +86,7 @@ int main(int argc, char *argv[]){
   par.dt = dt;
   par.initVelocities = false; //Do not modify initial velocities
 
-  auto verlet = make_shared<VerletNVE>(pd, sys, par);
+  auto verlet = make_shared<VerletNVE>(pd, par);
 
   { //Add SPH interactor
     SPH::Parameters params;
@@ -96,12 +95,12 @@ int main(int argc, char *argv[]){
     params.gasStiffness = gasStiffness;
     params.restDensity = restDensity;
     params.box = box;
-    auto sph = make_shared<SPH>(pd, pg, sys, params);
+    auto sph = make_shared<SPH>(pd, params);
     verlet->addInteractor(sph);
   }
 
   {//Add gravity+wall interactor
-    auto gravity = make_shared<ExternalForces<Gravity>>(pd, pg, sys, make_shared<Gravity>(boxSize));
+    auto gravity = make_shared<ExternalForces<Gravity>>(pd, make_shared<Gravity>(boxSize));
     verlet->addInteractor(gravity);
   }
 

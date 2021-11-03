@@ -17,9 +17,7 @@
 
     Create the module as any other integrator with the following parameters:
 
-    auto sys = make_shared<System>();
-    auto pd = make_shared<ParticleData>(N,sys);
-    auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+    auto pd = make_shared<ParticleData>(N);
 
     using NVT = VerletNVT::GronbechJensen;
     NVT::Parameters par;
@@ -32,7 +30,7 @@
      //par.initVelocities = false;
      //If mass is specified all particles will be assumed to have this mass. If unspecified pd::getMass will be used, if it has not been requested, all particles are assumed to have mass=1.
      //par.mass = 1.0;
-    auto verlet = make_shared<NVT>(pd, pg, sys, par);
+    auto verlet = make_shared<NVT>(pd, par);
 
     //Add any interactor
     verlet->addInteractor(...);
@@ -84,20 +82,13 @@ namespace uammd{
       void resetForces();
       real sumKineticEnergy();
       //Constructor for derived classes
-      Basic(shared_ptr<ParticleData> pd,
-	    shared_ptr<ParticleGroup> pg,
-	    shared_ptr<System> sys,
+      Basic(shared_ptr<ParticleGroup> pg,	    
 	    Parameters par,
 	    std::string name);
     public:
-      Basic(shared_ptr<ParticleData> pd,
-	    shared_ptr<ParticleGroup> pg,
-	    shared_ptr<System> sys,
-	    Parameters par);
-      Basic(shared_ptr<ParticleData> pd,
-	    shared_ptr<System> sys,
-	    Parameters par):
-	Basic(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
+      Basic(shared_ptr<ParticleGroup> pg, Parameters par);
+      Basic(shared_ptr<ParticleData> pd, Parameters par):
+	Basic(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       virtual ~Basic();
 
@@ -109,15 +100,12 @@ namespace uammd{
     class GronbechJensen final: public Basic{
     public:
       GronbechJensen(shared_ptr<ParticleData> pd,
-		     shared_ptr<ParticleGroup> pg,
-		     shared_ptr<System> sys,
 		     Basic::Parameters par):
-	Basic(pd, pg, sys, par, "VerletNVT::GronbechJensen"){}
+	Basic(std::make_shared<ParticleGroup>(pd, "All"), par, "VerletNVT::GronbechJensen"){}
 
-      GronbechJensen(shared_ptr<ParticleData> pd,
-		     shared_ptr<System> sys,
+      GronbechJensen(shared_ptr<ParticleGroup> pg,
 		     Basic::Parameters par):
-	Basic(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par, "VerletNVT::GronbechJensen"){}
+	GronbechJensen(pg->getParticleData(), par){}
 
       ~GronbechJensen(){}
 

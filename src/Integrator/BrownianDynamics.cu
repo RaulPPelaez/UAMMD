@@ -6,11 +6,9 @@
 namespace uammd{
   namespace BD{
 
-    BaseBrownianIntegrator::BaseBrownianIntegrator(shared_ptr<ParticleData> pd,
-						   shared_ptr<ParticleGroup> pg,
-						   shared_ptr<System> sys,
+    BaseBrownianIntegrator::BaseBrownianIntegrator(shared_ptr<ParticleGroup> pg,
 						   Parameters par):
-      Integrator(pd, pg, sys, "BD::BaseBrownianIntegrator"),
+      Integrator(pg, "BD::BaseBrownianIntegrator"),
       Kx(make_real3(0)),
       Ky(make_real3(0)),
       Kz(make_real3(0)),

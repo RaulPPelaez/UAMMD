@@ -22,7 +22,7 @@ UAMMD initializeUAMMD(int argc, char *argv[], int numberParticles){
   UAMMD sim;
   //Initialize System and ParticleData
   sim.sys = std::make_shared<System>(argc, argv);
-  sim.pd = std::make_shared<ParticleData>(sim.sys, numberParticles);
+  sim.pd = std::make_shared<ParticleData>(numberParticles);
   return sim;
 }
 
@@ -45,8 +45,7 @@ std::shared_ptr<Integrator> createIntegratorBD(UAMMD sim){
   //or
   //par.K[1].x = 1;
   //All K elements start being zero.
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<BDMethod>(sim.pd, pg, sim.sys, par);
+  return std::make_shared<BDMethod>(sim.pd, par);
 }
 
 #include "Integrator/VerletNVT.cuh"
@@ -63,8 +62,7 @@ std::shared_ptr<Integrator> createIntegratorVerletNVT(UAMMD sim){
   //If set to false particle velocities will be left untouched during initialization
   //If true (default) velocities will be sampled from the equilibrium configuration
   //par.initVelocities = false;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<Verlet>(sim.pd, pg, sim.sys, par);
+  return std::make_shared<Verlet>(sim.pd, par);
 }
 
 #include "Integrator/VerletNVE.cuh"
@@ -77,8 +75,7 @@ std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
   //If present, all particles will have this mass, otherwise the individual particle masses in ParticleData will be used
   //If those masses have not been set then the default mass is 1.0.
   //par.mass = 1.0;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<VerletNVE>(sim.pd, pg, sim.sys, par);
+  return std::make_shared<VerletNVE>(sim.pd, par);
 }
 
 #include "Integrator/VerletNVE.cuh"
@@ -90,8 +87,7 @@ std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
   NVE::Parameters par;
   par.dt = 1.0;
   par.initVelocities = false;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  auto verlet = std::make_shared<NVE>(sim.pd, pg, sim.sys, par);
+  auto verlet = std::make_shared<NVE>(sim.pd, par);
   using DPD = PairForces<Potential::DPD>;
   Potential::DPD::Parameters dpd_params;
   dpd_params.cutOff = 1.0;
@@ -99,11 +95,11 @@ std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
   dpd_params.gamma = 1.0;
   dpd_params.A = 1.0;
   dpd_params.dt = 0.1;
-  auto pot = std::make_shared<Potential::DPD>(sim.sys, dpd_params);
+  auto pot = std::make_shared<Potential::DPD>(dpd_params);
   DPD::Parameters params;
   real3 L = make_real3(32,32,32);
   params.box = Box(L);
-  auto pairforces = std::make_shared<DPD>(sim.pd, pg, sim.sys, params, pot);
+  auto pairforces = std::make_shared<DPD>(sim.pd, params, pot);
   verlet->addInteractor(pairforces);
   return verlet;
 }
@@ -116,8 +112,7 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
   NVE::Parameters par;
   par.dt = 0.1;
   par.initVelocities = false;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  auto verlet = std::make_shared<NVE>(sim.pd, pg, sim.sys, par);
+  auto verlet = std::make_shared<NVE>(sim.pd, par);
   SPH::Parameters params;
   real3 L = make_real3(32,32,32);
   params.box = Box(L);
@@ -128,7 +123,7 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
   params.viscosity = 1.0;   //Environment viscosity
   params.gasStiffness = 1.0;
   params.restDensity = 1.0;
-  auto sph = std::make_shared<SPH>(sim.pd, pg, sim.sys, params);
+  auto sph = std::make_shared<SPH>(sim.pd, params);
   verlet->addInteractor(sph);
   return verlet;
 }
@@ -151,7 +146,7 @@ std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
   //par.sumThermalDrift = true;
   //Additionally you can choose if the total momemtum of the fluid should be substracted each step or not
   //par.sumTotalMomemtum = true;
-  auto icm = std::make_shared<ICM>(sim.pd, sim.sys, par);
+  auto icm = std::make_shared<ICM>(sim.pd, par);
   //You can request the fluid velocities and the number of fluid cells from this integrator
   auto ptr = icm->getFluidVelocities(access::cpu);
   auto n = icm->getNumberFluidCells();
@@ -188,7 +183,7 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
     //Balances the load of the algorithm, low values work best for dilute and/or big systems.
     // Higher values will work best for dense and/or small systems.
     par.psi = 1.0/par.hydrodynamicRadius;
-    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, sim.sys, par);
+    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, par);
     return bdhi;
   }
   else{
@@ -200,7 +195,7 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
     par.dt = 0.1;
     par.hydrodynamicRadius = hydrodynamicRadius;
     par.tolerance = 1e-4;
-    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, sim.sys, par);
+    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, par);
     return bdhi;
   }
 }

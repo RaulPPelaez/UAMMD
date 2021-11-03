@@ -6,9 +6,7 @@
 
   Create the module as any other integrator with the following parameters:
 
-  auto sys = make_shared<System>();
-  auto pd = make_shared<ParticleData>(N,sys);
-  auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+  auto pd = make_shared<ParticleData>(N);
 
   VerletNVE::Parameters par;
      par.energy = 1.0; //Target energy per particle, will be ignored if initVelocities=false
@@ -16,7 +14,7 @@
      par.is2D = false;
      par.initVelocities=true; //Modify starting velocities to ensure the target energy, default is true
 
-    auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
+    auto verlet = make_shared<VerletNVE>(pd, par);
 
     //Add any interactor
     verlet->addInteractor(...);
@@ -37,12 +35,10 @@
 
 namespace uammd{
 
-  VerletNVE::VerletNVE(shared_ptr<ParticleData> pd,
-		       shared_ptr<ParticleGroup> pg,
-		       shared_ptr<System> sys,
-		       VerletNVE::Parameters par):
-    Integrator(pd, pg, sys, "VerletNVE"),
-    dt(par.dt), energy(par.energy), is2D(par.is2D), initVelocities(par.initVelocities),
+  VerletNVE::VerletNVE(shared_ptr<ParticleGroup> pg, VerletNVE::Parameters par):
+    Integrator(pg, "VerletNVE"),
+    dt(par.dt), energy(par.energy), is2D(par.is2D),
+    initVelocities(par.initVelocities),
     steps(0){
     if(initVelocities)
       sys->log<System::MESSAGE>("[VerletNVE] Target energy per particle: %g", energy);
@@ -109,7 +105,7 @@ namespace uammd{
       thrust::fill(thrust::cuda::par, energy_gr, energy_gr + numberParticles, real(0.0));
     }
     for(auto forceComp: interactors){
-      U += forceComp->sumEnergy();
+      forceComp->sum({.force=false, .energy=true});
     }
     {
       auto energy = pd->getEnergy(access::gpu, access::read);

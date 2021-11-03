@@ -52,14 +52,13 @@ int main(int argc, char *argv[]){
     charge[0] = 1;
     charge[1] = -1;
   }
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
   auto par = createDPPoissonSlabParameters(L, gw);
-  auto poisson = make_shared<DPPoissonSlab>(pd, pg, sys, par);
+  auto poisson = make_shared<DPPoissonSlab>(pd, par);
   {
     auto force = pd->getForce(access::location::gpu, access::mode::write);
     thrust::fill(thrust::cuda::par, force.begin(), force.end(), real4());
   }
-  poisson->sumForce(0);
+  poisson->sum({.force=true, .energy=true, .virial=false});
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::read);
     auto force = pd->getForce(access::location::cpu, access::mode::read);

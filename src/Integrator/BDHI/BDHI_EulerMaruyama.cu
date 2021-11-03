@@ -37,11 +37,9 @@
 namespace uammd{
   namespace BDHI{
     template<class Method>
-    EulerMaruyama<Method>::EulerMaruyama(shared_ptr<ParticleData> pd,
-					 shared_ptr<ParticleGroup> pg,
-					 shared_ptr<System> sys,
+    EulerMaruyama<Method>::EulerMaruyama(shared_ptr<ParticleGroup> pg,
 					 Parameters par):
-      Integrator(pd, pg, sys, "BDHI::EulerMaruyama/"+type_name<Method>()),
+      Integrator(pg, "BDHI::EulerMaruyama/"+type_name<Method>()),
       K(par.K),
       par(par),
       steps(0)

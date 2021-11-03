@@ -3,6 +3,7 @@
 -std=c++14
 -O3
 -I/usr/local/cuda/include
+--cuda-gpu-arch=sm_52
 -Isrc
 -Isrc/third_party
 -I/usr/include/lapacke

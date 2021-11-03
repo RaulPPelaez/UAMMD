@@ -20,10 +20,9 @@ TODO:
 namespace uammd{
   template<class BondType, int particlesPerBond>
   BondedForces<BondType, particlesPerBond>::BondedForces(shared_ptr<ParticleData> pd,
-							 shared_ptr<System> sys,
 							 Parameters par,
 							 std::shared_ptr<BondType> bondCompute):
-    Interactor(pd, sys, "BondedForces/" + type_name<BondType>()),
+    Interactor(pd, "BondedForces/" + type_name<BondType>()),
     bondCompute(bondCompute), TPP(64){
     //BondedForces does not care about any parameter update, but the BondType might.
     this->setDelegate(this->bondCompute);

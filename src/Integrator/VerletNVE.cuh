@@ -6,9 +6,8 @@
   Create the module as any other integrator with the following parameters:
 
 
-  auto sys = make_shared<System>();
-  auto pd = make_shared<ParticleData>(N,sys);
-  auto pg = make_shared<ParticleGroup>(pd,sys, "All");
+  auto pd = make_shared<ParticleData>(N);
+  auto pg = make_shared<ParticleGroup>(pd, "All");
 
 
   VerletNVE::Parameters par;
@@ -57,18 +56,16 @@ namespace uammd{
       // the default mass is 1
       real mass = -1;
     };
-    VerletNVE(shared_ptr<ParticleData> pd,
-	      shared_ptr<System> sys,
-	      Parameters par):
-      VerletNVE(pd, std::make_shared<ParticleGroup>(pd, sys, "All"),sys, par){}
 
-    VerletNVE(shared_ptr<ParticleData> pd,
-	      shared_ptr<ParticleGroup> pg,
-	      shared_ptr<System> sys,
-	      Parameters par);
+    VerletNVE(shared_ptr<ParticleData> pd, Parameters par):
+      VerletNVE(std::make_shared<ParticleGroup>(pd, "All"), par){}
+
+    VerletNVE(shared_ptr<ParticleGroup> pg, Parameters par);
+
     ~VerletNVE();
 
     virtual void forwardTime() override;
+
     virtual real sumEnergy() override;
   };
 

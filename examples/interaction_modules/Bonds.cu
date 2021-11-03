@@ -271,7 +271,7 @@ std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
   //You can pass an instance of the bond as a shared_ptr, which will allow you to modify the bond properties at any time
   //from outside BondedForces
   auto bond = std::make_shared<Bond>();
-  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, bond);
+  auto bf = std::make_shared<BF>(sim.pd, params, bond);
   return bf;
 }
 
@@ -282,7 +282,7 @@ std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
   params.file = "angular.bonds";
   real3 lbox = make_real3(32,32,32);
   auto bond = std::make_shared<Bond>(lbox);
-  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, bond);
+  auto bf = std::make_shared<BF>(sim.pd, params, bond);
   return bf;
 }
 
@@ -293,7 +293,7 @@ std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
   params.file = "torsional.bonds"; 
   real3 lbox = make_real3(32,32,32);
   auto bond = std::make_shared<Bond>(lbox);
-  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, bond);
+  auto bf = std::make_shared<BF>(sim.pd, params, bond);
   return bf;
 }
 
@@ -303,7 +303,7 @@ UAMMD initializeUAMMD(){
   UAMMD sim;
   sim.sys = std::make_shared<System>();
   constexpr int numberParticles = 50000;
-  sim.pd = std::make_shared<ParticleData>(sim.sys, numberParticles);
+  sim.pd = std::make_shared<ParticleData>(numberParticles);
   auto pos = sim.pd->getPos(access::cpu, access::write);
   std::generate(pos.begin(), pos.end(), [&](){return make_real4(sim.sys->rng().uniform3(-0.5, 0.5)*32,0);});
   return sim;

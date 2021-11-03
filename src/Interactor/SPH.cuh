@@ -51,16 +51,12 @@ namespace uammd{
       real restDensity = 0.4;
       std::shared_ptr<NeighbourList> nl = nullptr;
     };
-    SPH(shared_ptr<ParticleData> pd,
-	shared_ptr<ParticleGroup> pg,
-	shared_ptr<System> sys,
-	Parameters par);
+    SPH(shared_ptr<ParticleGroup> pg, Parameters par);
 
-    SPH(shared_ptr<ParticleData> pd,
-	shared_ptr<System> sys,
-	Parameters par):
-      SPH(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){
+    SPH(shared_ptr<ParticleData> pd, Parameters par):
+      SPH(std::make_shared<ParticleGroup>(pd, "All"), par){
     }
+
     ~SPH();
 
     virtual void sum(Interactor::Computables comp, cudaStream_t st) override;

@@ -31,30 +31,23 @@ int main(int argc, char *argv[]){
   ullint seed = 0xf31337Bada55D00dULL;
   sys->rng().setSeed(seed);
   auto pd = make_shared<ParticleData>(N, sys);
-
   Box box(32);
   int ntypes = 100;
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
-
     auto initial =  initLattice(box.boxSize, N, fcc);
-
     std::transform(initial.begin(), initial.end(), pos.begin(),
 		   [&](real4 p){p.w = sys->rng().next32()%ntypes; return p;});
   }
-
   using NVT = VerletNVT::GronbechJensen;
-
   NVT::Parameters par;
   par.temperature = 0.1;
   par.dt = 0.01;
-  par.viscosity = 1.0/(6*M_PI);
-  auto verlet = make_shared<NVT>(pd, sys, par);
-
+  par.friction = 1.0/(6*M_PI);
+  auto verlet = make_shared<NVT>(pd, par);
   {
     using PairForces = PairForces<Potential::LJ>;
-
-    auto pot = make_shared<Potential::LJ>(sys);
+    auto pot = make_shared<Potential::LJ>();
     {
       Potential::LJ::InputPairParameters par;
       par.epsilon = 1.0;
@@ -71,7 +64,7 @@ int main(int argc, char *argv[]){
 
     PairForces::Parameters params;
     params.box = box;  //Box to work on
-    auto pairforces = make_shared<PairForces>(pd, sys, params, pot);
+    auto pairforces = make_shared<PairForces>(pd, params, pot);
     verlet->addInteractor(pairforces);
   }
 

@@ -42,11 +42,8 @@ References:
 #include"SPH/Kernel.cuh"
 
 namespace uammd{
-  SPH::SPH(shared_ptr<ParticleData> pd,
-	   shared_ptr<ParticleGroup> pg,
-	   shared_ptr<System> sys,
-	   Parameters par):
-    Interactor(pd, pg, sys, "SPH/"),
+  SPH::SPH(shared_ptr<ParticleGroup> pg, Parameters par):
+    Interactor(pg, "SPH/"),
     box(par.box),
     support(par.support), viscosity(par.viscosity),
     gasStiffness(par.gasStiffness), restDensity(par.restDensity),

@@ -129,32 +129,37 @@ __device__ real lj_energy(real r2){
 struct ShortRangePotential{
   real rc;
   real epsilon, sigma;
-  
+
   ShortRangePotential(Parameters par){
     this->rc = par.cutOff;
     this->epsilon = par.epsilon;
     this->sigma = par.sigma;
   }
-  
+
   //A host function that must return the maximum required cut off for the interaction
   real getCutOff(){
     return rc;
   }
   //This object takes care of the interaction in the GPU, this interface is much more generic than shown here, if you need
   // something that is not easy to encode by changing this, see advanced/customPotential.cu
-  struct ForceEnergy{
+  struct Transverser{
     real4 *force;
     real* energy;
+    real* virial;
     Box box;
     real rc;
     real ep, s;
     real *mass;
     int *id;
-    ForceEnergy(Box i_box, real i_rc, real4* i_force, real* i_energy, real ep,  real s, real*mass, int* id):
+    Transverser(Box i_box, real i_rc,
+		real4* i_force, real* i_energy, real* i_virial,
+		real ep,  real s, real*mass, int* id):
       box(i_box),
       rc(i_rc),
       force(i_force),
-      energy(i_energy),mass(mass), id(id), ep(ep), s(s){
+      energy(i_energy),
+      virial(i_virial),
+      mass(mass), id(id), ep(ep), s(s){
       //All members will be available in the device functions
     }
     //Place in this struct any per-particle data that you need to compute the interaction between a particle pair.
@@ -167,36 +172,43 @@ struct ShortRangePotential{
       return {mass[index], id[index]};
     }
     //For each pair of close particles computes and returns the LJ force and/or energy based only on the positions
-    __device__ real4 compute(real4 pi, real4 pj, Info infoi, Info infoj){
+    __device__ ForceEnergyVirial compute(real4 pi, real4 pj, Info infoi, Info infoj){
       const real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
       const real r2 = dot(rij, rij);
       //mass of particle i is in: infoi.mass
       //name of particle j is in: infoj.id
       //Note that a particle is considered to be a neighbour of itself
       if(r2>0 and r2< rc*rc){
-	return make_real4(ep/s*lj_force(r2/(s*s))*rij,
-			  energy?(ep/s*(lj_energy(r2/(s*s))-lj_energy(rc*rc/(s*s)))):real(0.0));
+	real3 f;
+	real v, e;        
+	f = (force or virial)?ep/s*lj_force(r2/(s*s))*rij:real3();	
+	v = virial?dot(f, rij):0;
+	e = energy?(ep/s*(lj_energy(r2/(s*s))-lj_energy(rc*rc/(s*s)))):real(0.0);
+	return {f,e,v};
       }
-      return real4();
+      return {};
     }
     //The "set" function will be called with the accumulation of the result of "compute" for all neighbours.
-    __device__ void set(int id, real4 total){
+    __device__ void set(int id, ForceEnergyVirial total){
       //Write the total result to memory if the pointer was provided
-      force[id] += make_real4(total.x, total.y, total.z, 0);
-      if(energy) energy[id] += real(0.5)*total.w;
+      if(force) force[id]   += make_real4(total.force, 0);
+      if(energy) energy[id] += real(0.5)*total.energy;
+      if(virial) virial[id] += total.virial;
     }
   };
 
   //This function must construct and return an instance of the struct above, the name of the type or where it is defined does not matter, but the
   // functions implemented in it must be present
-  ForceEnergy getForceEnergyTransverser(Box box, std::shared_ptr<ParticleData> pd){
-    auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();
-    auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite).raw();    
+  Transverser getTransverser(Interactor::Computables comp, Box box, std::shared_ptr<ParticleData> pd){
+    auto force = comp.force?pd->getForce(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto energy = comp.energy?pd->getEnergy(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto virial = comp.virial?pd->getVirial(access::location::gpu, access::mode::readwrite).raw():nullptr;
     auto mass = pd->getMass(access::location::gpu, access::mode::read).raw();
     auto id = pd->getId(access::location::gpu, access::mode::read).raw();
-    return ForceEnergy(box, rc, force, energy, epsilon, sigma, mass, id);
+    return Transverser(box, rc, force, energy, virial,
+		       epsilon, sigma, mass, id);
   }
-  
+
 };
 
 //External potential acting on each particle independently. In this example particles experience gravity
@@ -213,7 +225,7 @@ struct GravityAndWall{
 
   //This function will be called for each particle
   //The arguments will be modified according to what was returned by getArrays below
-  __device__ real3 force(real4 pos /*, real mass */){
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, real4 pos /*, real mass */){
     real3 f = {0,0,-g};
     //A soft wall that prevents particles from crossing the wall (well they will cross it if determined enough)
     real dist = pos.z - zwall;
@@ -228,12 +240,13 @@ struct GravityAndWall{
 	f.z = g;
       }
     }
-    return f;
+    //energy and virial are set to zero here, there is not really an expression for them in this case
+    //But I left this here as an example
+    real energy = comp.energy?0:0;
+    real virial = comp.virial?0:0;
+    return {f,energy, virial};
   }
-  
-  //Energy can be ommited in the integrators this example use. It defaults to 0.
-  //__device__ real energy(real4 pos){ return 0;}
-  
+
   auto getArrays(ParticleData* pd){
     auto pos = pd->getPos(access::gpu, access::read);    
     return pos.begin();
@@ -286,7 +299,6 @@ struct HarmonicBond{
   }
 
 };
-
 
 //This angular potential is similar to the HarmonicBond above, the difference is that
 //Now three particles are involved in each bond instead of two

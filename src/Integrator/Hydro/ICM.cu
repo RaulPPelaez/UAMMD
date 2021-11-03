@@ -741,10 +741,9 @@ namespace uammd{
     }
 
 
-    ICM::ICM(shared_ptr<ParticleData> pd,
-	     shared_ptr<System> sys,
+    ICM::ICM(shared_ptr<ParticleGroup> pg,
 	     Parameters par):
-      Integrator(pd, sys, "Hydro::ICM"),
+      Integrator(pg, "Hydro::ICM"),
       dt(par.dt),
       temperature(par.temperature),
       density(par.density),

@@ -63,17 +63,17 @@ struct LJPotential{
       box(i_box), rc(i_rc), force(i_force), epsilon(epsilon), sigma(sigma){
     }
 
-    __device__ real3 compute(real4 pi, real4 pj){
+    __device__ ForceEnergyVirial compute(real4 pi, real4 pj){
       const real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
-      return lj_force(rij, epsilon, sigma, rc);
+      return {lj_force(rij, epsilon, sigma, rc), 0, 0};
     }
     
-    __device__ void set(int id, real3 total){
-      force[id] += make_real4(total);
+    __device__ void set(int id, ForceEnergyVirial total){
+      force[id] += make_real4(total.force);
     }
   };
 
-  LJTransverser getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
+  auto getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();    
     return LJTransverser(box, rc, force, epsilon, sigma);
   }
@@ -98,7 +98,7 @@ struct UAMMD {
     LJForces::Parameters pfpar;
     pfpar.box = par.box;
     auto pot = std::make_shared<LJPotential>(par);
-    this->pf = std::make_shared<LJForces>(pd, sys, pfpar, pot);   
+    this->pf = std::make_shared<LJForces>(pd, pfpar, pot);   
     tmp.resize(numberParticles);
     CudaSafeCall(cudaStreamCreate(&st));
   }
@@ -116,13 +116,13 @@ struct UAMMD {
       thrust::transform(thrust::cuda::par.on(st), tmp.begin(), tmp.end(), forces.begin(), ToReal4());
     }
     //Compute LJ forces
-    pf->sumForce(st);
+    pf->sum({.force=true, .energy=false, .virial=false}, st);
     //Copy particle forces to the input array, transformed again into a real3 layout
     auto forces = pd->getForce(access::cpu, access::read);
     std::transform(forces.begin(), forces.end(), (real3*) h_F.mutable_data(),
 		   [](real4 f){ return make_real3(f);});
   }
-  
+
   ~UAMMD(){
     cudaDeviceSynchronize();
     cudaStreamDestroy(st);

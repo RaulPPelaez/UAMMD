@@ -56,11 +56,8 @@ namespace uammd{
     }
   }
 
-  Poisson::Poisson(shared_ptr<ParticleData> pd,
-		   shared_ptr<ParticleGroup> pg,
-		   shared_ptr<System> sys,
-		   Poisson::Parameters par):
-    Interactor(pd, pg, sys, "IBM::Poisson"),
+  Poisson::Poisson(shared_ptr<ParticleGroup> pg, Parameters par):
+    Interactor(pg, "IBM::Poisson"),
     epsilon(par.epsilon),
     box(par.box),
     split(par.split),
@@ -132,9 +129,6 @@ namespace uammd{
 
     }
     CudaCheckError();
-  }
-
-  Poisson::~Poisson(){
   }
 
   void Poisson::initCuFFT(){

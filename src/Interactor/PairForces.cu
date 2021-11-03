@@ -14,12 +14,10 @@
 namespace uammd{
 
   template<class MyPotential, class NL>
-  PairForces<MyPotential, NL>::PairForces(shared_ptr<ParticleData> pd,
-					  shared_ptr<ParticleGroup> pg,
-					  shared_ptr<System> sys,
+  PairForces<MyPotential, NL>::PairForces(shared_ptr<ParticleGroup> pg,
 					  Parameters par,
 					  shared_ptr<MyPotential> pot):
-    Interactor(pd, pg, sys,
+    Interactor(pg,
 	       "PairForces/" +
 	       stringUtils::removePattern(type_name<NL>(), "uammd::") +
 	       "/" +

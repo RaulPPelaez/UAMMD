@@ -217,8 +217,7 @@ std::shared_ptr<BDMethod> createIntegratorBD(UAMMD sim){
   par.viscosity = sim.par.viscosity;
   par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
   par.dt = sim.par.dt;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<BDMethod>(sim.pd, pg, sim.sys, par);
+  return std::make_shared<BDMethod>(sim.pd, par);
 }
 
 using Verlet = VerletNVT::GronbechJensen;
@@ -227,8 +226,7 @@ std::shared_ptr<Verlet> createIntegratorVerletNVT(UAMMD sim){
   par.temperature = sim.par.temperature;
   par.friction = sim.par.friction;
   par.dt = sim.par.dt;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<Verlet>(sim.pd, pg, sim.sys, par);
+  return std::make_shared<Verlet>(sim.pd, par);
 }
 
 std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
@@ -237,7 +235,7 @@ std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
   //par.energy = 1; //Optionally a target energy can be passed that VerletNVE will set according to velocities keep constant
   par.initVelocities = false; //If true, velocities will be initialized by the module to ensure the desired energy
   //Note that it does not make sense to pass an energy and prevent VerletNVE from initializing velocities to match it.
-  return std::make_shared<VerletNVE>(sim.pd, sim.sys, par);
+  return std::make_shared<VerletNVE>(sim.pd, par);
 }
 
 //Dissipative Particle Dynamics
@@ -247,8 +245,7 @@ std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
   NVE::Parameters par;
   par.dt = sim.par.dt;
   par.initVelocities = false;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  auto verlet = std::make_shared<NVE>(sim.pd, pg, sim.sys, par);
+  auto verlet = std::make_shared<NVE>(sim.pd, par);
   using DPD = PairForces<Potential::DPD, NeighbourList>;
   Potential::DPD::Parameters dpd_params;
   dpd_params.cutOff = sim.par.cutOff_dpd;
@@ -256,10 +253,10 @@ std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
   dpd_params.gamma = sim.par.gamma_dpd;
   dpd_params.A = sim.par.A_dpd;
   dpd_params.dt = par.dt;
-  auto pot = std::make_shared<Potential::DPD>(sim.sys, dpd_params);
+  auto pot = std::make_shared<Potential::DPD>(dpd_params);
   DPD::Parameters params;
   params.box = Box(sim.par.L);
-  auto pairforces = std::make_shared<DPD>(sim.pd, pg, sim.sys, params, pot);
+  auto pairforces = std::make_shared<DPD>(sim.pd, params, pot);
   verlet->addInteractor(pairforces);
   return verlet;
 }
@@ -270,8 +267,7 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
   NVE::Parameters par;
   par.dt = sim.par.dt;
   par.initVelocities = false;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  auto verlet = std::make_shared<NVE>(sim.pd, pg, sim.sys, par);
+  auto verlet = std::make_shared<NVE>(sim.pd, par);
   SPH::Parameters params;
   params.box = Box(sim.par.L);
   //Pressure for a given particle "i" in SPH will be computed as gasStiffness·(density_i - restDensity)
@@ -281,7 +277,7 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
   params.viscosity = sim.par.viscosity;   //Environment viscosity
   params.gasStiffness = sim.par.gasStiffness_sph;
   params.restDensity = sim.par.restDensity_sph;
-  auto sph = std::make_shared<SPH>(sim.pd, pg, sim.sys, params);
+  auto sph = std::make_shared<SPH>(sim.pd, params);
   verlet->addInteractor(sph);
   return verlet;
 }
@@ -309,7 +305,7 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
     //Balances the load of the algorithm, low values work best for dilute and/or big systems.
     // Higher values will work best for dense and/or small systems.
     par.psi = 1.0/par.hydrodynamicRadius;
-    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, sim.sys, par);
+    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, par);
     return bdhi;
   }
   else{
@@ -321,7 +317,7 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
     par.dt = sim.par.dt;
     par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
     par.tolerance = 1e-4;
-    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, sim.sys, par);
+    auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, par);
     return bdhi;
   }
 }
@@ -336,8 +332,7 @@ std::shared_ptr<Integrator> createIntegratorFIB(UAMMD sim){
   //par.scheme = BDHI::FIB::IMPROVED_MIDPOINT;
   par.scheme = BDHI::FIB::MIDPOINT;
   par.box = Box(sim.par.L);
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<BDHI::FIB>(sim.pd, pg, sim.sys, par);
+  return std::make_shared<BDHI::FIB>(sim.pd, par);
 }
 
 //Inertial Coupling Method
@@ -349,7 +344,7 @@ std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
   par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
   par.dt = sim.par.dt;
   par.box = Box(sim.par.L);
-  return std::make_shared<Hydro::ICM>(sim.pd, sim.sys, par);
+  return std::make_shared<Hydro::ICM>(sim.pd, par);
 }
 
 //Create the integrator as selected via data.main.
@@ -392,7 +387,7 @@ std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim){
   using SR = PairForces<ShortRangePotential, NeighbourList>;
   typename SR::Parameters params;
   params.box = Box(sim.par.L);
-  auto pairForces = std::make_shared<SR>(sim.pd, sim.sys, params, pot);
+  auto pairForces = std::make_shared<SR>(sim.pd, params, pot);
   return pairForces;
 }
 
@@ -401,7 +396,7 @@ std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
   using BF = BondedForces<Bond,2>;
   typename BF::Parameters params;
   params.file = sim.par.bondFile;
-  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, Bond(sim.par));
+  auto bf = std::make_shared<BF>(sim.pd, params, std::make_shared<Bond>(sim.par));
   return bf;
 }
 
@@ -410,7 +405,7 @@ std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
   using BF = AngularBondedForces<Bond>;
   typename BF::Parameters params;
   params.file = sim.par.angularBondFile;
-  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, Bond(sim.par));
+  auto bf = std::make_shared<BF>(sim.pd, params, std::make_shared<Bond>(sim.par));
   return bf;
 }
 
@@ -419,7 +414,7 @@ std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
   using BF = TorsionalBondedForces<Bond>;
   typename BF::Parameters params;
   params.file = sim.par.torsionalBondFile;
-  auto bf = std::make_shared<BF>(sim.pd, sim.sys, params, Bond(sim.par));
+  auto bf = std::make_shared<BF>(sim.pd, params, std::make_shared<Bond>(sim.par));
   return bf;
 }
 
@@ -441,15 +436,15 @@ std::shared_ptr<Interactor> createElectrostaticInteractor(UAMMD sim){
     //Controls Ewald splitting, if the parameter is nor present no Ewald splitting is used.
     par.split = 0.07/par.gw;
   }
-  auto elec = std::make_shared<Electro>(sim.pd, sim.sys, par);
+  auto elec = std::make_shared<Electro>(sim.pd, par);
   return elec;
 }
 
 std::shared_ptr<Interactor> createExternalPotentialInteractor(UAMMD sim){
   //Uses the external potential defined in customizations.cuh
-  auto gr = GravityAndWall(sim.par);
-  auto ext = std::make_shared<ExternalForces<GravityAndWall>>(sim.pd, sim.sys, gr);
-  return ext;  
+  auto gr = std::make_shared<GravityAndWall>(sim.par);
+  auto ext = std::make_shared<ExternalForces<GravityAndWall>>(sim.pd, gr);
+  return ext;
 }
 
 

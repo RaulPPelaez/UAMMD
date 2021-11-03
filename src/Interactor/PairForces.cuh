@@ -26,28 +26,13 @@ namespace uammd{
       shared_ptr<NeighbourList> nl = shared_ptr<NeighbourList>(nullptr);
     };
     PairForces(shared_ptr<ParticleData> pd,
-	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
 	       Parameters par = Parameters(),
-	       shared_ptr<Potential> pot = std::make_shared<Potential>());
+	       shared_ptr<Potential> pot = std::make_shared<Potential>()):
+      PairForces(std::make_shared<ParticleGroup>(pd, "All"), par, pot){}
 
-    PairForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
+    PairForces(shared_ptr<ParticleGroup> pg,
                Parameters par = Parameters(),
-               shared_ptr<Potential> pot = std::make_shared<Potential>())
-        : PairForces(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys,
-                     par, pot) {
-      }
-
-    PairForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
-	       shared_ptr<ParticleGroup> pg,
-               shared_ptr<Potential> pot = std::make_shared<Potential>())
-        : PairForces(pd, pg, sys, Parameters(), pot) {
-      }
-
-    PairForces(shared_ptr<ParticleData> pd, shared_ptr<System> sys,
-               shared_ptr<Potential> pot = std::make_shared<Potential>())
-      : PairForces(pd, sys, Parameters(), pot) {
-    }
+               shared_ptr<Potential> pot = std::make_shared<Potential>());
 
     ~PairForces(){
       sys->log<System::DEBUG>("[PairForces] Destroyed.");

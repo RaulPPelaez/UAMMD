@@ -30,28 +30,22 @@ namespace uammd{
       std::shared_ptr<SurfaceChargeDispatch> surfaceCharge = std::make_shared<SurfaceChargeDispatch>();
     };
 
-    DPPoissonSlab(shared_ptr<ParticleData> pd,
-		  shared_ptr<ParticleGroup> pg,
-		  shared_ptr<System> sys,
-		  Parameters par);
+    DPPoissonSlab(shared_ptr<ParticleGroup> pg, Parameters par);
+
+    DPPoissonSlab(shared_ptr<ParticleData> pd, Parameters par):
+      DPPoissonSlab(std::make_shared<ParticleGroup>(pd, "All"), par){}
+
     ~DPPoissonSlab(){
       sys->log<System::MESSAGE>("[DPPoissonSlab] Destroyed");
     }
-
-    void sumForce(cudaStream_t st){
-      sys->log<System::DEBUG2>("[DPPoissonSlab] Sum Force");
-      sumForceEnergy(st);
-    }
-
-    real sumEnergy(){
-      sys->log<System::DEBUG2>("[DPPoissonSlab] Sum Energy");
-      return sumForceEnergy(0);
-    }
     
-    real sumForceEnergy(cudaStream_t st){
+    virtual void sum(Computables comp, cudaStream_t st = 0) override{
       farField->compute(st);
       nearField->compute(st);
-      return 0;
+      if(comp.virial){
+	sys->log<System::EXCEPTION>("[Poisson] Virial functionality not implemented.");
+	throw std::runtime_error("[Poisson] not implemented");
+      }
     }
     
   private:

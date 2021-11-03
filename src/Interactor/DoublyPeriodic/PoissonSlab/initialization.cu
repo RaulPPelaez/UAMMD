@@ -33,11 +33,9 @@ namespace uammd{
 
   }
 
-  DPPoissonSlab::DPPoissonSlab(shared_ptr<ParticleData> pd,
-		       shared_ptr<ParticleGroup> pg,
-		       shared_ptr<System> sys,
-		       DPPoissonSlab::Parameters par):
-    Interactor(pd, pg, sys, "IBM::DPPoissonSlab"){
+  DPPoissonSlab::DPPoissonSlab(shared_ptr<ParticleGroup> pg,
+			       Parameters par):
+    Interactor(pg,"IBM::DPPoissonSlab"){
     if(par.split<=0){
       if(par.Nxy<=0){
 	sys->log<System::EXCEPTION>("[DPPoissonSlab] I need either split or Nxy");

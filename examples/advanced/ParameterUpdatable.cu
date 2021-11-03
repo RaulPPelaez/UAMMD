@@ -43,11 +43,15 @@ struct MovingWall: public ParameterUpdatable{
   real amplitude = 3;
   real k = 0.1;
   real time = 0;
-  __device__ real3 force(const real4 &pos){
-    return make_real3(0, 0, -k*(pos.z-(zwall+amplitude*sin(kwall*time))));
+
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, const real4 &pos){
+    real3 f = make_real3(0, 0, -k*(pos.z-(zwall+amplitude*sin(kwall*time))));
+    real e = 0; //Lets ignore energy and virial for convenience. This will only be used for forces
+    real v = 0;
+    return {f,e,v};
   }
   
-  std::tuple<const real4 *> getArrays(ParticleData *pd){
+  auto getArrays(ParticleData *pd){
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     return std::make_tuple(pos.raw());
   }
@@ -67,15 +71,19 @@ class SmallInteractor: public Interactor{
   real currentTime = 0;
 public:
   //A simple constructor that just initializes the Interactor
-  SmallInteractor(shared_ptr<ParticleData> pd, shared_ptr<System> sys):Interactor(pd, sys, "IrrelevantName"){}
+  SmallInteractor(shared_ptr<ParticleData> pd):Interactor(pd, "IrrelevantName"){}
 
   //Part of the Interactor interface, needs to be defined to compile
-  virtual void sumForce(cudaStream_t st) override{
+  virtual void sum(Interactor::Computables comp, cudaStream_t st) override{
     //As an example, we will make particles experience some gravity starting at time=10.
     constexpr real startingTime = 10;
     if(currentTime<startingTime){
       //Simply sum {0,0,-1,0} to every particle's force
       constexpr real4 gravity = {0,0,-1,0};
+      if(comp.energy or comp.virial){
+	sys->log<System::EXCEPTION>("[SmallInteractor] Only force computing is supported");
+	throw std::runtime_error("Not implemented");
+      }
       auto forces = pd->getForce(access::location::gpu, access::mode::readwrite);      
       thrust::transform(thrust::cuda::par.on(st),
        			forces.begin(), forces.end(),
@@ -93,11 +101,18 @@ public:
   }  
 };
 
-__device__ real lj_force(real epsilon, real r2){
+//Some functions to compute forces/energies
+__device__ real lj_force(real r2){
   const real invr2 = real(1.0)/r2;
   const real invr6 = invr2*invr2*invr2;
-  const real fmoddivr = epsilon*(real(-48.0)*invr6 + real(24.0))*invr6*invr2;
+  const real fmoddivr = (real(-48.0)*invr6 + real(24.0))*invr6*invr2;
   return fmoddivr;
+}
+
+__device__ real lj_energy(real r2){
+  const real invr2 = real(1.0)/r2;
+  const real invr6 = invr2*invr2*invr2;
+  return real(4.0)*(invr6 - real(1.0))*invr6;
 }
 
 //A simple LJ Potential for PairForces, the interaction starts being weak and but gets stronger with time
@@ -112,37 +127,54 @@ struct SimpleLJ: public ParameterUpdatable{
     return rc;
   }
   
-  struct Force{
+  struct LJTransverser{
     real4 *force;
+    real *virial;
+    real* energy;
     Box box;
     real rc;
     real epsilon;
-    Force(Box i_box, real i_ep, real i_rc, real4* i_force):
+    LJTransverser(real epsilon, Box i_box, real i_rc, real4* i_force, real* i_energy, real* i_virial):
       box(i_box),
       rc(i_rc),
-      epsilon(i_ep),
-      force(i_force){}
-    
-    //For each pair computes and returns the LJ force
-    __device__ real3 compute(real4 pi, real4 pj){
+      epsilon(epsilon),
+      force(i_force),
+      virial(i_virial),
+      energy(i_energy){
+      //All members will be available in the device functions
+    }
+    //For each pair computes and returns the LJ force and/or energy and/or virial based only on the positions
+    __device__ ForceEnergyVirial compute(real4 pi, real4 pj){
       const real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
       const real r2 = dot(rij, rij);
       if(r2>0 and r2< rc*rc){
-	return lj_force(epsilon, r2)*rij;
+	real3 f;
+	real v, e;        
+	f = (force or virial)?epsilon*lj_force(r2)*rij:real3();	
+	v = virial?epsilon*dot(f, rij):0;
+	e = energy?epsilon*lj_energy(r2):0;
+	return {f,e,v};
       }
-      return real3();
+      return {};
     }
-
-    __device__ void set(int id, real3 total){      
-      force[id] += make_real4(total);
+    //There is no "accumulate" function so, for each particle, the result of compute for every neighbour will be summed
+    //There is no "zero" function so the total result starts being real4() (or {0,0,0,0}).
+    //The "set" function will be called with the accumulation of the result of "compute" for all neighbours. 
+    __device__ void set(int id, ForceEnergyVirial total){
+      //Write the total result to memory if the pointer was provided
+      if(force)  force[id] +=  make_real4(total.force, 0);
+      if(virial) virial[id] += total.virial;
+      if(energy) energy[id] += total.energy;
     }
   };
-
-  //Return an instance of the Transverser that will compute only the force (because the energy pointer is null)
-  Force getForceTransverser(Box box, std::shared_ptr<ParticleData> pd){
-    auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();    
-    return Force(box, epsilon, rc, force);
+  
+  auto getTransverser(Interactor::Computables comp, Box box, std::shared_ptr<ParticleData> pd){
+    auto force = comp.force?pd->getForce(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto energy = comp.energy?pd->getEnergy(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto virial = comp.virial?pd->getVirial(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    return LJTransverser(epsilon, box, rc, force, energy, virial);
   }
+
 
   virtual void updateTemperature(real newTemperature) override{
     this->temperature = newTemperature;
@@ -157,12 +189,12 @@ struct SimpleLJ: public ParameterUpdatable{
 
 
 template<class UsePotential>
-shared_ptr<Interactor> createPairForcesWithPotential(Box box, shared_ptr<ParticleData> pd, shared_ptr<System> sys){
+shared_ptr<Interactor> createPairForcesWithPotential(Box box, shared_ptr<ParticleData> pd){
   using PF = PairForces<UsePotential>;
   typename PF::Parameters par;
   par.box = box;
   auto pot = std::make_shared<UsePotential>();
-  return std::make_shared<PF>(pd, sys, par, pot);  
+  return std::make_shared<PF>(pd, par, pot);
 }
 
 
@@ -184,12 +216,12 @@ int main(int argc, char *argv[]){
   par.temperature = 0.6;
   par.dt = 0.005;
   par.friction = 1.0;
-  auto verlet = make_shared<NVT>(pd, sys, par);
-  auto ext = make_shared<ExternalForces<MovingWall>>(pd, sys);  
+  auto verlet = make_shared<NVT>(pd, par);
+  auto ext = make_shared<ExternalForces<MovingWall>>(pd);  
   verlet->addInteractor(ext);
-  auto small = make_shared<SmallInteractor>(pd, sys);
+  auto small = make_shared<SmallInteractor>(pd);
   verlet->addInteractor(small);
-  auto lj = createPairForcesWithPotential<SimpleLJ>(box, pd, sys);
+  auto lj = createPairForcesWithPotential<SimpleLJ>(box, pd);
   verlet->addInteractor(lj);
 
   sys->log<System::MESSAGE>("RUNNING");

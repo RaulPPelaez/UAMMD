@@ -65,11 +65,8 @@ namespace uammd{
       }
     }
 
-    FIB::FIB(shared_ptr<ParticleData> pd,
-	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys,
-	     Parameters par):
-      Integrator(pd, pg, sys, "BDHI::FIB"),
+    FIB::FIB(shared_ptr<ParticleGroup> pg, Parameters par):
+      Integrator(pg, "BDHI::FIB"),
       dt(par.dt),
       temperature(par.temperature), viscosity(par.viscosity),
       box(par.box), scheme(par.scheme){

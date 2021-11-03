@@ -67,19 +67,14 @@ namespace uammd{
     public:
       using Parameters = BD::Parameters;
 
-      BaseBrownianIntegrator(shared_ptr<ParticleData> pd,
-		    shared_ptr<ParticleGroup> pg,
-		    shared_ptr<System> sys,
-		    Parameters par);
+      BaseBrownianIntegrator(shared_ptr<ParticleGroup> pg, Parameters par);
 
-      BaseBrownianIntegrator(shared_ptr<ParticleData> pd,
-			     shared_ptr<System> sys,
-			     Parameters par):
-	BaseBrownianIntegrator(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+      BaseBrownianIntegrator(shared_ptr<ParticleData> pd, Parameters par):
+	BaseBrownianIntegrator(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       ~BaseBrownianIntegrator();
 
-      virtual void forwardTime() = 0;
+      virtual void forwardTime() override = 0;
 
       virtual real sumEnergy() override{
 	//Sum 1.5*kT to each particle
@@ -114,17 +109,13 @@ namespace uammd{
 
     class EulerMaruyama: public BaseBrownianIntegrator{
     public:
-      EulerMaruyama(shared_ptr<ParticleData> pd,
-		    shared_ptr<ParticleGroup> pg,
-		    shared_ptr<System> sys,
-		    Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+      EulerMaruyama(shared_ptr<ParticleGroup> pg, Parameters par):
+	BaseBrownianIntegrator(pg, par){
 	sys->log<System::MESSAGE>("[BD::EulerMaruyama] Initialized");
       }
 
-      EulerMaruyama(shared_ptr<ParticleData> pd,
-		    shared_ptr<System> sys,
-		    Parameters par):
-	EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+      EulerMaruyama(shared_ptr<ParticleData> pd, Parameters par):
+	EulerMaruyama(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       void forwardTime() override;
 
@@ -135,17 +126,14 @@ namespace uammd{
     //Implements the algorithm in [1]
     class MidPoint: public BaseBrownianIntegrator{
     public:
-      MidPoint(shared_ptr<ParticleData> pd,
-	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
-	       Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+      MidPoint(shared_ptr<ParticleGroup> pg, Parameters par):
+	BaseBrownianIntegrator(pg, par){
 	sys->log<System::MESSAGE>("[BD::MidPoint] Initialized");
       }
 
       MidPoint(shared_ptr<ParticleData> pd,
-	      shared_ptr<System> sys,
-	      Parameters par):
-	MidPoint(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+	       Parameters par):
+	MidPoint(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       void forwardTime() override;
 
@@ -159,17 +147,13 @@ namespace uammd{
     //Implements the algorithm in eq. 45 of [2]
     class AdamsBashforth: public BaseBrownianIntegrator{
     public:
-      AdamsBashforth(shared_ptr<ParticleData> pd,
-	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
-	       Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+      AdamsBashforth(shared_ptr<ParticleGroup> pg, Parameters par):
+	BaseBrownianIntegrator(pg, par){
 	sys->log<System::MESSAGE>("[BD::AdamsBashforth] Initialized");
       }
 
-      AdamsBashforth(shared_ptr<ParticleData> pd,
-	      shared_ptr<System> sys,
-	      Parameters par):
-	AdamsBashforth(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+      AdamsBashforth(shared_ptr<ParticleData> pd, Parameters par):
+	AdamsBashforth(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       void forwardTime() override;
 
@@ -183,17 +167,14 @@ namespace uammd{
     //Implements the algorithm in eq. 45 of [2]
     class Leimkuhler: public BaseBrownianIntegrator{
     public:
-      Leimkuhler(shared_ptr<ParticleData> pd,
-		     shared_ptr<ParticleGroup> pg,
-		     shared_ptr<System> sys,
-		     Parameters par):BaseBrownianIntegrator(pd, pg, sys, par){
+      Leimkuhler(shared_ptr<ParticleGroup> pg, Parameters par):
+	BaseBrownianIntegrator(pg, par){
 	sys->log<System::MESSAGE>("[BD::Leimkuhler] Initialized");
       }
 
       Leimkuhler(shared_ptr<ParticleData> pd,
-		     shared_ptr<System> sys,
-		     Parameters par):
-	Leimkuhler(pd, std::make_shared<ParticleGroup>(pd, sys), sys, par){}
+		 Parameters par):
+	Leimkuhler(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       void forwardTime() override;
 

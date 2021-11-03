@@ -17,6 +17,7 @@ References:
 #include<istream>
 #include<vector>
 #include"utils/vector.cuh"
+#include"utils/ForceEnergyVirial.cuh"
 inline std::ostream& operator<<(std::ostream& out, const uammd::real3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }

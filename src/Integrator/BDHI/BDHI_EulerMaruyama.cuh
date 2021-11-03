@@ -57,16 +57,10 @@ namespace uammd{
   class EulerMaruyama: public Integrator{
   public:
     using Parameters = typename Method::Parameters;
-    EulerMaruyama(shared_ptr<ParticleData> pd,
-		  shared_ptr<ParticleGroup> pg,
-		  shared_ptr<System> sys,
-		  Parameters par);
+    EulerMaruyama(shared_ptr<ParticleGroup> pg, Parameters par);
 
-    EulerMaruyama(shared_ptr<ParticleData> pd,
-		  shared_ptr<System> sys,
-		  Parameters par):
-      EulerMaruyama(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
-
+    EulerMaruyama(shared_ptr<ParticleData> pd, Parameters par):
+      EulerMaruyama(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
     ~EulerMaruyama();
 

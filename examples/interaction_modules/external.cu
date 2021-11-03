@@ -34,7 +34,7 @@ struct GravityAndWall{
 
   //This function will be called for each particle
   //The arguments will be modified according to what was returned by getArrays below
-  __device__ real3 force(real4 pos /*, real mass */){
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, real4 pos /*, real mass */){
     real3 f = {0,0,-g};
     //A soft wall that prevents particles from crossing the wall (well they will cross it if determined enough)
     real dist = pos.z - zwall;
@@ -49,18 +49,13 @@ struct GravityAndWall{
 	f.z = g;
       }
     }
-    return f;
+    //The decision to compute energy/virial and or force should come from the members of
+    // comp (comp.force, comp.energy)
+    real energy = 0;
+    real virial = 0;
+    return {f,energy, virial};
   }
-  
-  //Energy can be ommited in the integrators this example use. It defaults to 0.
-  //__device__ real energy(real4 pos){ return 0;}
-
-  //Optionally a compute function may be defined and will be called for each particle when ExternalForces::compute is called
-  // __device__ void compute(real4 pos /*, real mass */){
-  //   int id = blockIdx.x*blockDim.x + threadIdx.x;
-  //   if(id==0)printf("hello\n");
-  // }
-  
+    
   auto getArrays(ParticleData* pd){
     auto pos = pd->getPos(access::gpu, access::read);    
     return pos.begin();
@@ -84,7 +79,8 @@ struct MovingWall: public ParameterUpdatable{
 
   //This function will be called for each particle
   //The arguments will be modified according to what was returned by getArrays below
-  __device__ real3 force(real4 pos /*, real mass */){
+  //comp contains wether the caller needs force, energy, virial or a combination of them
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, real4 pos /*, real mass */){
     real3 f = real3();
     //A soft wall that prevents particles from crossing the wall (well they will cross it if determined enough)
     real dist = pos.z - zwall;
@@ -96,7 +92,7 @@ struct MovingWall: public ParameterUpdatable{
 	f += {0,0, kwall/(d2 + real(0.1))};
       }
     }
-    return f;
+    return {f,0,0};
   }
   
   auto getArrays(ParticleData* pd){
@@ -117,7 +113,7 @@ struct MovingWall: public ParameterUpdatable{
 std::shared_ptr<Interactor> createExternalPotentialInteractor(UAMMD sim){
   //You can pass an instance of the specialization as a shared_ptr, which allows you to modify it from outside the interactor module at any time.
   auto gr = std::make_shared<GravityAndWall>();
-  auto ext = std::make_shared<ExternalForces<GravityAndWall>>(sim.pd, sim.sys, gr);
+  auto ext = std::make_shared<ExternalForces<GravityAndWall>>(sim.pd, gr);
   return ext;  
 }
 
@@ -133,10 +129,8 @@ UAMMD initializeUAMMD(){
 }
 
 int main(){
-  // auto sim = initializeUAMMD();
-  // auto ext = createExternalPotentialInteractor(sim);
-  // ext->sumForce(0);
-  // ext->sumForce( );
-  // ext->compute();
+  auto sim = initializeUAMMD();
+  auto ext = createExternalPotentialInteractor(sim);
+  ext->sum({.force=true, .energy=false, .virial=false});
   return 0;
 }

@@ -57,7 +57,7 @@ void randomlyPlaceParticles(UAMMD sim){
 }
 
 //This function constructs and returns a Brownian Dynamics integrator.
-std::shared_ptr<Integrator> createBrownianDynamicsIntegrator(UAMMD sim){
+auto createBrownianDynamicsIntegrator(UAMMD sim){
   //Most Integrators in UAMMD are created in a very similar manner
   //First we choose the Integrator, in this case we are going to use the most basic Brownian Dynamics Integrator, Euler Maruyama
   using BD = BD::EulerMaruyama;
@@ -72,7 +72,7 @@ std::shared_ptr<Integrator> createBrownianDynamicsIntegrator(UAMMD sim){
   par.viscosity = sim.par.viscosity;
   //You should check the relevant wiki page for information on how to construct each integrator, but 99% of the time you will see
   //The arguments are the same as for this one:
-  auto bd = std::make_shared<BD>(sim.pd, sim.sys, par);
+  auto bd = std::make_shared<BD>(sim.pd, par);
   //I like to store Integrators in shared pointers to easily pass them around.
   //You might have noticed that the we are returning a pointer to "Integrator" instead of BD
   //This is ok because all integrators in UAMMD inherit from the base class Integrator. Meaning that they can maskarade as one
@@ -93,7 +93,7 @@ void printFirst10Particles(UAMMD sim){
 }
 
 //This function stores a vector with the particle positions ordered by id (name) and returns it
-std::vector<real4> vector_from_pd_positions(UAMMD sim){
+auto vector_from_pd_positions(UAMMD sim){
   auto id2index = sim.pd->getIdOrderedIndices(access::cpu);
   auto pos = sim.pd->getPos(access::cpu, access::read);
   auto pos_by_id = thrust::make_permutation_iterator(pos.begin(), id2index);

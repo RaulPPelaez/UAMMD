@@ -20,7 +20,7 @@ par.dt = 0.01;
 par.box = Box(64);
 //par.sumThermalDrift = false; //Default is false, controls if the thermal drift is taken into account or not.
 
-auto bdhi = make_shared<BDHI::FIB>(pd, sys, par);
+auto bdhi = make_shared<BDHI::FIB>(pd, par);
 
 //add any interactor
 
@@ -144,9 +144,10 @@ namespace uammd{
 	bool removeTotalMomentum = true; //Set the total fluid momentum to zero in each step
       };
 
-      ICM(shared_ptr<ParticleData> pd,
-	  shared_ptr<System> sys,
-	  Parameters par);
+      ICM(shared_ptr<ParticleData> pd, Parameters par):
+	ICM(std::make_shared<ParticleGroup>(pd, "All"), par){}
+
+      ICM(shared_ptr<ParticleGroup> pg, Parameters par);
 
       ~ICM();
 

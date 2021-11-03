@@ -93,17 +93,12 @@ namespace uammd{
       real split = -1;
     };
 
-    Poisson(shared_ptr<ParticleData> pd,
-	    shared_ptr<System> sys,
-	    Parameters par):
-      Poisson(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
+    Poisson(shared_ptr<ParticleData> pd, Parameters par):
+      Poisson(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
-    Poisson(shared_ptr<ParticleData> pd,
-	    shared_ptr<ParticleGroup> pg,
-	    shared_ptr<System> sys,
-	    Parameters par);
+    Poisson(shared_ptr<ParticleGroup> pg, Parameters par);
 
-    ~Poisson();
+    ~Poisson(){}
 
     void sum(Computables comp, cudaStream_t st = 0) override{
       sys->log<System::DEBUG2>("[Poisson] Summing interaction");

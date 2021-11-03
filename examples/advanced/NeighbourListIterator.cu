@@ -27,26 +27,36 @@ int numberParticles;
 int numberSteps, printSteps;
 real temperature, friction, rcut;
 
-__device__ real lj(real r2){
+__device__ real lj_force(real r2){
   const real invr2 = real(1.0)/r2;
   const real invr6 = invr2*invr2*invr2;
   const real fmod = (real(-48.0)*invr6 + real(24.0))*invr6*invr2;
   return fmod;
 }
 
+__device__ real lj_energy(real r2){
+  const real invr2 = real(1.0)/r2;
+  const real invr6 = invr2*invr2*invr2;
+  return real(4.0)*invr6*(invr6-real(1.0));
+}
+
 //A new way of using a neighbour list
 template<class NeighbourContainer>
 __global__ void processNeighbours(NeighbourContainer ni,// Provides iterator with neighbours of a particle
-			int numberParticles,
-			Box box,
-			real4* force //Forces in group indexing
-			){
+				  int numberParticles,
+				  Box box,
+				  real4* force, //Forces in group indexing
+				  real* energy, //Energies in group indexing
+				  real* virial //Virial in group indexing
+				  ){
   int i = blockIdx.x*blockDim.x + threadIdx.x;
   if(i >= numberParticles) return;
   //Set ni to provide iterators for particle i
   ni.set(i);
   const real3 pi = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(ni.getSortedPositions() + i));
   real3 f = real3();
+  real e = 0;
+  real v = 0;
   //for(auto neigh: ni){ //This is equivalent to the while loop, although a tad slower
   auto it = ni.begin(); //Iterator to the first neighbour of particle i
   //Note that ni.end() is not a pointer to the last neighbour, it just represents "no more neighbours" and
@@ -57,9 +67,18 @@ __global__ void processNeighbours(NeighbourContainer ni,// Provides iterator wit
     const real3 pj = make_real3(neigh.getPos());
     const real3 rij = box.apply_pbc(pj-pi);
     const real r2 = dot(rij, rij);
-    if(r2>0 and r2<(real(6.25))) f += lj(r2)*rij;
+    if(r2>0 and r2<(real(6.25))){
+      const real3 fmod = (force or virial)?lj_force(r2)*rij:real3();
+      if(force) f += fmod;
+      if(energy) e += lj_energy(r2);
+      if(virial) v += dot(fmod, rij);
+    }
   }
-  force[ni.getGroupIndexes()[i]] += make_real4(f);
+  const int global_index = ni.getGroupIndexes()[i];
+  if(force) force[global_index] += make_real4(f);
+  if(energy) energy[global_index] += e;
+  if(virial) virial[global_index] += v;
+  
 }
 
 //A small interactor that computes LJ force using a CellList
@@ -69,12 +88,12 @@ class myInteractor: public Interactor{
   using NeighbourList = CellList;
   std::shared_ptr<NeighbourList> cl;
 public:
-  myInteractor(std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys):
-    Interactor(pd, sys, "Custom"){
-    cl = make_shared<NeighbourList>(pd, sys);
+  myInteractor(std::shared_ptr<ParticleData> pd):
+    Interactor(pd, "Custom"){
+    cl = make_shared<NeighbourList>(pd);
   }
 
-  void sumForce(cudaStream_t st) override{
+  void sum(Computables comp, cudaStream_t st) override{
     Box box(boxSize);
     cl->update(box, rcut, st);
     //NeighbourContainer can provide forward iterators with the neighbours of each particle
@@ -82,8 +101,11 @@ public:
     //once you have asked for the next neighbour there is no going back without starting from the first.
     //With it=ni.begin() you can only do it++, etc, there is no operator[] nor it--
     auto ni = cl->getNeighbourContainer();
-    auto force = pd->getForce(access::location::gpu, access::mode::write);
-    processNeighbours<<<numberParticles/128+1, 128, 0, st>>>(ni, numberParticles, box, force.raw());
+    auto force = comp.force?pd->getForce(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto energy = comp.energy?pd->getEnergy(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    auto virial = comp.virial?pd->getVirial(access::location::gpu, access::mode::readwrite).raw():nullptr;
+    processNeighbours<<<numberParticles/128+1, 128, 0, st>>>(ni, numberParticles, box,
+							     force, energy, virial);
   }
 };
 
@@ -104,8 +126,8 @@ int main(int argc, char *argv[]){
   par.temperature = temperature;
   par.dt = dt;
   par.friction = friction;
-  auto verlet = make_shared<NVT>(pd, sys, par);
-  auto inter = std::make_shared<myInteractor>(pd, sys);
+  auto verlet = make_shared<NVT>(pd, par);
+  auto inter = std::make_shared<myInteractor>(pd);
   verlet->addInteractor(inter);
   std::ofstream out(outputFile);
   Timer tim;

@@ -21,7 +21,7 @@ par.box = Box(64);
 //par.scheme = BDHI::FIB::IMPROVED_MIDPOINT; -> Default
 //The MIDPOINT scheme is faster as it requires only one Stokes solve and thus half the FFTs as the improved one. Furthemore the simple midpoint scheme computes particle forces only one time as opposed to two times in the improved scheme. Both algorithms are described in [1].
 
-auto bdhi = make_shared<BDHI::FIB>(pd, sys, par);
+auto bdhi = make_shared<BDHI::FIB>(pd, par);
 
 //add any interactor
 
@@ -130,14 +130,10 @@ namespace uammd{
 	real tolerance = 1e-5;
       };
 
-      FIB(shared_ptr<ParticleData> pd,
-	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys,
-	  Parameters par);
-      FIB(shared_ptr<ParticleData> pd,
-	  shared_ptr<System> sys,
-	  Parameters par):
-	FIB(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
+      FIB(shared_ptr<ParticleGroup> pg, Parameters par);
+
+      FIB(shared_ptr<ParticleData> pd, Parameters par):
+	FIB(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       ~FIB();
 
