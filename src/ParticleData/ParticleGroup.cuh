@@ -179,12 +179,7 @@ namespace uammd{
 
   public:
     //Defaults to all particles in group
-    ParticleGroup(std::shared_ptr<ParticleData> pd, std::string name = std::string("noName")):
-      ParticleGroup(pd, pd->getSystem(), name){}
-
-    //Defaults to all particles in group
-    ParticleGroup(std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
-		  std::string name = std::string("noName"));
+    ParticleGroup(std::shared_ptr<ParticleData> pd, std::string name = std::string("noName"));
 
     //Create the group from a selector
     template<class ParticleSelector>
@@ -192,22 +187,10 @@ namespace uammd{
 		  std::shared_ptr<ParticleData> pd,
 		  std::string name = std::string("noName"));
 
-    //Create the group from a selector
-    template<class ParticleSelector>
-    ParticleGroup(ParticleSelector selector,
-		  std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
-		  std::string name = std::string("noName"));
-
     //Create the group from a list of particle IDs
     template<class InputIterator>
     ParticleGroup(InputIterator begin, InputIterator end,
 		  std::shared_ptr<ParticleData> pd,
-		  std::string name = std::string("noName"));
-
-    //Create the group from a list of particle IDs
-    template<class InputIterator>
-    ParticleGroup(InputIterator begin, InputIterator end,
-		  std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
 		  std::string name = std::string("noName"));
 
     ~ParticleGroup(){
@@ -216,6 +199,9 @@ namespace uammd{
       reorderConnection.disconnect();
       if(st) CudaSafeCall(cudaStreamDestroy(st));
     }
+
+    //Returns a reference to the internal ParticleData instance of this group
+    auto getParticleData(){return this->pd;}
 
     //Remove all particles from the group
     void clear(){
@@ -318,7 +304,7 @@ namespace uammd{
 
   template<class ParticleSelector>
   ParticleGroup::ParticleGroup(ParticleSelector selector,
-			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys, std::string name):
+			       std::shared_ptr<ParticleData> pd, std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created with selector %s",
 			      name.c_str(), type_name<ParticleSelector>().c_str());
@@ -344,7 +330,7 @@ namespace uammd{
   //Specialization of a particle group with an All selector
   template<>
   ParticleGroup::ParticleGroup(particle_selector::All selector,
-			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
+			       std::shared_ptr<ParticleData> pd,
 			       std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created with All selector",name.c_str());
@@ -357,14 +343,13 @@ namespace uammd{
   }
 
   ParticleGroup::ParticleGroup(std::shared_ptr<ParticleData> pd,
-			       std::shared_ptr<System> sys,
 			       std::string name):
-    ParticleGroup(particle_selector::All(), pd, sys, name){}
+    ParticleGroup(particle_selector::All(), pd, name){}
 
   //Specialization of an empty particle group
   template<>
   ParticleGroup::ParticleGroup(particle_selector::None selector,
-			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
+			       std::shared_ptr<ParticleData> pd,
 			       std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
     this->allParticlesInGroup = false;
@@ -377,7 +362,7 @@ namespace uammd{
   //Constructor of ParticleGroup when an ID list is provided
   template<class InputIterator>
   ParticleGroup::ParticleGroup(InputIterator begin, InputIterator end,
-			       std::shared_ptr<ParticleData> pd, std::shared_ptr<System> sys,
+			       std::shared_ptr<ParticleData> pd,
 			       std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created from ID list.", name.c_str());
@@ -398,18 +383,6 @@ namespace uammd{
       this->computeIndexList(true);
     }
   }
-
-  template<class ParticleSelector>
-  ParticleGroup::ParticleGroup(ParticleSelector selector,
-			       std::shared_ptr<ParticleData> pd,
-			       std::string name):
-    ParticleGroup(selector, pd, pd->getSystem(), name){}
-
-  template<class InputIterator>
-  ParticleGroup::ParticleGroup(InputIterator begin, InputIterator end,
-			       std::shared_ptr<ParticleData> pd,
-			       std::string name):
-    ParticleGroup(begin, end, pd, pd->getSystem(), name){}
 
   //This is trivial with  pd->getIdOrderedIndices()!
   //Handle a reordering of the particles (which invalids the previous relation between IDs and indices)
