@@ -27,14 +27,11 @@ namespace uammd{
     nl(par.nl),
     nb(nullptr)
   {
-    constexpr bool hasForceTransverser = Potential::has_getForceTransverser<MyPotential>::value;
-    constexpr bool hasEnergyTransverser = Potential::has_getForceTransverser<MyPotential>::value;
-    constexpr bool hasForceEnergyTransverser = Potential::has_getForceEnergyTransverser<MyPotential>::value;
-    if(not hasForceTransverser and not hasEnergyTransverser and not hasForceEnergyTransverser){
+    constexpr bool hasTransverser = Potential::has_getTransverser<MyPotential>::value;
+    if(not hasTransverser){
       auto potname = stringUtils::removePattern(type_name<MyPotential>(), "uammd::");
       sys->log<System::ERROR>("[PairForces] No valid Transverser found in %s.", potname.c_str());
-      sys->log<System::ERROR>("[PairForces] At least one of the following must be defined:");
-      sys->log<System::CRITICAL>("[PairForces] getForceTransverser, getEnergyTransverser, getForceEnergyTransverser");
+      sys->log<System::ERROR>("[PairForces] A member function called getTransverser must be defined:");      
     }
     sys->log<System::MESSAGE>("[PairForces] Using Box with size: %g %g %g", box.boxSize.x, box.boxSize.y, box.boxSize.z);
     this->setDelegate(pot.get());
