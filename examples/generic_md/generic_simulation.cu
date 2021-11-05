@@ -104,15 +104,15 @@ template<class T>
 std::vector<T> readPropertyFromFile(std::string file, int numberParticles){
   std::ifstream in(file);
   if(not in.good()){
-    System::log<System::CRITICAL>("Cannot open file %s", file);
+    System::log<System::CRITICAL>("Cannot open file %s", file.c_str());
   }
   std::istream_iterator<T> begin(in), end;
   std::vector<T> data_in_file(begin, end);
   if(not data_in_file.size()){
-    System::log<System::CRITICAL>("File %s is empty", file);
+    System::log<System::CRITICAL>("File %s is empty", file.c_str());
   }
   if(data_in_file.size() < numberParticles){
-    System::log<System::CRITICAL>("Not enough lines in file %s, expected %d, found %d", file, numberParticles, data_in_file.size());
+    System::log<System::CRITICAL>("Not enough lines in file %s, expected %d, found %d", file.c_str(), numberParticles, data_in_file.size());
   }
   data_in_file.resize(numberParticles);
   return data_in_file;
