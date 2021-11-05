@@ -22,19 +22,14 @@ int main(int argc, char *argv[]){
   auto sys = make_shared<System>();
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
-
   auto pd = make_shared<ParticleData>(N, sys);
-
   Box box(32);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     auto initial =  initLattice(box.boxSize, N, fcc);
     std::copy(initial.begin(), initial.end(), pos.begin());
   }
-
-
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-
+  auto pg = make_shared<ParticleGroup>(pd, "All");
   using Method  = BDHI::PSE;
   //using Method  = BDHI::FCM;
   double rh =  1;
@@ -46,27 +41,18 @@ int main(int argc, char *argv[]){
   par.dt = 0.005;
   par.box = box;
   par.tolerance = 1e-2;
-
-  auto bdhi = make_shared<BDHI::EulerMaruyama<Method>>(pd, pg, sys, par);
-
-
+  auto bdhi = make_shared<BDHI::EulerMaruyama<Method>>(pg, par);
   sys->log<System::MESSAGE>("RUNNING!!!");
-
   pd->sortParticles();
-
   Timer tim;
   tim.tic();
   int nsteps = 10000;
   int printSteps = 20;
-
   forj(0,nsteps){
-
     bdhi->forwardTime();
     if(j%printSteps==0){
       sys->log<System::DEBUG1>("[System] Writing to disk...");
-
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
-
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       out<<"#"<<endl;
       real3 p;
@@ -81,7 +67,6 @@ int main(int argc, char *argv[]){
       pd->sortParticles();
     }
   }
-
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
   sys->finish();

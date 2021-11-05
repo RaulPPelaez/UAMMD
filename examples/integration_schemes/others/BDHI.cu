@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019. A Brownian Dynamics with Hydrodynamic Interactions simulation.
+/*Raul P. Pelaez 2019-2021. A Brownian Dynamics with Hydrodynamic Interactions simulation.
 
 Runs a Brownian Hydrodynamics simulation with particles starting in a box, particles have different radius and interact with a LJ potential.
 
@@ -11,24 +11,17 @@ Reads some parameters from a file called "data.main.bdhi", if not present it wil
 //The rest can be included depending on the used modules
 #include"Integrator/BDHI/BDHI_EulerMaruyama.cuh"
 #include"Integrator/BDHI/BDHI_Lanczos.cuh"
-
 #include"Interactor/PairForces.cuh"
 #include"Interactor/NeighbourList/CellList.cuh"
 #include"Interactor/Potential/Potential.cuh"
-
 #include"utils/InitialConditions.cuh"
 #include"utils/InputFile.h"
 #include<fstream>
 
 
 using namespace uammd;
-
 using std::make_shared;
 using std::endl;
-using std::cerr;
-
-
-
 real3 boxSize;
 real dt;
 std::string outputFile;
@@ -37,21 +30,19 @@ int numberSteps, printSteps;
 
 real temperature, viscosity;
 
-void readParameters(std::shared_ptr<System> sys, std::string file);
+void readParameters(std::string file);
 
 int main(int argc, char *argv[]){
   //UAMMD System entity holds information about the GPU and tools to interact with the computer itself (such as a loging system). All modules need a System to work on.
 
   auto sys = make_shared<System>(argc, argv);
-  readParameters(sys, "data.main.bdhi");
+  readParameters("data.main.bdhi");
   //Modules will ask System when they need a random number (i.e for seeding the GPU RNG).
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
-
   //ParticleData stores all the needed properties the simulation will need.
   //Needs to start with a certain number of particles, which can be changed mid-simulation
   auto pd = make_shared<ParticleData>(numberParticles, sys);
-
   //Some modules need a simulation box (i.e PairForces for the PBC)
   Box box(boxSize);
   //Initial positions
@@ -59,18 +50,14 @@ int main(int argc, char *argv[]){
     //Ask pd for a property like so:
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     auto radius = pd->getRadius(access::location::cpu, access::mode::write);
-
     //Start in a fcc lattice, pos.w contains the particle type
     auto initial =  initLattice(box.boxSize*0.5, numberParticles, fcc);
-
     //Copy initial positions to pos, pos.w contains type, set it to 0 or 1 randomly
     std::transform(initial.begin(), initial.end(), pos.begin(),
 		   [&](real4 p){p.w = sys->rng().uniform(0,1)>0.5?0:1; return p;});
-
     //Set particles with type 0 to have radius 1 and type 1 to radius 0.5.
     std::transform(pos.begin(), pos.end(), radius.begin(),
 		   [&](real4 p){return p.w==1?1:0.5;});
-
   }
 
 
@@ -80,14 +67,10 @@ int main(int argc, char *argv[]){
   par.viscosity = viscosity;
   par.dt = dt;
   par.tolerance = 1e-3;
-
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::Lanczos>>(pd, sys, par);
-
-
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::Lanczos>>(pd, par);
   //Initialize Interactor module
   {
     using PairForces = PairForces<Potential::LJ>;
-
     //This is the general interface for setting up a potential
     auto pot = make_shared<Potential::LJ>(sys);
     {
@@ -116,16 +99,13 @@ int main(int argc, char *argv[]){
 
     PairForces::Parameters params;
     params.box = box;  //Box to work on
-    auto pairforces = make_shared<PairForces>(pd, sys, params, pot);
-
-
+    auto pairforces = make_shared<PairForces>(pd, params, pot);
     bdhi->addInteractor(pairforces);
   }
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).
   //A maximum log level is set in System.cuh, every logging event with a level superior to the max will result in
   // absolutely no overhead, so dont be afraid to write System::DEBUGX log calls.
   sys->log<System::MESSAGE>("RUNNING!!!");
-
   //Ask ParticleData to sort the particles in memory
   //It is a good idea to sort the particles once in a while during the simulation
   //This can increase performance considerably as it improves coalescence.
@@ -179,7 +159,7 @@ int main(int argc, char *argv[]){
   return 0;
 }
 
-void readParameters(std::shared_ptr<System> sys, std::string file){
+void readParameters(std::string file){
 
   {
     if(!std::ifstream(file).good()){
@@ -196,7 +176,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
     }
   }
 
-  InputFile in(file, sys);
+  InputFile in(file);
 
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("numberSteps", InputFile::Required)>>numberSteps;

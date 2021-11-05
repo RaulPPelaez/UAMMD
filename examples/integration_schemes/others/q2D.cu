@@ -29,16 +29,12 @@ std::string scheme;
 int in_numberParticles;
 bool loadParticles = true;
 
-void readParameters(shared_ptr<System> sys);
+void readParameters();
 int main(int argc, char *argv[]){
-
   auto sys = make_shared<System>(argc, argv);
-
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
-  readParameters(sys);
-
-
+  readParameters();
   Box box(boxSize);
   std::shared_ptr<ParticleData> pd;
   if(loadParticles){
@@ -46,8 +42,6 @@ int main(int argc, char *argv[]){
     if(!in) sys->log<System::CRITICAL>("Could not read from %s!", initFile.c_str());
     in>>N;
     pd = make_shared<ParticleData>(N, sys);
-
-
     {
       auto pos = pd->getPos(access::location::cpu, access::mode::write);
       fori(0,N){
@@ -65,12 +59,9 @@ int main(int argc, char *argv[]){
       pos[i] = make_real4(make_real3(sys->rng().uniform3(-boxSize.x*0.5, boxSize.x*0.5)));
       pos[i].z = 0;
     }
-
   }
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-
+  auto pg = make_shared<ParticleGroup>(pd, "All");
   std::ofstream out(outFile);
-
   std::shared_ptr<Integrator> bdhi;
   if(scheme.compare("quasi2D") == 0){
     using Scheme = BDHI::Quasi2D;
@@ -81,8 +72,7 @@ int main(int argc, char *argv[]){
     par.hydrodynamicRadius = hydrodynamicRadius;
     par.cells = cells;
     par.box = box;
-
-    bdhi = make_shared<Scheme>(pd, pg, sys, par);
+    bdhi = make_shared<Scheme>(pg, par);
   }
   else if(scheme.compare("true2D") == 0){
     using Scheme = BDHI::True2D;
@@ -93,21 +83,15 @@ int main(int argc, char *argv[]){
     par.hydrodynamicRadius = hydrodynamicRadius;
     par.cells = cells;
     par.box = box;
-
-    bdhi = make_shared<Scheme>(pd, pg, sys, par);
-
+    bdhi = make_shared<Scheme>(pg, par);
   }
   else{
-
     sys->log<System::CRITICAL>("Unrecognized scheme!, use quasi2D or ture2D");
   }
   sys->log<System::MESSAGE>("RUNNING!!!");
-
   Timer tim;
   tim.tic();
   int nsteps = numberSteps;
-
-
   forj(0,relaxSteps){
     bdhi->forwardTime();
   }
@@ -127,13 +111,10 @@ int main(int argc, char *argv[]){
       }
       out<<std::flush;
     }
-
   }
-
   auto totalTime = tim.toc();
   sys->log<System::MESSAGE>("mean FPS: %.2f", nsteps/totalTime);
   sys->finish();
-
   return 0;
 }
 
