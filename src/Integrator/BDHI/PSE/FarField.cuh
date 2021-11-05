@@ -80,7 +80,6 @@ namespace uammd{
 	  }
 	  /*Compute the scaling factor for this node*/
 	  const real k = sqrt(k2);
-	  const real invk2 = real(1.0)/k2;
 	  const real sinck = sin(k*rh)/k;
 	  const real k2_invsplit2_4 = k2/(4.0*split*split);
 	  /*The Hashimoto splitting function,
