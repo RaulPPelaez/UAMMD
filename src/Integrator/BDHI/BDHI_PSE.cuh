@@ -69,6 +69,9 @@ namespace uammd{
     class PSE{
     public:
       using Parameters = pse_ns::Parameters;
+      PSE(shared_ptr<ParticleData> pd, Parameters par):
+	PSE(pd, std::make_shared<ParticleGroup>(pd, "All"), pd->getSystem(), par){}
+
       PSE(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys,
