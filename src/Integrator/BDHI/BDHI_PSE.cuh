@@ -85,7 +85,7 @@ namespace uammd{
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
 	auto force = pd->getForce(access::location::gpu, access::mode::read);	
 	nearField->Mdot(force.begin(), MF, st);
-	farField->Mdot(pos.begin(), force.begin(), MF, numberParticles, st);
+	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles, st);
       }
 
       void computeBdW(real3* BdW, cudaStream_t st){
@@ -96,6 +96,20 @@ namespace uammd{
 
       void computeDivM(real3* divM, cudaStream_t st = 0){};
       void finish_step(             cudaStream_t st = 0){};
+
+      //Computes both the stochastic and deterministic contributions
+      void computeHydrodynamicDisplacements(real4* force, real3* MF, cudaStream_t st = 0){
+	int numberParticles = pg->getNumberParticles();
+	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
+	//Compute deterministic part in the near field
+	nearField->Mdot(force, MF, st);
+	real prefactor = sqrt(2*temperature/dt);
+	//Compute stochastic part in the near field
+	nearField->computeStochasticDisplacements(MF, prefactor, st);
+	auto pos = pd->getPos(access::location::gpu, access::mode::read);
+	//Compute both deterministic and stochastic part in the far field
+	farField->computeHydrodynamicDisplacements(pos.begin(), force, MF, numberParticles, st);
+      }
 
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
@@ -110,6 +124,7 @@ namespace uammd{
       shared_ptr<ParticleGroup> pg;
       shared_ptr<System> sys;      
       real hydrodynamicRadius, M0;
+      real temperature, dt;
       std::shared_ptr<pse_ns::NearField> nearField;
       std::shared_ptr<pse_ns::FarField> farField;
     };

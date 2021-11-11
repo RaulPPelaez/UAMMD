@@ -289,7 +289,7 @@ namespace uammd{
 	  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
 	  = σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
 	*/
-	void Mdot(real4* pos, real4* forces, real3 *Mv, int numberParticles, cudaStream_t st);
+	void computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *Mv, int numberParticles, cudaStream_t st);
 
       private:
 	template<class T> using cached_vector = uninitialized_cached_vector<T>;
@@ -437,18 +437,22 @@ namespace uammd{
 	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
 	= σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
       */
-      void FarField::Mdot(real4* pos, real4* forces, real3 *MF, int numberParticles, cudaStream_t st){
+      void FarField::computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *MF, int numberParticles, cudaStream_t st){
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
 	sys->log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
 	// G_k·FFT(S·F)
 	//The computation is skipped if the forces are not provided (nullptr)
 	auto gridVelsFourier = deterministicPart(pos, forces, numberParticles, st);
+	//1/√σ·√G_k·dWw
+	//The computation is skipped if temperature is zero
 	addBrownianNoise(gridVelsFourier, st);
+	//FFTi
 	auto gridVels = inverseTransformVelocity(gridVelsFourier, st);
+	//St
 	interpolateVelocity(gridVels, pos, MF, numberParticles, st);
 	sys->log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
-}
-
+      }
+      
       void FarField::initializeCuFFT(){
 	CufftSafeCall(cufftCreate(&cufft_plan_forward));
 	CufftSafeCall(cufftCreate(&cufft_plan_inverse));
