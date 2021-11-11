@@ -143,7 +143,7 @@ namespace uammd{
     }
 
     template<class PositionIterator>
-    bool needsRebuild(PositionIterator pos, int numberParticles, Box box, real cutOff, cudaStream_t st = 0){
+    bool needsRebuild(PositionIterator pos, uint numberParticles, Box box, real cutOff, cudaStream_t st = 0){
       if(forceNextRebuild){
 	forceNextRebuild = false;
         return true;

@@ -84,6 +84,7 @@ namespace uammd{
       //Standard 3-point Peskin interpolator
       struct threePoint{
 	const real invh;
+	static constexpr int support = 3;
 	threePoint(real h):invh(1.0/h){}
 	__host__ __device__ real phi(real rr) const{
 	  const real r = fabs(rr)*invh;
@@ -103,6 +104,7 @@ namespace uammd{
       //Standard 4-point Peskin interpolator
       struct fourPoint{
 	const real invh;
+	static constexpr int support = 4;
 	fourPoint(real h):invh(1.0/h){}
 
 	 __host__  __device__ real phi(real rr) const{

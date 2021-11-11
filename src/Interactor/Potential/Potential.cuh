@@ -1,41 +1,21 @@
-/*Raul P. Pelaez 2017. Implemented Potentials
+/*Raul P. Pelaez 2017-2021. Implemented Potentials
 
-  In this file there are functors and objects describing different potentials.
-
-  A potential must provide:
-   -transversers to compute force, energy and virial through get*Transverser(Box box, shared_ptr<ParticleData> pd)
-   -A maximum interaction distance (can be infty)
-   -Handle particle types (with setPotParameters(i, j, InputParameters p)
-
-
-
-  A single Potential might be written to handle a variety of similar potentials.
-  For example, all radial potentials need only the distance between particles,
-    so RadialPotential is defined, and the particular potential is a functor passed to it (See LJFunctor).
-    See RadialPotential on how to implement a RadialPotential.
-
-
-
+For more information on how to code a new Potential see examples/customPotentials.cu
+See RadialPotential.cuh for an additional example.
  */
 #ifndef POTENTIAL_CUH
 #define POTENTIAL_CUH
-
-#include"ParticleData/ParticleData.cuh"
 #include"utils/Box.cuh"
-
 #include"PotentialBase.cuh"
 #include"RadialPotential.cuh"
 namespace uammd{
-
   namespace Potential{
-
-
-    //LJFunctor is a radial potential that can be passed to RadialPotential to be used as a Potential in
-    //a module (i.e PairForces, NBodyForces...). Encodes the Lennard Jonnes potential
+    //LJFunctor encodes the Lennard Jonnes potential
+    //this class is meant to be used to specialize RadialPotential, which can then to be used as the Potential for PairForces
     //RadialPotential expects a functor with the rules of this one:
     //   -InputPairParameters, a type with the necessary parameters to differentiate between type pairs
     //   -PairParameters, a type with type pair parameters that the GPU computation will use (can be an alias of InputPairParameters).
-    //   -A force*, energy and virial (not yet) functions taking a squared distance and a PairParameters
+    //   -A force and energy functions taking a squared distance and a PairParameters
     //   -A processPairParameters function that transforms between InputPairParameters and PairParameters
     //* Notice that the force function in a RadialPotential must, in fact, return the modulus of the force divided by the distance, |f|/r.
     struct LJFunctor{
@@ -44,37 +24,34 @@ namespace uammd{
 	bool shift = false; //Shift the potential so lj(rc) = 0?
       };
 
-      struct __align__(16) PairParameters{
+      struct PairParameters{
 	real cutOff2;
 	real sigma2, epsilonDivSigma2;
-	real shift = 0.0; // Contains lj_force(rc)
+	real shift = 0.0; // Contains energy(rc)
       };
-
-      static inline __host__ __device__ real force(const real &r2, const PairParameters &params){
+      //Returns the modulus of the force divided by r
+      static inline __device__ real force(real r2, PairParameters params){
 	if(r2 >= params.cutOff2) return 0;
 	const real invr2 = params.sigma2/r2;
 	const real invr6 = invr2*invr2*invr2;
-	const real invr8 = invr6*invr2;
-	real fmod = params.epsilonDivSigma2*(real(-48.0)*invr6 + real(24.0))*invr8;
-	if(params.shift != real(0.0)){
-	  fmod += params.shift*sqrtf(invr2);
-	}
+	real fmod = params.epsilonDivSigma2*(real(-48.0)*invr6 + real(24.0))*invr6*invr2;
+	//fmod += params.shift?(params.shift*rsqrt(r2)):real(0.0);
 	return fmod;
       }
-
-      static inline __host__ __device__ real energy(const real &r2, const PairParameters &params){
+      //returns the energy per particle
+      static inline __device__ real energy(real r2, PairParameters params){
 	if(r2 >= params.cutOff2) return 0;
 	real invr2 = params.sigma2/r2;
 	real invr6 = invr2*invr2*invr2;
-	real E = params.epsilonDivSigma2*params.sigma2*real(4.0)*invr6*(invr6-real(1.0));
-	if(params.shift != real(0.0)){
-	  //With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
-	  real rc = sqrt(params.cutOff2);
-	  real invrc2 = real(params.sigma2)/(params.cutOff2);
-	  real invrc6 = invrc2*invrc2*invrc2;
-	  E += -(sqrt(r2)-rc)*params.shift - real(4.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
-	}
-	return E;
+	real E = params.epsilonDivSigma2*params.sigma2*real(4.0)*invr6*(invr6-real(1.0)) - params.shift;
+	// if(params.shift != real(0.0)){
+	//   ////With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
+	//   // real rc = sqrt(params.cutOff2);
+	//   // real invrc2 = real(params.sigma2)/(params.cutOff2);
+	//   // real invrc6 = invrc2*invrc2*invrc2;
+	//   // E += -(sqrt(r2)-rc)*params.shift - real(4.0)*params.epsilonDivSigma2*params.sigma2*invrc6*(invrc6-real(1.0));
+	// }
+	return real(0.5)*E;
       }
 
       static inline __host__ PairParameters processPairParameters(InputPairParameters in_par){
@@ -85,16 +62,14 @@ namespace uammd{
 	if(in_par.shift){
 	  real invCutOff2 = params.sigma2/params.cutOff2;
 	  real invrc6 = invCutOff2*invCutOff2*invCutOff2;
-	  real invrc7 = invrc6*sqrtf(invCutOff2);
-	  real invrc13 = invrc7*invrc6;
-	  params.shift = params.epsilonDivSigma2*(real(48.0)*invrc13 - real(24.0)*invrc7);
+	  //params.shift = params.epsilonDivSigma2*(real(48.0)*invrc13 - real(24.0)*invrc7);
+	  params.shift = in_par.epsilon*real(4.0)*invrc6*(invrc6-real(1.0));
 	}
 	else params.shift = real(0.0);
 	return params;
       }
 
     };
-
 
     using LJ = Radial<LJFunctor>;
   }

@@ -1,9 +1,8 @@
-/*Raul P. Pelaez 2019. NeighbourContainer interface example.
+/*Raul P. Pelaez 2019-2021. NeighbourContainer interface example.
 
   This file computes a LJ liquid simulation, similar to benchmark.cu.
 
   The difference is that instead of using PairForces, this code gets a NeighbourContainer from CellList and processes the neighbours manually (see processNeighbours kernel).
-  This code has an even better performance than benchmark.cu (as many Potential parameters are not present)
 
   It is an example on how to interface with a NeighbourList without writing a Transverser and without necesarily constructing an explicit neighbour list.
 
@@ -26,7 +25,7 @@ real dt;
 std::string outputFile;
 int numberParticles;
 int numberSteps, printSteps;
-real temperature, viscosity, rcut;
+real temperature, friction, rcut;
 
 __device__ real lj(real r2){
   const real invr2 = real(1.0)/r2;
@@ -104,7 +103,7 @@ int main(int argc, char *argv[]){
   NVT::Parameters par;
   par.temperature = temperature;
   par.dt = dt;
-  par.viscosity = viscosity;
+  par.friction = friction;
   auto verlet = make_shared<NVT>(pd, sys, par);
   auto inter = std::make_shared<myInteractor>(pd, sys);
   verlet->addInteractor(inter);
@@ -144,7 +143,7 @@ void generateDefaultParameters(std::string file){
   default_options<<"numberSteps 500"<<std::endl;
   default_options<<"printSteps -1"<<std::endl;
   default_options<<"temperature 1.0"<<std::endl;
-  default_options<<"viscosity 1"<<std::endl;
+  default_options<<"friction 1"<<std::endl;
 }
 
 void readParameters(std::shared_ptr<System> sys, std::string file){
@@ -160,5 +159,5 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
   in.getOption("printSteps", InputFile::Required)>>printSteps;
   in.getOption("dt", InputFile::Required)>>dt;
   in.getOption("temperature", InputFile::Required)>>temperature;
-  in.getOption("viscosity", InputFile::Required)>>viscosity;
+  in.getOption("friction", InputFile::Required)>>friction;
 }

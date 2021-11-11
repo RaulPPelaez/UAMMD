@@ -85,7 +85,7 @@ namespace uammd{
       >{
       friend class thrust::iterator_core_access;
       friend class NeighbourContainer;
-      const int particleIndex;
+      const int cellIndex;
       const CellListBase::CellListData nl;
       const int3 celli;
       int currentNeighbourIndex;
@@ -139,21 +139,18 @@ namespace uammd{
       __device__  Neighbour operator[](int i) = delete;
 
       __device__  bool equal(NeighbourIterator const& other) const{
-	return other.particleIndex == particleIndex and other.currentNeighbourIndex==currentNeighbourIndex;
+	return other.currentNeighbourIndex==currentNeighbourIndex;
       }
 
-      __device__ NeighbourIterator(int i, const CellListBase::CellListData &nl, bool begin):
-	particleIndex(i),
-	currentNeighbourIndex(noMoreNeighbours-1),
+      __device__ NeighbourIterator(real3 pos, const CellListBase::CellListData &nl, bool begin):
+	currentNeighbourIndex(noMoreNeighbours-begin),
 	nl(nl),
 	currentCell(0),
 	lastParticleInCell(noMoreNeighbours),
-	celli(begin?nl.grid.getCell(make_real3(cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos + i))):make_int3(0,0,0)){
+	celli(nl.grid.getCell(pos)),
+      	cellIndex(nl.grid.getCellIndex(celli)){
 	if(begin){
 	  increment();
-	}
-	else{
-	  currentNeighbourIndex = noMoreNeighbours;
 	}
       }
 
@@ -163,16 +160,17 @@ namespace uammd{
     };
 
     struct NeighbourContainer{
-      int my_i = -1;
+      real3 myPos;
       const CellListBase::CellListData nl;
-
       NeighbourContainer(CellListBase::CellListData nl): nl(nl){}
 
-      __device__ void set(int i){this->my_i = i;}
+      __device__ void set(int i){this->myPos = make_real3(cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos + i));}
 
-      __device__ NeighbourIterator begin(){return NeighbourIterator(my_i, nl, true);}
+      __device__ void set(real3 pos){this->myPos = pos;}
 
-      __device__ NeighbourIterator end(){  return NeighbourIterator(my_i, nl, false);}
+      __device__ NeighbourIterator begin(){return NeighbourIterator(myPos, nl, true);}
+
+      __device__ NeighbourIterator end(){  return NeighbourIterator(myPos, nl, false);}
 
       __host__ __device__ const real4* getSortedPositions(){return nl.sortPos;}
 

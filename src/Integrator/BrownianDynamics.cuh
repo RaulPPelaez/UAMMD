@@ -54,7 +54,7 @@ namespace uammd{
   namespace BD{
     struct Parameters{
       //The 3x3 shear matrix is encoded as an array of 3 real3
-      std::vector<real3> K;
+      std::vector<real3> K = std::vector<real3>(3,real3());
       real temperature = 0;
       real viscosity = 1;
       real hydrodynamicRadius = -1.0;
@@ -80,6 +80,19 @@ namespace uammd{
       ~BaseBrownianIntegrator();
 
       virtual void forwardTime() = 0;
+
+      virtual real sumEnergy() override{
+	//Sum 1.5*kT to each particle
+	auto energy = pd->getEnergy(access::gpu, access::readwrite);
+	auto energy_gr = pg->getPropertyIterator(energy);
+	auto energy_per_particle = thrust::make_constant_iterator<real>(1.5*temperature);
+	thrust::transform(thrust::cuda::par,
+			  energy_gr, energy_gr + pg->getNumberParticles(),
+			  energy_per_particle,
+			  energy_gr,
+			  thrust::plus<real>());
+	return 0;
+      }
 
     protected:
       real3 Kx, Ky, Kz; //shear matrix

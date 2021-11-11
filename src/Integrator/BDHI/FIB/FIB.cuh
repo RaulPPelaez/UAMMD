@@ -165,10 +165,8 @@ namespace uammd{
 	return 0.91*box.boxSize.x/(real)grid.cellDim.x;
       }
     private:
-      using Kernel = IBM_kernels::PeskinKernel::threePoint;
+      using Kernel = IBM_kernels::Peskin::threePoint;
       real temperature, viscosity;
-
-      shared_ptr<CellList> cl;
 
       Grid grid;
       Box box;
@@ -176,8 +174,9 @@ namespace uammd{
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
 
-      //Grid forces/velocities in fourier/real space
-      thrust::device_vector<cufftComplex> gridVels;
+
+      thrust::device_vector<real3> gridVels;
+      thrust::device_vector<cufftComplex> gridVelsFourier;
 
       curandGenerator_t curng;
       thrust::device_vector<real> random;

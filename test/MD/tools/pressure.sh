@@ -4,10 +4,10 @@
 N=$(grep numberParticles data.main | awk '{print $2}')
 ep=$(grep epsilon data.main | awk '{print $2}')
 sig=$(grep sigma data.main | awk '{print $2}')
-l=$(grep boxSize data.main | awk '{print $2/'$sig'}')
+l=$(grep '^L ' data.main | awk '{print $2/'$sig'}')
 t=$(grep temperature data.main | awk '{print $2/'$ep'}')
 cutOff=$(grep cutOff data.main | awk '{print $2}')
-rho=$(echo 1 | awk '{print '$N'/('$l'^3)}')
+rho=$(echo 1 | awk '{print 1.0*'$N'/('$l'^3)}')
 
 file=$1
 

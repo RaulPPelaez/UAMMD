@@ -81,15 +81,17 @@ namespace uammd{
   template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>
   class IBM{
     shared_ptr<Kernel> kernel;
-    shared_ptr<System> sys;
     Grid grid;
     Index3D cell2index;
   public:
+    IBM(shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index): IBM(nullptr, kern, a_grid, cell2index){}
 
     IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index):
-      sys(sys), kernel(kern), grid(a_grid), cell2index(cell2index){
-      sys->log<System::DEBUG2>("[IBM] Initialized with kernel: %s", type_name<Kernel>().c_str());
+      kernel(kern), grid(a_grid), cell2index(cell2index){
+      System::log<System::DEBUG2>("[IBM] Initialized with kernel: %s", type_name<Kernel>().c_str());
     }
+
+    IBM(shared_ptr<Kernel> kern, Grid a_grid): IBM(nullptr, kern, a_grid){}
 
     IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid):
       IBM(sys, kern, a_grid, Index3D(a_grid.cellDim.x, a_grid.cellDim.y,a_grid.cellDim.z )){}
@@ -98,7 +100,7 @@ namespace uammd{
     void spread(const PosIterator &pos, const QuantityIterator &v,
 		GridDataIterator &gridData,
 		int numberParticles, cudaStream_t st = 0){
-      sys->log<System::DEBUG2>("[IBM] Spreading");
+      System::log<System::DEBUG2>("[IBM] Spreading");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       const bool is2D = grid.cellDim.z == 1;
       int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
@@ -142,7 +144,7 @@ namespace uammd{
     void gather(const PosIterator &pos, const ResultIterator &Jq,
 		const GridQuantityIterator &gridData,
 		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
-      sys->log<System::DEBUG2>("[IBM] Gathering");
+      System::log<System::DEBUG2>("[IBM] Gathering");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
       int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 64);

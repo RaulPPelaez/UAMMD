@@ -384,10 +384,9 @@ VECATTR real4 make_real4(real x, real y, real z, real w){
 }
 
 VECATTR real4 make_real4(real s){return make_real4(s, s, s, s);}
-  VECATTR real4 make_real4(real3 a){ return make_real4(a.x, a.y, a.z, real(0.0));}
+VECATTR real4 make_real4(real3 a){ return make_real4(a.x, a.y, a.z, real(0.0));}
 VECATTR real4 make_real4(real3 a, real w){ return make_real4(a.x, a.y, a.z, w);}
-
-  VECATTR real4 make_real4(real2 a){ return make_real4(a.x, a.y, real(0.0), real(0.0));}
+VECATTR real4 make_real4(real2 a){ return make_real4(a.x, a.y, real(0.0), real(0.0));}
 #ifdef SINGLE_PRECISION
 VECATTR real4 make_real4(double3 a, real w){return make_real4(a.x, a.y, a.z, w);}
 #else
@@ -399,7 +398,6 @@ VECATTR real4 make_real4(uint4 a){return make_real4(real(a.x), real(a.y), real(a
 
 
 //////////////////REAL3///////////////////////////
-
 
 VECATTR real3 make_real3(real x, real y, real z){
 #ifdef SINGLE_PRECISION
@@ -416,8 +414,8 @@ VECATTR real3 make_real3(real3 a){return make_real3(a.x, a.y, a.z);}
 VECATTR real3 make_real3(double3 a){return make_real3(a.x, a.y, a.z);}
 VECATTR real3 make_real3(double4 a){return make_real3(a.x, a.y, a.z);}
 #else
-  template<typename T>
-  VECATTR real3 make_real3(float2 a,  T b){return make_real3(a.x, a.y, b);}
+template<typename T>
+VECATTR real3 make_real3(float2 a,  T b){return make_real3(a.x, a.y, b);}
 VECATTR real3 make_real3(float3 a){return make_real3(a.x, a.y, a.z);}
 VECATTR real3 make_real3(float4 a){return make_real3(a.x, a.y, a.z);}
 

@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019. ParticleData.
+/*Raul P. Pelaez 2019-2021. ParticleData.
   Handles and stores all properties a particle can have.
   However they are only initialized when they are asked for the first time.
   Offers a way to access this properties.
@@ -74,7 +74,7 @@
 
   numParticlesChangedSignal() -> int : Triggered when the total number of particles changes
   reorderSignal() -> void : Triggered when the global sorting of particles changes
-  [PROPERTY]WrittenSignal() -> void: Triggered when PROPERTY has been requested with the write or readwrite flag (notice that the signal is emitted at requesting of the property, so the requester has writing rights
+  [PROPERTY]WriteRequestedSignal() -> void: Triggered when PROPERTY has been requested with the write or readwrite flag (notice that the signal is emitted at requesting of the property, so the requester has writing rights
 
 */
 #ifndef PARTICLEDATA_CUH
@@ -90,6 +90,7 @@
 #include<third_party/boost/preprocessor/seq/for_each.hpp>
 #include<third_party/boost/preprocessor/tuple/elem.hpp>
 #include<thrust/device_vector.h>
+#include<thrust/host_vector.h>
 #include <thrust/system_error.h>
 
 #include"utils/vector.cuh"
@@ -101,6 +102,7 @@
                             ((Id, id, int))	       \
                             ((Mass, mass, real))       \
 			    ((Force, force, real4))    \
+  			    ((Virial, virial, real))  \
   			    ((Energy, energy, real))   \
 			    ((Vel, vel, real3))        \
   			    ((Radius, radius, real))   \
@@ -112,25 +114,24 @@
 
 */
 
-namespace uammd{
-
-  template<class T>
-  using signal = typename nod::unsafe_signal<T>;
-
-  using connection = nod::connection;
-
-  //Get the Name (first letter capital) from a tuple in the property list
+//Get the Name (first letter capital) from a tuple in the property list
 #define PROPNAME_CAPS(tuple) BOOST_PP_TUPLE_ELEM(3, 0 ,tuple)
-  //Get the name (no capital) from a tuple in the property list
+//Get the name (no capital) from a tuple in the property list
 #define PROPNAME(tuple) BOOST_PP_TUPLE_ELEM(3, 1 ,tuple)
-  //Get the type from a tuple in the property list
+//Get the type from a tuple in the property list
 #define PROPTYPE(tuple) BOOST_PP_TUPLE_ELEM(3, 2 ,tuple)
-
 //This macro iterates through all properties applying some macro
 #define PROPERTY_LOOP(macro)  BOOST_PP_SEQ_FOR_EACH(macro, _, ALL_PROPERTIES_LIST)
 
+namespace uammd{
 
-
+  template<class T> using signal = typename nod::unsafe_signal<T>;
+  using connection = nod::connection;
+  /*
+    UAMMD uses this class to handle particle information, such as positions, forces, charges,...
+    Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from
+    CPU or GPU transparently.
+  */
   class ParticleData{
   public:
     //Hints to ParticleData about how to perform different task. Mainly how to sort the particles.
@@ -159,8 +160,6 @@ namespace uammd{
     //Declare all property write signals
     PROPERTY_LOOP(DECLARE_SIGNAL_PROPERTIES)
 
-
-
     std::shared_ptr<ParticleSorter> particle_sorter;
     thrust::host_vector<int> originalOrderIndexCPU;
     bool originalOrderIndexCPUNeedsUpdate;
@@ -168,7 +167,11 @@ namespace uammd{
 
   public:
     ParticleData() = delete;
+    
     ParticleData(int numberParticles, shared_ptr<System> sys);
+
+    ParticleData(shared_ptr<System> sys, int numberParticles): ParticleData(numberParticles, sys){}
+
     ~ParticleData(){
       sys->log<System::DEBUG>("[ParticleData] Destroyed");
     }
@@ -215,8 +218,9 @@ namespace uammd{
 
     PROPERTY_LOOP(IS_ALLOCATED)
 
+    //Trigger a particle sort, which assigns an spatial hash to each particle and then reorders them in memory, you can access the original order via getIdOrderedIndices
     void sortParticles();
-
+    //Returns an array with the current location of each particle by id. i.e. the particle with id=i can be found at index getIdOrderedIndices()[i]
     const int * getIdOrderedIndices(access::location dev){
       sys->log<System::DEBUG5>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
       auto id = getId(access::location::gpu, access::mode::read);
@@ -278,12 +282,10 @@ namespace uammd{
       return this->numParticlesChangedSignal;
     }
 
-
     void hintSortByHash(Box hash_box, real3 hash_cutOff){
       hints.orderByHash = true;
       hints.hash_box = hash_box;
       hints.hash_cutOff = hash_cutOff;
-
     }
 
   private:
@@ -312,7 +314,7 @@ namespace uammd{
     particle_sorter = std::make_shared<ParticleSorter>();
   }
 
-  //Sort the particles to improve a certain kind of access pattern.
+  //Sort the particles to improve data locality
   void ParticleData::sortParticles(){
     sys->log<System::DEBUG>("[ParticleData] Sorting particles...");
 
@@ -358,11 +360,11 @@ namespace uammd{
   }
 }
 
-#undef ALL_PROPERTIES_LIST
-#undef PROPNAME_CAPS
-#undef PROPNAME
-#undef PROPTYPE
-#undef PROPERTY_LOOP
+// #undef ALL_PROPERTIES_LIST
+// #undef PROPNAME_CAPS
+// #undef PROPNAME
+// #undef PROPTYPE
+// #undef PROPERTY_LOOP
 #undef DECLARE_PROPERTIES_T
 #undef DECLARE_PROPERTIES
 #undef DECLARE_SIGNAL_PROPERTIES_T

@@ -153,14 +153,13 @@ namespace uammd{
     }
 
   }
+
     // Keeps track of a certain subset of particles in a ParticleData entity
     // You can ask ParticleGroup to return you:
     // -The particle IDs of its members.
     // -The current indices of its members in the ParticleData arrays.
-
     // You can ask for the indices as a raw memory pointer or as a custom iterator.
     // Asking for the raw memory is a risky bussiness, as this array may not even exists (i.e if all particles in the system are in the group, it might decide to not create it, as it would be unnecessary). In this case, you will get a nullptr.
-
   class ParticleGroup{
     std::shared_ptr<ParticleData> pd;
     std::shared_ptr<System> sys;

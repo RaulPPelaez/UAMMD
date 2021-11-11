@@ -2,6 +2,9 @@
 -DMAXLOGLEVEL=5
 -std=c++14
 -O3
+-I/usr/local/cuda/include
 -Isrc
 -Isrc/third_party
+-I/usr/include/lapacke
+-I/usr/include/cblas
 --cuda-path=/usr/local/cuda

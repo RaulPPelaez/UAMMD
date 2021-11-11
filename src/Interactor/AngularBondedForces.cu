@@ -20,13 +20,13 @@ namespace uammd{
     TPP(32),
     bondType(bondType_in){
     this->setDelegate(bondType);
-    auto bondProcessor = readBondFile(par.readFile);
+    auto bondProcessor = readBondFile(par.file);
     generateBondList(bondProcessor);
     bondProcessor.checkDuplicatedBonds();
   }
 
   template<class BondType>
-  AngularBondedForces<BondType>::BondProcessor AngularBondedForces<BondType>::readBondFile(std::string bondFile){
+  typename AngularBondedForces<BondType>::BondProcessor AngularBondedForces<BondType>::readBondFile(std::string bondFile){
     int numberParticles = pg->getNumberParticles();
     BondProcessor bondProcessor(numberParticles);
     BondReader bondReader(bondFile);

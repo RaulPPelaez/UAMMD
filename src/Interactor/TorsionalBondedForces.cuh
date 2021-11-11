@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2020. Four bonded forces, AKA torsional springs.
+/*Raul P. Pelaez 2019-2021. Four bonded forces, AKA torsional springs.
 
   Joins four particles with a torsional bond i---j---k---l
 
@@ -43,8 +43,8 @@
 
 namespace uammd{
 
-  namespace TorsionalBondedForces_ns{
-    struct TorsionalBond{
+  namespace BondedType{
+    struct Torsional{
     private:
 
       __device__ real3 cross(real3 a, real3 b){
@@ -53,7 +53,7 @@ namespace uammd{
 
     public:
       Box box;
-      TorsionalBond(Box box): box(box){}
+      Torsional(Box box): box(box){}
 
       struct BondInfo{
 	real phi0, k;
@@ -213,7 +213,7 @@ namespace uammd{
 	  return real(0.0);
 	const real cosPhi = thrust::max(real(-1.0), thrust::min(real(1.0), dot(v123, v234)*rsqrt(v123q)*rsqrt(v234q)));
 	const real dphi = signOfPhi(r12, r23, r34)*acos(cosPhi) - bond_info.phi0;
-	return bond_info.kdih*(1+cos(dphi));  //U=kdih(1+cos(phi-phi0))
+	return real(0.25)*bond_info.kdih*(1+cos(dphi));  //U=kdih(1+cos(phi-phi0))
       }
 
     private:
@@ -230,7 +230,7 @@ namespace uammd{
   }
 
   namespace TorsionalBondedForces_ns{
-
+    using TorsionalBond = BondedType::Torsional;
     template<class Bond>
     class BondProcessor{
       int numberParticles;
@@ -327,13 +327,19 @@ namespace uammd{
     };
 
     struct Parameters{
-      std::string readFile;
+      std::string file;
     };
 
     explicit TorsionalBondedForces(shared_ptr<ParticleData> pd,
 				   shared_ptr<System> sys,
 				   Parameters par,
 				   std::shared_ptr<BondType> bondType = std::make_shared<BondType>());
+    
+    explicit TorsionalBondedForces(shared_ptr<ParticleData> pd,
+				   shared_ptr<System> sys,
+				   Parameters par,
+				   BondType bondType):
+      TorsionalBondedForces(pd, sys, par, std::make_shared<BondType>(bondType)){}
 
     ~TorsionalBondedForces() = default;
 

@@ -12,13 +12,14 @@
 
 
   VerletNVE::Parameters par;
-     par.energy = 1.0; //Target energy per particle, can be ommited if initVelocities=false
-     par.dt = 0.01;
-     par.is2D = false;
-     par.initVelocities=true; //Modify starting velocities to ensure the target energy
-
-    auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
-
+  par.energy = 1.0; //Target energy per particle, can be ommited if initVelocities=false
+  par.dt = 0.01;
+  par.is2D = false;
+  par.initVelocities=true; //Modify starting velocities to ensure the target energy
+  //If mass is specified all particles will be assumed to have this mass. If unspecified pd::getMass will be used, if it has not been requested, all particles are assumed to have mass=1.
+  //par.mass = 1.0;
+  auto verlet = make_shared<VerletNVE>(pd, pg, sys, par);
+    
     //Add any interactor
     verlet->addInteractor(...);
     ...
@@ -32,7 +33,6 @@
 #define VERLETNVE_CUH
 
 #include "Integrator/Integrator.cuh"
-#include <curand.h>
 #include<thrust/device_vector.h>
 namespace uammd{
   class VerletNVE: public Integrator{
@@ -40,18 +40,22 @@ namespace uammd{
     real energy;
     bool is2D;
     bool initVelocities;
-
+    real defaultMass;
     cudaStream_t stream;
     int steps;
-
-    size_t temp_storage_bytes;
-
+    void initializeVelocities();
+    template<int step> void callIntegrate();
+    void resetForces();
+    void firstStepPreparation();
   public:
     struct Parameters{
-      real energy = 0;
+      real energy = 0; //Target energy, ignored if initVelocities is false
       real dt = 0;
       bool is2D = false;
-      bool initVelocities = true;
+      bool initVelocities = true; //Modify initial particle velocities to enforce the provided energy
+      //If >0 all particles will have this mass, otherwise the ParticleData mass will be used, if masses have not been set
+      // the default mass is 1
+      real mass = -1;
     };
     VerletNVE(shared_ptr<ParticleData> pd,
 	      shared_ptr<System> sys,

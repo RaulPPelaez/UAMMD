@@ -1,8 +1,7 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 0.8**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 1.0**
 
 
 <img src="https://github.com/raulppelaez/uammd/blob/master/.res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/master/.res/shotlogo.png" width="500">  
-
 
 
 **See the wiki for more info!**  
@@ -12,12 +11,12 @@
 
 -----------------  
 
-Raul P. Pelaez 2018-2020. (raul.perez(at)uam.es)  
+Raul P. Pelaez 2018-2021. (raul.perez(at)uam.es)  
 
 
-A C++11+ header-only fast generic multiscale CUDA Molecular Dynamics framework made into modules for expandability and generality.  
+A C++14+ header-only fast generic multiscale CUDA Molecular Dynamics framework made with moduarity, expandability and generality in mind. UAMMD is intended to be hackable and copy pastable.  
 
-Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for much more than that. To this moment multiple integrators are implemented allowing it to perform:  
+Although "Molecular Dynamics" is part of the name,the UAMMD framework allows for much more than that. To this moment multiple integrators are implemented allowing it to perform:  
 
 	-Molecular dynamics (MD)  
 	-Brownian Dynamics  (BD)  
@@ -29,54 +28,35 @@ Although "Molecular Dynamics" is part of the name,the UAMMD framework allos for 
 	-Fluctuating Hydrodynamics (coupled with particles with Immerse Boundary Method (IBM))  
 		
 
-Multiple building blocks are provided in order for the user to construct a certain simulation, 
-highly templated so the user can easily add in the input the specific interactions when they are not implemented by default.  
+Building blocks are provided for the user to construct a certain simulation. Most are highly templated to ease adaptability.  
 
-For example, there is not a harmonic trap module, but you can write a simple functor in the input file (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. You can do the same with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction... See the examples folder and the wiki for more info  
+For example, there is no harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the ExternalForces module. Similar things can be achieved with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...   
 
-UAMMD is coded into separated types of modules. A code that uses UAMMD needs to create/instantiate some of this modules and update them when necessary (i.e to forward the simulation time). For example, the simulation could have a VerletNVT integrator module and a PairForces interactor module to create a molecular dynamics simulation. Or a DPD integrator module with Nbody interactor module, etc. See the example folder.  
-
-There are two basic types of modules:  
-
-      1. Integrators  
-      2. Interactors  
-
-**Interactors**
-
-An Interactor is an abstract entity that has the ability of computing the forces, energies... acting on each particle due to some interaction.  
-For example, an Interactor could compute the pair Lennard Jonnes forces between each particle pair of the system or sum the forces due to the particles being joined by springs. Each interactor might also ask for some kind of functor for specialization (such as a pair potential for PairForces), see the wiki or the header of the particular Interactor for instructions.  
-
-**Integrators**
-
-An Integrator is an abstract entity that has the ability of taking the simulation state to the next next time step.  
-In order to do so it can hold any number of Interactors and use them to compute the forces, energies... at any time.  
-For example, the VerletNVT module updates the positions and velocities of particles according to the interactors it holds to ensure that the temperature is conserved each time the simulation time is updated.  
-
-----------------------  
-
-These objects are abstract classes that can be derived to create all kinds of functionality and add new physics. Just create a new class that inherits Interactor or Integrator and override the virtual methods with the new functionality. See any of the available modules for an example, like ExternalForces.cuh 
+Hop on to the examples folder for an introduction or check the [wiki](https://github.com/RaulPPelaez/UAMMD/wiki) for more information.  
 
 
 # Currently Implemented
 
-See the wiki page at https://github.com/RaulPPelaez/UAMMD/wiki for a full list of available modules!
+See the wiki page at https://github.com/RaulPPelaez/UAMMD/wiki for a full list of available modules.  
 
 ----------------------
 ## USAGE
 
 -------------------
 
-**UAMMD does not need to be compiled (it is header only)**.  
+**UAMMD does not need to be compiled separatedly (it is header only)**.  
 
-To use it in your project, include the modules you need, create a System and ParticleData instances and configure the simulation as you need.  
-See examples/LJ.cu and examples/Makefile or [Simulation File](https://github.com/RaulPPelaez/UAMMD/wiki/Simulation-File) in the wiki  
+Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/compiling-uammd).  
+Here you have a short example of how a typical UAMMD code looks like:  
+
+
 ```c++
 //Ideal brownian particles
 #include"uammd.cuh"
 #include"Integrator/BrownianDynamics.cuh"
 using namespace uammd;
 int main(int argc, char * argv[]){
-	int numberParticles = 1<<14;
+	int numberParticles = 1e5;
 	auto sys = make_shared<System>(argc, argv);
 	auto pd = make_shared<ParticleData>(numberParticles, sys);
 	{
@@ -84,10 +64,10 @@ int main(int argc, char * argv[]){
 		std::generate(pos.begin(), pos.end(), [&](){ return make_real4(sys->rng.uniform3(-0.5, 0.5), 0);});	
 	}
 	BD::EulerMaruyama::Parameters par;
-	par.temperature = temperature;
-	par.viscosity = viscosity;
+	par.temperature = 1.0;
+	par.viscosity = 1.0;
 	par.hydrodynamicRadius = 1.0;
-	par.dt = dt;
+	par.dt = 0.1;
 	auto bd = make_shared<BD::EulerMaruyama>(pd, sys, par);
 	for(int i = 0; i<numberSteps; i++){
 		bd->forwardTime();
@@ -97,73 +77,30 @@ int main(int argc, char * argv[]){
 }
 
 ```
-See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for instructions.  
 
-UAMMD can be compiled in single or double precision, it works in single precision by default unless you specify otherwise when compiling. See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki.  
+Drop by the examples folder to get started with UAMMD or go to the [wiki](https://github.com/RaulPPelaez/UAMMD/wiki).  
 
-You can use the --device X flag to specify a certain GPU.  
-
-## DEPENDENCIES
+## DEPENDENCIES  
 
 ---------------------
 Depends on:
 
-	1. CUDA 7.5+                                :   https://developer.nvidia.com/cuda-downloads
+	1. CUDA 9.x+                                :   https://developer.nvidia.com/cuda-downloads
 
 Some modules make use of certain NVIDIA libraries included with CUDA:
 	
-	1. cuRAND
-	2. cuBLAS
-	3. cuSolver
-	4. cuFFT
+	1. cuBLAS
+	2. cuFFT
 	
+Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
 Apart from this, any dependency is already included in the repository under the third_party	folder.  
 See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for more information.  
-
-## NOTES FOR DEVELOPERS
-
-The procedure to implement a new module is the following:
-
-	1. Create a new class that inherits from one of the parents (Interactor, Integrator...) and overload the virtual methods. You can do whatever you want as long as the virtual methods are overloaded.   
-	2. Take as input shared_ptr's to a ParticleData and a System at least, use them to interface with UAMMD (ask ParticleData for properties like pos, force, torque..)
-	3. If the new module needs a new particle property (i.e torque) include it in ParticleData.cuh ALL_PROPERTIES_LIST macro
-	4. If the new module needs to communicate a new parameter change to all modules (i.e it changes the simulation box with time) include it in ParameterUpdatable.cuh  PARAMETER_LIST macro	
-	5. Include the new module in the source file that makes use of it
-	
-See available modules for a tutorial (i.e PairForces.cuh or VerletNVT.cuh)  
-
-Some things to take into account:
-	
-	1. ParticleData can regularly update the particle order and/or the number of particles, it will communicate this changes through signals. See ParticleData.cuh for a tutorial on how to connect and handle a signal.
-	2. ParticleData can also change the storage location of the particle arrays, so do not store raw pointers to particle properties, always ask PD for them before using them with ParticleData::get*()
-	3. In the modules where it makes sense, make them be able to take a ParticleGroup (which will contain all particles by default). See PairForces.cuh for an example of a module handling ParticleGroups. Groups will handle particle reorders and particle number changes, easing working with variable number of particles. A ParticleGroup containing all particles yields no overhead and has a very small memory footprint.  
-	4. UAMMD usually uses the lazy initialization scheme, nothing is initialized unless it is absolutely necessary. For example, the CPU version of a particle property (and the GPU version FWIW) will not be allocated until someone explicitly asks for it with pd->get*().  
-	5. Using the "real" type and "make_real" type will ensure precision agnostic code, as real is an alias to either float or double depending on the precision mode.  
-	
-Some advice:
-
-	1. Make use of the existing modules and submodules when possible, inherit from them if you need an extra level of control. For example with a neighbourList.
-	2. Use cub/thrust when possible, it is unusual to write an actual kernel. Most times a thrust::transform of thrust::for_each will do the trick.
-	3. When constructing a new kind of simulation compile the modules in one file and compile another separate one for using the first (to reduce compilation time), or better yet make the code read all needed parameters from a file or script using InputFile.
-	4. Use the iterator concept whenever possible.  
-	
--------------------------------
-
-
-In the creation of a new module (Interactor or Integrator) for interoperability with the already existing modules, the code expects you to use the variables from ParticleData when available, the containers storing the positions, forces, velocities... of each particle.  
-These containers start with zero size and are initialized by ParticleData the first time they are asked for.  
-
-
-**Guidelines**
-
-Each module should be under the uammd namespace. And if helper functions are needed which are not available in UAMMD, they should be under another, module specific, namespace (usually called detail, they can later be introduced to the code base).  
-If you want to make small changes to an existing module without changing it you should create a new module that inherits it, and overload the necessary functions or just copy it.  
 
 ------------------------------------------
 
 ## ACKNOWLEDGMENTS
 
-UAMMD is being developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R and FIS2013-50510-EXP**.  
+UAMMD is being developed at the Departamento de Física Teórica de la Materia Condensada of Universidad Autónoma de Madrid (UAM) under supervision of Rafael Delgado-Buscalioni. Acknowledgment is made to the Donors of the American Chemical Society Petroleum Research Fund (**PRF# 54312-ND9**) for support of this research and to Spanish MINECO projects **FIS2013- 47350-C05-1-R, FIS2013-50510-EXP** and mostly **FIS2017-86007-C3-1-P**.  
 
 Acknowledgment is made to NVIDIA Corporation for their GPU donations.  
 
@@ -171,7 +108,7 @@ Acknowledgment is made to NVIDIA Corporation for their GPU donations.
 
 Raul P. Pelaez is the main developer of UAMMD.  
 
-Other people that have contributed to UAMMD:  
+Other people that have contributed to UAMMD (thanks!):  
 
 Marc Melendez Schofield  
 Sergio Panzuela  

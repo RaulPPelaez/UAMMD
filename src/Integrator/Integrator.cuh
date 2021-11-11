@@ -1,4 +1,4 @@
-/* Raul P. Pelaez 2017. Integrator Base class
+/* Raul P. Pelaez 2017-2020. Integrator Base class
 
    An integrator has the ability to move the simulation one step forward in time.
 
@@ -26,8 +26,11 @@ namespace uammd{
     shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
     shared_ptr<System> sys;
-
     std::vector<shared_ptr<Interactor>> interactors;
+    virtual ~Integrator(){
+      sys->log<System::DEBUG>("[Integrator] %s Destroyed", name.c_str());
+    }
+
   public:
 
     Integrator(shared_ptr<ParticleData> pd,
@@ -44,13 +47,9 @@ namespace uammd{
       sys->log<System::MESSAGE>("[Integrator] Acting on group %s", pg->getName().c_str());
     }
 
-    ~Integrator(){
-      sys->log<System::DEBUG>("[Integrator] %s Destroyed", name.c_str());
-    }
-
     virtual void forwardTime() = 0;
-    virtual real sumEnergy(){ return 0.0;}
 
+    virtual real sumEnergy(){ return 0.0;}
 
     //The interactors can be called at any time from the integrator to compute the forces when needed.
     void addInteractor(shared_ptr<Interactor> an_interactor){

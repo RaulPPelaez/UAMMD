@@ -7,7 +7,7 @@
 !Makefile
 # Unignore all dirs
 !*/
-
+!extensions
 src/Interactor/Experimental
 *.o
 a.out

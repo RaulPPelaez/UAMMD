@@ -101,7 +101,7 @@ namespace uammd{
   public:
 
     CellListBase(){
-      System::log<System::MESSAGE>("[CellList] Created");
+      System::log<System::DEBUG>("[CellList] Created");
       CudaSafeCall(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
       currentValidCell_counter = -1;
       errorFlags.resize(1);
@@ -168,7 +168,7 @@ namespace uammd{
     }
 
     void tryToResizeCellListToCurrentGrid(){
-      const int ncells = grid.getNumberCells();
+      const uint ncells = grid.getNumberCells();
       if(cellStart.size()!= ncells){
 	cellStart.clear();
 	cellStart.resize(ncells);
@@ -191,7 +191,7 @@ namespace uammd{
       }
     }
 
-    void updateCurrentValidCell(int numberParticles){
+    void updateCurrentValidCell(uint numberParticles){
       if(numberParticles != sortPos.size()){
 	currentValidCell_counter = -1;
       }

@@ -51,7 +51,6 @@ public:
   real sumEnergy() override{return 0;}
 };
 
-
 using std::make_shared;
 using std::endl;
 //Self mobility deterministic test. Pull a particle with a force, measure its velocity.
@@ -59,10 +58,9 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, double &true_r
   int N = 1;
   auto sys = make_shared<System>();
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
-  for(int i = 0; i<10000; i++) sys->rng().next();
+  for(int i = 0; i<1000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
   auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-
   Box box(L);
   BDHI::FIB::Parameters par;
   par.temperature = 0.0;
@@ -70,16 +68,11 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, double &true_r
   par.hydrodynamicRadius = rh;
   par.dt = 0.01;
   par.box = box;
-
-
   auto bdhi = make_shared<BDHI::FIB>(pd, pg, sys, par);
-
   true_M0 = bdhi->getSelfMobility();
   true_rh = bdhi->getHydrodynamicRadius();
   auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
   bdhi->addInteractor(inter);
-
-
   for(int i = 0; i<9;i++){M[i] = 0;}
   int Ntest = 10;
   for(int i = 0; i<Ntest;i++){
@@ -90,7 +83,6 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, double &true_r
 	pos.raw()[0] = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5))*box.boxSize,0);
 	posprev = make_double3(make_real3(pos.raw()[0]));
       }
-
       inter->F = F*make_real3(alpha==0, alpha==1, alpha==2);
       bdhi->forwardTime();
       double3 vel;
@@ -107,13 +99,10 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, double &true_r
 }
 
 bool selfMobilityCubicBox_test(){
-
   int NL = 30;
   std::vector<real2> velocities(NL);
-
   real L_min = 8*rh;
   real L_max = 128*rh;
-
   double F = 1;
   long double M[9];
   std::ofstream Mout("selfMobilityCubicBox.test");
@@ -122,16 +111,13 @@ bool selfMobilityCubicBox_test(){
     double true_rh;
     double M0;
     computeSelfMobilityMatrix(make_real3(L), F, M, true_rh, M0);
-
     CudaCheckError();
-
     Mout<<std::setprecision(15)<<L/true_rh<<" ";
     //Substract 1 to the diagonal terms, which should be one so a matrix of zeroes should be printed
     //abs to be able to plot log
     for(int j=0; j<9; j++) Mout<<std::setprecision(15)<<abs((1*(j%3==j/3)-M[j]/M0))<<" ";
     Mout<<endl;
   }
-
   return true;
 }
 

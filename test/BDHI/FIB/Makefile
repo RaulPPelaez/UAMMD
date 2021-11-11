@@ -1,52 +1,27 @@
-
-#The target CUDA compute capability(s), if not set it will be autodetected
-#ARCH ?= 30 35 50 52 60 61
-ARCH=
-
-#Uncomment to compile in double precision mode, single by default
-DOUBLE_PRECISION=-DDOUBLE_PRECISION
-
-#C++ compiler, I tested up to clang++-5.0
-#CXX=clang++-5.0
-CXX=g++
-
-#Cuda version (assumed to be in /usr/local/cuda*) You can change this in CUDA_ROOT
-#If not set it will be autodetected
-CUDA_VER=
-
-ifeq ($(CUDA_VER),)
-CUDA_VER:=$(shell ls -d /usr/local/cuda*/ | grep -Eo '\-[0-9]\.[0-9]' | cut -d- -f2 | sort -grk1 | head -1)
-endif
-CUDA_ROOT=/usr/local/cuda-$(CUDA_VER)
-
+#Default log level is 5, which prints up to MESSAGE, 0 will only print critical errors and 14 will print everything up to the most low level debug information 
 LOG_LEVEL=5
 
-#Uncomment to add debug flags to nvcc
-#DEBUG= -lineinfo -src-in-ptx -g -G
+NVCC=nvcc
 
-#Flags to $(CXX)
-CPU= -O3 -funroll-loops -ffinite-math-only -fno-math-errno -fno-signed-zeros -march=native -fPIC -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-sign-compare
-
-
-#If arch was not set, autodetect all GPUs in the system
-ifeq ($(ARCH),)
-GENCODE_FLAGS:=$(shell printf '\#include<cstdio>\n int main(){int nD;cudaGetDeviceCount(&nD);for(int i=0;i<nD;i++){cudaDeviceProp dp;cudaGetDeviceProperties(&dp, i);std::printf("%%d\\n", dp.major*10+dp.minor);} return 0;}' | $(CUDA_ROOT)/bin/nvcc -Wno-deprecated-gpu-targets -x cu - -o /tmp/listarch --run | sort -g -k1 | uniq | awk 'END{system("rm -f /tmp/listarch")}{print "-gencode arch=compute_"$$1",code=sm_"$$1}')
-else
-$(foreach sm,$(ARCH),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
-endif
-
+CXX=g++
+CUDA_ROOT=/usr/local/cuda
 UAMMD_ROOT=../../../
-INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I $(UAMMD_ROOT)/src -I $(UAMMD_ROOT)/src/third_party
-OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
-BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++11 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" $(GENCODE_FLAGS) -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr -Wno-deprecated-gpu-targets
+#Uncomment to compile in double precision mode
+DOUBLE_PRECISION=-DDOUBLE_PRECISION
+INCLUDEFLAGS=-I$(CUDA_ROOT)/include -I$(UAMMD_ROOT)/src -I$(UAMMD_ROOT)/src/third_party
 
-all: fib
+NVCCFLAGS=-std=c++14 -O3 -ccbin=$(CXX) -Xcompiler="-march=native" $(INCLUDEFLAGS) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DOUBLE_PRECISION) --extended-lambda -lcurand -lcufft
 
-fib:
-	$(BASIC_LINE) FIB.cu -lcurand -lcufft  -o fib
+all: $(patsubst %.cu, %, $(wildcard *.cu))
 
-clean:
-	rm -f fib
+%: %.cu Makefile
+	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=)
+
+clean: $(patsubst %.cu, %.clean, $(wildcard *.cu))
+
+%.clean:
+	rm -f $(@:.clean=)
+
 
 
 

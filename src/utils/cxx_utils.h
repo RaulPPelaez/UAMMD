@@ -45,14 +45,14 @@ namespace uammd{
   }
 
 
-  //These lines replace the std::make_index_sequence functions from C++14
-  template <std::size_t ...> struct index_sequence {};
+  // //These lines replace the std::make_index_sequence functions from C++14
+  // template <std::size_t ...> struct index_sequence {};
 
-  template <std::size_t N, std::size_t ...Is>
-  struct make_index_sequence : make_index_sequence<N - 1, N - 1, Is...> {};
+  // template <std::size_t N, std::size_t ...Is>
+  // struct make_index_sequence : make_index_sequence<N - 1, N - 1, Is...> {};
 
-  template <std::size_t ... Is>
-  struct make_index_sequence<0, Is...> : index_sequence<Is...> {};
+  // template <std::size_t ... Is>
+  // struct make_index_sequence<0, Is...> : index_sequence<Is...> {};
 
   namespace SFINAE{
     //This magic macro creates a struct such that has_X<T>::value will be true if
@@ -87,8 +87,6 @@ namespace uammd{
   std::unique_ptr<T> make_unique( Args&& ...args ){
     return std::unique_ptr<T>( new T( std::forward<Args>(args)... ) );
   }
-
-
 
 }
 #endif

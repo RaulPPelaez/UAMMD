@@ -421,7 +421,8 @@ namespace uammd{
 	sys->log<System::DEBUG2>("[BDHI::FCM] Wave space brownian noise");
 	const int3 n = grid.cellDim;
 	const real dV = grid.getCellVolume();
-	real prefactor = sqrt(2*temperature/(dt*dV));
+	const real fourierNormalization = 1.0/(double(n.x)*n.y*n.z);
+	real prefactor = sqrt(fourierNormalization*2*temperature/(dt*dV));
 	int Nthreads = 128;
 	int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
 	//In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw

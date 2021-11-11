@@ -4,6 +4,7 @@
 #Expect this script to consume approximately 4GB of GPU memory and take several hours to complete
 #You can turn off/on each test in the last lines and change the parameters below, the test should work for any combination of temperature, viscosity... as they should incurr only a change of units. All results should be unitless.
 #This script is quite severe and will complain even with seemingly small deviations from theory, so you should judge yourself.
+EXE=FIB
 if ! which gracebat > /dev/null 2>&1
 then
     echo "FIB TEST FAILED: I need gracebat to plot results!, install grace"
@@ -39,7 +40,7 @@ mkdir -p $resultsFolder $figuresFolder
 
 function selfMobilityCubicBox {
     echo "self Mobility cubic box test"
-    ./fib selfMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.selfMobility.log 2>&1 
+    ./$EXE selfMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.selfMobility.log 2>&1 
 
     gracebat -nxy selfMobilityCubicBox.test -par tools/selfMobility.par -hdevice EPS -printfile selfMobilityCubicBox.eps
 
@@ -78,7 +79,7 @@ function pairMobilityCubicBox {
     #Computes 1-M_{\alpha\beta}(\vec{r}, L)/M_{\alpha\beta}(\vec{r}, L=\inf) for two particles with opposing forces, which should converge to 0 for all terms.
     #It computes dist for several distances and uses a random distance between the two particles each time.
     
-    ./fib pairMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility.log 2>&1 
+    ./$EXE pairMobilityCubicBox 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility.log 2>&1 
 
     maxDeviation=$(
     for i in $(ls  pairMobilityCubicBox.dist*.test)
@@ -100,7 +101,7 @@ function pairMobilityCubicBox {
 
 function selfMobility_q2D {
     echo "Self Mobility q2D test"
-    ./fib selfMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.selfMobility_q2D.log 2>&1 
+    ./$EXE selfMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.selfMobility_q2D.log 2>&1 
 
     gracebat -nxy selfMobility_q2D.test -nxy selfMobility_q2D.theo.test -par tools/selfMobility_q2D.par -hdevice EPS -printfile selfMobility_q2D.eps
 
@@ -110,7 +111,7 @@ function selfMobility_q2D {
 
 function selfDiffusionCubicBox {
     echo "Self diffusion cubic box test"
-    ./fib selfDiffusionCubicBox $temperature $viscosity $hydrodynamicRadius $tolerance  > uammd.selfDiffusion.log 2>&1
+    ./$EXE selfDiffusionCubicBox $temperature $viscosity $hydrodynamicRadius $tolerance  > uammd.selfDiffusion.log 2>&1
     g++ -std=c++11 -O3 tools/msd.cpp tools/Timer.cpp -o msd
     for i in $(ls pos.noise*.test | grep -v q2D)
     do
@@ -145,7 +146,7 @@ function selfDiffusionCubicBox {
 
 function selfDiffusion_q2D {
     echo "Self diffusion q2D test"
-    ./fib selfDiffusion_q2D $temperature $viscosity $hydrodynamicRadius $tolerance  > uammd.selfDiffusion_q2D.log 2>&1
+    ./$EXE selfDiffusion_q2D $temperature $viscosity $hydrodynamicRadius $tolerance  > uammd.selfDiffusion_q2D.log 2>&1
     g++ -std=c++11 -O3 tools/msd.cpp tools/Timer.cpp -o msd
     for i in $(ls pos.noise*.*q2D*test)
     do
@@ -173,14 +174,14 @@ function selfDiffusion_q2D {
 
 function noiseVariance {
     echo "Noise variance test"
-    ./fib noiseVariance $temperature $viscosity $hydrodynamicRadius $tolerance > uammd.noiseVariance.log 2>&1 
+    ./$EXE noiseVariance $temperature $viscosity $hydrodynamicRadius $tolerance > uammd.noiseVariance.log 2>&1 
     gracebat -nxy noiseVariance.test -par tools/noiseVariance.par -hdevice EPS -printfile figures/noiseVariance.eps
     mv noiseVariance.test uammd.noiseVariance.log $resultsFolder/
 }
 
 function radialDistributionFunction {
     echo "Radial Distribution Function"
-    ./fib radialDistributionFunction $temperature $viscosity $hydrodynamicRadius $tolerance > uammd.radialDistributionFunction.log 2>&1
+    ./$EXE radialDistributionFunction $temperature $viscosity $hydrodynamicRadius $tolerance > uammd.radialDistributionFunction.log 2>&1
 
     if ! ls tools/rdf >/dev/null 2>&1
     then
@@ -199,7 +200,7 @@ function radialDistributionFunction {
 
     
 pairMobilityCubicBox
-#./fib pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1 
+#./$EXE pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1 
 selfMobilityCubicBox
 selfMobility_q2D
 selfDiffusionCubicBox
