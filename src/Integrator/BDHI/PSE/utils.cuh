@@ -31,10 +31,14 @@ namespace uammd{
 	return make_int3(ikx, iky, ikz);
       }
 
-      __device__ real3 waveNumberToWaveVector(int3 ik, real3 L, real shearStrain){
-	auto kvec = (real(2.0)*real(M_PI)/L)*make_real3(ik.x, ik.y, ik.z);
+      __device__ real3 shearWaveVector(real3 kvec, real shearStrain){
 	kvec.y -= shearStrain*kvec.x;
 	return kvec;
+      }
+
+      __device__ real3 waveNumberToWaveVector(int3 ik, real3 L, real shearStrain){
+	auto kvec = (real(2.0)*real(M_PI)/L)*make_real3(ik.x, ik.y, ik.z);
+	return shearWaveVector(kvec, shearStrain);
       }
     }
   }

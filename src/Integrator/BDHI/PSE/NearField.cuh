@@ -215,16 +215,17 @@ namespace uammd{
       
       }
 
-      void NearField::Mdot(real3 *MF, cudaStream_t st){
-	//Sheared coordinates fix. The rcut must be increased by a safety factor
-	real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
-	sys->log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);
-	cl->update(box, rcut*safetyFactor, st);
-	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
-	auto force = pd->getForce(access::location::gpu, access::mode::read);
-	pse_ns::RPYNearTransverser<real4> tr(force.begin(), MF, *RPY_near, rcut, box, shearStrain);
-	sys->log<System::DEBUG1>("[BDHI::PSE] Shear strain %f", shearStrain);
-	cl->transverseList(tr, st);
+      void NearField::Mdot(real4* forces, real3 *MF, cudaStream_t st){
+	if(forces){
+	  //Sheared coordinates fix. The rcut must be increased by a safety factor
+	  real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
+	  sys->log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);	
+	  cl->update(box, rcut*safetyFactor, st);
+	  sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
+	  pse_ns::RPYNearTransverser<real4> tr(forces, MF, *RPY_near, rcut, box, shearStrain);
+	  sys->log<System::DEBUG1>("[BDHI::PSE] Shear strain %f", shearStrain);
+	  cl->transverseList(tr, st);
+	}
       }
 
       void NearField::computeBdW(real3* BdW, cudaStream_t st){

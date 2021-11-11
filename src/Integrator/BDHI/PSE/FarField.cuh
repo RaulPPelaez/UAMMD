@@ -70,6 +70,7 @@ namespace uammd{
 	   Returns B(||k||^2, xi, eta) = 1/(vis·Vol) · sinc(k·rh)^2/k^2·Hashimoto(k,xi,eta)
 	*/
 	__device__ real greensFunction(real3 waveVector,
+				       real shearStrain,
 				       real rh, //Hydrodynamic radius
 				       real viscosity,
 				       real split, //Ewald splitting
@@ -79,19 +80,26 @@ namespace uammd{
 	  if(k2 == 0){
 	    return real(0.0);
 	  }
+	  const real3 K_NUFFT = waveVector;
+	  const real3 K_Ewald = shearWaveVector(waveVector, shearStrain);
 	  /*Compute the scaling factor for this node*/
-	  const real k = sqrt(k2);
-	  const real invk2 = real(1.0)/k2;
-	  const real sinck = sin(k*rh)/k;
-	  const real k2_invsplit2_4 = k2/(4.0*split*split);
+	  double K_Ewald2 = dot(K_Ewald,K_Ewald);
+	  double K_NUFFT2 = dot(K_NUFFT,K_NUFFT);
+	  double kmod = sqrt(K_Ewald2);
+	  double invk2 = 1.0/K_Ewald2;
+	  double sink = sin(kmod*rh);
+	  double kEw2_invsplit2_4 = K_Ewald2/(4.0*split*split);
+	  double kNU2_invsplit2_4 = K_NUFFT2/(4.0*split*split);
 	  /*The Hashimoto splitting function,
 	    split is the splitting between near and far contributions,
 	    eta is the splitting of the gaussian kernel used in the grid interpolation, see sec. 2 in [2]*/
 	  /*See eq. 11 in [1] and eq. 11 and 14 in [2]*/
-	  const real tau = -k2_invsplit2_4*(1.0-eta);
-	  const real hashimoto = (1.0 + k2_invsplit2_4)*exp(tau)/k2;
+	  /* Modification for shear strain: the right exponential is 
+	     exp ((eta*kNUFFT^2- kEwald^2)/(4*xi^2)) */
+	  double tau = eta*kNU2_invsplit2_4-kEw2_invsplit2_4;
+	  double hashimoto = (1.0 + kEw2_invsplit2_4)*exp(tau)/K_Ewald2;
 	  /*eq. 20.5 in [1]*/
-	  real B = sinck*sinck*hashimoto/(viscosity*rh*rh);
+	  real B = sink*sink*hashimoto/(viscosity*rh*rh);
 	  B /= real(n.x*n.y*n.z);
 	  //B(k)*(I- k^k/k^2)
 	  return B;
@@ -118,7 +126,7 @@ namespace uammd{
 	  if(id>=(ncells.z*ncells.y*(ncells.x/2+1))) return;
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
 	  const real3 waveVector = waveNumberToWaveVector(waveNumber, grid.box.boxSize, shearStrain);
-	  const real B = greensFunction(waveVector,
+	  const real B = greensFunction(waveVector, shearStrain,
 					hydrodynamicRadius, viscosity, split, eta, ncells);
 	  gridVels[id] = B*projectFourier(waveVector, gridForces[id]);
 	}
@@ -144,24 +152,24 @@ namespace uammd{
 	  /*Beware of nyquist points! They only appear with even cell dimensions
 	    There are 8 nyquist points at most (cell=0,0,0 is excluded at the start of the kernel)
 	    These are the 8 vertex of the inferior left cuadrant. The O points:
-	    +--------+--------+
-	    /|       /|       /|
-	    / |      / |      / |
-	    +--------+--------+  |
-	    /|  |    /|  |    /|  |
-	    / |  +---/-|--+---/-|--+
-	    +--------+--------+  |	/|
-	    |  |/ |  |  |/ |  |  |/ |
-	    |  O-----|--O-----|--+	 |
-	    | /|6 |  | /|7 |  | /|	 |
-	    |/ |  +--|/-|--+--|/-|--+
-	    O--------O--------+  |	/
-	    |5 |/    |4 |/    |  |/
-	    |  O-----|--O-----|--+
-	    ^   | / 3    | / 2    | /  ^
-	    |   |/       |/       |/  /
-	    kz  O--------O--------+  ky
-	    kx ->     1
+                       +--------+--------+
+                      /|       /|       /|
+                     / |      / |      / |
+                    +--------+--------+  |
+                   /|  |    /|  |    /|  |
+                  / |  +---/-|--+---/-|--+
+                 +--------+--------+  |	/|
+                 |  |/ |  |  |/ |  |  |/ |
+                 |  O-----|--O-----|--+	 |
+                 | /|6 |  | /|7 |  | /|	 |
+                 |/ |  +--|/-|--+--|/-|--+
+                 O--------O--------+  |	/
+                 |5 |/    |4 |/    |  |/
+                 |  O-----|--O-----|--+
+             ^   | / 3    | / 2    | /  ^
+             |   |/       |/       |/  /
+             kz  O--------O--------+  ky
+                 kx ->     1
 	  */
 	  //Is the current wave number a nyquist point?
 	  const bool isXnyquist = (cell.x == ncells.x - cell.x) and (ncells.x%2 == 0);
@@ -222,8 +230,8 @@ namespace uammd{
 	  /*Z = sqrt(B)·(I-k^k)·dW*/
 	  {// Compute for v_k wave number
 	    const int3 ik = indexToWaveNumber(id, nk);
-	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, , shearStrain);
-	    const real B = greensFunction(k, hydrodynamicRadius, viscosity, split, eta, nk);
+	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, shearStrain);
+	    const real B = greensFunction(k, shearStrain, hydrodynamicRadius, viscosity, split, eta, nk);
 	    gridVelsFourier[id] += sqrt(B)*projectFourier(k, noise);
 	  }
 	  /*Compute for conjugate v_{N-k} if needed*/
@@ -243,7 +251,7 @@ namespace uammd{
 	    factor.x.y *= real(-1.0);
 	    factor.y.y *= real(-1.0);
 	    factor.z.y *= real(-1.0);
-	    const real B = greensFunction(k, hydrodynamicRadius, viscosity, split, eta, nk);
+	    const real B = greensFunction(k, shearStrain, hydrodynamicRadius, viscosity, split, eta, nk);
 	    gridVelsFourier[id_conj] += sqrt(B)*projectFourier(k, factor);
 	  }
 	}
@@ -293,7 +301,7 @@ namespace uammd{
 	  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
 	  = σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
 	*/
-	void Mdot(real4* pos, real4* forces, real3 *Mv, int numberParticles, cudaStream_t st);
+	void computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *Mv, int numberParticles, cudaStream_t st);
 
       private:
 	template<class T> using cached_vector = uninitialized_cached_vector<T>;
@@ -444,14 +452,18 @@ namespace uammd{
 	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
 	= σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
       */
-      void FarField::Mdot(real4* pos, real4* forces, real3 *MF, int numberParticles, cudaStream_t st){
+      void FarField::computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *MF, int numberParticles, cudaStream_t st){
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
 	sys->log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
 	// G_k·FFT(S·F)
 	//The computation is skipped if the forces are not provided (nullptr)
 	auto gridVelsFourier = deterministicPart(pos, forces, numberParticles, st);
+	//1/√σ·√G_k·dWw
+	//The computation is skipped if temperature is zero
 	addBrownianNoise(gridVelsFourier, st);
+	//FFTi
 	auto gridVels = inverseTransformVelocity(gridVelsFourier, st);
+	//St
 	interpolateVelocity(gridVels, pos, MF, numberParticles, st);
 	sys->log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
       }
