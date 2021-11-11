@@ -80,11 +80,22 @@ namespace uammd{
       /*Compute M·F = Mr·F + Mw·F*/
       void computeMF(real3* MF, cudaStream_t st){
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
+	computeMFNearField(MF, st);
+	computeMFFarField(MF, st);
+      }
+
+      void computeMFNearField(real3* MF, cudaStream_t st){
+	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MFNearField....");
+	auto force = pd->getForce(access::location::gpu, access::mode::read);
+	nearField->Mdot(force.begin(), MF, st);
+      }
+
+      void computeMFFarField(real3* MF, cudaStream_t st){
+	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MFFarField....");
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
 	auto force = pd->getForce(access::location::gpu, access::mode::read);	
-	nearField->Mdot(force.begin(), MF, st);
 	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles, st);
       }
 
