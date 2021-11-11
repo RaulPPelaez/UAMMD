@@ -1,15 +1,23 @@
 /*Raul P. Pelaez 2020, Kernels (Window  functions) for FCM.
   These are adapted from kernels in the IBM module, they are adapted to provide the resulting hydrodynamic radius and the support for a given tolerance.
+
+TODO:
+ 100- Create the function:
+      template<class Kernel>
+      auto createKernelTorque(...);
+      Given the translational kernel and a series of parameters, this function should return a version of the kernel
+      that can be used for rotation.
  */
 #ifndef FCM_KERNELS_CUH
 #define FCM_KERNELS_CUH
-#include "BDHI.cuh"
+#include "Integrator/BDHI/BDHI.cuh"
 #include "misc/IBM_kernels.cuh"
 namespace uammd{
   namespace BDHI{
     namespace FCM_ns{
       namespace Kernels{
-	class Gaussian {
+
+	class Gaussian{
 	  IBM_kernels::Gaussian kern;
 	  static real computeUpsampling(real tolerance){
 	    real amin = 0.55;
@@ -41,6 +49,29 @@ namespace uammd{
 
 	  real fixHydrodynamicRadius(real hydrodynamicRadius, real h){
 	    return a;
+	  }
+
+	  __host__ __device__ real phi(real r) const{
+	    return r>=rmax?0:kern.phi(r);
+	  }
+
+	};
+
+	class GaussianTorque{
+	  IBM_kernels::Gaussian kern;
+	  real a;
+	public:
+	  int support;
+	  real rmax;
+	  GaussianTorque(real width, real h, real tolerance):
+	    kern(width){
+	    const real dr = 0.5*h;
+	    real r = dr;
+	    while(kern.phi(r)>tolerance){
+	      r += dr;
+	    }
+	    this->support = std::max(3, int(2*r/h + 0.5));
+	    rmax = support*h;
 	  }
 
 	  __host__ __device__ real phi(real r) const{

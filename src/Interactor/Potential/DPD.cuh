@@ -1,4 +1,4 @@
-/* Raul P. Pelaez 2018. Dissipative Particle Dynamics potential.
+/* Raul P. Pelaez 2018-2021. Dissipative Particle Dynamics potential.
 
    A DPD simulation can be seen as a regular Molecular Dynamics simulation with a special interaction force between particles [1].
    This file implements a Potential entity that when used with a VerletNVE integrator (through a PairForces interactor) will produce a DPD simulation.
@@ -35,7 +35,6 @@ namespace uammd{
     template<class DissipativeStrength = DefaultDissipation>
     class DPD_impl: public ParameterUpdatable{
     protected:
-      shared_ptr<System> sys;
       int step;
       real rcut;
       DissipativeStrength gamma; //Dissipative force strength
@@ -52,20 +51,24 @@ namespace uammd{
 	real A = 1;
       };
 
+      //The system parameter is deprecated and actually unused, the
+      // other constructor is left here for retrocompatibility
+      DPD_impl(Parameters par): DPD_impl(nullptr, par){}
+
       DPD_impl(shared_ptr<System> sys, Parameters par):
-	sys(sys), rcut(par.cutOff), dt(par.dt), gamma(par.gamma), temperature(par.temperature), A(par.A){
-	sys->log<System::MESSAGE>("[Potential::DPD] Created");
+        rcut(par.cutOff), dt(par.dt), gamma(par.gamma), temperature(par.temperature), A(par.A){
+	System::log<System::MESSAGE>("[Potential::DPD] Created");
 	step = 0;
 	sigma = sqrt(2.0*temperature)/sqrt(dt);
-	sys->log<System::MESSAGE>("[Potential::DPD] Temperature: %f", temperature);
-	sys->log<System::MESSAGE>("[Potential::DPD] Cut off: %f", rcut);
-	sys->log<System::MESSAGE>("[Potential::DPD] aij: %f", A);
+	System::log<System::MESSAGE>("[Potential::DPD] Temperature: %f", temperature);
+	System::log<System::MESSAGE>("[Potential::DPD] Cut off: %f", rcut);
+	System::log<System::MESSAGE>("[Potential::DPD] aij: %f", A);
 	printGamma();
       }
       void printGamma();
 
       ~DPD_impl(){
-	sys->log<System::MESSAGE>("[Potential::DPD] Destroyed");
+	System::log<System::MESSAGE>("[Potential::DPD] Destroyed");
       }
 
       real getCutOff(){ return rcut;}
@@ -116,8 +119,6 @@ namespace uammd{
 	  int id;
 	};
 
-	inline __device__ returnInfo zero(){ return make_real3(0);}
-
 	inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, const Info &infoi, const Info &infoj){
 	  real3 rij = box.apply_pbc(make_real3(pi) - make_real3(pj));
 	  real3 vij = make_real3(infoi.vel) - make_real3(infoj.vel);
@@ -144,8 +145,6 @@ namespace uammd{
 
 	inline __device__ Info getInfo(int pi){return  {vel[pi], pi};}
 
-	inline __device__ void accumulate(returnInfo &total, const returnInfo &current){total += current;}
-
 	inline __device__ void set(uint pi, const returnInfo &total){ force[pi] += make_real4(total);}
 
       };
@@ -154,7 +153,7 @@ namespace uammd{
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
 	auto vel = pd->getVel(access::location::gpu, access::mode::read);
 	auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
-	auto seed = sys->rng().next();
+	static auto seed = pd->getSystem()->rng().next();
 	step++;
 	int N = pd->getNumParticles();
 	return ForceTransverser(pos.raw(), vel.raw(), force.raw(), seed, step, box, N, rcut, gamma, sigma, A);
@@ -162,7 +161,7 @@ namespace uammd{
       //Notice that no getEnergyTransverser is present, this is not a problem as modules using this potential will fall back to a BasicNullTransverser when the method getEnergyTransverser is not found and the energy will not be computed altogether.
 
       BasicNullTransverser getForceEnergyTransverser(Box box, shared_ptr<ParticleData> pd){
-	sys->log<System::CRITICAL>("[DPD] No way of measuring energy in DPD");
+	System::log<System::CRITICAL>("[DPD] No way of measuring energy in DPD");
 	return BasicNullTransverser();
       }
 
@@ -170,12 +169,12 @@ namespace uammd{
 
     template<>
     void DPD_impl<DefaultDissipation>::printGamma(){
-      sys->log<System::MESSAGE>("[Potential::DPD] gamma: %f", gamma.gamma);
+      System::log<System::MESSAGE>("[Potential::DPD] gamma: %f", gamma.gamma);
     }
 
     template<class T>
     void DPD_impl<T>::printGamma(){
-      sys->log<System::MESSAGE>("[Potential::DPD] Using %s for dissipation", type_name<T>().c_str());
+      System::log<System::MESSAGE>("[Potential::DPD] Using %s for dissipation", type_name<T>().c_str());
     }
 
     using DPD = DPD_impl<>;

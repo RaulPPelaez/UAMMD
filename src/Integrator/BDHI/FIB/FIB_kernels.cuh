@@ -1,13 +1,13 @@
-/*Raul P. Pelaez 2020, Kernels (Window  functions) for FCM.
+/*Raul P. Pelaez 2021, Kernels (Window  functions) for FIB.
   These are adapted from kernels in the IBM module, they are adapted to provide the resulting hydrodynamic radius and the support for a given tolerance.
  */
-#ifndef FCM_KERNELS_CUH
-#define FCM_KERNELS_CUH
-#include "BDHI.cuh"
+#ifndef FIB_KERNELS_CUH
+#define FIB_KERNELS_CUH
+#include "Integrator/BDHI/BDHI.cuh"
 #include "misc/IBM_kernels.cuh"
 namespace uammd{
   namespace BDHI{
-    namespace FCM_ns{
+    namespace FIB_ns{
       namespace Kernels{
 	class Gaussian {
 	  IBM_kernels::Gaussian kern;
@@ -46,7 +46,6 @@ namespace uammd{
 	  __host__ __device__ real phi(real r) const{
 	    return r>=rmax?0:kern.phi(r);
 	  }
-
 	};
 
 	class BarnettMagland{
@@ -54,6 +53,7 @@ namespace uammd{
 
 	  IBM_kernels::BarnettMagland initBM(real tolerance){
 	    real w = computeW(tolerance);
+	    //real beta=sqrt(2*M_PI)*w*2;
 	    real beta=1.8*w*2;
 	    return IBM_kernels::BarnettMagland(w, beta);
 	  }
@@ -102,6 +102,9 @@ namespace uammd{
 	    return bm.phi(r/a)/a;
 	  }
 
+	  __host__ __device__ real delta(real3 r, real3 h) const{
+	    return phi(r.x)*phi(r.y)*phi(r.z);
+	  }
 	};
 
 	namespace Peskin{
@@ -115,15 +118,19 @@ namespace uammd{
 	    }
 
 	    static real adviseGridSize(real hydrodynamicRadius, real tolerance){
-	      return hydrodynamicRadius;
+	      return hydrodynamicRadius/0.91;
 	    }
 
 	    real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
-	      return h;
+	      return h*0.91;
 	    }
 
 	    __host__ __device__ real phi(real r) const{
 	      return kern.phi(r);
+	    }
+
+	    __host__ __device__ real delta(real3 r, real3 h) const{
+	      return kern.phi(r.x)*kern.phi(r.y)*kern.phi(r.z);
 	    }
 
 	  };
@@ -135,16 +142,16 @@ namespace uammd{
 
 	    fourPoint(real h, real tolerance): kern(h){
 	    }
-	    static constexpr real fac = 1.31;
-	    static constexpr real adviseGridSize(real hydrodynamicRadius, real tolerance){
+	    static constexpr real fac = 1.265;
+	    static real adviseGridSize(real hydrodynamicRadius, real tolerance){
 	      return hydrodynamicRadius/fac;
 	    }
 
-	    static constexpr real fixHydrodynamicRadius(real hydrodynamicRadius, real h){
+	    real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
 	      return h*fac;
 	    }
 
-	    __device__ real phi(real r) const{
+	    __host__ __device__ real phi(real r) const{
 	      return kern.phi(r);
 	    }
 
@@ -159,19 +166,18 @@ namespace uammd{
 
 	    sixPoint(real h, real tolerance): kern(h, tolerance){
 	    }
-	    static constexpr real fac = 1.5195;
-	    static constexpr real adviseGridSize(real hydrodynamicRadius, real tolerance){
+	    static constexpr real fac = 1.483;
+	    static real adviseGridSize(real hydrodynamicRadius, real tolerance){
 	      return hydrodynamicRadius/fac;
 	    }
 
-	    static constexpr real fixHydrodynamicRadius(real hydrodynamicRadius, real h){
+	    real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
 	      return h*fac;
 	    }
 
-	    __device__ real phi(real r) const{
+	    __host__ __device__ real phi(real r) const{
 	      return kern.phi_tabulated(r);
 	    }
-
 	  };
 	}
 

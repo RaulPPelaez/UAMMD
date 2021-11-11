@@ -361,8 +361,39 @@ struct Angular{
 				real3 posi,
 				real3 posj,
 				real3 posk,
-				BondInfo bond_info){
-    return 0;
+				BondInfo bond_info){   
+    const real ang0 = bond_info.ang0;
+    const real kspring = bond_info.k;
+    //         i -------- j -------- k
+    //             rij->     rjk ->
+    //Compute distances and vectors
+    //---rij---
+    const real3 rij =  box.apply_pbc(posj - posi);
+    const real rij2 = dot(rij, rij);
+    const real invsqrij = rsqrt(rij2);
+    //---rkj---
+    const real3 rjk =  box.apply_pbc(posk - posj);
+    const real rjk2 = dot(rjk, rjk);
+    const real invsqrjk = rsqrt(rjk2);
+    const real a2 = invsqrij * invsqrjk;
+    real cijk = dot(rij, rjk)*a2; //cijk = cos (theta) = rij*rkj / mod(rij)*mod(rkj)
+    //Cos must stay in range
+    if(cijk>real(1.0)) cijk = real(1.0);
+    else if (cijk<real(-1.0)) cijk = -real(1.0);
+    real ampli;
+    // //Approximation for small angle displacements
+    // real sijk = sqrt(real(1.0)-cijk*cijk); //sijk = sin(theta) = sqrt(1-cos(theta)^2)
+    // //sijk cant be zero to avoid division by zero
+    // if(sijk<std::numeric_limits<real>::min()) sijk = std::numeric_limits<real>::min();
+    // ampli = -kspring * (acos(cijk) - ang0)/sijk; //The force amplitude -k·(theta-theta_0)
+    //ampli = -kspring*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0; //k(1-cos(ang-ang0))
+    const real theta = acos(cijk);
+    if(theta==real(0.0))  return real(0);
+    const real sinthetao2 = sin(real(0.5)*theta);
+    const real stmst= (sinthetao2 - sin(ang0*real(0.5)));
+    ampli = real(4.0)*kspring*stmst*stmst;
+    //Split the bond energy between the three particles
+    return ampli/real(3.0);
   }
 
   static BondInfo readBond(std::istream &in){

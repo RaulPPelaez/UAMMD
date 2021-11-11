@@ -101,6 +101,9 @@ namespace uammd {
 
     template<class Pot>
     void Anderson<Pot>::updateSimulationBox(Box box){
+      for(auto updatable: updatables){
+	updatable->updateBox(par.box);
+      }
       real rcut = pot->getCutOff();
       this->grid = Anderson_ns::createGrid(box, rcut);
       if(not Anderson_ns::checkGridValidity(grid)){
@@ -146,6 +149,11 @@ namespace uammd {
     template<class Pot>
     void Anderson<Pot>::forwardTime(){
       sys->log<System::DEBUG>("[MC_NVT::Anderson] Performing Monte Carlo Parallel step: %d", steps);
+      if(steps==0){
+	for(auto updatable: updatables){
+	  updatable->updateTemperature(par.temperature);
+	}
+      }
       steps++;
       updateOrigin();
       updateListWithCurrentOrigin();

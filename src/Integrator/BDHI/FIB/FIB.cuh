@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2018. Fluctuating Immerse Boundary for Brownian Dynamics with Hydrodynamic Interactions.
+/*Raul P. Pelaez 2018-2021. Fluctuating Immerse Boundary for Brownian Dynamics with Hydrodynamic Interactions.
 
 This file implements the algorithm described in [1] for PBC using FFT to solve the stokes operator. Fluid properties are stored in a staggered grid for improved translational invariance [2]. This module solves the same regime as the rest of the BDHI modules, but without imposing a mobility kernel. FIB solves the fluctuating Navier-Stokes equation directly.
 
@@ -84,22 +84,12 @@ REFERENCES:
 
 #ifndef INTEGRATORBDHIFIB_CUH
 #define INTEGRATORBDHIFIB_CUH
-#include"System/System.h"
-#include"ParticleData/ParticleData.cuh"
-#include"ParticleData/ParticleGroup.cuh"
-#include"global/defines.h"
-
 #include"Integrator/Integrator.cuh"
-#include<thrust/device_vector.h>
-
 #include "utils/utils.h"
-#include"Interactor/NeighbourList/CellList.cuh"
 #include"utils/cufftPrecisionAgnostic.h"
 #include"utils/Grid.cuh"
 #include<curand.h>
-
-
-#include"misc/IBM_kernels.cuh"
+#include"FIB_kernels.cuh"
 
 namespace uammd{
   namespace BDHI{
@@ -136,6 +126,8 @@ namespace uammd{
 	Box box;
 	int3 cells={-1, -1, -1}; //Default is compute the closest number of cells that is a FFT friendly number
 	Scheme scheme = Scheme::IMPROVED_MIDPOINT;
+	//Tolerance for the kernels (if they have a tolerance, like Gaussian)
+	real tolerance = 1e-5;
       };
 
       FIB(shared_ptr<ParticleData> pd,
@@ -157,23 +149,36 @@ namespace uammd{
       using cufftReal = cufftReal_t<real>;
 
       real getSelfMobility(){
-	double rh = 0.91*box.boxSize.x/grid.cellDim.x;
-	double l = rh/box.boxSize.x;
-	return 1.0/(6*M_PI*viscosity*rh)*(1-2.837297*l+(4.0/3.0)*M_PI*l*l*l-27.4*pow(l,6));
+	long double rh = this->getHydrodynamicRadius();
+	long double L = box.boxSize.x;
+	long double a = rh/L;
+	long double a2= a*a; long double a3 = a2*a;
+	long double c = 2.83729747948061947666591710460773907l;
+	long double b = 0.19457l;
+	long double a6pref = 16.0l*M_PIl*M_PIl/45.0l + 630.0L*b*b;
+	return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-c*a+(4.0l/3.0l)*M_PIl*a3-a6pref*a3*a3);
       }
+
       real getHydrodynamicRadius(){
-	return 0.91*box.boxSize.x/(real)grid.cellDim.x;
+	return hydrodynamicRadius;
+      }
+
+      real getCellSize(){
+	return grid.cellSize.x;
       }
     private:
-      using Kernel = IBM_kernels::Peskin::threePoint;
+      using Kernel = FIB_ns::Kernels::Peskin::threePoint;
+      //using Kernel = FIB_ns::Kernels::Peskin::fourPoint;
+      //using Kernel = FIB_ns::Kernels::GaussianFlexible::sixPoint;
+
+      std::shared_ptr<Kernel> kernel;
       real temperature, viscosity;
 
       Grid grid;
       Box box;
-
+      real hydrodynamicRadius;
       cufftHandle cufft_plan_forward, cufft_plan_inverse;
       thrust::device_vector<char> cufftWorkArea; //Work space for cufft
-
 
       thrust::device_vector<real3> gridVels;
       thrust::device_vector<cufftComplex> gridVelsFourier;

@@ -306,7 +306,7 @@ namespace uammd{
 					 real viscosity,
 					 real density,
 					 real dt,
-					 Grid grid){
+					 Grid grid, bool removeTotalMomentum){
 	/*I expect a 3D grid of threads, one for each fourier node/grid cell*/
 	/*Get my cell*/
 	int3 cell;
@@ -318,9 +318,12 @@ namespace uammd{
 	if(cell.z>=grid.cellDim.z) return;
 	/*Get my cell index (position in the array) */
 	const int icell =grid.getCellIndex(cell);
-	//k=0 cannot contribute, v_cm = 0
+	const int ncells = grid.getNumberCells();
 	if(icell==0){
-	  gridVels[0] = cufftComplex3();//{0,0 ,0,0 ,0,0};
+	  if(removeTotalMomentum)
+	    gridVels[0] = cufftComplex3();//{0,0 ,0,0 ,0,0};
+	  else
+	    gridVels[0]/=real(ncells);
 	  return;
 	}
 	//Staggered grid requires to define an effective k -> keff_\alpha = 2/d\alpha*sin(k_\alpha*d\alpha/2)
@@ -347,7 +350,6 @@ namespace uammd{
 	  }
 	  vk = projectFourier(keff, prefactor*vk);
 	}
-	const int ncells = grid.getNumberCells();
 	//Store new velocity shifted back to cell faces, normalize FFT
 	gridVels[icell] = (real(1.0)/real(ncells))*shiftVelocity(vk, cosk, sink);
       }
@@ -748,6 +750,7 @@ namespace uammd{
       density(par.density),
       viscosity(par.viscosity),
       box(par.box),
+      removeTotalMomentum(par.removeTotalMomentum),
       sumThermalDrift(par.sumThermalDrift){
       sys->log<System::MESSAGE>("[Hydro::ICM] Initialized");
       CudaCheckError();
@@ -1038,7 +1041,8 @@ namespace uammd{
 									 viscosity,
 									 density,
 									 dt,
-									 grid);
+									 grid,
+									 removeTotalMomentum);
       sys->log<System::DEBUG3>("[Hydro::ICM] Going back to real space");
       //Go back to real space
       CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, d_gridDataF, d_gridData));
@@ -1094,19 +1098,20 @@ namespace uammd{
     void ICM::forwardTime(){
       step++;
       if(step==1){
-	for(auto forceComp: interactors){
-	  forceComp->updateTemperature(temperature);
-	  forceComp->updateTimeStep(dt);
-	  forceComp->updateBox(box);
-	  forceComp->updateSimulationTime(0);
-	  forceComp->sumForce(0);
+	for(auto updatable: updatables){
+	  updatable->updateTemperature(temperature);
+	  updatable->updateTimeStep(dt);
+	  updatable->updateViscosity(viscosity);
+	  updatable->updateBox(box);
+	  updatable->updateSimulationTime(0);
 	}
+	for(auto forceComp: interactors) forceComp->sumForce(0);
 	cudaDeviceSynchronize();
       }
       sys->log<System::DEBUG1>("[Hydro::ICM] Performing integration step %d", step);
       //Take particles to t_{n+1/2}
       predictorStep();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime((step-0.5)*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime((step-0.5)*dt);
       //Compute unperturbed fluid forcing \vec{g}
       unperturbedFluidForcing();
       spreadParticleForces(); //Sum SF
@@ -1117,7 +1122,7 @@ namespace uammd{
       //gridVelsPrediction = gridVels;
       //Take particles to t_{n+1}
       correctorStep();
-      for(auto forceComp: interactors) forceComp->updateSimulationTime(step*dt);
+      for(auto updatable: updatables) updatable->updateSimulationTime(step*dt);
       CudaCheckError();
     }
   }

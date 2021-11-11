@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2020. Force Biased Monte Carlo Integrator. The algorithm
+/*Raul P. Pelaez 2020-2021. Force Biased Monte Carlo Integrator. The algorithm
 encoded in this module is the so called Metropolized Forward Euler-Maruyama in
 [1]. Also known as Metropolis-adjusted Langevin algorithm (MALA).
 
@@ -207,8 +207,8 @@ namespace uammd{
 
       void updateInteractors(){
 	if(step==0){
-	  for(auto forceComp: interactors){
-	    forceComp->updateTemperature(1.0/beta);
+	  for(auto updatable: updatables){
+	    updatable->updateTemperature(1.0/beta);
 	  }
 	}
       }

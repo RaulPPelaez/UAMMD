@@ -44,8 +44,8 @@ namespace uammd{
 
 	~NearField(){}
 	
-	void Mdot(real3 *MF, cudaStream_t st);
-	
+	void Mdot(real4* forces, real3 *MF, cudaStream_t st);
+
 	void computeBdW(real3* BdW, cudaStream_t st);
 	
       private:
@@ -91,7 +91,6 @@ namespace uammd{
 	}
       };
 
-
       namespace pse_ns{
 	/*Compute the product M_nearv = M_near·v by transversing a neighbour list
 
@@ -118,8 +117,6 @@ namespace uammd{
 	    v(v), Mv(Mv), FandG(FandG), box(box), shearStrain(shearStrain){
 	    this->rcut2 = (rcut*rcut);
 	  }
-
-	  inline __device__ computeType zero(){ return computeType();}
 
 	  inline __device__ infoType getInfo(int pi){
 	    return make_real3(v[pi]);
@@ -172,8 +169,6 @@ namespace uammd{
 	    /*((g(r)-f(r))·v·(r(diadic)r) )_ß = gmfv·r_ß*/
 	    return make_real3(f*vj + gmfv*rij);
 	  }
-	
-	  inline __device__ void accumulate(computeType &total, const computeType &cur){total += cur;}
 
 	  inline __device__ void set(int id, const computeType &total){
 	    Mv[id] += make_real3(total);
@@ -223,12 +218,12 @@ namespace uammd{
       void NearField::Mdot(real3 *MF, cudaStream_t st){
 	//Sheared coordinates fix. The rcut must be increased by a safety factor
 	real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
-	sys->log<System::MESSAGE>("[BDHI::PSE] Safety factor %f", safetyFactor);
+	sys->log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);
 	cl->update(box, rcut*safetyFactor, st);
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
 	auto force = pd->getForce(access::location::gpu, access::mode::read);
 	pse_ns::RPYNearTransverser<real4> tr(force.begin(), MF, *RPY_near, rcut, box, shearStrain);
-	sys->log<System::MESSAGE>("[BDHI::PSE] Shear strain %f", shearStrain);
+	sys->log<System::DEBUG1>("[BDHI::PSE] Shear strain %f", shearStrain);
 	cl->transverseList(tr, st);
       }
 
@@ -237,6 +232,7 @@ namespace uammd{
 	if(temperature == real(0.0)) return;
 	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box, shearStrain);
 	int numberParticles = pg->getNumberParticles();
+	cl->update(box, rcut, st);
 	pse_ns::Dotctor Mvdot_near(tr, cl, numberParticles, st);
 	/*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/
 	real *noise = lanczos->getV(numberParticles);
@@ -252,7 +248,7 @@ namespace uammd{
 	  sys->log<System::EXCEPTION>("[BDHI::PSE] Lanczos Algorithm failed with code %d!", status);
 	  throw std::runtime_error("Lanczos algorithm exited abnormally");
 	}
-      } 
+      }
     }
   }
 }

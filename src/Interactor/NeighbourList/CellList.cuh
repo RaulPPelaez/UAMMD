@@ -107,11 +107,11 @@ namespace uammd{
 
   public:
 
-    CellList(shared_ptr<ParticleData> pd, shared_ptr<System> sys):
-      CellList(pd, std::make_shared<ParticleGroup>(pd, sys), sys){}
+    CellList(shared_ptr<ParticleData> pd, shared_ptr<System> sys = nullptr):
+      CellList(pd, std::make_shared<ParticleGroup>(pd), pd->getSystem()){}
 
-    CellList(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg, shared_ptr<System> sys):
-      pd(pd), pg(pg), sys(sys), currentCutOff(real3()), currentBox(Box()){
+    CellList(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg, shared_ptr<System> sys = nullptr):
+      pd(pd), pg(pg), sys(pd->getSystem()), currentCutOff(real3()), currentBox(Box()){
       sys->log<System::MESSAGE>("[CellList] Created");
       posWriteConnection = pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});
       CudaCheckError();

@@ -162,6 +162,9 @@ namespace uammd{
     template<class PositionIterator>
     bool isParticleDriftOverThreshold(PositionIterator pos, int numberParticles, cudaStream_t st = 0){
       real thresholdDistance = (verletRadiusMultiplier*currentCutOff-currentCutOff)/2.0;
+      if(thresholdDistance <= 1e-6){
+	return true;
+      }
       errorFlagsGPU[0] = 0;
       int blockSize = 128;
       int nblocks = numberParticles/blockSize+1;

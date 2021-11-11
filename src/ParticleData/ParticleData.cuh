@@ -15,6 +15,9 @@
   CREATION:
 
   auto pd = make_shared<ParticleData>(numberParticles, system);
+  //System can be ommited if a handle to it is not needed. 
+  //It will be auto created by ParticleData.
+  auto pd = make_shared<ParticleData>(numberParticles);
 
   USAGE:
 
@@ -106,13 +109,10 @@
   			    ((Energy, energy, real))   \
 			    ((Vel, vel, real3))        \
   			    ((Radius, radius, real))   \
-      			    ((Charge, charge, real))
-/*
+      			    ((Charge, charge, real))   \
 			    ((Torque, torque, real4))  \
   			    ((AngVel, angVel, real4))  \
-  			    ((Dir, dir, real4))        \
-
-*/
+  			    ((Dir, dir, real4))
 
 //Get the Name (first letter capital) from a tuple in the property list
 #define PROPNAME_CAPS(tuple) BOOST_PP_TUPLE_ELEM(3, 0 ,tuple)
@@ -167,7 +167,9 @@ namespace uammd{
 
   public:
     ParticleData() = delete;
-    
+
+    ParticleData(int numberParticles): ParticleData(numberParticles, std::make_shared<System>()){}
+
     ParticleData(int numberParticles, shared_ptr<System> sys);
 
     ParticleData(shared_ptr<System> sys, int numberParticles): ParticleData(numberParticles, sys){}
@@ -176,6 +178,10 @@ namespace uammd{
       sys->log<System::DEBUG>("[ParticleData] Destroyed");
     }
 
+    //Return the System instance used by this instance of ParticleData
+    auto getSystem(){
+      return this->sys;
+    }
 
     //Generate getters for all properties except ID
 #define GET_PROPERTY_T(Name,name)  GET_PROPERTY_R(Name,name)
@@ -273,11 +279,6 @@ namespace uammd{
 #define GET_PROPERTY_SIGNAL(r, data, tuple) GET_PROPERTY_SIGNAL_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
     PROPERTY_LOOP(GET_PROPERTY_SIGNAL)
 
-    void emitReorder(){
-      sys->log<System::DEBUG>("[ParticleData] Emitting reorder signal...");
-      (*this->reorderSignal)();
-    }
-
     shared_ptr<signal<void(int)>> getNumParticlesChangedSignal(){
       return this->numParticlesChangedSignal;
     }
@@ -292,6 +293,11 @@ namespace uammd{
 
     void emitNumParticlesChanged(int Nnew){
       (*numParticlesChangedSignal)(Nnew);
+    }
+
+    void emitReorder(){
+      sys->log<System::DEBUG>("[ParticleData] Emitting reorder signal...");
+      (*this->reorderSignal)();
     }
 
   };
