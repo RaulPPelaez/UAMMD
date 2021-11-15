@@ -99,7 +99,7 @@ namespace uammd{
 	  double tau = eta*kNU2_invsplit2_4-kEw2_invsplit2_4;
 	  double hashimoto = (1.0 + kEw2_invsplit2_4)*exp(tau)/K_Ewald2;
 	  /*eq. 20.5 in [1]*/
-	  real B = sink*sink*hashimoto/(viscosity*rh*rh);
+	  real B = sink*sink*invk2*hashimoto/(viscosity*rh*rh);
 	  B /= real(n.x*n.y*n.z);
 	  //B(k)*(I- k^k/k^2)
 	  return B;
