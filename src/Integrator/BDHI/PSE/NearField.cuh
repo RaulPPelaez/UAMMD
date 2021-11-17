@@ -94,6 +94,8 @@ namespace uammd{
 	  sys->log<System::MESSAGE>("[BDHI::PSE] Number of real RPY texture points: %d", nPointsTable);
 	  sys->log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f", rcut);
 	}
+
+	void updateNeighbourList(cudaStream_t st);
       };
 
       namespace pse_ns{
@@ -222,12 +224,16 @@ namespace uammd{
       
       }
 
+      void NearField::updateNeighbourList(cudaStream_t st){
+	//Sheared coordinates fix. The rcut must be increased by a safety factor
+	real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
+	sys->log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);	
+	cl->update(box, rcut*safetyFactor, st);
+      }
+
       void NearField::Mdot(real4* forces, real3 *MF, cudaStream_t st){
 	if(forces){
-	  //Sheared coordinates fix. The rcut must be increased by a safety factor
-	  real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
-	  sys->log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);	
-	  cl->update(box, rcut*safetyFactor, st);
+	  updateNeighbourList(st);
 	  sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
 	  pse_ns::RPYNearTransverser<real4> tr(forces, MF, *RPY_near, rcut, box, shearStrain);
 	  sys->log<System::DEBUG1>("[BDHI::PSE] Shear strain %f", shearStrain);
@@ -242,6 +248,7 @@ namespace uammd{
       void NearField::computeStochasticDisplacements(real3* BdW, real prefactor, cudaStream_t st){
 	//Compute stochastic term only if T>0 
 	if(temperature == real(0.0)) return;
+	updateNeighbourList(st);
 	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box, shearStrain);
 	int numberParticles = pg->getNumberParticles();
 	pse_ns::Dotctor Mvdot_near(tr, cl, numberParticles, st);

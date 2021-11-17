@@ -116,14 +116,14 @@ namespace uammd{
       void computeHydrodynamicDisplacements(real4* force, real3* MF, cudaStream_t st = 0){
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
+	//Compute stochastic part in the near field
+	real prefactor = sqrt(2*temperature/dt);
+	nearField->computeStochasticDisplacements(MF, prefactor, st);
+	//Compute both deterministic and stochastic part in the far field
+	auto pos = pd->getPos(access::location::gpu, access::mode::read);
+	farField->computeHydrodynamicDisplacements(pos.begin(), force, MF, numberParticles, st);
 	//Compute deterministic part in the near field
 	nearField->Mdot(force, MF, st);
-	real prefactor = sqrt(2*temperature/dt);
-	//Compute stochastic part in the near field
-	nearField->computeStochasticDisplacements(MF, prefactor, st);
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	//Compute both deterministic and stochastic part in the far field
-	farField->computeHydrodynamicDisplacements(pos.begin(), force, MF, numberParticles, st);
       }
 
       real getHydrodynamicRadius(){
