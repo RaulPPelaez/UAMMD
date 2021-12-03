@@ -29,14 +29,9 @@ namespace uammd{
       public:
 	using NeighbourList = CellList;
 	NearField(Parameters par, std::shared_ptr<System> sys, std::shared_ptr<ParticleData> pd, std::shared_ptr<ParticleGroup> pg):
-<<<<<<< HEAD
-	  box(par.box), temperature(par.temperature),shearStrain(par.shearStrain),
-	  sys(sys), pd(pd), pg(pg)
-=======
-	  box(par.box),
+	  box(par.box),shearStrain(par.shearStrain),
 	  sys(sys), pd(pd), pg(pg),
 	  tolerance(par.tolerance)
->>>>>>> development
 	{
 	  initializeDeterministicPart(par);
 	  this->seed = sys->rng().next32();

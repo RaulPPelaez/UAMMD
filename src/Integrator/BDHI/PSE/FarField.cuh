@@ -274,11 +274,7 @@ namespace uammd{
 	  box(par.box),
 	  viscosity(par.viscosity),
 	  hydrodynamicRadius(par.hydrodynamicRadius),
-<<<<<<< HEAD
 	  shearStrain(par.shearStrain),
-	  dt(par.dt),
-=======
->>>>>>> development
 	  psi(par.psi),
 	  sys(sys)
 	{
