@@ -11,7 +11,8 @@ namespace uammd{
       auto dir = pd->getDirIfAllocated(access::location::gpu, access::mode::readwrite);
       int numberParticles = pg->getNumberParticles();
       return fcm->computeHydrodynamicDisplacements(pos.raw(), force.raw(), torque.raw(),
-					      numberParticles, st);
+						   numberParticles,
+						   temperature, 1.0/sqrt(dt), st);
     }
 
     void FCMIntegrator::updateInteractors(){
@@ -19,7 +20,7 @@ namespace uammd{
       if(steps==1){
 	for(auto forceComp: interactors){
 	  forceComp->updateTimeStep(dt);
-	  forceComp->updateTemperature(fcm->getTemperature());
+	  forceComp->updateTemperature(temperature);
 	  forceComp->updateBox(fcm->getBox());
 	}
       }
