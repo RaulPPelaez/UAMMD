@@ -102,7 +102,7 @@ namespace uammd{
 	auto force = pd->getForce(access::gpu, access::read);	
 	nearField->Mdot(force.begin(), MF, st);
 	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles,
-						   temperature, 1.0/sqrt(dt), st);
+						   0.0, 0.0, st);
       }
 
       void computeBdW(real3* BdW, cudaStream_t st){
