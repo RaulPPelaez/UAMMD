@@ -879,7 +879,7 @@ VECATTR float3 cross(float3 a, float3 b){
 }
 
 
-VECATTR float3 sqrt(const float3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
+VECATTR float3 sqrt(const float3 &a){ return {sqrtf(a.x), sqrtf(a.y), sqrtf(a.z)};}
 VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
 
 
