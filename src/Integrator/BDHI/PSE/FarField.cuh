@@ -260,10 +260,8 @@ namespace uammd{
 
 	FarField(Parameters par, std::shared_ptr<System> sys):
 	  box(par.box),
-	  temperature(par.temperature),
 	  viscosity(par.viscosity),
 	  hydrodynamicRadius(par.hydrodynamicRadius),
-	  dt(par.dt),
 	  psi(par.psi),
 	  sys(sys)
 	{
@@ -288,7 +286,8 @@ namespace uammd{
 	  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
 	  = σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
 	*/
-	void Mdot(real4* pos, real4* forces, real3 *Mv, int numberParticles, cudaStream_t st);
+	void computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *Mv, int numberParticles,
+					      real temperature, real prefactor, cudaStream_t st);
 
       private:
 	template<class T> using cached_vector = uninitialized_cached_vector<T>;
@@ -298,9 +297,7 @@ namespace uammd{
 	uint seed;
 
 	real hydrodynamicRadius;
-	real temperature;
 	real viscosity;
-	real dt;
 	real psi; /*Splitting factor*/
 	Grid grid;
 
@@ -381,7 +378,8 @@ namespace uammd{
 	}
 
 	//Adds the stochastic part in Fourier space ( 1/dV sqrt(G_k)·dW )
-	void addBrownianNoise(cached_vector<cufftComplex3> & gridVelsFourier, cudaStream_t st){
+	void addBrownianNoise(cached_vector<cufftComplex3> & gridVelsFourier,
+			      real temperature, real prefactor, cudaStream_t st){
 	  //eq 19 and beyond in [1].
 	  //The sqrt(2*T/dt) factor needs to be here because far noise is summed to the M·F term.
 	  /*Add the stochastic noise to the fourier velocities if T>0 -> 1/√σ·√B·dWw */
@@ -391,12 +389,12 @@ namespace uammd{
 	    sys->log<System::DEBUG2>("[BDHI::PSE] Wave space brownian noise");
 	    const int3 n = grid.cellDim;
 	    const real dV = grid.getCellVolume();
-	    real prefactor = sqrt(2*temperature/(dt*dV));
+	    real noise_prefactor = prefactor*sqrt(2*temperature/(dV));
 	    int Nthreads = 128;
 	    int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
 	    //In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
 	    detail::fourierBrownianNoise<<<Nblocks, Nthreads, 0, st>>>(d_gridVelsFourier, grid,
-								       prefactor, // 1/√σ· sqrt(2*T/dt),
+								       noise_prefactor, // 1/√σ· sqrt(2*T/dt),
 								       hydrodynamicRadius, viscosity, psi, eta,
 								       seed, //Saru needs two seeds apart from thread id
 								       seed2);
@@ -436,18 +434,23 @@ namespace uammd{
 	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
 	= σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
       */
-      void FarField::Mdot(real4* pos, real4* forces, real3 *MF, int numberParticles, cudaStream_t st){
+      void FarField::computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *MF, int numberParticles,
+						      real temperature, real prefactor, cudaStream_t st){
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
 	sys->log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
 	// G_k·FFT(S·F)
 	//The computation is skipped if the forces are not provided (nullptr)
 	auto gridVelsFourier = deterministicPart(pos, forces, numberParticles, st);
-	addBrownianNoise(gridVelsFourier, st);
+	//1/√σ·√G_k·dWw
+	//The computation is skipped if temperature is zero
+	addBrownianNoise(gridVelsFourier, temperature, prefactor, st);
+	//FFTi
 	auto gridVels = inverseTransformVelocity(gridVelsFourier, st);
+	//St
 	interpolateVelocity(gridVels, pos, MF, numberParticles, st);
 	sys->log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
-}
-
+      }
+      
       void FarField::initializeCuFFT(){
 	CufftSafeCall(cufftCreate(&cufft_plan_forward));
 	CufftSafeCall(cufftCreate(&cufft_plan_inverse));

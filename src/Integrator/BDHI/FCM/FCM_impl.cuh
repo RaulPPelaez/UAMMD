@@ -52,9 +52,7 @@ namespace uammd{
       };
 
       FCM_impl(Parameters par):
-	dt(par.dt),
 	par(par),
-	temperature(par.temperature),
 	viscosity(par.viscosity),
 	hydrodynamicRadius(par.hydrodynamicRadius),
 	box(par.box){
@@ -105,22 +103,17 @@ namespace uammd{
 	return this->box;
       }
 
-      real getTemperature(){
-	return this->temperature;
-      }
       //Computes the velocities and angular velocities given the forces and torques
       // If torques is a nullptr, the torque computation is skipped and the second output is empty
       std::pair<cached_vector<real3>, cached_vector<real3>>
       computeHydrodynamicDisplacements(real4* pos, real4* force, real4* torque,
-				       int numberParticles, cudaStream_t st);
+				       int numberParticles, real temperature, real prefactor, cudaStream_t st);
 
     private:
       
       cudaStream_t st;
       uint seed;
 
-      real temperature;
-      real dt;
       real viscosity;
       real hydrodynamicRadius;
       
@@ -467,7 +460,7 @@ namespace uammd{
 }
             
       void addBrownianNoise(cached_vector<cufftComplex3>& gridVelsFourier,
-			    real temperature, real viscosity, real dt,
+			    real temperature, real viscosity, real prefactor,
 			    uint seed,
 			    Grid grid, cudaStream_t st){
 	static uint seed2 = 0;
@@ -480,12 +473,12 @@ namespace uammd{
 	  const int3 n = grid.cellDim;
 	  const real dV = grid.getCellVolume();
 	  const real fourierNormalization = 1.0/(double(n.x)*n.y*n.z);
-	  real prefactor = sqrt(fourierNormalization*2*temperature/(dt*dV));
+	  real noisePrefactor = prefactor*sqrt(fourierNormalization*2*temperature/(dV));
 	  int Nthreads = 128;
 	  int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
 	  //In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
 	  fourierBrownianNoise<<<Nblocks, Nthreads, 0, st>>>(d_gridVelsFourier, grid,
-							     prefactor, // 1/√σ· sqrt(2*T/dt),
+							     noisePrefactor, // 1/√σ· sqrt(2*T/dt),
 							     viscosity,
 							     seed,
 							     seed2);
@@ -588,17 +581,26 @@ namespace uammd{
     template<class Kernel, class KernelTorque>
     std::pair<cached_vector<real3>, cached_vector<real3>>
     FCM_impl<Kernel, KernelTorque>::computeHydrodynamicDisplacements(real4* pos, real4* force, real4* torque,
-								     int numberParticles, cudaStream_t st){
+								     int numberParticles, real temperature, real prefactor, cudaStream_t st){
       using namespace fcm_detail;
-      auto gridVels = spreadForces(pos, force, numberParticles, kernel, grid, st);
-      auto gridVelsFourier = forwardTransform(gridVels, grid.cellDim, cufft_plan_forward, st);
+      cached_vector<cufftComplex3> gridVelsFourier;
+      if(force){
+	auto gridVels = spreadForces(pos, force, numberParticles, kernel, grid, st);
+	gridVelsFourier = forwardTransform(gridVels, grid.cellDim, cufft_plan_forward, st);
+      }
+      else{
+	const auto n = grid.cellDim;
+	gridVelsFourier.resize((n.x/2+1)*n.y*n.z);
+	thrust::fill(thrust::cuda::par.on(st), gridVelsFourier.begin(), gridVelsFourier.end(), cufftComplex3());
+      }
       if(torque){
 	addSpreadTorquesFourier(pos, torque, numberParticles, grid, kernelTorque,
 				cufft_plan_forward, gridVelsFourier, st);
       }
-      convolveFourier(gridVelsFourier, viscosity, grid, st);
-      addBrownianNoise(gridVelsFourier, temperature, viscosity, dt, seed, grid, st);
-      gridVels.clear();     
+      if(force or torque){
+	convolveFourier(gridVelsFourier, viscosity, grid, st);
+      }
+      addBrownianNoise(gridVelsFourier, temperature, viscosity, prefactor, seed, grid, st);
       cached_vector<real3> angularVelocities;
       if (torque){
 	auto gridVelsFourier2 = gridVelsFourier;
@@ -607,7 +609,7 @@ namespace uammd{
 	angularVelocities = interpolateAngularVelocity(pos, gridAngVel, grid,
 						       kernelTorque, numberParticles, st);
       }
-      gridVels = inverseTransform(gridVelsFourier, grid.cellDim, cufft_plan_inverse, st);      
+      auto gridVels = inverseTransform(gridVelsFourier, grid.cellDim, cufft_plan_inverse, st);
       auto linearVelocities = interpolateVelocity(pos, gridVels, grid, kernel, numberParticles, st);
       CudaCheckError();
       return {linearVelocities, angularVelocities};

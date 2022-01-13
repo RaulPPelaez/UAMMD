@@ -26,12 +26,12 @@ namespace uammd{
     class FCM{
       using Kernel = FCM_ns::Kernels::Gaussian;
       using KernelTorque = FCM_ns::Kernels::GaussianTorque;
-      using FCM_super = FCM_impl<Kernel, KernelTorque>;      
+      using FCM_super = FCM_impl<Kernel, KernelTorque>;
       std::shared_ptr<FCM_super> fcm;
       shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
       shared_ptr<System> sys;
-
+      real temperature, dt;
     public:
       using Parameters = FCM_super::Parameters;
       
@@ -39,7 +39,8 @@ namespace uammd{
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys,
 	  Parameters par):
-	pd(pd), pg(pg), sys(sys){
+	pd(pd), pg(pg), sys(sys),
+	temperature(par.temperature), dt(par.dt){
 	if(par.seed == 0)
 	  par.seed = sys->rng().next32();
 	this->fcm = std::make_shared<FCM_super>(par);
@@ -54,11 +55,12 @@ namespace uammd{
     */
       void computeMF(real3* MF, cudaStream_t st = 0){
 	sys->log<System::DEBUG1>("[BDHI::FCM] Computing MF....");
-	auto force = pd->getForce(access::location::gpu, access::mode::read);
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);
+	auto force = pd->getForce(access::gpu, access::read);
+	auto pos = pd->getPos(access::gpu, access::read);
 	int numberParticles = pg->getNumberParticles();
         auto disp = fcm->computeHydrodynamicDisplacements(pos.begin(), force.begin(), nullptr,
-							  numberParticles, st);
+							  numberParticles,
+							  temperature, 1.0/sqrt(dt), st);
 	thrust::copy(thrust::cuda::par.on(st),
 		     disp.first.begin(), disp.first.end(),
 		     MF);
@@ -86,7 +88,7 @@ namespace uammd{
 
       FCMIntegrator(shared_ptr<ParticleGroup> pg, Parameters par):
 	Integrator(pg, "BDHI::FCMIntegrator"),
-	dt(par.dt){
+	temperature(par.temperature), dt(par.dt){
 	if(par.seed == 0)
 	  par.seed = sys->rng().next32();
 	this->fcm = std::make_shared<FCM_super>(par);
@@ -106,7 +108,7 @@ namespace uammd{
     private:
       uint steps = 0;
       cudaStream_t st;
-      real dt;
+      real temperature, dt;
       void updateInteractors();
       void resetForces();
       void resetTorques();

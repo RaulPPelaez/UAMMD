@@ -23,25 +23,23 @@ namespace uammd{
       public:
 	using NeighbourList = CellList;
 	NearField(Parameters par, std::shared_ptr<System> sys, std::shared_ptr<ParticleData> pd, std::shared_ptr<ParticleGroup> pg):
-	  box(par.box), temperature(par.temperature),
-	  sys(sys), pd(pd), pg(pg)
+	  box(par.box),
+	  sys(sys), pd(pd), pg(pg),
+	  tolerance(par.tolerance)
 	{
 	  initializeDeterministicPart(par);
 	  this->seed = sys->rng().next32();
-	  if(temperature>real(0.0)){
-	    //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
-	    auto lanczosTolerance = par.tolerance; //std::min(0.05f, sqrt(par.tolerance));
-	    this->lanczos = std::make_shared<LanczosAlgorithm>(sys, lanczosTolerance);
-	  }
 	  CudaCheckError();
 	}
 
 	~NearField(){}
-	
+
+	//Computes the deterministic part of the hydrodynamic displacements
 	void Mdot(real4* forces, real3 *MF, cudaStream_t st);
 
-	void computeBdW(real3* BdW, cudaStream_t st);
-	
+	//Computes the stochastic part of the hydrodynamic displacements as prefactor*sqrt(2*T*M)*dW
+	void computeStochasticDisplacements(real3* BdW, real temperature, real prefactor, cudaStream_t st);
+
       private:
 	shared_ptr<ParticleData> pd;
 	shared_ptr<ParticleGroup> pg;
@@ -53,8 +51,7 @@ namespace uammd{
 	shared_ptr<TabulatedFunction<real2>> RPY_near;
 	uint seed;
 	shared_ptr<NeighbourList> cl;
-
-	real temperature;
+	real tolerance;
 	shared_ptr<LanczosAlgorithm> lanczos;
 
 	void initializeDeterministicPart(Parameters par){
@@ -178,11 +175,13 @@ namespace uammd{
 
 	struct SaruTransform{
 	  uint seed1, seed2;
-	  SaruTransform(uint s1, uint s2):seed1(s1), seed2(s2){}
+	  real variance;
+	  SaruTransform(real variance, uint s1, uint s2):
+	    variance(variance), seed1(s1), seed2(s2){}
 
 	  __device__ real3 operator()(uint i){
 	    Saru rng(i, seed1, seed2);
-	    return make_real3(rng.gf(0,1), rng.gf(0,1).x);
+	    return make_real3(rng.gf(0,1), rng.gf(0,1).x)*variance;
 	  }
 	};
       
@@ -198,19 +197,25 @@ namespace uammd{
 	}
       }
 
-      void NearField::computeBdW(real3* BdW, cudaStream_t st){
+      void NearField::computeStochasticDisplacements(real3* BdW, real temperature, real prefactor, cudaStream_t st){
 	//Compute stochastic term only if T>0 
 	if(temperature == real(0.0)) return;
-	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box);      
-	int numberParticles = pg->getNumberParticles();
+	if(not lanczos){
+	  //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
+	  auto lanczosTolerance = this->tolerance; //std::min(0.05f, sqrt(par.tolerance));
+	  this->lanczos = std::make_shared<LanczosAlgorithm>(sys, lanczosTolerance);
+	}
 	cl->update(box, rcut, st);
+	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box);
+	int numberParticles = pg->getNumberParticles();
 	pse_ns::Dotctor Mvdot_near(tr, cl, numberParticles, st);
 	/*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/
 	real *noise = lanczos->getV(numberParticles);
 	const auto id_tr = thrust::make_counting_iterator<uint>(0);
 	const uint seed2 = sys->rng().next32();
+	real noise_prefactor = prefactor*sqrt(2*temperature);
 	thrust::transform(thrust::cuda::par.on(st), id_tr, id_tr + numberParticles, (real3*)noise,
-			  pse_ns::SaruTransform(seed, seed2));      
+			  pse_ns::SaruTransform(noise_prefactor, seed, seed2));
 	auto status = lanczos->solve(Mvdot_near, (real *)BdW, noise, numberParticles, st);
 	if(status == LanczosStatus::TOO_MANY_ITERATIONS){
 	  sys->log<System::WARNING>("[BDHI::PSE] This is probably fine, but Lanczos could not achieve convergence, try increasing the tolerance or switching to double precision.");

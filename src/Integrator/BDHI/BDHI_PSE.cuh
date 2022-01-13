@@ -69,6 +69,9 @@ namespace uammd{
     class PSE{
     public:
       using Parameters = pse_ns::Parameters;
+      PSE(shared_ptr<ParticleData> pd, Parameters par):
+	PSE(pd, std::make_shared<ParticleGroup>(pd, "All"), pd->getSystem(), par){}
+
       PSE(shared_ptr<ParticleData> pd,
 	  shared_ptr<ParticleGroup> pg,
 	  shared_ptr<System> sys,
@@ -77,25 +80,42 @@ namespace uammd{
       ~PSE(){}
       
       void setup_step(              cudaStream_t st = 0){}
-      /*Compute M·F = Mr·F + Mw·F*/
+      /*Compute M·F = Mr·F + Mw·F, also includes the far field stochastic displacements*/
       void computeMF(real3* MF, cudaStream_t st){
 	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	auto force = pd->getForce(access::location::gpu, access::mode::read);	
+	auto pos = pd->getPos(access::gpu, access::read);
+	auto force = pd->getForce(access::gpu, access::read);	
 	nearField->Mdot(force.begin(), MF, st);
-	farField->Mdot(pos.begin(), force.begin(), MF, numberParticles, st);
+	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles,
+						   temperature, 1.0/sqrt(dt), st);
       }
 
       void computeBdW(real3* BdW, cudaStream_t st){
 	sys->log<System::DEBUG2>("[BDHI::PSE] Real space brownian noise");
 	//Far contribution is included in farField::Mdot
-	nearField->computeBdW(BdW, st);
+	nearField->computeStochasticDisplacements(BdW, temperature, 1.0, st);
       }
 
       void computeDivM(real3* divM, cudaStream_t st = 0){};
       void finish_step(             cudaStream_t st = 0){};
+
+      //Computes both the stochastic and deterministic contributions.
+      //The noise is multiplied by prefactor before summing to the result.
+      //MF = Mobility*force + prefactor*sqrt(2*T*M)dW
+      void computeHydrodynamicDisplacements(real4* force, real3* MF, real temperature, real noise_prefactor, cudaStream_t st = 0){
+	int numberParticles = pg->getNumberParticles();
+	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
+	//Compute deterministic part in the near field
+	nearField->Mdot(force, MF, st);
+	//Compute stochastic part in the near field
+	nearField->computeStochasticDisplacements(MF, temperature, noise_prefactor, st);
+	auto pos = pd->getPos(access::gpu, access::read);
+	//Compute both deterministic and stochastic part in the far field
+	farField->computeHydrodynamicDisplacements(pos.begin(), force, MF, numberParticles,
+						   temperature, noise_prefactor, st);
+      }
 
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
@@ -110,6 +130,7 @@ namespace uammd{
       shared_ptr<ParticleGroup> pg;
       shared_ptr<System> sys;      
       real hydrodynamicRadius, M0;
+      real temperature, dt;
       std::shared_ptr<pse_ns::NearField> nearField;
       std::shared_ptr<pse_ns::FarField> farField;
     };
