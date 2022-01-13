@@ -1,4 +1,4 @@
-/* Raul P. Pelaez 2020.
+/* Raul P. Pelaez 2020-2022.
    Some basic defines and aliases for uammd
  */
 #ifndef UAMMD_DEFINES_H
