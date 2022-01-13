@@ -2,7 +2,8 @@
    Your first UAMMD code.
    This file is the minimum file that can be considered UAMMD code.
    It will create an instance of System, the basic UAMMD structure that every other module will typically need.
-   Among other startup operation, System sets up the CUDA environment and provides certain utilities as we will see in later examples.   
+   Among other startup operation, System sets up the CUDA environment and provides certain utilities as we will see in later examples.
+   Note, however, that in general System is not required to be created explicitly, as we will see in the following examples.
  */
 
 //uammd.cuh is the basic uammd include containing, among other things, the System struct.

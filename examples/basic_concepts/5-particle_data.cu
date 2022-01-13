@@ -17,11 +17,15 @@
 using namespace uammd;
 
 int main(int argc, char* argv[]){
-  //Initialize System
+  //Initialize System if needed
   auto sys = std::make_shared<System>(argc, argv);
   //Lets create 1e5 particles:
   const int numberParticles = 1e5;
   auto pd = std::make_shared<ParticleData>(sys, numberParticles);
+  //ParticleData does not require a System necessarily, if not provided ParticleData will autocreate it.
+  //auto pd = std::make_shared<ParticleData>(numberParticles);
+  //We can access the system instance in pd at any time with:
+  //auto sys = pd->getSystem();
   //From now on we can check the number of particles with   pd->getNumParticles();
   //ParticleData exposes a collection of functions to request the different properties of the particles.
   //UAMMD is a GPU code, so there is the issue of working with two separated memory spaces. ParticleData handles it for you.

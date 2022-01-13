@@ -33,7 +33,6 @@ struct Parameters{
 //I like to place these basic UAMMD objects in a struct so it is easy to pass them around
 struct UAMMD{
   std::shared_ptr<ParticleData> pd;
-  std::shared_ptr<System> sys;
   Parameters par;
 };
 
@@ -41,16 +40,15 @@ struct UAMMD{
 UAMMD initializeUAMMD(int argc, char *argv[]){
   UAMMD sim;
   sim.par = Parameters(); //Default parameters
-  //Initialize System and ParticleData
-  sim.sys = std::make_shared<System>(argc, argv);
-  sim.pd = std::make_shared<ParticleData>(sim.sys, sim.par.numberParticles);
+  //Initialize ParticleData
+  sim.pd = std::make_shared<ParticleData>(sim.par.numberParticles);
   return sim;
 }
 
 //This function places particle positions randomly inside a cubic box of size L
 void randomlyPlaceParticles(UAMMD sim){
   auto positions = sim.pd->getPos(access::location::cpu, access::mode::write);
-  std::mt19937 gen(sim.sys->rng().next());
+  std::mt19937 gen(sim.pd->getSystem()->rng().next());
   std::uniform_real_distribution<real> dist(-0.5, 0.5);
   auto rng = [&](){return dist(gen);};
   std::generate(positions.begin(), positions.end(), [&](){ return make_real4(rng(), rng(), rng(), 0)*sim.par.boxSize;});
@@ -151,6 +149,6 @@ int main(int argc, char* argv[]){
   //Integrators provide a couple more functions, you can check them in the relevant wiki page if you are impatient, but we will soon cover them.
   
   //Destroy the UAMMD environment and exit
-  sim.sys->finish();
+  sim.pd->getSystem()->finish();
   return 0;
 }

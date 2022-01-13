@@ -27,11 +27,11 @@ int main(int argc, char* argv[]){
   sys->rng().setSeed(seed);
   //This rng can generate numbers in several ways, lets see a few:  
   //A number chosen among all the representable by uint (0 and 2^32-1)
-  uint integral = sys->rng().next32();
-  sys->log<System::MESSAGE>("An integral number between 0 and 2^32-1: %u", integral);
+  uint integer = sys->rng().next32();
+  sys->log<System::MESSAGE>("An integer number between 0 and 2^32-1: %u", integer);
   //A number chosen among all the representable by uint64_t  (0 and 2^64-1)  
-  uint64_t long_integral  = sys->rng().next();
-  sys->log<System::MESSAGE>("An integral number between 0 and 2^64-1: %lu", long_integral);
+  uint64_t long_integer  = sys->rng().next();
+  sys->log<System::MESSAGE>("An integer number between 0 and 2^64-1: %lu", long_integer);
   //An uniform random number between 0 and1 
   double uniform = sys->rng().uniform(0, 1);
   sys->log<System::MESSAGE>("An uniformly distributed number between 0 and 1: %.13g", uniform);

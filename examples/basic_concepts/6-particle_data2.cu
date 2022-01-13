@@ -10,15 +10,13 @@
 using namespace uammd;
 
 int main(int argc, char* argv[]){
-  //Initialize System
-  auto sys = std::make_shared<System>(argc, argv);
-  //Lets create 1e5 particles:
+  //Lets create 1e5 particles (note that we are letting ParticleData take care of initializing System):
   const int numberParticles = 1e5;
-  auto pd = std::make_shared<ParticleData>(sys, numberParticles);
+  auto pd = std::make_shared<ParticleData>(numberParticles);
   //Lets start by placing the particles randomly
   {//We place particles randomly as in the previous tutorial.
     auto positions = pd->getPos(access::location::cpu, access::mode::write);
-    std::mt19937 gen(sys->rng().next());
+    std::mt19937 gen(pd->getSystem()->rng().next());
     std::uniform_real_distribution<real> dist(-0.5, 0.5);
     auto rng = [&](){return dist(gen);};
     real L = 64; //Lets randomly set positions inside a cubic box of size L
@@ -85,6 +83,6 @@ int main(int argc, char* argv[]){
   }//The exact same thing gets printed again.
   
   //Destroy the UAMMD environment and exit
-  sys->finish();
+  pd->getSystem()->finish();
   return 0;
 }

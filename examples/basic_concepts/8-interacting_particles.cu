@@ -36,7 +36,6 @@ struct Parameters{
 //I like to place these basic UAMMD objects in a struct so it is easy to pass them around
 struct UAMMD{
   std::shared_ptr<ParticleData> pd;
-  std::shared_ptr<System> sys;
   Parameters par;
 };
 
@@ -45,8 +44,7 @@ UAMMD initializeUAMMD(int argc, char *argv[]){
   UAMMD sim;
   sim.par = Parameters(); //Default parameters
   //Initialize System and ParticleData
-  sim.sys = std::make_shared<System>(argc, argv);
-  sim.pd = std::make_shared<ParticleData>(sim.sys, sim.par.numberParticles);
+  sim.pd = std::make_shared<ParticleData>(sim.par.numberParticles);
   return sim;
 }
 
@@ -194,6 +192,6 @@ int main(int argc, char* argv[]){
   
   
   //Destroy the UAMMD environment and exit
-  sim.sys->finish();
+  sim.pd->getSystem()->finish();
   return 0;
 }

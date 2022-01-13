@@ -13,16 +13,14 @@ using namespace uammd;
 //I like to place these basic UAMMD objects in a struct so it is easy to pass them around
 struct UAMMD{
   std::shared_ptr<ParticleData> pd;
-  std::shared_ptr<System> sys;
 };
 
 //Creates and returns a UAMMD struct with the basics that we have covered in previous tutorials
 UAMMD initializeUAMMD(int argc, char *argv[]){
   UAMMD sim;
-  //Initialize System and ParticleData
-  sim.sys = std::make_shared<System>(argc, argv);
+  //Initialize ParticleData
   constexpr int numberParticles = 16384; //Lets just hardcode a number of particles
-  sim.pd = std::make_shared<ParticleData>(sim.sys, numberParticles);
+  sim.pd = std::make_shared<ParticleData>(numberParticles);
   return sim;
 }
 
@@ -46,6 +44,6 @@ int main(int argc, char* argv[]){
   initializePositionsInALattice(sim);
   //Doing this might be useful to start simulations with hard potentials that cannot handle overlapping particles
   //Destroy the UAMMD environment and exit
-  sim.sys->finish();
+  sim.pd->getSystem()->finish();
   return 0;
 }
