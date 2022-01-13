@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. Some general utilities. Mainly:
+/*Raul P. Pelaez 2017-2022. Some general utilities. Mainly:
 
   -A Timer to keep track of time
   -A Xorshift128+ CPU rng
