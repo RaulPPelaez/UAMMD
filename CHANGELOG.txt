@@ -1,4 +1,20 @@
 
-No official releases have been done yet so the versioning is a little subjective...
-From first release version (1.0) on this file will contain the important changes between releases.
-For the time being, refer to the commit history.
+v2.0:
+Version shipped with Raul's Ph.D manuscript
+API Breaking Changes:
+  -Add Computables to the Interactor interface, replacing the old sumForce/Energy family of function with just sum(Computables ...)
+  -Remove System as an input argument to every Interactor/Integrator. Now modules fetch it from the ParticleData instance.
+  -In Integrators/Interactors where it makes sense to pass a ParticleGroup, a ParticleData is not needed (modules will request ParticleGroup from the ParticleData).
+  -The Potential interface has been simplified, a single getTransverser function now exists, with an argument of type Computables that covers the requirements of the caller.
+       -The requirements of the Transverser in a Potential have also changed slightly.
+  -The interface for the Bonded Interactors have been unified.
+  -The ExternalForces module has also been ported to only have a single "sum" function, which takes a Computables as an argument.
+  -The IBM module has been updated to allow more generic forms of the coupling kernels.
+  
+Most of these changes are present in the generic_md example (look inside customizations.cuh).  
+
+In addition to the above, some new modules and utility functions have been included.
+
+
+v1.x:
+First version of the different interfaces
