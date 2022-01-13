@@ -1,4 +1,4 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 1.0**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 2.0**
 
 
 <img src="https://github.com/raulppelaez/uammd/blob/master/.res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/master/.res/shotlogo.png" width="500">  
@@ -11,7 +11,7 @@
 
 -----------------  
 
-Raul P. Pelaez 2018-2021. (raul.perez(at)uam.es)  
+Raul P. Pelaez 2018-2022. (raul.perez(at)uam.es)  
 
 
 A C++14+ header-only fast generic multiscale CUDA Molecular Dynamics framework made with moduarity, expandability and generality in mind. UAMMD is intended to be hackable and copy pastable.  
@@ -57,10 +57,9 @@ Here you have a short example of how a typical UAMMD code looks like:
 using namespace uammd;
 int main(int argc, char * argv[]){
 	int numberParticles = 1e5;
-	auto sys = make_shared<System>(argc, argv);
-	auto pd = make_shared<ParticleData>(numberParticles, sys);
+	auto pd = make_shared<ParticleData>(numberParticles);
 	{
-		auto pos = pd->getPos(access::location::cpu, access::mode::write);
+		auto pos = pd->getPos(access::cpu, access::write);
 		std::generate(pos.begin(), pos.end(), [&](){ return make_real4(sys->rng.uniform3(-0.5, 0.5), 0);});	
 	}
 	BD::EulerMaruyama::Parameters par;
@@ -68,7 +67,7 @@ int main(int argc, char * argv[]){
 	par.viscosity = 1.0;
 	par.hydrodynamicRadius = 1.0;
 	par.dt = 0.1;
-	auto bd = make_shared<BD::EulerMaruyama>(pd, sys, par);
+	auto bd = make_shared<BD::EulerMaruyama>(pd, par);
 	for(int i = 0; i<numberSteps; i++){
 		bd->forwardTime();
 	}
