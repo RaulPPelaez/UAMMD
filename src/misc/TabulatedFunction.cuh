@@ -74,13 +74,13 @@ namespace uammd{
 
   template<class T, class Interpolation = LinearInterpolation>
   struct TabulatedFunction{
-    const int Ntable;
-    const real rmin, rmax, interval;
-    const real dr;
+    int Ntable;
+    real rmin, rmax, interval;
+    real dr;
     T *table;
-    const Interpolation interp;
+    Interpolation interp;
     bool freeTable = false;
-    const bool isCopy;
+    bool isCopy;
 
     TabulatedFunction(){}
 
@@ -125,6 +125,20 @@ namespace uammd{
       interp(_orig.interp),
       freeTable(false),
       isCopy(true){ }
+
+    void operator=(TabulatedFunction&& _orig ){
+      this->Ntable = _orig.Ntable;
+      this->rmin = _orig.rmin;
+      this->rmax = _orig.rmax;
+      this->interval = _orig.interval;
+      this->dr = _orig.dr;
+      this->table = _orig.table;
+      this->interp = _orig.interp;
+      this->freeTable = _orig.freeTable;
+      this->isCopy = _orig.isCopy;
+      _orig.freeTable = false;
+      _orig.isCopy = true;
+    }
 
     ~TabulatedFunction(){
       if(freeTable and ! isCopy)CudaSafeCall(cudaFree(table));

@@ -18,6 +18,10 @@ References:
 #include<vector>
 #include"utils/vector.cuh"
 #include"utils/ForceEnergyVirial.cuh"
+inline std::ostream& operator<<(std::ostream& out, const uammd::real2 &f){
+  return out<<f.x<<" "<<f.y;
+}
+
 inline std::ostream& operator<<(std::ostream& out, const uammd::real3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
@@ -30,6 +34,10 @@ inline std::ostream& operator<<(std::ostream& out, const int3 &f){
 }
 inline std::ostream& operator<<(std::ostream& out, const int4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
+}
+
+inline std::istream& operator>>(std::istream& in, uammd::real2 &f){
+  return in >> f.x>>f.y;
 }
 
 inline std::istream& operator>>(std::istream& in, uammd::real3 &f){
