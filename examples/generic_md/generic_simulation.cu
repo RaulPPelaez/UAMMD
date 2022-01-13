@@ -210,8 +210,8 @@ UAMMD initialize(int argc, char *argv[]){
  */
 
 //Brownian Dynamics
-using BDMethod = BD::EulerMaruyama;
-std::shared_ptr<BDMethod> createIntegratorBD(UAMMD sim){
+auto createIntegratorBD(UAMMD sim){
+  using BDMethod = BD::EulerMaruyama;
   typename BDMethod::Parameters par;
   par.temperature = sim.par.temperature;
   par.viscosity = sim.par.viscosity;
@@ -220,8 +220,8 @@ std::shared_ptr<BDMethod> createIntegratorBD(UAMMD sim){
   return std::make_shared<BDMethod>(sim.pd, par);
 }
 
-using Verlet = VerletNVT::GronbechJensen;
-std::shared_ptr<Verlet> createIntegratorVerletNVT(UAMMD sim){
+auto createIntegratorVerletNVT(UAMMD sim){
+  using Verlet = VerletNVT::GronbechJensen;
   typename Verlet::Parameters par;
   par.temperature = sim.par.temperature;
   par.friction = sim.par.friction;
@@ -229,7 +229,7 @@ std::shared_ptr<Verlet> createIntegratorVerletNVT(UAMMD sim){
   return std::make_shared<Verlet>(sim.pd, par);
 }
 
-std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
+auto createIntegratorVerletNVE(UAMMD sim){
   VerletNVE::Parameters par;
   par.dt = sim.par.dt;
   //par.energy = 1; //Optionally a target energy can be passed that VerletNVE will set according to velocities keep constant
@@ -240,7 +240,7 @@ std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
 
 //Dissipative Particle Dynamics
 //DPD is handled by UAMMD as a VerletNVE integrator with a special short range interaction
-std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
+auto createIntegratorDPD(UAMMD sim){
   using NVE = VerletNVE;
   NVE::Parameters par;
   par.dt = sim.par.dt;
@@ -262,7 +262,7 @@ std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
 }
 
 //Smoothed Particle Hydrodynamics
-std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
+auto createIntegratorSPH(UAMMD sim){
   using NVE = VerletNVE;
   NVE::Parameters par;
   par.dt = sim.par.dt;
@@ -283,7 +283,8 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
 }
 
 //Creates a triply periodic Brownian Dynamics with Hydrodynamic Interactions integration module
-std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
+auto createIntegratorBDHI(UAMMD sim){
+  std::shared_ptr<Integrator> integrator;
   //There are several hydrodynamics modules, we choose between Positively Split Ewald (PSE) or Force Coupling Method (FCM) here
   // mainly for performance reasons. FCM is faster for small and/or dense systems, but it is limited in the system size by memory.
   // PSE can be slower it temperature>0, but does not have that system size constraints.
@@ -306,7 +307,7 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
     // Higher values will work best for dense and/or small systems.
     par.psi = 1.0/par.hydrodynamicRadius;
     auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, par);
-    return bdhi;
+    integrator = bdhi;
   }
   else{
     using Scheme = BDHI::FCM;
@@ -318,12 +319,13 @@ std::shared_ptr<Integrator> createIntegratorBDHI(UAMMD sim){
     par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
     par.tolerance = 1e-4;
     auto bdhi = std::make_shared<BDHI::EulerMaruyama<Scheme>>(sim.pd, par);
-    return bdhi;
+    integrator = bdhi;
   }
+  return integrator;
 }
 
 //Fluctuating Immersed Boundary
-std::shared_ptr<Integrator> createIntegratorFIB(UAMMD sim){
+auto createIntegratorFIB(UAMMD sim){
   BDHI::FIB::Parameters par;
   par.temperature = sim.par.temperature;
   par.viscosity = sim.par.viscosity;
@@ -336,7 +338,7 @@ std::shared_ptr<Integrator> createIntegratorFIB(UAMMD sim){
 }
 
 //Inertial Coupling Method
-std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
+auto createIntegratorICM(UAMMD sim){
   Hydro::ICM::Parameters par;
   par.temperature = sim.par.temperature;
   par.viscosity = sim.par.viscosity;
@@ -349,39 +351,39 @@ std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
 
 //Create the integrator as selected via data.main.
 //Notice that all Integrators can be passed around as shared_ptr<Integrator>
-std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
+auto createIntegrator(UAMMD sim){
+  std::shared_ptr<Integrator> integrator;
   if(sim.par.integrator.compare("BD") == 0){
-    return createIntegratorBD(sim);
+    integrator = createIntegratorBD(sim);
   }
   else if(sim.par.integrator.compare("VerletNVT") == 0){
-    return createIntegratorVerletNVT(sim);
+    integrator = createIntegratorVerletNVT(sim);
   }
   else if(sim.par.integrator.compare("VerletNVE") == 0){
-    return createIntegratorVerletNVE(sim);
+    integrator = createIntegratorVerletNVE(sim);
   }
   else if(sim.par.integrator.compare("DPD") == 0){
-    return createIntegratorDPD(sim);
+    integrator = createIntegratorDPD(sim);
   }
   else if(sim.par.integrator.compare("SPH") == 0){
-    return createIntegratorSPH(sim);
+    integrator = createIntegratorSPH(sim);
   }
   else if(sim.par.integrator.compare("BDHI") == 0){
-    return createIntegratorBDHI(sim);
+    integrator = createIntegratorBDHI(sim);
   }
   else if(sim.par.integrator.compare("FIB") == 0){
-    return createIntegratorFIB(sim);
+    integrator = createIntegratorFIB(sim);
   }
   else if(sim.par.integrator.compare("ICM") == 0){
-    return createIntegratorICM(sim);
+    integrator = createIntegratorICM(sim);
   }
-
   else{
     sim.sys->log<System::CRITICAL>("Invalid integrator. Choose BD, BDHI, FIB, ICM, VerletNVT, VerletNVE, SPH or DPD");
   }
-  return nullptr;
+  return integrator;
 }
 
-std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim){
+auto createShortRangeInteractor(UAMMD sim){
   //The potential used is defined in customizations.cuh and describes an LJ interaction by default
   auto pot = std::make_shared<ShortRangePotential>(sim.par);
   using SR = PairForces<ShortRangePotential, NeighbourList>;
@@ -391,7 +393,7 @@ std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim){
   return pairForces;
 }
 
-std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
+auto createBondInteractor(UAMMD sim){
   using Bond = HarmonicBond;
   using BF = BondedForces<Bond,2>;
   typename BF::Parameters params;
@@ -400,7 +402,7 @@ std::shared_ptr<Interactor> createBondInteractor(UAMMD sim){
   return bf;
 }
 
-std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
+auto createAngularBondInteractor(UAMMD sim){
   using Bond = Angular;
   using BF = AngularBondedForces<Bond>;
   typename BF::Parameters params;
@@ -409,7 +411,7 @@ std::shared_ptr<Interactor> createAngularBondInteractor(UAMMD sim){
   return bf;
 }
 
-std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
+auto createTorsionalBondInteractor(UAMMD sim){
   using Bond = Torsional;
   using BF = TorsionalBondedForces<Bond>;
   typename BF::Parameters params;
@@ -418,7 +420,7 @@ std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
   return bf;
 }
 
-std::shared_ptr<Interactor> createElectrostaticInteractor(UAMMD sim){
+auto createElectrostaticInteractor(UAMMD sim){
   //Similar to the hydrodynamics modules, electrostatics are available in two algorithms, in this case exposed under the same module
   //One works best for dilute/big systems (Ewald splitting) and the other for dense/small systems (with no Ewald splitting).
   //Ewald splitting is automatically selected according to some system size heuristic.
@@ -440,13 +442,12 @@ std::shared_ptr<Interactor> createElectrostaticInteractor(UAMMD sim){
   return elec;
 }
 
-std::shared_ptr<Interactor> createExternalPotentialInteractor(UAMMD sim){
+auto createExternalPotentialInteractor(UAMMD sim){
   //Uses the external potential defined in customizations.cuh
   auto gr = std::make_shared<GravityAndWall>(sim.par);
   auto ext = std::make_shared<ExternalForces<GravityAndWall>>(sim.pd, gr);
   return ext;
 }
-
 
 double sumTotalEnergy(std::shared_ptr<Integrator> integrator, std::shared_ptr<ParticleData> particles){
   {
@@ -498,7 +499,7 @@ void writeSimulation(UAMMD sim){
 }
 
 //Create and run the simulation
-int main(int argc, char *argv[]){  
+int main(int argc, char *argv[]){
   auto sim = initialize(argc, argv);
   auto bd = createIntegrator(sim);
   sim.integrator = bd;
