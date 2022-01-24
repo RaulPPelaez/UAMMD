@@ -28,6 +28,7 @@ Creation
 
 
 
+Typically, UAMMD modules will require a shared_ptr to an instance of ParticleData:
 		     
 .. code:: c++
 	  

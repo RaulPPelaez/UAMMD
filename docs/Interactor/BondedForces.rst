@@ -126,6 +126,7 @@ Defining a new bond potential
    };
 
 Note that a bond potential functor may be :ref:`ParameterUpdatable`.
+The argument :cpp:`comp` in the compute function is of type :cpp:type:`Interactor::Computables`, a POD structure containing boolean flags for the energy, force and virial.
 
 The interface for a bond potential involving more than two particles is similar, but the :cpp:`compute` function would take as an argument a larger array (with as many elements as particles per bond).
 

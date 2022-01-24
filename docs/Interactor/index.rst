@@ -15,22 +15,39 @@ The Interactor interface exposes the following functions:
 		    
       Constructor
 	       
-  .. cpp:function:: void Interactor::sum(comp, st);
+   .. cpp:function:: virtual void Interactor::sum(Interactor::Computables comp, cudaStream_t st = 0) = 0;
 
      Computes the forces, energies and/or virials on each particle according to the interaction. Adds the results to the relevant arrays in the :ref:`ParticleData` instance that was provided to it at creation.
      
-     :param comp: A structure containing three booleans called :cpp:`force`, :cpp:`energy` and :cpp:`virial`. An interactor is expected to update the properties of the particles in :ref:`ParticleData` for the members of Computables that are true.
-     :type comp: :cpp:type:`Interactor::Computables`
+     :param comp: An interactor is expected to update the properties of the particles in :ref:`ParticleData` for the members of :cpp:any:`Interactor::Computables` that are true.
      :param st: (Optional) A CUDA stream.
-     :type st: :cpp:type:`cudaStream_t`
-     :return: :code:`void`
 	      
-  .. cpp:function:: std::string Interactor::getName();
+   .. cpp:function:: std::string Interactor::getName();
 
      Returns the given name of the Interactor.
 
-     :return: :cpp:`void`
 
+     
+.. cpp:type:: Interactor::Computables
+
+   A POD structure containing three booleans called :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
+
+   .. cpp:member:: bool force
+
+		   Defaults to :cpp:`false`.
+		   
+
+   .. cpp:member:: bool energy
+
+		   Defaults to :cpp:`false`.
+		   
+				   
+   .. cpp:member:: bool virial
+
+		   Defaults to :cpp:`false`.
+		   
+		   
+   
 Additionally, the following members are available as private members for any class inheriting Interactor:
   * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.
   * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :code:`pd->getSystem()`.

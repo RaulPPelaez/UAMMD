@@ -30,15 +30,15 @@ The Integrator interface exposes the following functions:
      :param an_updatable: Some :cpp:any:`ParameterUpdatable`
 
 			  
- .. cpp:function:: void Integrator::forwardTime();
+ .. cpp:function:: virtual void Integrator::forwardTime() = 0;
 
      Takes the simulation to the next time step
 
 
 	      
- .. cpp:function:: void Integrator::sumEnergy();
+ .. cpp:function:: virtual void Integrator::sumEnergy();
   
-     Adds to each particle (via :cpp:any:`ParticleData`::getEnergy) the energy due to the Integrator (typically the kinetic energy)
+     Adds to each particle (via :cpp:any:`ParticleData`::getEnergy) the energy due to the Integrator (typically the kinetic energy). Defaults to doing nothing.
 
 
 	       
@@ -73,8 +73,8 @@ Creation
 The arguments for the constructor of an Integrator may vary on a case by case basis (see the page for the particular one you want to use). Most Integrators, however, share the same two arguments of a shared_ptr to either a :ref:`ParticleData` or a :ref:`ParticleGroup` and a set of parameters via a structure called :code:`[ModuleName]::Parameters`.
 
 
-Example
-~~~~~~~~~
+Using an already available Integrator
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: cpp
    
