@@ -11,46 +11,46 @@ C++ wise, Integrator is a pure virtual class.
 
 The Integrator interface exposes the following functions:
 
+.. cpp:class:: Integrator
 
-  .. cpp:function:: addInteractor(some_interactor);
+ .. cpp:function:: Integrator::Integrator(std::shared_ptr<ParticleData> pd, std::string name = "noName")
+		    
+    Constructor
+		    
+ .. cpp:function:: void Integrator::addInteractor(std::shared_ptr<Interactor> some_interactor)
 		    
      Adds an :ref:`Interactor` to the integrator.
 
      :param some_interactor: Some :ref:`Interactor`
-     :type some_interactor: :cpp:type:`std::shared_ptr\<Interactor\>`
-     :return: :cpp:`void`
 	      
-  .. cpp:function:: addUpdatable(an_updatable);
+  .. cpp:function:: void Integrator::addUpdatable(std::shared_ptr<ParameterUpdatable> an_updatable)
 		     
-     Adds a :ref:`ParameterUpdatable` to the integrator.
+     Adds a :cpp:any:`ParameterUpdatable` to the integrator.
      
-     :param an_updatable: Some :ref:`ParameterUpdatable`
-     :type an_updatable: :cpp:type:`std::shared_ptr\<ParameterUpdatable>`
-     :return: :cpp:`void`
-				  
-  .. cpp:function:: forwardTime();
+     :param an_updatable: Some :cpp:any:`ParameterUpdatable`
+
+			  
+ .. cpp:function:: void Integrator::forwardTime();
 
      Takes the simulation to the next time step
 
-     :return: :cpp:`void`
-	      
-  .. cpp:function:: sumEnergy();
-  
-     Adds to each particle (via :ref:`ParticleData`::getEnergy) the energy due to the Integrator (typically the kinetic energy)
 
-     :return:  :cpp:`void`
+	      
+ .. cpp:function:: void Integrator::sumEnergy();
+  
+     Adds to each particle (via :cpp:any:`ParticleData`::getEnergy) the energy due to the Integrator (typically the kinetic energy)
+
+
 	       
-  .. cpp:function::  getInteractors();
+ .. cpp:function::  std::vector<std::shared_ptr<Interactor>> Integrator::getInteractors();
 		     
      Returns a list of all the interactors in the Integrator
 
-     :return: :cpp:type:`std::vector\<std::shared_ptr\<Interactor>>`
 	      
-  .. cpp:function:: getUpdatables();
+ .. cpp:function:: std::vector<std::shared_ptr<ParameterUpdatable>> Integrator::getUpdatables();
 		    
      Returns a list of all the updatables in the Integrator (includes all Interactors)
 
-     :return: :cpp:type:`std::vector\<std::shared_ptr\<ParameterUpdatable>>`
 
 Additionally, the following members are available as private members for any class inheriting Integrator:
   * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.

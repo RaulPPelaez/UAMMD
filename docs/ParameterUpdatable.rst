@@ -1,16 +1,24 @@
 ParameterUpdatable
 ===================
 
-A parameter communication interface, anything that inherits from ParameterUpdatable can be called through a series of update* methods to communicate a parameter change. Parameters related with the particles' data are communicated using :ref:`ParticleData` (like number of particles).  
+.. cpp:class:: ParameterUpdatable
+
+	  A parameter communication interface, anything that inherits from ParameterUpdatable can be called through a series of update* methods to communicate a parameter change. Parameters related with the particles' data are communicated using :cpp:class:`ParticleData` (like number of particles).  
+
 
 Parameters like a simulation box or the current simulation time are updated through ParameterUpdatable. See utils/ParameterUpdatable.h for a list of parameters handled by this interface.   
 
-Every :ref:`Interactor` is a ParameterUpdatable by default.  
+Every :cpp:any:`Interactor` is a ParameterUpdatable by default.  
 
 If a module needs to be aware of a parameter change, it should define the particular update method. Which will do nothing by default.  
 
 If a module needs to delegate the ParameterUpdatable behavior to a member (i.e :ref:`ExternalForces` to the provided potential) it must then inherit from ParameterUpdatableDelegate and call :code:`setDelegate(&member)`. From that moment, calls to the :code:`update*()` family of functions will be called on "member".  
 This will work (although will do nothing) even when "member" is not ParameterUpdatable (through SFINAE).   
+
+
+
+   
+
 
 Usage
 ---------
@@ -45,7 +53,7 @@ To update some parameter of some ParameterUpdatable entity:
  //Some will do something with this information, some will just ignore the function call, which is the default behavior. 
 
 
-Every :ref:`Integrator` is expected to call update* on its list of updatables (which includes all Interactors added to it) with every parameter that changes during the course of the simulation. That means that, among other things, the first thing happening at each step will typically be a call to :code:`updateSimulationTime()` for each updatable.   
+Every :cpp:any:`Integrator` is expected to call update* on its list of updatables (which includes all Interactors added to it) with every parameter that changes during the course of the simulation. That means that, among other things, the first thing happening at each step will typically be a call to :cpp:`updateSimulationTime()` for each updatable.   
 
 Advanced usage
 ----------------

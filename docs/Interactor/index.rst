@@ -8,7 +8,14 @@ An Interactor can be issued to compute, for each particle, the forces, energies 
 To do so it can access the current state of the particles (like positions, velocities, etc) via :ref:`ParticleData`.
 
 The Interactor interface exposes the following functions:
-  .. cpp:function:: sum(comp, st);
+
+.. cpp:class:: Interactor
+
+   .. cpp:function:: Interactor::Interactor(std::shared_ptr<ParticleData> pd, std::string name = "noName");
+		    
+      Constructor
+	       
+  .. cpp:function:: void Interactor::sum(comp, st);
 
      Computes the forces, energies and/or virials on each particle according to the interaction. Adds the results to the relevant arrays in the :ref:`ParticleData` instance that was provided to it at creation.
      
@@ -18,7 +25,7 @@ The Interactor interface exposes the following functions:
      :type st: :cpp:type:`cudaStream_t`
      :return: :code:`void`
 	      
-  .. cpp:function:: getName();
+  .. cpp:function:: std::string Interactor::getName();
 
      Returns the given name of the Interactor.
 

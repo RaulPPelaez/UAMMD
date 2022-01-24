@@ -9,6 +9,8 @@ BondedForces delegates the :ref:`ParameterUpdatable` behavior to the provided bo
 
 This module is defined in Interactor/BondedForces.cuh.
 
+.. _bondUsage:
+
 Usage
 ********************
 
@@ -73,7 +75,7 @@ Additionally, given that this will be used with a 2-particle BondedForces module
 	  1
 	  3 10 11 12 2 0.1
 	  
-This bond file can be used as the *bond.dat* file in the example :ref:`above <Usage>`
+This bond file can be used as the *bond.dat* file in the example :ref:`above <bondUsage>`
 
 Defining a new bond potential
 *******************************
