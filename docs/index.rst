@@ -146,9 +146,10 @@ A plethora of guided examples are available in the repository.
    :caption: First steps
 	     
    QuickStart
-   FAQ
    Compiling-UAMMD
    SimulationFile
+   FAQ
+   Examples
 
 .. toctree::
    :hidden:
@@ -163,26 +164,53 @@ A plethora of guided examples are available in the repository.
 .. toctree::
    :hidden:
    :maxdepth: 4
-   :caption: Other concepts and utilities
+   :caption: Concepts
+	     
+   Simulation domain   
+   Neighbour lists
+   Immersed boundary
+   Potential
    
-   ParameterUpdatable
-   InputFile
-   ProgrammingTools
-
+      
 .. toctree::
    :maxdepth: 4
    :hidden:
    :caption: Available Integrators
-	     
+
+   Integrator/MolecularDynamics
+   Integrator/LangevinDynamics
    Integrator/BrownianDynamics
+   Integrator/Hydrodynamics
+   Integrator/MonteCarlo
 
 .. toctree::
    :maxdepth: 4
    :hidden:
    :caption: Available Interactors
-	     
-   Interactor/BondedForces
 
+   Interactor/ExternalForces
+   Interactor/BondedForces
+   Interactor/PairForces
+   Interactor/Electrostatics   
+
+
+   
+.. toctree::
+   :hidden:
+   :maxdepth: 4
+   :caption: Other concepts and utilities
+   
+   ParameterUpdatable
+   InputFile
+   TabulatedFunctions   
+   Grid
+   ParticleSorter
+   ErrorHandling
+   ProgrammingTools
+   Postprocessing
+   
+   
+	     
 Indices and tables
 ==================
    
