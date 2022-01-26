@@ -31,9 +31,10 @@ Where:
 -----------------------------------------------------
 Brownian Dynamics :ref:`integrators <Integrator>`
 -----------------------------------------------------
-
+   
 There are several :ref:`Integrators <Integrator>` in UAMMD under the :cpp:`BD` namespace, which solve the BD equation above:
-  
+
+.. note:: The code for this module is located in the source :code:`Integrator/BrownianDynamics.cuh`
     
 EulerMaruyama
 ---------------
@@ -109,6 +110,7 @@ Example
 .. code:: cpp
 	  
   #include"uammd.cuh"
+  #include"Integrator/BrownianDynamics.cuh"
   using namespace uammd;
   int main(){
     //Assume an instance of ParticleData, called "pd", is available

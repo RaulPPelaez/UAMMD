@@ -42,13 +42,13 @@ The velocity Verlet update rules, taking the simulation from the time step :math
 
 The velocity Verlet algorithm presents all the necessary properties for being a popular integrator. It has good numerical stability, a small memory footprint, good energy conservation, guaranteed momentum conservation,...
 
+.. node:: The code for this module is located in the source code :code:`Integrator/VerletNVE.cuh`
 
 Usage
 --------------
 
 Use it as any other integrator module.  
 The following parameters are available:  
-
   * :cpp:`real energy` Target energy per particle, can be omitted if :cpp:`initVelocities=false`.
   * :cpp:`real dt` Time step.
   * :cpp:`real mass = -1` Mass of all the particles. If >0 all particles will have this mass, otherwise the mass for each particle in :ref:`ParticleData` will be used. If masses have not been set in :ref:`ParticleData` the default mass is 1 for all particles.  
@@ -58,6 +58,7 @@ The following parameters are available:
 .. code:: cpp
    
   #include"uammd.cuh"
+  #include"Integrator/VerletNVE.cuh"
   using namespace uammd;
   int main(){
     //Assume an instance of ParticleData, called "pd", is available

@@ -64,6 +64,8 @@ Where
    a:&=b \left(1-\frac{\xi\dt}{2}\right)
 
 Note that, since we need the force at :math:`t+\dt` to compute the velocities at :math:`t+\dt` the forces have to be a function of the positions only (and not velocities).
+   
+.. note:: The code for this module is located in the source code :code:`Integrator/VerletNVT/GronbechJensen.cuh`.
 
 Usage
 ---------
@@ -75,8 +77,10 @@ Grønbech-Jensen [1]_ is available as an :ref:`Integrator`.
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
 
+
+
+The following parameters are available:  
   * :code:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :code:`real friction` Friction, :math:`\xi`.
   * :cpp:`real dt` Time step.
@@ -88,6 +92,7 @@ The following parameters are available:
 .. code:: cpp
 	  
   #include"uammd.cuh"
+  #include"Integrator/VerletNVT.cuh"
   using namespace uammd;
   int main(){
     //Assume an instance of ParticleData, called "pd", is available
@@ -113,7 +118,105 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
 
 	  
+
+Dissipative Particle Dynamics
+==============================
+
+One of the most popular techniques used to reintroduce some of the degrees of freedom lost with LD is Dissipative Particle Dynamics (DPD). This coarse graining technique can be used to go further in the spatio-temporal scale by choosing groups of fluid particles as the simulation unit, sitting inbetween microscopic (as in MD) and macroscopic (hydrodynamic) descriptions. In practice DPD is a Langevin approach where friction acts by pairs of particles and conserves momentum.
+
+In the standard DPD, particles interact via a soft potential, modelling the interaction between two large groups of fluid particles.
+In many instances DPD is used as a momentum-conserving thermostat, which thus permits to include hydrodynamics (contrary to a single Langevin approach). Local momemtum conservation results in the emergence of macroscopic hydrodynamic effects. These momentum conserving forces can then be tuned to reproduce not only thermodynamics, but also dynamical and rheological properties of diverse complex fluids.
+The equations of motion in DPD have the same functional form as LD and can be in fact considered as a momentum-conserving generalization of LD. The equations of motion for DPD read,
+
+.. math::
+
+   m\vec{a} = \vec{F^c} + \vec{F^d} + \vec{F^r}.
+   
+Where the three forces are traditionally expressed as,
+
+.. math::
+
+   \vec{F^c}_{ij} &=\omega(r_{ij})\hat{\vec{\ppos}}_{ij}\\
+    \vec{F^d}_{ij} &=-\xi\omega^2(r_{ij})(\vec{\pvel}_{ij}\cdot\vec{\ppos}_{ij})\hat{\vec{\ppos}}_{ij}\\
+    \vec{F^r}_{ij} &=\sqrt{2\xi\kT}\omega(r_{ij})\widetilde{W}_{ij}\hat{\vec{\ppos}}_{ij}    
+
+Where :math:`\vec{\pvel}_{ij} = \vec{\pvel}_j - \vec{\pvel}_i` is the relative velocity between particles :math:`i` and :math:`j`. Here :math:`\xi` represents a friction coefficient and is related to the random force strength via fluctuation-dissipation balance in a familiar way [2]_. In general :math:`\xi` can be considered to be a tensorial quantity and even derived from atomistic simulations using dynamic coarse graining theory. The factor :math:`\widetilde{W}_{ij}` is different from the one in LD in that it affects pairs of particles (instead of each individual one), it also represents a Gaussian random number with zero mean and unit standard deviation, but must be chosen independently for each pair while ensuring symmetry so that :math:`\widetilde{W}_{ij} = \widetilde{W}_{ji}`.
+The weight function :math:`\omega(r)` is a soft repulsive force usually defined as
+
+.. math::
+
+   \omega(r) =  \begin{cases}
+    \alpha\left(1-\dfrac{\ppos}{r_{c}}\right) & r<r_{c}\\
+    0 & r\ge r_{c}
+    \end{cases}
+    
+Where :math:`r_{c}` is a cut-off distance. The strength parameter, :math:`\alpha`, can in principle be different for each pair of particles, :math:`i` - :math:`j`, but for simplicity we will assume it is the same for every pair.
+
+.. note:: The code is easily generalized for a different per-particle strength and/or friction.
+
+Being an SDE where the forces depend on the velocities, numerical integration of the DPD equations is tricky. A simple modification can be made, sacrificing stability, by approximating the velocity to just first order in the Gronbech-Jensen update rule, so that the velocity depends only on the force for the current step. Unfortunately, this leads to artifacts in the transport properties and unacceptable temperature drifts. There are several strategies in the literature trying to overcome this, usually presented as modifications of the velocity Verlet algorithm.
+
+All of these methods improve the accuracy of the predicted transport properties and response functions in exchange for increased computational cost. 
+One popular approach is to simply use the energy-conserving velocity Verlet (see :ref:`Molecular Dynamics`)  with the DPD forces. This yields "poor" stability and presents certain artifacts due to the mistreatment of the derivative of the noise term incurred by treating the DPD equations as an ordinary differential equation instead of a proper SDE. However, it is often good enough and while it might require a smaller time step to recover measurables to an acceptable tolerance it is the fastest approach and trivial to implement in a code already providing the velocity Verlet algorithm.
+
+This is the approach used in UAMMD, where DPD is encoded as a :ref:`Molecular Dynamics`  :ref:`Integrator` coupled with a :ref:`PairForces`  :ref:`Interactor` encoding the DPD forces.
+
+.. note:: The force-computing code for this module is located in the source code :code:`Interactor/Potential/DPD.cuh`
+
+Usage
+----------
+
+A DPD :ref:`Integrator` is created by coupling a :code:`VerletNVE`  :ref:`Molecular Dynamics`  :ref:`Integrator`  with a :code:`DPD`  :ref:`Potential` (the Potential is supplied to a :ref:`PairForces`  :ref:`Interactor` that can be then added to the Integrator).
+
+.. sidebar::
+
+   .. warning:: Note that the temperature is provided in units of energy.
+
+
+The following parameters are available for the DPD :ref:`Potential`:
+  * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
+  * :cpp:`real cutOff` The cut off, :math:`r_c`, for the weight function.
+  * :cpp:`par.gamma`  The friction coefficient, :math:`\xi`.
+  * :cpp:`real A`  The strength of the weight function, :math:`\alpha`.
+  * :cpp:`real dt` The time step. Be sure to pass the same time step to DPD and the Integrator.
+
+.. code:: cpp
+
+  #include<uammd.cuh>
+  #include<Integrator/VerletNVE.cuh>
+  #include<Interactor/PairForces.cuh>
+  #include<Interactor/Potential/DPD.cuh>
+  using namespace uammd;
+  //A function that creates and returns a DPD integrator
+  auto createIntegratorDPD(UAMMD sim){
+    Potential::DPD::Parameters par;
+    par.temperature = sim.par.temperature;
+    //The cut off for the weight function
+    par.cutOff = sim.par.cutOff;
+    //The friction coefficient
+    par.gamma = sim.par.friction; 
+    //The strength of the weight function
+    par.A = sim.par.strength; 
+    par.dt = sim.par.dt;  
+    auto dpd = make_shared<Potential::DPD>(dpd);
+    //From the example in PairForces
+    auto interactor = createPairForcesWithPotential(sim, dpd);
+    //From the example in the MD section
+    // particle velocities should not be initialized
+    // by VerletNVE (initVelocities=false)
+    using NVE = VerletNVE;
+    NVE::Parameters params;
+    params.dt = par.dt;
+    params.initVelocities=false;
+    verlet = make_shared<NVE>(pd,  params);
+    verlet->addInteractor(interactor);
+    return verlet;
+  }
+
+.. note:: The :code:`UAMMD` structure in this example is taken from the :code:`example/` folders in the repository, containing, for convenience, an instance of :ref:`ParticleData` and a set of parameters
+
+
 .. rubric:: References
 
 .. [1] A simple and effective Verlet-type algorithm for simulating Langevin dynamics. Niels   Grønbech-Jensen  and  Oded   Farago 2013. https://doi.org/10.1080/00268976.2012.760055
-   
+.. [2] Statistical Mechanics of Dissipative Particle Dynamics. P Español and P Warren 1995. https://doi.org/10.1209/0295-5075/30/4/001

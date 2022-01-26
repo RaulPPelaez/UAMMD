@@ -180,7 +180,8 @@ A plethora of guided examples are available in the repository.
    Integrator/MolecularDynamics
    Integrator/LangevinDynamics
    Integrator/BrownianDynamics
-   Integrator/Hydrodynamics
+   Integrator/BrownianHydrodynamics
+   Integrator/FluctuatingHydrodynamics   
    Integrator/MonteCarlo
 
 .. toctree::
