@@ -166,11 +166,11 @@ A plethora of guided examples are available in the repository.
    :maxdepth: 4
    :caption: Concepts
 	     
-   Simulation domain   
-   Neighbour lists
-   Immersed boundary
+   SimulationDomain   
+   NeighbourLists
+   ImmersedBoundary
+   Transverser
    Potential
-   
       
 .. toctree::
    :maxdepth: 4
