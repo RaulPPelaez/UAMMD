@@ -68,14 +68,18 @@ The update rule is very similar to EM but uses noise from two steps (which are g
 
    \vec{\ppos}^{n+1} = \vec{\ppos}^n + dtM\vec{F}^{n} + \sqrt{2\kT M dt}\half(d\vec{W}^n + d\vec{W}^{n-1})
 
-     
-Note that, as stated in [5]_, while this solver seems to be better than the rest at sampling equilibrium configurations, it does not correctly solves the dynamics of the problem.
+.. warning:: Note that, as stated in [5]_, while this solver seems to be better than the rest at sampling equilibrium configurations, it does not correctly solves the dynamics of the problem.
 
 -----------------------------------------------------
 Usage
 -----------------------------------------------------
 
-Use it as any other integrator module.  
+Use it as any other integrator module.
+
+.. sidebar::
+
+   .. warning:: Note that the temperature is provided in units of energy.
+
 The following parameters are available:  
 
   * :code:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
@@ -85,6 +89,7 @@ The following parameters are available:
   * :code:`bool is2D = false` Set to true if the system is 2D  
 
 \* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. If particle radius has not been allocated prior construction of EulerMaruyama it will fail.  
+
 
 -----------------------------------------------------
 Example
@@ -114,7 +119,7 @@ Example
     ...
     auto bd = make_shared<BD>(pd, par);
     ...
-    //Add any interactor[2]
+    //Add any interactor
     bd->addInteractor(myInteractor);
     ...
     //Take simulation to the next step
@@ -124,6 +129,12 @@ Example
   }
 
 Here, :code:`pd` is a :ref:`ParticleData` instance.
+
+.. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
+
+
+
+	  
 
 ****
 
