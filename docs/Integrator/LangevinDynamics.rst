@@ -65,10 +65,54 @@ Where
 
 Note that, since we need the force at :math:`t+\dt` to compute the velocities at :math:`t+\dt` the forces have to be a function of the positions only (and not velocities).
 
+Usage
+---------
+
+Grønbech-Jensen [1]_ is available as an :ref:`Integrator`.
 
 
+.. sidebar::
+
+   .. warning:: Note that the temperature is provided in units of energy.
+
+The following parameters are available:  
+
+  * :code:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
+  * :code:`real friction` Friction, :math:`\xi`.
+  * :cpp:`real dt` Time step.
+  * :cpp:`real mass = -1` Mass of all the particles. If >0 all particles will have this mass, otherwise the mass for each particle in :ref:`ParticleData` will be used. If masses have not been set in :ref:`ParticleData` the default mass is 1 for all particles.  
+  * :cpp:`bool initVelocities=true` Modify starting velocities to ensure the target temperature from the start. When :cpp:`false` the velocities of the particles are left untouched at initialization. The default is true and sets particle velocities following the botzmann distribution.
+  * :code:`bool is2D = false` Set to true if the system is 2D  
 
 
+.. code:: cpp
+	  
+  #include"uammd.cuh"
+  using namespace uammd;
+  int main(){
+    //Assume an instance of ParticleData, called "pd", is available
+    ...
+    using NVT = VerletNVT::GronbechJensen;
+    NVT::Parameters params;
+    params.temperature = 1.0;
+    params.dt = 0.1;
+    params.friction = 1.0;
+    auto verlet = std::make_shared<NVT>(pd, params);
+    ...
+    //Add any interactor
+    verlet->addInteractor(myInteractor);
+    ...
+    //Take simulation to the next step
+    verlet->forwardTime();
+    ...
+    return 0;
+  }
+
+Here, :code:`pd` is a :ref:`ParticleData` instance.
+  
+.. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
+
+	  
 .. rubric:: References
 
 .. [1] A simple and effective Verlet-type algorithm for simulating Langevin dynamics. Niels   Grønbech-Jensen  and  Oded   Farago 2013. https://doi.org/10.1080/00268976.2012.760055
