@@ -1,29 +1,40 @@
 Brownian Dynamics
 =================
------------------------------------------------------
-Brownian Dynamics :ref:`integrators <Integrator>`
------------------------------------------------------
 
-There are several Integrators under the BD namespace, which solve the following differential equation:  
-  
+
+
+When the viscous forces are much larger than the inertial forces, i.e. :math:`|\xi\vec{\pvel}| \gg |m\vec{a}|`, inertial terms becomes irrelevant at very short time scales.
+Brownian Dynamics (BD)[2]_ takes advantage of such a time scale separation between the particle velocity fluctuations and its displacement and can be interpreted as the overdamped, or non-inertial, limit of :ref:`Langevin Dynamics`. The decorrelation time of the velocity, defined as :math:`\tau_l = m/\xi` is much faster than the time needed for a particle to move farther than its own size. BD represents the long time limit of the Langevin equation. This is a powerful property of BD, since sampling the probability distributions of the underlying stochastic processes (stemming from the rapid movement of the solute particles) does not require sampling their fast dynamics.
+
+In BD, the coupling between the submerged particles and the solvent is instantaneous.
+Furthermore, since the particle velocities decorrelate instantly, the only remaining relevant variables are the positions of the colloidal particles.
+
+
+Neglecting hydrodynamic interactions (see :ref:`Brownian Hydrodynamics`) we will focus on the simple case of the mobility being non-zero only on the diagonal. In the case of a no-slip sphere of radius :math:`a` moving inside a fluid with viscosity :math:`\eta` the bare self-mobility is given by the well-known Stokes drag :math:`M = (6\pi\eta a)^{-1}`.
+
+The Brownian dynamics equation of motion are
+
 .. math::
+   
+  d\vec{\ppos} = M\vec{F}dt + \sqrt{2\kT M}d\vec{\noise},
 
-   d\vec{\ppos} = M\vec{F}dt + \sqrt{2\kT M dt}d\vec{W}
 
 Where:
 
   * :math:`\vec{\ppos}` - Particle positions (:math:`\vec{\ppos} = \{\vec{\ppos}_1, \dots, \vec{\ppos}_N\}`)
   * :math:`\vec{F}` - Particle forces
-  * :math:`M = \frac{1}{6\pi \eta a}` - Mobility -> :math:`M = D/\kT`. Here :math:`\eta` is the fluid viscosity and :math:`a` the hydrodynamic radius of the particles.
-  * :math:`d\vec{W}`- Brownian noise vector (gaussian numbers with mean=0, std=1)
+  * :math:`M = (6\pi \eta a)^{-1}` - Mobility -> :math:`M = D/\kT`. Here :math:`\eta` is the fluid viscosity and :math:`a` the hydrodynamic radius of the particles.
+  * :math:`d\vec{\noise}`- Brownian noise vector (gaussian numbers with mean=0, std=1)
+
+
+
+-----------------------------------------------------
+Brownian Dynamics :ref:`integrators <Integrator>`
+-----------------------------------------------------
+
+There are several :ref:`Integrators <Integrator>` in UAMMD under the :cpp:`BD` namespace, which solve the BD equation above:
+  
     
-
-
-Hydrodynamic interactions are not considered in this module. See :ref:`Brownian Hydrodynamics` for solvers with hydrodynamic interactions.
-
-
-The following update rules are available:
-
 EulerMaruyama
 ---------------
 
@@ -84,11 +95,11 @@ The following parameters are available:
 
   * :code:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :code:`real viscosity` Viscosity of the solvent.
-  * :code:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles)*
+  * :code:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles*)
   * :code:`real dt`  Time step
   * :code:`bool is2D = false` Set to true if the system is 2D  
 
-\* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. If particle radius has not been allocated prior construction of EulerMaruyama it will fail.  
+\* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. In the latter case, if particle radii has not been set in :ref:`ParticleData` prior to the construction of the module an error will be thrown.  
 
 
 -----------------------------------------------------
@@ -140,6 +151,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. rubric:: References:  
 
+.. [2] An Introduction to Dynamics of Colloids. Dhont 1996; https://www.elsevier.com/books/an-introduction-to-dynamics-of-colloids/dhont/978-0-444-82009-9
 .. [3] Temporal Integrators for Fluctuating Hydrodynamics. Delong et. al. (2013) Phys. Rev. E 87, 033302.  
 .. [4] Brownian dynamics of confined suspensions of active microrollers. Balboa et. al. (2017) J. Chem. Phys. 146; https://doi.org/10.1063/1.4979494  
 .. [5] The computation of averages from equilibrium and nonequilibrium Langevin molecular dynamics. Leimkuhler et. al. IMA J. Numerical Analysis 36, 1 (2016) https://doi.org/10.1093/imanum/dru056  

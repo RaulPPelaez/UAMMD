@@ -31,7 +31,7 @@ At their core, these equations are an expression of the conservation of the tota
 
 
 UAMMD offers the well known velocity Verlet algorithm [1]_, which is second-order accurate in the velocity and third-order accurate in the positions.
-The velocity Verlet update rules can be summarized in the following steps
+The velocity Verlet update rules, taking the simulation from the time step :math:`n` (time :math:`t=\dt n`) to the next, :math:`n+1`, can be summarized as
 
 .. math::
    
