@@ -1,5 +1,6 @@
 # **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 2.0**
 
+[![Documentation Status](https://readthedocs.org/projects/uammd/badge/?version=latest)](https://uammd.readthedocs.io/en/latest/?badge=latest)
 
 <img src="https://github.com/raulppelaez/uammd/blob/master/.res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/master/.res/shotlogo.png" width="500">  
 
@@ -32,12 +33,12 @@ Building blocks are provided for the user to construct a certain simulation. Mos
 
 For example, there is no harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the ExternalForces module. Similar things can be achieved with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...   
 
-Hop on to the examples folder for an introduction or check the [wiki](https://github.com/RaulPPelaez/UAMMD/wiki) for more information.  
+Hop on to the examples folder for an introduction or check the [documentation](https://uammd.readthedocs.io) for more information.  
 
 
 # Currently Implemented
 
-See the wiki page at https://github.com/RaulPPelaez/UAMMD/wiki for a full list of available modules.  
+See the documentation page at https://uammd.readthedocs.io for a full list of available modules.  
 
 ----------------------
 ## USAGE
@@ -46,7 +47,7 @@ See the wiki page at https://github.com/RaulPPelaez/UAMMD/wiki for a full list o
 
 **UAMMD does not need to be compiled separatedly (it is header only)**.  
 
-Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/compiling-uammd).  
+Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html).  
 Here you have a short example of how a typical UAMMD code looks like:  
 
 
@@ -77,7 +78,7 @@ int main(int argc, char * argv[]){
 
 ```
 
-Drop by the examples folder to get started with UAMMD or go to the [wiki](https://github.com/RaulPPelaez/UAMMD/wiki).  
+Drop by the examples folder to get started with UAMMD or go to the [wiki](https://uammd.readthedocs.io/).  
 
 ## DEPENDENCIES  
 
@@ -93,7 +94,7 @@ Some modules make use of certain NVIDIA libraries included with CUDA:
 	
 Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
 Apart from this, any dependency is already included in the repository under the third_party	folder.  
-See [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) in the wiki for more information.  
+See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
 
 ------------------------------------------
 
