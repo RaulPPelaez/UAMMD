@@ -28,8 +28,11 @@ Creation
 
 
 
-Typically, UAMMD modules will require a shared_ptr to an instance of ParticleData:
-		     
+.. note:: Typically, UAMMD modules will require a shared_ptr to an instance of ParticleData:
+
+
+**Example: creating a ParticleData instance**
+   
 .. code:: c++
 	  
   auto pd = make_shared<ParticleData>(numberParticles);
@@ -48,6 +51,26 @@ You can access a property via ParticleData in GPU or CPU memory. You must specif
 		  :param mode: Access read/write mode specifier.
 		  :return: Reference to the property.
 
+			   
+.. cpp:enum:: access::location
+
+	      .. cpp:enumerator:: access::location::gpu
+				  
+	      .. cpp:enumerator:: access::location::cpu
+	      
+
+				  
+.. cpp:enum:: access::mode
+
+	      .. cpp:enumerator:: access::mode::read
+				  
+	      .. cpp:enumerator:: access::mode::write
+	      
+	      .. cpp:enumerator:: access::mode::readwrite
+				  
+
+.. note:: The enumerators :cpp:enum:`access::location` and  :cpp:enum:`access::mode` can be used without the second scope. In other words, you can write :cpp:any:`access::gpu` instead of :cpp:any:`access::location::gpu`.
+	  
 The type returned by :cpp:any:`ParticleData::getProperty` is a lightweight standard-library-like pseudo-container defined as
 
 
@@ -87,7 +110,9 @@ Example
   auto id = pd->getId(access::cpu, access::read); //It is not legal to write to ID, one can only read from it.
   int* raw_id_property_pointer = id.raw();
 
-If the mode is set to write, the handle will gain exclusivity and no one else will be able to access it until it is released (the handle is deleted).   
+If the mode is set to write, the handle will gain exclusivity and no one else will be able to access it until it is released (the handle is deleted).
+
+.. note:: There is no real difference between :cpp:any:`access::write` and :cpp:any:`access::readwrite` (at the moment) beyond informing the reader of the intention of modifying the contents (readwrite) vs ignoring the current contents and overwriting (write).	  
 UAMMD cannot write to a property that is currently being read and cannot read from a property that is currently being written to.   
 For this **it is important to control the scope of the property handles**.  
 Handles are compatible with std and thrust algorithms and can be considered c++ iterators for all porpoises.  

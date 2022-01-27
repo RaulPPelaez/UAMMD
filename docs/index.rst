@@ -18,7 +18,7 @@ Universally Adaptable Multiscale Molecular Dynamics
 	    10 Million LJ particles in a box with a low temperature thermostat. Ran on a GTX 980.
 
 
-Screenshot made with `superpunto <https://github.com/RaulPPelaez/superpunto/](https://github.com/RaulPPelaez/superpunto/tree/SDL_OGL45>`_! 
+Screenshot made with `superpunto <https://github.com/RaulPPelaez/superpunto/tree/SDL_OGL45>`_! 
 
 
 For information about a particular module, see its page. You will find the most up to date information about a module in its header file.  
