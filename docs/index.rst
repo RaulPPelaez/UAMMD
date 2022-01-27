@@ -3,6 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. _index:
+   
 Welcome to the UAMMD v2.0 documentation!
 =========================================
 ----------------------------------------------------
@@ -62,7 +64,7 @@ Look in :doc:`Compiling-UAMMD` if some Makefile gives you troubles. The :doc:`FA
 UAMMD is a header only framework and it is mostly self contained in terms of dependencies so compilation should not be too troubling.  
 
 
-
+.. _basic-assumptions:
 
 The four basic assumptions
 =============================

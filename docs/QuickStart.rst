@@ -10,6 +10,7 @@ Keep in mind that UAMMD is designed to be hackable and copy-pastable, so feel fr
 
 There are therefore two choices when first encountering UAMMD, are you looking for a stand alone molecular dynamics package or are you looking to accelerate your existing code with some of the algorithms exposed by UAMMD?
 
+In both cases, reading about the :ref:`basic hierarchy of concepts <basic-assumptions>` (see the :ref:`documentation home <index>`) is the starting place to get acquainted with the primary classes in UAMMD.
 
 UAMMD as a standalone framework    
 -------------------------------------------
@@ -18,7 +19,7 @@ Go to the examples/generic_md folder and follow the instructions, you will end u
 UAMMD as a library  
 ---------------------------------
 
-Go to the examples/uammd_as_a_library folder. You will find some copy-pastable codes that you an use to accelerate your existing code, such as a GPU neighbour list or a way to expose any UAMMD module to python.  
+Go to the examples/uammd_as_a_library folder. You will find some copy-pastable codes that you can use to accelerate your existing code, such as a GPU neighbour list or a way to expose any UAMMD module to python.  
  
 Extending or adapting UAMMD
 ----------------------------------
