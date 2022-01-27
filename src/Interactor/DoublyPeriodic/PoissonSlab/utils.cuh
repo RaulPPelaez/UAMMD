@@ -15,7 +15,7 @@ namespace uammd{
       real top, bottom, inside;
     };
 
-    class SurfaceChargeDispatch{
+    class SurfaceValueDispatch{
 
     public:
 

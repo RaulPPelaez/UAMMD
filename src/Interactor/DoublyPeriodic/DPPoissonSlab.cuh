@@ -15,7 +15,7 @@ namespace uammd{
   class DPPoissonSlab: public Interactor{
   public:
     using Permitivity = DPPoissonSlab_ns::Permitivity;
-    using SurfaceChargeDispatch = DPPoissonSlab_ns::SurfaceChargeDispatch;
+    using SurfaceValueDispatch = DPPoissonSlab_ns::SurfaceValueDispatch;
     struct Parameters{
       real upsampling = 1.2;
       real2 Lxy;
@@ -27,7 +27,8 @@ namespace uammd{
       int support = 10;
       real numberStandardDeviations = 4;
       real split = -1;
-      std::shared_ptr<SurfaceChargeDispatch> surfaceCharge = std::make_shared<SurfaceChargeDispatch>();
+      //Either Charge of potential depending on whether the walls are metallic or not
+      std::shared_ptr<SurfaceValueDispatch> surfaceValues = std::make_shared<SurfaceValueDispatch>();
     };
 
     DPPoissonSlab(shared_ptr<ParticleGroup> pg, Parameters par);
@@ -46,6 +47,10 @@ namespace uammd{
 	sys->log<System::EXCEPTION>("[Poisson] Virial functionality not implemented.");
 	throw std::runtime_error("[Poisson] not implemented");
       }
+    }
+
+    void setSurfaceValuesZeroModeFourier(cufftComplex2_t<real> zeroMode){
+      farField->setSurfaceValuesZeroModeFourier(zeroMode);
     }
     
   private:

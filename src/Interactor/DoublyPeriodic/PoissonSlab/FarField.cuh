@@ -67,7 +67,7 @@ namespace uammd{
 	real numberStandardDeviations =-1;
 	real upsampling = -1;
 	int support = -1;	
-	std::shared_ptr<SurfaceChargeDispatch> surfaceCharge = std::make_shared<SurfaceChargeDispatch>();
+	std::shared_ptr<SurfaceValueDispatch> surfaceValues = std::make_shared<SurfaceValueDispatch>();
       };
 
     private:
@@ -113,7 +113,7 @@ namespace uammd{
 	this->fct = std::make_shared<FastChebyshevTransform>(sys, cellDim);
 	this->bvp = createBVP(par);
 	this->correction = std::make_shared<Correction>(par.permitivity, cellDim, par.Lxy, par.H, He);
-	setUpSurfaceCharges(par.surfaceCharge);
+	setUpSurfaceValues(par.surfaceValues);
       }
 
       void compute(cudaStream_t st){
@@ -126,13 +126,16 @@ namespace uammd{
 	ibm->spreadImageChargesAdd(separatedCharges, gridCharges, par.permitivity, st);
 	gridChargesFourier = fct->forwardTransform(gridCharges, st);
 	auto insideSolution = bvp->solveFieldPotential(gridChargesFourier, st);
-	auto surfaceCharges_ptr = thrust::raw_pointer_cast(surfaceChargesFourier.data());
-	correction->correctSolution(insideSolution, outsideSolution, surfaceCharges_ptr, st);
+	auto surfaceValues_ptr = thrust::raw_pointer_cast(surfaceValuesFourier.data());
+	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st);
 	auto gridFields = fct->inverseTransform(insideSolution, st);
 	ibm->interpolateFieldsToParticles(gridFields, st);
 	CudaCheckError();
       }
 
+      void setSurfaceValuesZeroModeFourier(cufftComplex2 zeroMode){
+	surfaceValuesFourier[0] = zeroMode;
+      }
     private:
 
       shared_ptr<SpreadInterpolateCharges> createImmersedBoundary(){
@@ -171,14 +174,14 @@ namespace uammd{
 	return std::make_shared<BVPPoissonSlab>(bvppar);
       }
 
-      void setUpSurfaceCharges(std::shared_ptr<SurfaceChargeDispatch> surfaceCharge);
+      void setUpSurfaceValues(std::shared_ptr<SurfaceValueDispatch> surfaceValue);
 
-      gpu_container<cufftComplex2> surfaceChargesFourier;
+      gpu_container<cufftComplex2> surfaceValuesFourier;
     };
 
-    gpu_container<cufftComplex2> takeSurfaceChargeDensityToFourier(cached_vector<real> &surfaceChargeTop, cached_vector<real> &surfaceChargeBottom, int2 gridSize){
+    gpu_container<cufftComplex2> takeSurfaceValueDensityToFourier(cached_vector<real> &surfaceValueTop, cached_vector<real> &surfaceValueBottom, int2 gridSize){
       int2 n = gridSize;
-      gpu_container<cufftComplex2> surfaceChargesFourier(n.y*(n.x/2+1));
+      gpu_container<cufftComplex2> surfaceValuesFourier(n.y*(n.x/2+1));
       int2 cdtmp = {n.y, n.x};
       int2 inembed = {n.y, 2*(n.x/2+1)};
       int2 oembed = {n.y, n.x/2+1};
@@ -190,38 +193,38 @@ namespace uammd{
 				  &oembed.x,
 				  2, 1,
 				  CUFFT_Real2Complex<real>::value, 1));
-      real* i_data = thrust::raw_pointer_cast(surfaceChargeTop.data());
-      cufftComplex* o_data = (cufftComplex*)thrust::raw_pointer_cast(surfaceChargesFourier.data());
+      real* i_data = thrust::raw_pointer_cast(surfaceValueTop.data());
+      cufftComplex* o_data = (cufftComplex*)thrust::raw_pointer_cast(surfaceValuesFourier.data());
       CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, i_data, o_data));
-      i_data = thrust::raw_pointer_cast(surfaceChargeBottom.data());
+      i_data = thrust::raw_pointer_cast(surfaceValueBottom.data());
       CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, i_data, o_data+1));
-      return surfaceChargesFourier;
+      return surfaceValuesFourier;
     }
 
-    void FarField::setUpSurfaceCharges(std::shared_ptr<SurfaceChargeDispatch> surfaceCharge){
+    void FarField::setUpSurfaceValues(std::shared_ptr<SurfaceValueDispatch> surfaceValue){
       int2 n = {cellDim.x,cellDim.y};
       auto charges = pd->getCharge(access::location::cpu, access::mode::read);
       real qtot = std::accumulate(charges.begin(), charges.end(), real());
-      std::vector<real> surfaceChargeTop(2*(n.x/2+1)*n.y);
-      auto surfaceChargeBottom = surfaceChargeTop;
+      std::vector<real> surfaceValueTop(2*(n.x/2+1)*n.y);
+      auto surfaceValueBottom = surfaceValueTop;
       forj(0, n.y){
 	fori(0, n.x){
 	  real x = (i/real(n.x)-0.5)*par.Lxy.x;
 	  real y = (j/real(n.y)-0.5)*par.Lxy.y;
-	  surfaceChargeTop[i + 2*(n.x/2+1)*j] = surfaceCharge->top(x,y);
-	  surfaceChargeBottom[i + 2*(n.x/2+1)*j] = surfaceCharge->bottom(x,y);
+	  surfaceValueTop[i + 2*(n.x/2+1)*j] = surfaceValue->top(x,y);
+	  surfaceValueBottom[i + 2*(n.x/2+1)*j] = surfaceValue->bottom(x,y);
 	}
       }
-      real totalWallCharge = std::accumulate(surfaceChargeTop.begin(), surfaceChargeTop.end(), 0.0);
-      totalWallCharge += std::accumulate(surfaceChargeBottom.begin(), surfaceChargeBottom.end(), 0.0);
+      real totalWallCharge = std::accumulate(surfaceValueTop.begin(), surfaceValueTop.end(), 0.0);
+      totalWallCharge += std::accumulate(surfaceValueBottom.begin(), surfaceValueBottom.end(), 0.0);
       real totalSystemCharge =  qtot + totalWallCharge;
       if(totalSystemCharge != 0){
 	System::log<System::WARNING>("[DPPoissonSlab] The system is not electroneutral (found %g total charge)", totalSystemCharge);
 	System::log<System::WARNING>("[DPPoissonSlab] To ensure electroneutrality half an opposite charge will be placed on each wall. This is an assumption of the algorithm and cannot be avoided.");
       }
-      cached_vector<real> sct(surfaceChargeTop);
-      cached_vector<real> scb(surfaceChargeBottom);
-      surfaceChargesFourier = takeSurfaceChargeDensityToFourier(sct, scb, n);
+      cached_vector<real> sct(surfaceValueTop);
+      cached_vector<real> scb(surfaceValueBottom);
+      surfaceValuesFourier = takeSurfaceValueDensityToFourier(sct, scb, n);
     }
 
   }
