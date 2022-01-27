@@ -87,7 +87,6 @@ using namespace uammd;
 
 //Lets use this struct to pass around the basic uammd environment
 struct UAMMD{
-  std::shared_ptr<System> sys;
   std::shared_ptr<ParticleData> pd;
   Parameters par;
   std::shared_ptr<Integrator> integrator;
@@ -145,9 +144,9 @@ void initializeChargesFromFile(std::string file, std::shared_ptr<ParticleData> p
 }
 
 //this function will initialize particle velocities following a Boltzmann Distribution according to the given temperature
-void initVelocitiesBoltzmannDistribution(std::shared_ptr<System> sys, std::shared_ptr<ParticleData> pd, real temperature){
+void initVelocitiesBoltzmannDistribution(std::shared_ptr<ParticleData> pd, real temperature){
   auto vel = pd->getVel(access::cpu, access::write);
-  std::mt19937 gen(sys->rng().next());
+  std::mt19937 gen(pd->getSystem()->rng().next());
   real mean = 0;
   real stdev = sqrt(temperature);
   std::normal_distribution<real> dis(mean, stdev);
@@ -180,7 +179,7 @@ std::shared_ptr<ParticleData> initializeParticles(std::shared_ptr<System> sys, P
     std::fill(mass.begin(), mass.end(), 1);
   }
   if(par.integrator.compare("VerletNVE") == 0){
-    initVelocitiesBoltzmannDistribution(sys, pd, par.temperature);
+    initVelocitiesBoltzmannDistribution(pd, par.temperature);
   }
   furtherParticleInitialization(pd, par);
   return pd;
@@ -192,15 +191,15 @@ UAMMD initialize(int argc, char *argv[]){
   UAMMD sim;
   //System can optionally be handed argc/argv. In this case some command line options can be passed (see wiki for a list).
   //Things like the used GPU are selected through this.
-  sim.sys = std::make_shared<System>(argc, argv);
+  auto sys = std::make_shared<System>(argc, argv);
   //System provides an uammd-wide random generator, which can be seeded like this
   std::random_device r;
-  sim.sys->rng().setSeed(r());
+  sys->rng().setSeed(r());
   std::string datamain = (argc>1)?argv[1]:"data.main";
   //Process data.main
   sim.par = readParameters(datamain);
   //Initialize particle properties according to data.main
-  sim.pd = initializeParticles(sim.sys, sim.par);
+  sim.pd = initializeParticles(sys, sim.par);
   return sim;
 }
 
