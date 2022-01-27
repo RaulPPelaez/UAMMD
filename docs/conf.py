@@ -36,7 +36,8 @@ primary_domain = 'cpp'
 extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx_rtd_theme',
-    'sphinx.ext.imgmath'
+    'sphinx.ext.imgmath',
+    'sphinxcontrib.inkscapeconverter',
 ]
 
 
@@ -84,7 +85,13 @@ html_static_path = ['_static']
 rst_prolog = open('global.rst', 'r').read()
 
 
-imgmath_latex_preamble = r'''\renewcommand{\vec}[1]{\bm{#1}}
+imgmath_latex_preamble = r'''
+\usepackage{bm}
+\usepackage{svg}
+\usepackage{graphicx}
+\graphicspath{{img/}}
+\pdfmapfile{-mpfonts.map}
+\renewcommand{\vec}[1]{\bm{#1}}
 \newcommand{\kT}{k_B T}
 \newcommand{\tens}[1]{\bm{\mathcal{#1}}}
 \newcommand{\oper}[1]{\mathcal{#1}}
@@ -109,3 +116,5 @@ imgmath_latex_preamble = r'''\renewcommand{\vec}[1]{\bm{#1}}
 \newcommand{\qtd}{\text{\tiny q2D}}
 
 '''
+
+latex_elements = {'preamble': imgmath_latex_preamble}

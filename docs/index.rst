@@ -67,7 +67,7 @@ The four basic assumptions
 =============================
 
 
-.. figure:: img/sketchUAMMD.svg
+.. figure:: img/sketchUAMMD.*
 	    :scale: 90	    
 
 	    The basic conceptual hierarchy in UAMMD.
