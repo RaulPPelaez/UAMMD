@@ -146,7 +146,7 @@ The weight function :math:`\omega(r)` is a soft repulsive force usually defined 
 .. math::
 
    \omega(r) =  \begin{cases}
-    \alpha\left(1-\dfrac{\ppos}{r_{c}}\right) & r<r_{c}\\
+    \alpha\left(1-\dfrac{r}{r_{c}}\right) & r<r_{c}\\
     0 & r\ge r_{c}
     \end{cases}
     
@@ -176,7 +176,7 @@ A DPD :ref:`Integrator` is created by coupling a :code:`VerletNVE`  :ref:`Molecu
 The following parameters are available for the DPD :ref:`Potential`:
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real cutOff` The cut off, :math:`r_c`, for the weight function.
-  * :cpp:`par.gamma`  The friction coefficient, :math:`\xi`.
+  * :cpp:`real gamma`  The friction coefficient, :math:`\xi`.
   * :cpp:`real A`  The strength of the weight function, :math:`\alpha`.
   * :cpp:`real dt` The time step. Be sure to pass the same time step to DPD and the Integrator.
 
