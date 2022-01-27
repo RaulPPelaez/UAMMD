@@ -90,7 +90,6 @@ imgmath_latex_preamble = r'''
 \usepackage{svg}
 \usepackage{graphicx}
 \graphicspath{{img/}}
-\pdfmapfile{-mpfonts.map}
 \renewcommand{\vec}[1]{\bm{#1}}
 \newcommand{\kT}{k_B T}
 \newcommand{\tens}[1]{\bm{\mathcal{#1}}}

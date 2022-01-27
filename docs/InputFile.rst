@@ -11,10 +11,15 @@ The input file must have the following format:
 .. code:: bash
 	  
   #Lines starting with '#' will be ignored
-  [option] [argument1] [argument2] ...
+  #[option] [argument1] [argument2] ...
 
-  You can have an option with no arguments  
-  Additionally you can use the special shell option, which will run the rest of the line as a bash command when encountered and wait for it to finish.  
+  exampleOption argument1 argument2
+  #You can have an option with no arguments
+  justAFlag
+  #Additionally you can use the special shell option, which will run the rest of the line as a bash command when encountered and wait for it to finish.  
+  shell bash run.sh
+  shell echo "Hello"
+
   
 Usage
 ---------
@@ -42,10 +47,13 @@ Usage
    }
 
    //Finally you can check if the option not only exists but has the correct number/type of arguments
+   int anInt;
+   float aFloat;
+   std::string aString;
    if(!(inputFile.getOption("someOption")>>anInt>>aFloat>>aString)){
       cerr<<"Some parameter missing in the option!"<<endl;
    }
 
 
-getOption will return an `std::istringstream <http://www.cplusplus.com/reference/sstream/stringstream/>`_, so you can work with its output as such.
+.. note:: getOption will return an `std::istringstream <http://www.cplusplus.com/reference/sstream/stringstream/>`_, so you can work with its output as such.
 

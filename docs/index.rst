@@ -30,14 +30,15 @@ UAMMD is a software infrastructure for complex fluids simulations for the GPU, p
 
 Although "Molecular Dynamics" is part of the name,the UAMMD framework allows for much more than that. To this moment multiple integrators are implemented allowing it to perform:
 
-- Molecular dynamics (MD)  
-- Brownian Dynamics  (BD)  
-- Brownian Hydrodynamics (BDHI)  
-- Dissipative Particle Dynamics (DPD)  
-- Smoothed Particle Hydrodynamics (SPH)  
-- Metropolis Monte Carlo (MC)   
-- Lattice Boltzmann (LBM)(WIP)  
-- Fluctuating Hydrodynamics (coupled with particles with Immerse Boundary Method (IBM))  
+- :ref:`Molecular dynamics` (MD)
+- :ref:`Langevin Dynamics`  (LD)  
+- :ref:`Brownian Dynamics`  (BD)  
+- :ref:`Brownian Hydrodynamics` (BDHI)  
+- :ref:`Dissipative Particle Dynamics` (DPD)  
+- :ref:`Smoothed Particle Hydrodynamics` (SPH)  
+- :ref:`Metropolis Monte Carlo` (MC)   
+- :ref:`Lattice Boltzmann` (LBM)(WIP)  
+- :ref:`Fluctuating Hydrodynamics` (coupled with particles with :ref:`Immerse Boundary Method` (IBM))  
 
 Building blocks are provided for the user to construct a certain simulation. Most are highly templated to ease adaptability.
 
@@ -134,7 +135,7 @@ Here you have a short example of how a typical UAMMD code looks like:
     int numberSteps=100;
     for(int i = 0; i<numberSteps; i++){
     	bd->forwardTime();
-    }
+    }  
     return 0;
   }
 
