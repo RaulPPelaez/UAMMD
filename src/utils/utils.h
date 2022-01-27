@@ -25,6 +25,7 @@ inline std::ostream& operator<<(std::ostream& out, const uammd::real2 &f){
 inline std::ostream& operator<<(std::ostream& out, const uammd::real3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
+
 inline std::ostream& operator<<(std::ostream& out, const uammd::real4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
 }
@@ -32,24 +33,39 @@ inline std::ostream& operator<<(std::ostream& out, const uammd::real4 &f){
 inline std::ostream& operator<<(std::ostream& out, const int3 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z;
 }
+
 inline std::ostream& operator<<(std::ostream& out, const int4 &f){
   return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
 }
 
-inline std::istream& operator>>(std::istream& in, uammd::real2 &f){
+inline std::istream& operator>>(std::istream& in, float2 &f){
   return in >> f.x>>f.y;
 }
 
-inline std::istream& operator>>(std::istream& in, uammd::real3 &f){
+inline std::istream& operator>>(std::istream& in, float3 &f){
   return in >> f.x>>f.y>>f.z;
 }
-inline std::istream& operator>>(std::istream& in, uammd::real4 &f){
+
+inline std::istream& operator>>(std::istream& in, float4 &f){
+  return in>>f.x>>f.y>>f.z>>f.w;
+}
+
+inline std::istream& operator>>(std::istream& in, double2 &f){
+  return in >> f.x>>f.y;
+}
+
+inline std::istream& operator>>(std::istream& in, double3 &f){
+  return in >> f.x>>f.y>>f.z;
+}
+
+inline std::istream& operator>>(std::istream& in, double4 &f){
   return in>>f.x>>f.y>>f.z>>f.w;
 }
 
 inline std::istream& operator>>(std::istream& in,  int3 &f){
   return in>>f.x>>f.y>>f.z;
 }
+
 inline std::istream& operator>>(std::istream& in,  int4 &f){
   return in>>f.x>>f.y>>f.z>>f.w;
 }
