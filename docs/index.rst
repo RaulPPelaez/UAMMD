@@ -143,6 +143,14 @@ Here you have a short example of how a typical UAMMD code looks like:
 
 A plethora of guided examples are available in the repository.  
 
+----------------------
+
+About this documentation
+===========================
+
+This documentation constitutes an ongoing effort to port and update the old `UAMMD wiki <https://github.com/RaulPPelaez/UAMMD/wiki>`_ (which pertains to UAMMD v1.x) to ReadTheDocs, describing the new interfaces of the modules that have change since then. Thus, the pages for many modules are not yet available in this documentation. Although this documentation should be your primary source of knowledge for UAMMD, you should also consider, for the time being, the `old wiki <https://github.com/RaulPPelaez/UAMMD/wiki>`_.
+
+
 .. toctree::
    :hidden:
    :maxdepth: 4
