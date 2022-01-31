@@ -113,8 +113,9 @@ Example
 If the mode is set to write, the handle will gain exclusivity and no one else will be able to access it until it is released (the handle is deleted).
 
 .. note:: There is no real difference between :cpp:any:`access::write` and :cpp:any:`access::readwrite` (at the moment) beyond informing the reader of the intention of modifying the contents (readwrite) vs ignoring the current contents and overwriting (write).	  
-UAMMD cannot write to a property that is currently being read and cannot read from a property that is currently being written to.   
-For this **it is important to control the scope of the property handles**.  
+
+.. warning:: UAMMD cannot write to a property that is currently being read and cannot read from a property that is currently being written to.
+	     For this **it is important to control the scope of the property handles**, deleting them as soon as possible and never storing them (store a pointer to ParticleData instead).  
 Handles are compatible with std and thrust algorithms and can be considered c++ iterators for all porpoises.  
 
 .. _list-of-available-properties:
