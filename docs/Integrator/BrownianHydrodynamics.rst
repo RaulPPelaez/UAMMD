@@ -419,7 +419,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
 
-.. hint:: Although by default the Gaussian kernel is used for spreading/interpolation, the code includes a lot of other alternatives (such as Peskin kernels) that can be selected in the source file _Integrator/BDHI/BDHI_FCM.cuh_
+.. hint:: Although by default the Gaussian kernel is used for spreading/interpolation, the code includes a lot of other alternatives (such as Peskin kernels) that can be selected in the source file "Integrator/BDHI/BDHI_FCM.cuh"
 
 .. note:: Although this is undocumented at the moment, the FCM module can also deal with torques/angular displacements.
 
