@@ -24,6 +24,7 @@ src/aradillo.*
 star*
 armadillo*
 *.nvvp
+.\#*
 \#*
 work
 examples/data.main*
