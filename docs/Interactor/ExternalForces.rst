@@ -70,6 +70,18 @@ Another example, in which we showcase the fact that the ExternalForces functor m
     }
   };
 
+
+.. cpp:class:: ForceEnergy
+
+   A POD type holding members for the force, energy and virial
+
+   .. cpp:member:: real3 force
+
+   .. cpp:member:: real energy
+
+   .. cpp:member:: real virial
+
+
 Creating the :ref:`Interactor`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

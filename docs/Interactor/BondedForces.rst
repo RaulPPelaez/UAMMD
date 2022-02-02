@@ -80,8 +80,54 @@ This bond file can be used as the *bond.dat* file in the example :ref:`above <bo
 Defining a new bond potential
 *******************************
 
+A bond potential must abide to the following interface
+
+.. cpp:class:: BondPotential
+
+   An interface that must be used by any class to be used as a bond potential in BondedForces.
+
+   .. cpp:struct:: BondInfo
+
+      A POD structure containing any required per-bond information.
+   
+   .. cpp:function:: ComputeType BondPotential::compute(int bond_index, int ids[NperBond], real3 pos[NperBond], Interactor::Computables comp, BondInfo bi)
+
+     This function will be called for every bond read in the bond file and is expected to compute force/energy and or virial. **This must be a __device__ function**.
+     
+     :param bond_index: The index of the particle to compute force/energy/virial on
+     :param ids: list of indexes of the particles involved in the current bond (in the same order as they were provided in the input file)
+     :param pos: list of positions of the particles involved in the current bond
+     :param comp: computable targets (wether force, energy and or virial are needed).
+     :param bi: bond information for the current bond
+     :return: The force/energy/virial for the particle in the bond, of type :cpp:any:`ComputeType`
+	      
+   .. cpp:function:: BondInfo BondPotential::readBond(std::istream &in)
+
+     This function will be called for each bond in the bond file with the contents of the line after the particle indices. It must use the stream that is handed to it to construct and return a :cpp:any:`BondInfo`.  
+
+
+.. note:: Note that this is not a virtual class to inherit, the BondedForces module is templated for the bond potential, so any class implementing the necessary methods can be used.
+	  
+     
+.. cpp:class:: ComputeType
+
+   A POD type holding members for the force, energy and virial
+
+   .. cpp:member:: real3 force
+
+   .. cpp:member:: real energy
+
+   .. cpp:member:: real virial
+
+
+      
+   
+
+
 .. code:: cpp
 
+   __device__ real sq (real a){ return a*a;}
+   
    //Harmonic bond for pairs of particles
    struct HarmonicBond{
      HarmonicBond(/*Parameters par*/){
@@ -93,13 +139,8 @@ Defining a new bond potential
      struct BondInfo{
        real k, r0;
      };
-     //This function will be called for every bond read in the bond file and is expected to compute force/energy and or virial
-     //bond_index: The index of the particle to compute force/energy/virial on
-     //ids: list of indexes of the particles involved in the current bond
-     //pos: list of positions of the particles involved in the current bond
-     //comp: computable targets (wether force, energy and or virial are needed).
-     //bi: bond information for the current bond (as returned by readBond)
-     __device__ real sq (real a){ return a*a;}
+
+     
      __device__ ComputeType compute(int bond_index,
                                     int ids[2], real3 pos[2],
 				    Interactor::Computables comp,
@@ -115,8 +156,6 @@ Defining a new bond potential
        return (r2==real(0.0))?(ComputeType{}):ct;
      }
      
-     //This function will be called for each bond in the bond file and read the information of a bond
-     //It must use the stream that is handed to it to construct a BondInfo.  
      static BondInfo readBond(std::istream &in){
        //BondedForces will read i j, readBond has to read the rest of the line
        BondInfo bi;
@@ -125,7 +164,15 @@ Defining a new bond potential
      }
    };
 
-Note that a bond potential functor may be :ref:`ParameterUpdatable`.
+
+.. hint:: Note that the :cpp:`compute` function takes arrays with as many elements as particles per bond.
+
+   
+.. hint:: Note that a bond potential functor may be :ref:`ParameterUpdatable`.
+	  
+.. note:: As usual, this :ref:`Interactor` can be added to an :ref:`Integrator`.
+
+
 The argument :cpp:`comp` in the compute function is of type :cpp:type:`Interactor::Computables`, a POD structure containing boolean flags for the energy, force and virial.
 
 The interface for a bond potential involving more than two particles is similar, but the :cpp:`compute` function would take as an argument a larger array (with as many elements as particles per bond).
