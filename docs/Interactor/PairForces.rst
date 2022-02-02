@@ -12,7 +12,7 @@ PairForces will delegate its :ref:`ParameterUpdatable` behavior to the provided 
 Usage
 -------
 
-PairForces is created as any other :ref:`Interactor` module. Some :ref:`Potentials` are offered by UAMMD in the source :code:`Interactor/Potential/Potential.cuh`.
+PairForces is created as any other :ref:`Interactor` module, but it needs an additional argument in the constructor with a :cpp:any:`Potential` encoding the specific inter particle interaction. Some :ref:`Potentials <Potential>` are offered by UAMMD in the source :code:`Interactor/Potential/Potential.cuh`.
 
 .. code:: c++
 	  

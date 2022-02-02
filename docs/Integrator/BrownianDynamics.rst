@@ -48,7 +48,7 @@ The simplest algorithm, described in [6]_, advances the simulation with the foll
 
 .. math::
    
-  \vec{\ppos}^{n+1} = \vec{\ppos}^n + dt(M\vec{F}^n) + \sqrt{2*\kT M dt}d\vec{W}
+  \vec{\ppos}^{n+1} = \vec{\ppos}^n + dt(M\vec{F}^n) + \sqrt{2\kT M dt}d\vec{W}^n
   
   
 This algorithm has a convergence scaling of 1/2 (:math:`dt^{0.5}`).  
