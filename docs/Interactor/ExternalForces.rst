@@ -102,4 +102,5 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. note:: As usual, this :ref:`Interactor` can be added to an :ref:`Integrator`.
 
+.. hint:: A :ref:`ParticleGroup` can be provided instead of a :ref:`ParticleData` for the module to act only on a subset of particles.
 	  

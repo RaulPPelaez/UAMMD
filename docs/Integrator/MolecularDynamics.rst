@@ -42,12 +42,13 @@ The velocity Verlet update rules, taking the simulation from the time step :math
 
 The velocity Verlet algorithm presents all the necessary properties for being a popular integrator. It has good numerical stability, a small memory footprint, good energy conservation, guaranteed momentum conservation,...
 
-.. node:: The code for this module is located in the source code :code:`Integrator/VerletNVE.cuh`
+.. note:: The code for this module is located in the source code :code:`Integrator/VerletNVE.cuh`
 
 Usage
 --------------
 
-Use it as any other integrator module.  
+Use it as any other integrator module.
+
 The following parameters are available:  
   * :cpp:`real energy` Target energy per particle, can be omitted if :cpp:`initVelocities=false`.
   * :cpp:`real dt` Time step.
