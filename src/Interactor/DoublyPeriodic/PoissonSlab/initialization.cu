@@ -68,8 +68,8 @@ namespace uammd{
       sys->log<System::MESSAGE>("[DPPoissonSlab] Bottom wall is metallic, surface values will be interpreted as potential for the bottom wall.");
     if(isMetallicBottom and not isMetallicTop){
       sys->log<System::ERROR>("[DPPoissonSlab] If only one wall is metallic, it must be the top wall");
+      throw std::runtime_error("[DPPoissonSlab] Bottom metallic wall not implemented");
     }
-    throw std::runtime_error("[DPPoissonSlab] Bottom metallic wall not implemented");   
   }
 
   void DPPoissonSlab::initializeNearField(Parameters par){
