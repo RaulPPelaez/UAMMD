@@ -38,8 +38,11 @@ extensions = [
     'sphinx_rtd_theme',
     'sphinx.ext.imgmath',
     'sphinxcontrib.inkscapeconverter',
+    'sphinx.ext.todo',
 ]
 
+
+todo_include_todos=True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

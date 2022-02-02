@@ -4,7 +4,7 @@ Molecular Dynamics
 At the lowest level our simulation units are interacting atoms or molecules whose motion can be described using classical mechanics. We refer to the numerical techniques used in this regime as Molecular Dynamics (MD).
 In MD molecules are moving in a vacuum following the Newtonian equation of motion. If we need to include some kind of solvent, i.e. water, in an MD simulation we must do so by explicitly solving the motion of all the involved molecules of water (with some suitable force field).
 Even so, MD represents the basis for all particle-based methods, where the term *particle*, depending on the level of coarse graining, might refer to anything from an atom to a colloidal particle.
-Although it is not the most fundamental way of expressing the equations of motion, we will stick to a somewhat simplified but still quite general approach. For a system of $N$ molecules interacting via a certain potential, Newton's second law states that the acceleration experienced by each particle comes from the total force, :math:`\vec{F}`, acting on it.
+Although it is not the most fundamental way of expressing the equations of motion, we will stick to a somewhat simplified but still quite general approach. For a system of :math:`N` molecules interacting via a certain potential, Newton's second law states that the acceleration experienced by each particle comes from the total force, :math:`\vec{F}`, acting on it.
 
 .. math::
    
@@ -27,7 +27,7 @@ which in general is a function of the positions of the particles. In UAMMD :ref:
 At their core, these equations are an expression of the conservation of the total energy of the entire system. Consequently, these equations of motion can be used to perform simulations in the so-called microcanonical ensemble (NVE) :math:`^1`, where the number of particles (N), the volume of the domain (V) and the total energy (E) are conserved. Note, however, that the energy is only conserved when forces stem from the gradient of a potential.
 
 
-	     
+.. hint:: Molecular Dynamics allow to model the Microscopic level of description, where the relevant variables are the positions and moments of every particle in the system, including the solvent and solute particles. This level is dominated by the mean collision time between the particles, of the order of :math:`\tau \sim 10^{-12} s`. The (purely Lagrangian) Newtonian equations of motion describe the dynamics of the system.
 
 
 UAMMD offers the well known velocity Verlet algorithm [1]_, which is second-order accurate in the velocity and third-order accurate in the positions.

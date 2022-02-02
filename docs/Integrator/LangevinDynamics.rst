@@ -45,6 +45,9 @@ Where we have defined :math:`\vec{\beta} := \sqrt{2\xi\kT}\vec{\noise}`.
 Technically, the restrictions for :math:`\vec{\beta}` would be compatible with any random distribution for the noise, :math:`\vec{\noise}`, that has zero mean and variance :math:`dt`. However, as the noise term comes from the action of countless independent random variables (collisions with the solvent particles) the central limit theorem applies. Thus, it is convenient to choose :math:`\vec{\noise}` as a Gaussian white noise (i.e. a Wiener process).
 
 
+.. hint:: At the Langevin level of description, particles move so slowly compared to the solvent characteristic times that hydrodynamic interactions are effectively instantaneous. Only the positions and momenta of the particles remain as relevant variables (Lagrangian description :ref:`once again <Molecular Dynamics>`), which obey a Langevin equation. The characteristic decorrelation time of the particle's velocities governs this scale with :math:`\tau\sim 10^{-5}s`.
+
+
 UAMMD exposes a Verlet-like algorithm to numerically integrate the Langevin SDE called Grønbech-Jensen [1]_ 
 
 
