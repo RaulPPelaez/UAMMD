@@ -429,6 +429,9 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 Positively Split Ewald
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+An Ewald split version of the Force Coupling Method [12]_. Splits the computation between a far and near field contributions. The far field reuses the FCM machinery described above and the near field makes use of the Lanczos algorithm.
+
+
 .. todo:: Fill
 
 Usage
@@ -494,7 +497,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 Fluctuating Immersed Boundary
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Identical to :ref:`FCM`, but using a staggered grid.
+Identical to :ref:`FCM`, but using a staggered grid [10]_.
 
 .. todo:: fill
 
@@ -560,6 +563,21 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 Doubly periodic BDHI solvers
 ------------------------------
 
+
+.. _Quasi2D:
+
+Quasi two-dimensional
+~~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. todo:: fill
+
+Usage
+********
+
+.. todo:: fill
+
+
 .. _DPStokes:
    
 Doubly Periodic Stokes (DPStokes)
@@ -597,3 +615,6 @@ Usage
 .. [10] Brownian dynamics without Green's functions.  Delong et. al. 2014. https://doi.org/10.1063/1.4869866
 
 .. [11] Complex fluids in the GPU era. Raul P. Pelaez tesis manuscript 2022. https://github.com/RaulPPelaez/tesis/raw/main/manuscript.pdf
+
+.. [12] Rapid sampling of stochastic displacements in Brownian dynamics simulations. Fiore et. al. 2017. https://doi.org/10.1063/1.4978242
+
