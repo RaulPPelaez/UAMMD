@@ -1,3 +1,4 @@
+
 /*Raul P. Pelaez 2019-2021. Spectral/Chebyshev Doubly Periodic Stokes solver.
  */
 
@@ -89,7 +90,7 @@ namespace uammd{
     //The BM kernel and its derivative
     inline __host__  __device__ real bm(real r, real alpha, real beta, real norm){
       real za  = fabs(r/alpha);
-      return za>=1?0:exp(beta*(sqrt(1-za*za)-1))/norm;
+      return za>=real(1.0)?real(0.0):exp(beta*(sqrt(real(1.0)-za*za)-real(1.0)))/norm;
     }
 
     inline __host__  __device__ real bm_deriv(real r, real alpha, real beta, real norm){
@@ -128,8 +129,8 @@ namespace uammd{
       BarnettMagland(real w, real beta, real i_alpha, real h, real H, int nz):
       //real tolerance_ignored, real width_ignored, real h, real H, int supportxy, int nz, bool torqueMode = false):
 	H(H), nz(nz), beta(beta), alpha(i_alpha){
-	int supportxy = w/h+0.5;
-	this->rmax = w;
+	int supportxy = w+0.5;
+	this->rmax = w*h;
 	support.x = support.y = supportxy+1;
 	int ct = int(nz*(acos(-2*(-H*0.5+rmax)/H)/M_PI));
 	support.z = 2*ct+1;
