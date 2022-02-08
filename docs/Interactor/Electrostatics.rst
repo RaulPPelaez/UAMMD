@@ -60,7 +60,7 @@ Given that the Gaussian kernel has, in principle, an infinite support evaluating
 
 
 Triply periodic boundary conditions
-------------------
+--------------------------------------
 
 In this instance we solve the Poisson equation with in a periodic boundary (in the three dimensions).
 Our approach is similar to the one presented at [1]_. However, the authors of [1]_ make use of the so-called Fast Gaussian Gridding (FGG) to accelerate spreading/interpolation while UAMMD's its :ref:`Immersed Boundary framework <IBM>`. The electrostatic modules in UAMMD make use of Ewald splitting framework following closely from the mathematical machinery laid out in [2]_.

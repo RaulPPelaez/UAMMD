@@ -22,8 +22,9 @@ The Integrator interface exposes the following functions:
      Adds an :ref:`Interactor` to the integrator.
 
      :param some_interactor: Some :ref:`Interactor`
-	      
-  .. cpp:function:: void Integrator::addUpdatable(std::shared_ptr<ParameterUpdatable> an_updatable)
+
+ 
+ .. cpp:function:: void Integrator::addUpdatable(std::shared_ptr<ParameterUpdatable> an_updatable)
 		     
      Adds a :cpp:any:`ParameterUpdatable` to the integrator.
      
