@@ -180,7 +180,8 @@ An in depth theoretical description of most of the algorithms and physics behind
    ImmersedBoundary
    Transverser
    Potential
-      
+   ParticleGroup
+
 .. toctree::
    :maxdepth: 4
    :hidden:
