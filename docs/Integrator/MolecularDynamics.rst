@@ -47,7 +47,7 @@ The velocity Verlet algorithm presents all the necessary properties for being a 
 Usage
 --------------
 
-Use it as any other integrator module.
+Use it as any other :ref:`Integrator` module.
 
 The following parameters are available:  
   * :cpp:`real energy` Target energy per particle, can be omitted if :cpp:`initVelocities=false`.
