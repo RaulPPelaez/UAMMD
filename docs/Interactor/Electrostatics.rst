@@ -16,7 +16,7 @@ Here :math:`\varepsilon` represents the permittivity of the medium and :math:`f`
   f(\vec{\fpos})= \oper{S}(\vec{\fpos})\vec{Q} = \sum_iQ_i\delta_a(||\vec{\fpos}-\vec{\ppos}_i||).
 
 Let us denote with the vector containing all charges as :math:`\vec{Q} = \{Q_1,\dots,Q_N\}`.
-We will use the spreading operator, :math;`\oper{S}`, (see :ref:`IBM`) to transform the particles charges to a smooth charge density field. We use the Gaussian kernel,
+We will use the spreading operator, :math:`\oper{S}`, (see :ref:`IBM`) to transform the particles charges to a smooth charge density field. We use the Gaussian kernel,
 
 .. math::
    
@@ -64,7 +64,7 @@ Triply periodic boundary conditions
 
 In this instance we solve the Poisson equation with in a periodic boundary (in the three dimensions).
 Our approach is similar to the one presented at [1]_. However, the authors of [1]_ make use of the so-called Fast Gaussian Gridding (FGG) to accelerate spreading/interpolation while UAMMD's its :ref:`Immersed Boundary framework <IBM>`. The electrostatic modules in UAMMD make use of Ewald splitting framework following closely from the mathematical machinery laid out in [2]_.
-One notable thing about the following algorithm is that it can be seen as merely a reinterpretation of terms in the non-fluctuating version of the :ref:`FCM`for hydrodynamics.
+One notable thing about the following algorithm is that it can be seen as merely a reinterpretation of terms in the non-fluctuating version of the :ref:`FCM` for hydrodynamics.
 
 We solve the Poisson equation in Fourier space by convolution with the Poisson's Greens function,
 
@@ -129,7 +129,7 @@ For a given tolerance, the splitting parameters controls the load that each part
 Usage
 ~~~~~~
 
-The triply periodic Poisson solver is available as an :ref:`Interactor` called :cpp:any:`SpectralEwaldPoisson`.
+The triply periodic Poisson solver is available as an :ref:`Interactor` called :cpp:any:`Poisson`.
 
 The following parameters are available:  
   * :cpp:`Box box` Simulation domain (must be triply periodic).

@@ -44,24 +44,21 @@ Although "Molecular Dynamics" is part of the name,the UAMMD framework allows for
 
 Building blocks are provided for the user to construct a certain simulation. Most are highly templated to ease adaptability.
 
-For example, there is no harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the ExternalForces module. Similar things can be achieved with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...
+For example, there is no harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the :ref:`ExternalForces` module. Similar things can be achieved with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...
 
 Hop on to the examples folder for an introduction or check the docs for more information.
 
 
-**Compiling and running any code containing UAMMD requires a GPU and a system with a working CUDA environment**. CUDA is free and you can download it here:
+.. important::
 
- - https://developer.nvidia.com/cuda-toolkit
+   **Compiling and running any code containing UAMMD requires a GPU and a system with a working CUDA environment**. CUDA is free and you can download it here: https://developer.nvidia.com/cuda-toolkit
 
-On the other hand **understanding and modifying UAMMD code will require at least basic knowledge of GPU programming with CUDA**. There are a lot of resources online to learn CUDA, but you can start here:
+   On the other hand **understanding and modifying UAMMD code will require at least basic knowledge of GPU programming with CUDA**. There are a lot of resources online to learn CUDA, but you can start here: https://developer.nvidia.com/blog/even-easier-introduction-cuda/
 
- - https://developer.nvidia.com/blog/even-easier-introduction-cuda/  
 
-If this is the first time you encounter UAMMD and want a quick start guide check the :doc:`QuickStart`.
+If this is the first time you encounter UAMMD and want a quick start guide check the :doc:`QuickStart`. The :doc:`FAQ` is also a good source of knowledge.  
 
-Look in :doc:`Compiling-UAMMD` if some Makefile gives you troubles. The :doc:`FAQ` is also a good source of knowledge.  
-
-UAMMD is a header only framework and it is mostly self contained in terms of dependencies so compilation should not be too troubling.  
+Look in :doc:`Compiling-UAMMD` if some Makefile gives you troubles. UAMMD is a header only framework and it is mostly self contained in terms of dependencies so compilation should not be too troubling.  
 
 
 .. _basic-assumptions:
@@ -75,7 +72,7 @@ The four basic assumptions
 	    The basic conceptual hierarchy in UAMMD.
 
 
-The foundational concepts of UAMMD are supported on a handful of (deliberately) vague assumptions which can be summarize in four:
+The foundational concepts of UAMMD are supported on a handful of (deliberately) vague assumptions which can be summarized in four:
 
 .. rst-class:: centered
 
@@ -115,7 +112,7 @@ Here you have a short example of how a typical UAMMD code looks like:
 
 .. code:: cpp
 	  
-  //Ideal brownian particles
+  //Ideal Brownian particles
   #include"uammd.cuh"
   #include"Integrator/BrownianDynamics.cuh"
   using namespace uammd;
