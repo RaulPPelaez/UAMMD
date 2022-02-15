@@ -114,5 +114,3 @@ An example :cpp:any:`Potential` that computes Lennard-Jones forces, energies and
 
 .. note:: We defined two things in this code example; a :ref:`Transverser` called :cpp:`LJTransverser` and a :ref:`Potential` called :cpp:`SimpleLJ`
 
-	  
-
