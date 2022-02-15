@@ -51,17 +51,17 @@ namespace uammd{
       };
 
   struct LanczosAlgorithm{
-    LanczosAlgorithm(shared_ptr<System> sys, real tolerance = 1e-3);
+    LanczosAlgorithm(real tolerance = 1e-3);
     void init();
     ~LanczosAlgorithm(){
       CublasSafeCall(cublasDestroy_v2(cublas_handle));
-      sys->log<System::DEBUG>("[LanczosAlgorithm] Destroyed");
+      System::log<System::DEBUG>("[LanczosAlgorithm] Destroyed");
     }
 
     //Fill the first N values of V and pass it to solve as "v" instead of an external array,
     //this will save a memcpy
     real * getV(int N){
-      sys->log<System::DEBUG1>("[LanczosAlgorithm] V requested");
+      System::log<System::DEBUG1>("[LanczosAlgorithm] V requested");
       if(N != this->N) numElementsChanged(N);
       return thrust::raw_pointer_cast(V.data());
     }
@@ -106,7 +106,7 @@ namespace uammd{
   template<class Dotctor>
   LanczosStatus LanczosAlgorithm::solve(Dotctor &dot, real *Bz, real*z, int N, cudaStream_t st){
     st = 0;
-    sys->log<System::DEBUG1>("[LanczosAlgorithm] Computing sqrt(M)·v");
+    System::log<System::DEBUG1>("[LanczosAlgorithm] Computing sqrt(M)·v");
     //Exit if this instance has become boggus, in which case it should be reinitialized
     if(errorStatus != LanczosStatus::SUCCESS){
       return errorStatus;
@@ -126,7 +126,7 @@ namespace uammd{
     int steps_needed = 0;
     CublasSafeCall(cublasSetStream(cublas_handle, st));
 
-    sys->log<System::DEBUG2>("[LanczosAlgorithm] Starting");
+    System::log<System::DEBUG2>("[LanczosAlgorithm] Starting");
     real normNoise_prev = 1.0; //For error estimation, see eq 27 in [1]
 
     /*See algorithm I in [1]*/
@@ -134,7 +134,7 @@ namespace uammd{
 
     /*If v doesnt come from solveNoise*/
     if(z != d_V){
-      sys->log<System::DEBUG2>("[LanczosAlgorithm] Copying input to subspace  proyection matrix");
+      System::log<System::DEBUG2>("[LanczosAlgorithm] Copying input to subspace  proyection matrix");
       CudaSafeCall(cudaMemcpyAsync(d_V, z, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
     }
     /*1/norm(z)*/
@@ -152,9 +152,9 @@ namespace uammd{
     while(errorStatus == LanczosStatus::SUCCESS){
       i++;
       real3 * d_w = thrust::raw_pointer_cast(w.data());
-      sys->log<System::DEBUG3>("[LanczosAlgorithm] Iteration %d", i);
+      System::log<System::DEBUG3>("[LanczosAlgorithm] Iteration %d", i);
       /*w = D·vi ---> See i.e BDHI::Lanczos_ns::NbodyFreeMatrixMobilityDot and BDHI::Lanczos_ns::Dotctor on how this works*/
-      sys->log<System::DEBUG3>("[LanczosAlgorithm] Computing M·v");
+      System::log<System::DEBUG3>("[LanczosAlgorithm] Computing M·v");
       dot(d_w, (real3 *)(d_V+3*N*i));
 
       if(i>0){
@@ -171,7 +171,7 @@ namespace uammd{
 		(real *)d_w, 1,
 		d_V+3*N*i, 1,
 		&(hdiag[i])));
-      sys->log<System::DEBUG4>("[LanczosAlgorithm] hdiag[%d] %e", i, hdiag[i]);
+      System::log<System::DEBUG4>("[LanczosAlgorithm] hdiag[%d] %e", i, hdiag[i]);
       /*Allocate more space if needed*/
       if(i == max_iter-1){
 	CudaSafeCall(cudaStreamSynchronize(st));
@@ -202,19 +202,19 @@ namespace uammd{
 	    thrust::fill(w.begin(), w.end(), real3());
 	  }
 	  catch(thrust::system_error &e){
-	    sys->log<System::CRITICAL>("[LanczosAlgorithm] thurst::fill failed with error: %s", e.what());
+	    System::log<System::CRITICAL>("[LanczosAlgorithm] thurst::fill failed with error: %s", e.what());
 	  }
 	  real one = 1;
 	  CudaSafeCall(cudaMemcpyAsync(d_w, &one , sizeof(real), cudaMemcpyHostToDevice, st));
 	}
-	sys->log<System::DEBUG4>("[LanczosAlgorithm] norm(w) = %e in iteration %d! z2 = %e, threshold= %e", hsup[i], i,1.0/invz2, tol);
+	System::log<System::DEBUG4>("[LanczosAlgorithm] norm(w) = %e in iteration %d! z2 = %e, threshold= %e", hsup[i], i,1.0/invz2, tol);
 	CudaSafeCall(cudaMemcpyAsync(d_V+3*N*(i+1), (real *)d_w, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
       }
 
       /*Check convergence if needed*/
       steps_needed++;
       if(i >= check_convergence_steps){ //Miminum of 3 iterations
-	sys->log<System::DEBUG3>("[LanczosAlgorithm] Checking convergence");
+	System::log<System::DEBUG3>("[LanczosAlgorithm] Checking convergence");
 	/*Compute Bz using h and z*/
 	/**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
 	this->compResult(1.0/invz2, N, i, (real *)Bz, st);
@@ -238,7 +238,7 @@ namespace uammd{
 	  //eq. 27 in [1]
 	  real Error = abs(yy/normNoise_prev);
 	  if(isnan(Error)){
-	    sys->log<System::DEBUG>("[LanczosAlgorithm] Error is nan!!!");
+	    System::log<System::DEBUG>("[LanczosAlgorithm] Error is nan!!!");
 	    errorStatus = LanczosStatus::UNKNOWN_ERROR;
 	    return errorStatus;
 	  }
@@ -252,19 +252,19 @@ namespace uammd{
 	      check_convergence_steps = std::max(1, check_convergence_steps - 2);
 
 	    }
-	    sys->log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %e",i, Error);
+	    System::log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %e",i, Error);
 	    return errorStatus;
 	  }
 	  else{
-	    sys->log<System::DEBUG3>("[LanczosAlgorithm] Convergence not achieved! Error: %e, Tolerance: %e", Error, tolerance);
-	    sys->log<System::DEBUG3>("[LanczosAlgorithm] yy: %e, normNoise_prev: %e", yy, normNoise_prev);
+	    System::log<System::DEBUG3>("[LanczosAlgorithm] Convergence not achieved! Error: %e, Tolerance: %e", Error, tolerance);
+	    System::log<System::DEBUG3>("[LanczosAlgorithm] yy: %e, normNoise_prev: %e", yy, normNoise_prev);
 	    if(i>=iterationHardLimit){
-	      sys->log<System::DEBUG>("[LanczosAlgorithm] Convergence not achieved after %d iterations! I will stop trying. Error: %e, Tolerance: %e", i, Error, tolerance);
+	      System::log<System::DEBUG>("[LanczosAlgorithm] Convergence not achieved after %d iterations! I will stop trying. Error: %e, Tolerance: %e", i, Error, tolerance);
 	      return LanczosStatus::TOO_MANY_ITERATIONS;
 	    }
 	  }
 	}
-	sys->log<System::DEBUG3>("[LanczosAlgorithm] Saving current result.");
+	System::log<System::DEBUG3>("[LanczosAlgorithm] Saving current result.");
 	/*Always save the current result as oldBz*/
 	real * d_oldBz = (real*) thrust::raw_pointer_cast(oldBz.data());
 	CudaSafeCall(cudaMemcpyAsync(d_oldBz, Bz, N*sizeof(real3), cudaMemcpyDeviceToDevice, st));

@@ -22,13 +22,13 @@ namespace uammd{
       class NearField{
       public:
 	using NeighbourList = CellList;
-	NearField(Parameters par, std::shared_ptr<System> sys, std::shared_ptr<ParticleData> pd, std::shared_ptr<ParticleGroup> pg):
+	NearField(Parameters par, std::shared_ptr<ParticleGroup> pg):
 	  box(par.box),
-	  sys(sys), pd(pd), pg(pg),
+	  pg(pg),
 	  tolerance(par.tolerance)
 	{
 	  initializeDeterministicPart(par);
-	  this->seed = sys->rng().next32();
+	  this->seed = pg->getParticleData()->getSystem()->rng().next32();
 	  CudaCheckError();
 	}
 
@@ -41,9 +41,7 @@ namespace uammd{
 	void computeStochasticDisplacements(real3* BdW, real temperature, real prefactor, cudaStream_t st);
 
       private:
-	shared_ptr<ParticleData> pd;
 	shared_ptr<ParticleGroup> pg;
-	shared_ptr<System> sys;
 	Box box;
 	real rcut;
 	//Rodne Prager Yamakawa PSE real space part textures
@@ -59,10 +57,10 @@ namespace uammd{
 	  /*Near neighbour list cutoff distance, see sec II:C in [1]*/
 	  this->rcut = sqrt(-log(par.tolerance))/split;	  
 	  if(0.5*box.boxSize.x < rcut){
-	    sys->log<System::WARNING>("[BDHI::PSE] A real space cut off (%e) larger than half the box size (%e) can result in artifacts!, try increasing the splitting parameter (%e)", rcut, 0.5*box.boxSize.x, split);
+	    System::log<System::WARNING>("[BDHI::PSE] A real space cut off (%e) larger than half the box size (%e) can result in artifacts!, try increasing the splitting parameter (%e)", rcut, 0.5*box.boxSize.x, split);
 	    rcut = box.boxSize.x*0.5;
 	  }
-	  this->cl = std::make_shared<NeighbourList>(pd, pg, sys);
+	  this->cl = std::make_shared<NeighbourList>(pg);
 	  const double a = par.hydrodynamicRadius;
 	  RPYPSE_near rpy(a, split, (6*M_PI*a*par.viscosity), rcut);
 	  const real textureTolerance = a*par.tolerance; //minimum distance described
@@ -76,8 +74,8 @@ namespace uammd{
 								rcut,//maximum distance
 								rpy //Function to tabulate
 								);
-	  sys->log<System::MESSAGE>("[BDHI::PSE] Number of real RPY texture points: %d", nPointsTable);
-	  sys->log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f", rcut);
+	  System::log<System::MESSAGE>("[BDHI::PSE] Number of real RPY texture points: %d", nPointsTable);
+	  System::log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f", rcut);
 	}
       };
 
@@ -191,7 +189,7 @@ namespace uammd{
 	//The deterministic part can be skipped if there are no forces
 	if(forces){
 	  cl->update(box, rcut, st);
-	  sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
+	  System::log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
 	  pse_ns::RPYNearTransverser<real4> tr(forces, MF, *RPY_near, rcut, box);
 	  cl->transverseList(tr, st);
 	}
@@ -203,7 +201,7 @@ namespace uammd{
 	if(not lanczos){
 	  //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
 	  auto lanczosTolerance = this->tolerance; //std::min(0.05f, sqrt(par.tolerance));
-	  this->lanczos = std::make_shared<LanczosAlgorithm>(sys, lanczosTolerance);
+	  this->lanczos = std::make_shared<LanczosAlgorithm>(lanczosTolerance);
 	}
 	cl->update(box, rcut, st);
 	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box);
@@ -212,16 +210,16 @@ namespace uammd{
 	/*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/
 	real *noise = lanczos->getV(numberParticles);
 	const auto id_tr = thrust::make_counting_iterator<uint>(0);
-	const uint seed2 = sys->rng().next32();
+	const uint seed2 = pg->getParticleData()->getSystem()->rng().next32();
 	real noise_prefactor = prefactor*sqrt(2*temperature);
 	thrust::transform(thrust::cuda::par.on(st), id_tr, id_tr + numberParticles, (real3*)noise,
 			  pse_ns::SaruTransform(noise_prefactor, seed, seed2));
 	auto status = lanczos->solve(Mvdot_near, (real *)BdW, noise, numberParticles, st);
 	if(status == LanczosStatus::TOO_MANY_ITERATIONS){
-	  sys->log<System::WARNING>("[BDHI::PSE] This is probably fine, but Lanczos could not achieve convergence, try increasing the tolerance or switching to double precision.");
+	  System::log<System::WARNING>("[BDHI::PSE] This is probably fine, but Lanczos could not achieve convergence, try increasing the tolerance or switching to double precision.");
 	}
 	else if(status != LanczosStatus::SUCCESS){
-	  sys->log<System::EXCEPTION>("[BDHI::PSE] Lanczos Algorithm failed with code %d!", status);
+	  System::log<System::EXCEPTION>("[BDHI::PSE] Lanczos Algorithm failed with code %d!", status);
 	  throw std::runtime_error("Lanczos algorithm exited abnormally");
 	}
       }

@@ -93,7 +93,7 @@ struct UAMMD {
   UAMMD(Parameters par, int numberParticles){
     //Initialize UAMMD
     this->sys = std::make_shared<System>();
-    this->pd = std::make_shared<ParticleData>(numberParticles, sys);
+    this->pd = std::make_shared<ParticleData>(numberParticles);
     //Create the PairForces module
     LJForces::Parameters pfpar;
     pfpar.box = par.box;

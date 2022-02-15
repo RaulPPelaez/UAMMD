@@ -255,7 +255,7 @@ namespace uammd{
   void Poisson::nearFieldForce(cudaStream_t st){
     if(split>0){
       sys->log<System::DEBUG2>("[Poisson] Near field force computation");
-      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
+      if(!nl) nl = std::make_shared<NeighbourList>(pg);
       nl->update(box, nearFieldCutOff, st);
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
@@ -268,7 +268,7 @@ namespace uammd{
     if(split>0){
       int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[Poisson] Near field energy computation");
-      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
+      if(!nl) nl = std::make_shared<NeighbourList>(pg);
       nl->update(box, nearFieldCutOff, st);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
       auto energy = pd->getEnergy(access::location::gpu, access::mode::read);

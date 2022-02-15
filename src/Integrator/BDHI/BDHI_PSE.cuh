@@ -70,21 +70,19 @@ namespace uammd{
     public:
       using Parameters = pse_ns::Parameters;
       PSE(shared_ptr<ParticleData> pd, Parameters par):
-	PSE(pd, std::make_shared<ParticleGroup>(pd, "All"), pd->getSystem(), par){}
+	PSE(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
-      PSE(shared_ptr<ParticleData> pd,
-	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys,
-	  Parameters par);
+      PSE(shared_ptr<ParticleGroup> pg, Parameters par);
       
       ~PSE(){}
       
-      void setup_step(              cudaStream_t st = 0){}
+      void setup_step(cudaStream_t st = 0){}
       /*Compute M·F = Mr·F + Mw·F, also includes the far field stochastic displacements*/
       void computeMF(real3* MF, cudaStream_t st){
-	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
+	System::log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
+	auto pd = pg->getParticleData();
 	auto pos = pd->getPos(access::gpu, access::read);
 	auto force = pd->getForce(access::gpu, access::read);	
 	nearField->Mdot(force.begin(), MF, st);
@@ -93,7 +91,7 @@ namespace uammd{
       }
 
       void computeBdW(real3* BdW, cudaStream_t st){
-	sys->log<System::DEBUG2>("[BDHI::PSE] Real space brownian noise");
+	System::log<System::DEBUG2>("[BDHI::PSE] Real space brownian noise");
 	//Far contribution is included in farField::Mdot
 	nearField->computeStochasticDisplacements(BdW, temperature, 1.0, st);
       }
@@ -111,7 +109,7 @@ namespace uammd{
 	nearField->Mdot(force, MF, st);
 	//Compute stochastic part in the near field
 	nearField->computeStochasticDisplacements(MF, temperature, noise_prefactor, st);
-	auto pos = pd->getPos(access::gpu, access::read);
+	auto pos = pg->getParticleData()->getPos(access::gpu, access::read);
 	//Compute both deterministic and stochastic part in the far field
 	farField->computeHydrodynamicDisplacements(pos.begin(), force, MF, numberParticles,
 						   temperature, noise_prefactor, st);
@@ -126,9 +124,7 @@ namespace uammd{
       }
       
     private:
-      shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
-      shared_ptr<System> sys;      
       real hydrodynamicRadius, M0;
       real temperature, dt;
       std::shared_ptr<pse_ns::NearField> nearField;

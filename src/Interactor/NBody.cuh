@@ -27,24 +27,21 @@ For use outside the UAMMD ecosystem, see NBodyBase.cuh
 namespace uammd{
   class NBody{
     shared_ptr<ParticleGroup> pg;
-    shared_ptr<ParticleData> pd;
-    shared_ptr<System> sys;
     NBodyBase nb;
   public:
-    NBody(shared_ptr<ParticleData> pd,
-	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys): pg(pg), pd(pd), sys(sys){
-      sys->log<System::DEBUG>("[NBody] Created");
+    NBody(shared_ptr<ParticleGroup> pg): pg(pg){
+      System::log<System::DEBUG>("[NBody] Created");
     }
 
     NBody(shared_ptr<ParticleData> pd):
-      NBody(pd, std::make_shared<ParticleGroup>(pd), pd->getSystem()){
+      NBody(std::make_shared<ParticleGroup>(pd, "All")){
     }
 
     template<class Transverser>
     inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
       int N = pg->getNumberParticles();
       auto groupIterator = pg->getIndexIterator(access::location::gpu);
+      auto pd = pg->getParticleData();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       SFINAE::TransverserAdaptor<Transverser>::prepare(a_tr, pd);
       nb.transverse(pos.begin(), groupIterator, a_tr, N, st);

@@ -258,23 +258,22 @@ namespace uammd{
 	using cufftComplex = cufftComplex_t<real>;
 	using cufftComplex3 =  detail::cufftComplex3;
 
-	FarField(Parameters par, std::shared_ptr<System> sys):
+	FarField(std::shared_ptr<System> sys, Parameters par):
+	  sys(sys),
 	  box(par.box),
 	  viscosity(par.viscosity),
 	  hydrodynamicRadius(par.hydrodynamicRadius),
-	  psi(par.psi),
-	  sys(sys)
-	{
+	  psi(par.psi){
 	  this->seed = sys->rng().next32();
 	  initializeGrid(par.tolerance);
 	  initializeKernel(par.tolerance);
 	  initializeCuFFT();
 	  CudaCheckError();
-	  sys->log<System::MESSAGE>("[BDHI_PSE] Gaussian kernel support: %d", this->kernel->support);
-	  sys->log<System::MESSAGE>("[BDHI::PSE] Box Size: %f %f %f", box.boxSize.x, box.boxSize.y, box.boxSize.z);
-	  sys->log<System::MESSAGE>("[BDHI::PSE] Unitless splitting factor ξ·a: %f", psi*par.hydrodynamicRadius);
+	  System::log<System::MESSAGE>("[BDHI_PSE] Gaussian kernel support: %d", this->kernel->support);
+	  System::log<System::MESSAGE>("[BDHI::PSE] Box Size: %f %f %f", box.boxSize.x, box.boxSize.y, box.boxSize.z);
+	  System::log<System::MESSAGE>("[BDHI::PSE] Unitless splitting factor ξ·a: %f", psi*par.hydrodynamicRadius);
 	  const int3 n = grid.cellDim;
-	  sys->log<System::MESSAGE>("[BDHI::PSE] Far range grid size: %d %d %d", n.x, n.y, n.z);
+	  System::log<System::MESSAGE>("[BDHI::PSE] Far range grid size: %d %d %d", n.x, n.y, n.z);
 	}
 
 	~FarField(){
@@ -290,9 +289,9 @@ namespace uammd{
 					      real temperature, real prefactor, cudaStream_t st);
 
       private:
+	std::shared_ptr<System> sys;
 	template<class T> using cached_vector = uninitialized_cached_vector<T>;
 	template<class T> using gpu_container = thrust::device_vector<T>;
-	shared_ptr<System> sys;
 	Box box;
 	uint seed;
 
@@ -313,7 +312,7 @@ namespace uammd{
 	//Computes S·F
 	auto spreadForce(real4* pos, real4* forces, int numberParticles, cudaStream_t st){
 	  /*Spread force on particles to grid positions -> S·F*/
-	  sys->log<System::DEBUG2>("[BDHI::PSE] Particles to grid");
+	  System::log<System::DEBUG2>("[BDHI::PSE] Particles to grid");
 	  //auto force = pd->getForce(access::location::gpu, access::mode::read);
 	  auto force_r3 = thrust::make_transform_iterator(forces, detail::ToReal3());
 	  const int3 n = grid.cellDim;
@@ -328,7 +327,7 @@ namespace uammd{
 
 	//Applies the FFT operator
         auto forwardTransformForces(cached_vector<real3> &gridVels, cudaStream_t st){
-	  sys->log<System::DEBUG2>("[BDHI::PSE] Taking grid to wave space");
+	  System::log<System::DEBUG2>("[BDHI::PSE] Taking grid to wave space");
 	  cached_vector<char> cufftWorkArea(cufftWorkAreaSize);
 	  auto d_cufftWorkArea = thrust::raw_pointer_cast(cufftWorkArea.data());
 	  CufftSafeCall(cufftSetWorkArea(cufft_plan_forward, (void*)d_cufftWorkArea)); 
@@ -344,7 +343,7 @@ namespace uammd{
 
 	//Multiplies by the Greens function in Fourier space (G_k)
 	void convolveFourier(cached_vector<cufftComplex3> & gridVelsFourier, cudaStream_t st){
-	  sys->log<System::DEBUG2>("[BDHI::PSE] Wave space velocity scaling");
+	  System::log<System::DEBUG2>("[BDHI::PSE] Wave space velocity scaling");
 	  /*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
 	  auto d_gridVelsFourier = (cufftComplex3*) thrust::raw_pointer_cast(gridVelsFourier.data());
 	  const int3 n = grid.cellDim;
@@ -386,7 +385,7 @@ namespace uammd{
 	  if(temperature > real(0.0)){
 	    auto d_gridVelsFourier = (cufftComplex3*) thrust::raw_pointer_cast(gridVelsFourier.data());
 	    uint seed2 = sys->rng().next32();
-	    sys->log<System::DEBUG2>("[BDHI::PSE] Wave space brownian noise");
+	    System::log<System::DEBUG2>("[BDHI::PSE] Wave space brownian noise");
 	    const int3 n = grid.cellDim;
 	    const real dV = grid.getCellVolume();
 	    real noise_prefactor = prefactor*sqrt(2*temperature/(dV));
@@ -403,7 +402,7 @@ namespace uammd{
 
 	//Applies the FFT^-1 operator
 	auto inverseTransformVelocity(cached_vector<cufftComplex3> & gridVelsFourier, cudaStream_t st){
-	  sys->log<System::DEBUG2>("[BDHI::PSE] Going back to real space");
+	  System::log<System::DEBUG2>("[BDHI::PSE] Going back to real space");
 	  cached_vector<char> cufftWorkArea(cufftWorkAreaSize);
 	  auto d_cufftWorkArea = thrust::raw_pointer_cast(cufftWorkArea.data());
 	  CufftSafeCall(cufftSetWorkArea(cufft_plan_inverse, (void*)d_cufftWorkArea));
@@ -420,11 +419,11 @@ namespace uammd{
 	//Computes J·v. Interpolates the velocities at the particles positions
 	void interpolateVelocity(cached_vector<real3> &gridVels, real4* pos, real3* MF,
 				 int numberParticles, cudaStream_t st){
-	sys->log<System::DEBUG2>("[BDHI::PSE] Grid to particles");
+	System::log<System::DEBUG2>("[BDHI::PSE] Grid to particles");
 	/*Interpolate the real space velocities back to the particle positions ->
 	  Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )*/
 	auto d_gridVels = (real3*)thrust::raw_pointer_cast(gridVels.data());
-	IBM<Kernel> ibm(sys, kernel, grid);
+	IBM<Kernel> ibm(kernel, grid);
 	ibm.gather(pos, MF, d_gridVels, numberParticles, st);
 	CudaCheckError();
       }
@@ -436,8 +435,8 @@ namespace uammd{
       */
       void FarField::computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *MF, int numberParticles,
 						      real temperature, real prefactor, cudaStream_t st){
-	sys->log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
-	sys->log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
+	System::log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
+	System::log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
 	// G_k·FFT(S·F)
 	//The computation is skipped if the forces are not provided (nullptr)
 	auto gridVelsFourier = deterministicPart(pos, forces, numberParticles, st);
@@ -448,7 +447,7 @@ namespace uammd{
 	auto gridVels = inverseTransformVelocity(gridVelsFourier, st);
 	//St
 	interpolateVelocity(gridVels, pos, MF, numberParticles, st);
-	sys->log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
+	System::log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
       }
       
       void FarField::initializeCuFFT(){
@@ -474,7 +473,7 @@ namespace uammd{
 					/*Perform 3 direct Batched FFTs*/
 					CUFFT_Real2Complex<real>::value, 3,
 					&cufftWorkSizef));
-	sys->log<System::DEBUG>("[BDHI::PSE] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
+	System::log<System::DEBUG>("[BDHI::PSE] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
 	/*Same as above, but with C2R for inverse FFT*/
 	CufftSafeCall(cufftMakePlanMany(cufft_plan_inverse,
 					3, &cdtmp.x, /*Three dimensional FFT*/
@@ -487,11 +486,11 @@ namespace uammd{
 					CUFFT_Complex2Real<real>::value, 3,
 					&cufftWorkSizei));
 	size_t cufftWorkSize = std::max(cufftWorkSizef, cufftWorkSizei);
-	sys->log<System::DEBUG>("[BDHI::PSE] Necessary work space for cuFFT: %s", printUtils::prettySize(cufftWorkSize).c_str());
+	System::log<System::DEBUG>("[BDHI::PSE] Necessary work space for cuFFT: %s", printUtils::prettySize(cufftWorkSize).c_str());
 	size_t free_mem, total_mem;
 	CudaSafeCall(cudaMemGetInfo(&free_mem, &total_mem));
 	if(free_mem<cufftWorkSize){
-	  sys->log<System::EXCEPTION>("[BDHI::PSE] Not enough memory in device to allocate cuFFT free %s, needed: %s!!, try lowering the splitting parameter!",
+	  System::log<System::EXCEPTION>("[BDHI::PSE] Not enough memory in device to allocate cuFFT free %s, needed: %s!!, try lowering the splitting parameter!",
 				      printUtils::prettySize(free_mem).c_str(),
 				      printUtils::prettySize(cufftWorkSize).c_str());
 	  throw std::runtime_error("Not enough memory for cuFFT");
@@ -532,13 +531,13 @@ namespace uammd{
 	double w   = pw*h/2.0;
 	/*Gaussian splitting parameter*/
 	this->eta = pow(2.0*psi*w/gaussM, 2);
-	sys->log<System::MESSAGE>("[BDHI::PSE] eta: %g", eta);
+	System::log<System::MESSAGE>("[BDHI::PSE] eta: %g", eta);
 	kernel = std::make_shared<Kernel>(P, sqrt(eta)/(2.0*psi));
 }
 
       void FarField::initializeGrid(real tolerance){
 	real kcut = 2*psi*sqrt(-log(tolerance));
-	sys->log<System::MESSAGE>("[BDHI::PSE] Far range wave number cut off: %f", kcut);
+	System::log<System::MESSAGE>("[BDHI::PSE] Far range wave number cut off: %f", kcut);
 	const double hgrid = 2*M_PI/kcut;
 	int3 cellDim = make_int3(2*box.boxSize/hgrid)+1;
 	cellDim = nextFFTWiseSize3D(cellDim);

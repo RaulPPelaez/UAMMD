@@ -69,19 +69,17 @@ References:
 namespace uammd{
   class CellList{
   protected:
-    shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
-    shared_ptr<System> sys;
 
     CellListBase cl;
     connection posWriteConnection;
 
     bool force_next_update = true;
-    real3 currentCutOff;
-    Box currentBox;
+    real3 currentCutOff = real3();
+    Box currentBox = Box();
 
     void handlePosWriteRequested(){
-      sys->log<System::DEBUG1>("[CellList] Issuing a list update after positions were written to.");
+      System::log<System::DEBUG1>("[CellList] Issuing a list update after positions were written to.");
       force_next_update = true;
     }
 
@@ -107,18 +105,17 @@ namespace uammd{
 
   public:
 
-    CellList(shared_ptr<ParticleData> pd, shared_ptr<System> sys = nullptr):
-      CellList(pd, std::make_shared<ParticleGroup>(pd), pd->getSystem()){}
+    CellList(shared_ptr<ParticleData> pd):
+      CellList(std::make_shared<ParticleGroup>(pd)){}
 
-    CellList(shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg, shared_ptr<System> sys = nullptr):
-      pd(pd), pg(pg), sys(pd->getSystem()), currentCutOff(real3()), currentBox(Box()){
-      sys->log<System::MESSAGE>("[CellList] Created");
-      posWriteConnection = pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});
+    CellList(shared_ptr<ParticleGroup> pg): pg(pg){
+      System::log<System::MESSAGE>("[CellList] Created");
+      posWriteConnection = pg->getParticleData()->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});
       CudaCheckError();
     }
 
     ~CellList(){
-      sys->log<System::DEBUG>("[CellList] Destroyed");
+      System::log<System::DEBUG>("[CellList] Destroyed");
       posWriteConnection.disconnect();
     }
 
@@ -129,29 +126,29 @@ namespace uammd{
 
     void update(Box box, real3 cutOff, cudaStream_t st = 0){
       if(needsRebuild(box, cutOff)){
-	sys->log<System::DEBUG1>("[CellList] Updating cell list");
+	System::log<System::DEBUG1>("[CellList] Updating cell list");
 	currentBox = box;
 	currentCutOff = cutOff;
 	int numberParticles = pg->getNumberParticles();
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);
+	auto pos = pg->getParticleData()->getPos(access::location::gpu, access::mode::read);
 	auto posGroupIterator = pg->getPropertyIterator(pos);
 	Grid grid = createUpdateGrid(box, cutOff);
 	cl.update(posGroupIterator, numberParticles, grid, st);
       }
       else{
-	sys->log<System::DEBUG1>("[CellList] Ignoring unnecessary update");
+	System::log<System::DEBUG1>("[CellList] Ignoring unnecessary update");
       }
     }
 
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
-      sys->log<System::DEBUG2>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
+      System::log<System::DEBUG2>("[CellList] Transversing Cell List with %s", type_name<Transverser>().c_str());
       const int numberParticles = pg->getNumberParticles();
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(tr);
-      SFINAE::TransverserAdaptor<Transverser>::prepare(tr, pd);
+      SFINAE::TransverserAdaptor<Transverser>::prepare(tr, pg->getParticleData());
       NeighbourList_ns::transverseWithNeighbourContainer<<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
 									       globalIndex,
 									       this->getNeighbourContainer(),
