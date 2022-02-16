@@ -3,6 +3,27 @@ InputFile
 
 The InputFile class in utils/InputFile.h allows you to read parameters and options from a file.  
 
+
+.. cpp:class:: InputFile
+
+   .. cpp:function:: InputFile(std::string fileName);
+
+      Initializes the class with a certain parameter file. See :ref:`file format` below.
+      
+   .. cpp:function:: std::istringstream getOption(std::string option, InputFile::OptionType type );
+
+      :param option: The option to look for in the file.
+      :param type: Whether the option is mandatory or optional. An exception will be thrown if a mandatory option is not found in the file.
+      :return: A stream with the contents of the line containing the option (not including the option). Empty if the option was not found.
+      
+   .. cpp:enum:: OptionType
+
+      .. cpp:enumerator:: \
+			  Optional
+			  Required
+
+			  
+
 File format
 ------------
 

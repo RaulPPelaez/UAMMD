@@ -13,49 +13,50 @@ The Integrator interface exposes the following functions:
 
 .. cpp:class:: Integrator
 
- .. cpp:function:: Integrator::Integrator(std::shared_ptr<ParticleData> pd, std::string name = "noName")
+ .. cpp:function:: Integrator(std::shared_ptr<ParticleData> pd, std::string name = "noName")
 		    
     Constructor
-		    
- .. cpp:function:: void Integrator::addInteractor(std::shared_ptr<Interactor> some_interactor)
+
+    
+ .. cpp:function:: void addInteractor(std::shared_ptr<Interactor> some_interactor)
 		    
      Adds an :ref:`Interactor` to the integrator.
 
      :param some_interactor: Some :ref:`Interactor`
 
  
- .. cpp:function:: void Integrator::addUpdatable(std::shared_ptr<ParameterUpdatable> an_updatable)
+ .. cpp:function:: void addUpdatable(std::shared_ptr<ParameterUpdatable> an_updatable)
 		     
      Adds a :cpp:any:`ParameterUpdatable` to the integrator.
      
      :param an_updatable: Some :cpp:any:`ParameterUpdatable`
 
 			  
- .. cpp:function:: virtual void Integrator::forwardTime() = 0;
+ .. cpp:function:: virtual void forwardTime() = 0;
 
      Takes the simulation to the next time step
 
 
 	      
- .. cpp:function:: virtual void Integrator::sumEnergy();
+ .. cpp:function:: virtual void sumEnergy();
   
      Adds to each particle (via :cpp:any:`ParticleData`::getEnergy) the energy due to the Integrator (typically the kinetic energy). Defaults to doing nothing.
 
 
 	       
- .. cpp:function::  std::vector<std::shared_ptr<Interactor>> Integrator::getInteractors();
+ .. cpp:function::  std::vector<std::shared_ptr<Interactor>> getInteractors();
 		     
      Returns a list of all the interactors in the Integrator
 
 	      
- .. cpp:function:: std::vector<std::shared_ptr<ParameterUpdatable>> Integrator::getUpdatables();
+ .. cpp:function:: std::vector<std::shared_ptr<ParameterUpdatable>> getUpdatables();
 		    
      Returns a list of all the updatables in the Integrator (includes all Interactors)
 
 
 Additionally, the following members are available as private members for any class inheriting Integrator:
   * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.
-  * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :code:`pd->getSystem()`.
+  * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :cpp:any:`ParticleData::getSystem`.
 
 After calling :code:`Integrator::forwardTime()` on a given Integrator the relevant particle properties (i.e. positions, velocities...) will be updated and can be accessed via :ref:`ParticleData`.  
 

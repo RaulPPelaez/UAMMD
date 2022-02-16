@@ -9,43 +9,43 @@ A group can contain all particles, no particles or anything in between.
 
    Keeps track of a subset of particles which properties reside in :cpp:any:`ParticleData`.
             
-   .. cpp:function:: std::shared_ptr<ParticleData> ParticleGroup::getParticleData()
+   .. cpp:function:: std::shared_ptr<ParticleData> getParticleData()
 
       Get the instance of :cpp:class:`ParticleData` the :cpp:class:`ParticleGroup` works on.
 
-   .. cpp:function:: void ParticleGroup::clear();
+   .. cpp:function:: void clear();
 
 		        Remove all particles from the group.
 			
    
-   .. cpp:function:: void ParticleGroup::addParticlesById(access::location loc, const int *ids, int N);
+   .. cpp:function:: void addParticlesById(access::location loc, const int *ids, int N);
 
 		     Add particles to the group via an array (with memory residing according to :cpp:`loc`) of :ref:`particle ids <particle_id_assignation>`.
 
-   .. cpp:function:: void ParticleGroup::addParticlesByCurrentIndex(access::location loc, const int *indices, int N);
+   .. cpp:function:: void addParticlesByCurrentIndex(access::location loc, const int *indices, int N);
 	     		     
 		     Add particles to the group via an array with the current indices of the particles in :ref:`ParticleData` (this is faster than :cpp:any:`addParticlesById`).
 		     
-   .. cpp:function:: const int * ParticleGroup::getIndicesRawPtr(access::location loc);
+   .. cpp:function:: const int * getIndicesRawPtr(access::location loc);
 
 		     Get a raw memory pointer to the index list if it exists (:ref:`ParticleGroup` not always creates an actual list of particles).
 		     
     
-   .. cpp:function:: IndexIterator ParticleGroup::getIndexIterator(access::location loc);
+   .. cpp:function:: IndexIterator getIndexIterator(access::location loc);
 
 		     Get an iterator with the indices of particles in this group
 
 
-   .. cpp:function:: template<class Iterator> accessIterator<Iterator> ParticleGroup::getPropertyIterator(Iterator property, access::location loc);
+   .. cpp:function:: template<class Iterator> accessIterator<Iterator> getPropertyIterator(Iterator property, access::location loc);
 
       Returns an iterator that will have size pg->getNumberParticles() and will iterate over the particles in the group.For example, If a group contains only the particle with :cpp:`id=10`, passing :cpp:`pd->getPos(...).begin()` to this function will return an iterator so that :cpp:`iterator[0] = pos[10];` and it will take into account any possible reordering of the pos array. The location does not have to be specified if the property argument is a :cpp:class:`property_ptr` provided by :cpp:class:`ParticleData`.
 
-   .. cpp:function:: int ParticleGroup::getNumberParticles();
+   .. cpp:function:: int getNumberParticles();
 
       Returns the number of particles currently in the group.
 		     
 		     
-   .. cpp:function:: std::string ParticleGroup::getName();
+   .. cpp:function:: std::string getName();
 
       Returns the given name of the group.
 

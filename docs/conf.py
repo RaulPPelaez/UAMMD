@@ -53,6 +53,9 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'global.rst', 'README.md']
 
 
+cpp_id_attributes = ["__device__","__host__"]
+cpp_paren_attributes = ["__device__","__host__"]
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for

@@ -53,7 +53,24 @@ To update some parameter of some ParameterUpdatable entity:
  //Some will do something with this information, some will just ignore the function call, which is the default behavior. 
 
 
+
+Adding a :ref:`ParameterUpdatable` to an :ref:`Integrator`
+------------------------------------------------------------
+
+:cpp:any:`Integrator` exposes the function :cpp:any:`Integrator::addUpdatable`. 
+
+.. code:: cpp
+
+   //An instance of some Integrator exists called myIntegrator
+   std::shared_ptr<Integrator> myIntegrator = ...
+   //An object inheriting from ParameterUpdatable exists called myUpdatable
+   std::shared_ptr<ParameterUpdatable> myUpdatable = ...
+   myIntegrator->addUpdatable(myUpdatable);
+   
+   
+ 
 Every :cpp:any:`Integrator` is expected to call update* on its list of updatables (which includes all Interactors added to it) with every parameter that changes during the course of the simulation. That means that, among other things, the first thing happening at each step will typically be a call to :cpp:`updateSimulationTime()` for each updatable.   
+
 
 Advanced usage
 ----------------

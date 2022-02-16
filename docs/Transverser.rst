@@ -27,28 +27,28 @@ The :cpp:any:`Transverser` interface requires a given class/struct to provide th
 .. cpp:class:: Transverser
 
 	       
-   .. cpp:function:: Compute Transverser::compute(real4 position_i, real4 position_j,Info info_i, Info info_j);
+   .. cpp:function:: Compute compute(real4 position_i, real4 position_j,Info info_i, Info info_j);
 
       For a pair of particles characterized by position and info this function must return the  result from the interaction for that pair of particles. The last two arguments must be present only when :cpp:any:`getInfo` is defined.The returning type, :cpp:any:`Compute`, must be a POD type (just an aggregate of plain types), for example a :cpp:any:`real4`.
 
-   .. cpp:function:: void Transverser::set(int particle_index, Compute &total);
+   .. cpp:function:: void set(int particle_index, Compute &total);
   
       After calling compute for all neighbours this function will be called with the contents of "total" after the last call to "accumulate".  Can be used to, for example, write the final result to main memory.
 
-   .. cpp:function:: Compute Transverser::zero();
+   .. cpp:function:: Compute zero();
 
       This function returns the initial value of the computation, for example {0,0,0} when computing the force. The returning type, :cpp:any:`Compute`, must be a POD type (just an aggregate of plain types), for example a :cpp:any:`real4`. Furthermore it must be the same type returned by the "compute" member.
       This function is optional and defaults to zero initialization (it will return Compute() which works even for POD types).
     
-   .. cpp:function:: Info Transverser::getInfo(int particle_index);
+   .. cpp:function:: Info getInfo(int particle_index);
    
       Will be called for each particle to be processed and returns the per-particle data necessary for the interaction with another particle (except the position which is always available). For example the mass in a gravitational interaction or the particle index for some custom interaction. The returning type, :cpp:any:`Info`, must be a POD type (just an aggregate of plain types), for example a :cpp:any:`real4`. **This function is optional and if not present it is assumed the only per-particle data required is the position**. In this case the function "compute" must only have the first two arguments.
 
-   .. cpp:function:: void Transverser::accumulate(Compute &total, const Compute &current);
+   .. cpp:function:: void accumulate(Compute &total, const Compute &current);
    
       This function will be called after :cpp:any:`compute` for each neighbour with its result and the accumulated result. It is expected that this function modifies :cpp:any:`total` as necessary given the new data in :cpp:any:`current`.  The first time it is called :cpp:any:`total` will be have the value as given by the :cpp:any:`zero` function. This function is optional and defaults to summation: :cpp:`total = total + current`. Notice that this will fail for non trivial types.
      
-   .. cpp:function:: void Transverser::prepare(std::shared_ptr<ParticleData> pd);
+   .. cpp:function:: void prepare(std::shared_ptr<ParticleData> pd);
 
       This function will be called one time on the CPU side just before processing the particles.
       This function is optional and defaults to simply nothing.

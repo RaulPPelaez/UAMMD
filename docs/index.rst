@@ -176,7 +176,7 @@ An in depth theoretical description of most of the algorithms and physics behind
    :caption: Concepts
 	     
    SimulationDomain   
-   NeighbourLists
+   NeighbourList
    ImmersedBoundary
    Transverser
    Potential

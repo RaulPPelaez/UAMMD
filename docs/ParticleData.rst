@@ -18,11 +18,11 @@ Creation
 
 .. cpp:class:: ParticleData
 
-   .. cpp:function:: ParticleData::ParticleData(int numberParticles, std::shared_ptr<System> sys = nullptr)
+   .. cpp:function:: ParticleData(int numberParticles, std::shared_ptr<System> sys = nullptr)
 	       
 		     ParticleData only needs a number of particles at creation. Optionally, a :ref:`System` instance can also be provided as a second argument. If not provided, ParticleData will handle System initialization.
 
-   .. cpp:function:: std::shared_ptr<System> ParticleData::getSystem();
+   .. cpp:function:: std::shared_ptr<System> getSystem();
 		  
    Returns the instance of :ref:`System` used by this ParticleData instance.
 
@@ -41,7 +41,8 @@ Creation
 Getting a handle get a certain property
 ------------------------------------------
 
-You can access a property via ParticleData in GPU or CPU memory. You must specify the kind of access (read, write, readwrite). 
+You can access a property via ParticleData in GPU or CPU memory. You must specify the kind of access (read, write, readwrite).
+
 
 .. cpp:function:: property_ptr<type> ParticleData::getProperty(access::location loc, access::mode mode);
 
