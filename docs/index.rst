@@ -219,7 +219,7 @@ An in depth theoretical description of most of the algorithms and physics behind
    ErrorHandling
    ProgrammingTools
    Postprocessing
-   
+   VectorTypes
    
 	     
 Indices and tables
