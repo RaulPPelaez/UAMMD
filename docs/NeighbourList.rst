@@ -70,8 +70,8 @@ Once constructed, there are three ways to use a neighbour list:
     return 0;
   }
   
-.. hint:: See :cpp:any:`Neighbourcontainer` below.
-.. hint:: Here, :cpp:expr:`some_transverser` is an instance of a :ref:`Transverser`.
+.. hint:: See :cpp:any:`NeighbourContainer` below.
+.. hint:: Here, :cpp:`some_transverser` is an instance of a :ref:`Transverser`.
 
 	  
 

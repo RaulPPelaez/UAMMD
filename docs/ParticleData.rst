@@ -263,7 +263,7 @@ Note that it is possible that a module does not need to track the specific order
 
 UAMMD uses the :cpp:type:`signal`/:cpp:type:`connection` classes from `fr00b0/nod <https://github.com/fr00b0/nod>`_.
 
-.. cpp:type:: template<class Function> signal<Function> = nod::unsafe_signal<Function>
+.. cpp:type:: template<class Function> signal = nod::unsafe_signal<Function>
 
 	       UAMMD's signal class. Must be specialized with a function signature, for instance :cpp:`using non_broadcasting_signal = signal<void()>`.
 
