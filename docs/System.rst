@@ -12,11 +12,11 @@ Creation
 
 .. cpp:class:: System
 
-	   .. cpp:function:: System::System()
+	   .. cpp:function:: System()
 
 			     Default Constructor.
 			     
-	   .. cpp:function:: System::System(int argc, char* argv[])
+	   .. cpp:function:: System(int argc, char* argv[])
 
 			     System can take in the command line arguments and understands :ref:`some options <System options>` for them.
 			     
