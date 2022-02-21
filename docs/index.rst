@@ -159,7 +159,8 @@ An in depth theoretical description of most of the algorithms and physics behind
    SimulationFile
    FAQ
    Examples
-
+   Contact
+   
 .. toctree::
    :hidden:
    :maxdepth: 4
@@ -220,7 +221,9 @@ An in depth theoretical description of most of the algorithms and physics behind
    ProgrammingTools
    Postprocessing
    VectorTypes
-   
+
+
+
 	     
 Indices and tables
 ==================
@@ -230,4 +233,4 @@ Indices and tables
 * :ref:`search`
 
   
-.. disqus::
+
