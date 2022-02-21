@@ -42,7 +42,8 @@ extensions = [
     'sphinx.ext.todo',
     "sphinx_disqus.disqus"
 ]
-disqus_shortname = "uammdreadthedocs"
+
+disqus_shortname = 'uammd-readthedocs'
 
 todo_include_todos=True
 

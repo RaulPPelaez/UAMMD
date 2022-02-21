@@ -109,7 +109,7 @@ Adding new properties is not expected to have a negative performance impact, and
 How do I use a neighbour list?
 --------------------------------
 
-You can find the workings of UAMMD's neighbour lists :ref:`here <NeighbourList>.
+You can find the workings of UAMMD's neighbour lists :ref:`here <NeighbourList>`.
 UAMMD offers several ways to interface with a neighbour list. The prefered way is to use a so-called :doc:`"Transverser" <Interactor/Transverser>`, although there are other ways. This structure provides the building blocks for a very generic computation using a neighbour list, in the below example you have a simple "neighbour counter" you can adapt.  
 
 Here you have some copy pastable example on how to use a :ref:`CellList` (although any neighbour list will behave the same).
