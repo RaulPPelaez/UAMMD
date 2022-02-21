@@ -102,8 +102,8 @@ An example :cpp:any:`Potential` that computes Lennard-Jones forces, energies and
     }
     //This function is required to provide a Transverser that has the ability to compute the requested Computables.
     auto getTransverser(Interactor::Computables comp,
-    Box box,
-    std::shared_ptr<ParticleData> pd){
+                        Box box,
+                        std::shared_ptr<ParticleData> pd){
       auto force = comp.force?pd->getForce(access::gpu, access::readwrite).raw():nullptr;
       auto energy = comp.energy?pd->getEnergy(access::gpu, access::readwrite).raw():nullptr;
       auto virial = comp.virial?pd->getVirial(access::gpu, access::readwrite).raw():nullptr;

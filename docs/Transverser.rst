@@ -60,7 +60,7 @@ Example
 The example code below contains a very bare-bones instance of a :cpp:any:`Transverser`. In particular, :cpp:`NeighbourCounter` relies on as much default behavior as possible, presenting only a :cpp:any:`compute` and :cpp:any:`set` functions.
 If we apply the :cpp:`NeighbourCounter`  :cpp:any:`Transverser` to one of the :ref:`neighbour lists` in UAMMD, the output (:code:`nneigh` array) will hold, for each particle, the number of neighbour particles.
 
-.. code:: c++
+.. code:: cpp
   	  
   struct NeighbourCounter{
     int *nneigh;

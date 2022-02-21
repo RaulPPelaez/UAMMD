@@ -85,7 +85,8 @@ Logging
 
 System provides a logging engine with several levels of relevance for the message. The available levels are in the System::level enum in System.h. You can see the following in this example:
 
-.. cpp:function:: template<class LogLevel> void System::log<LogLevel>(const char * format, ...);
+.. cpp:function:: template<class LogLevel> \
+		  static void System::log(const char * format, ...);
 
 	Log messages with a printf-like interface. Requires a log level (see below).
 		  
@@ -113,12 +114,12 @@ Cached memory allocation
 UAMMD exposes a cached allocator of GPU memory via System under the names :cpp:any:`System::allocator\<T>` and :cpp:any:`System::allocator_thrust\<T>`. Both types comply with the `C++ standard library's Allocator concept <https://en.cppreference.com/w/cpp/named_req/Allocator>`_ and can thus be used with the standard library's containers, such as :cpp:type:`std::vector`.
 
 
-.. cpp:class:: template<class T> System::allocator<T>
+.. cpp:class:: template<class T> System::allocator
 
       An std-compatible polymorphic pool allocator that provides GPU memory (allocated via cudaMalloc).
       Allocations via this type will be cached. If a chunk of memory is allocated and deallocated, the next time a similar chunk is requested will not incur in a cudaMalloc call.
 
-.. cpp:class:: template<class T> System::thrust_allocator<T>
+.. cpp:class:: template<class T> System::thrust_allocator
 
       Thurst containers require an allocator with a pointer type :cpp:any:`thrust::device_ptr\<T>` (instead of the plain :cpp:expr:`T*` provided by :cpp:type:`System::allocator\<T>`). This type behaves identical to :cpp:any:`System::allocator\<T>` (and shares its memory pool) but can be used with thrust containers.
 

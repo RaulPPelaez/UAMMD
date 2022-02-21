@@ -5,7 +5,15 @@ Neighbour Lists
 ================
 
 
+.. figure:: img/verletlist.*
+	    :width: 75%
+	    :align: center
 
+	    A depiction of a neighbour list in a section of a particle distribution (left). Particles inside the blue circle (of radius :math:`r_c` ) are neighbours of the red particle. The Verlet list strategy (see below) defines a second safety radius, :math:`r_s` , that can be leveraged to reuse the list even after particles have moved. In the worst-case scenario of the red particle and another particle just outside rs approaching each other (right), the list will be invalidated only when each has moved :math:`r_t = \frac{1}{2}(r_s - r_c )` since the last rebuild.
+
+
+All neighbour lists in UAMMD are provided under a common interface:
+	    
 .. cpp:class:: NeighbourList
 
 	       A conceptual interface class that all UAMMD neighbour lists share.
@@ -23,7 +31,8 @@ Neighbour Lists
 
       Uses the latest positions of the particles in the :ref:`ParticleData` instance to generate a list of neighbours.
 
-   .. cpp:function:: void transverseList(Transverser &tr, cudaStream_t st = 0);
+   .. cpp:function:: template<class Transverser>\
+		     void transverseList(Transverser &tr, cudaStream_t st = 0);
 
       Applies a given :cpp:any:`Transverser` to the current state of the neighbour list.
 
@@ -36,6 +45,8 @@ Neighbour Lists
       Returns a :cpp:any:`NeighbourContainer` that allows accessing the neighbours of each particle from the GPU.
 
 
+.. note:: Given that both :cpp:any:`transverseList` must be templated and :cpp:any:`getNeighbourContainer` returns a different type depending on the particular list, the :cpp:any:`NeighbourList` concept cannot be a virtual base class. All neighbour lists in UAMMD provide the functions above, but not using a language-enforced mechanism.
+
 
 Example
 ---------
@@ -43,15 +54,16 @@ Example
 Constructing and using a neighbour list.
 
 Once constructed, there are three ways to use a neighbour list:
- * Providing a :ref:`Transverser` (:cpp:any:`NeighbourList::transverseList`).
- * Obtaining a :cpp:any:`NeighbourContainer` (:cpp:any:`NeighbourList::getNeighbourContainer`).
+ * Providing a :ref:`Transverser` (via :cpp:any:`NeighbourList::transverseList`).
+ * Obtaining a :cpp:any:`NeighbourContainer` (via :cpp:any:`NeighbourList::getNeighbourContainer`).
  * Using the internal data structures of the particular neighbour list (see for instance :cpp:any:`CellList::getCellList`).
 
 .. code:: cpp
 
   #include"uammd.cuh"
   #include"Interactor/NeighbourList/CellList.cuh"
-
+  using namespace uammd;
+  
   int main(){
     //Alias to show that any neighbour list could be used.
     using NeighbourList = CellList;
@@ -60,9 +72,8 @@ Once constructed, there are three ways to use a neighbour list:
     real rcut = 2.5;
     auto pd = std::shared_ptr<ParticleData>(N);
     //.. initialize particle positions here...
-    CellList cl;
-    Box box(boxSize);
     nl = make_shared<NeighbourList>(pd);
+    Box box(boxSize);
     nl->update(box, rcut);
     
     //auto ni = nl->getNeighbourContainer();    
@@ -82,6 +93,13 @@ Available neighbour lists
 CellList
 ~~~~~~~~
 
+.. figure:: img/celllist_sketch.*
+	    :width: 50%
+	    :align: center
+		    
+	    Sketch of the cell list algorithm. Space is binned (black grid) and the bin (cell) of each particle is computed. In order to look for the neighbours of the black particle (those inside the green dashed circle) all the particles inside the adjacent cells (bins inside the orange dashed square, 27 cells in three dimensions) are checked. The orange particles are therefore false positives. Finally, the yellow particles are never considered when looking for neighbours of the black one.
+
+	    
 The main idea behind the cell list is to perform a spatial binning and assign a hash to each particle according to the bin it is in. If we then sort these hashes we get a list in which all the particles in a given cell are contiguous. By accessing, for a certain particle, the particles in the 27 surrounding cells we can find its neighbours without checking too many false positives.
 
 The algorithm for the cell list construction can be summarized in three separate steps:
@@ -92,6 +110,12 @@ The algorithm for the cell list construction can be summarized in three separate
 After these steps we end up with enough information to visit the 27 neighbour cells of a given particle.
 We have to compute the assigned cell of a given position at several points during the algorithm. Doing this is straightforward. For a position inside the domain, :math:`x \in [0, L)`, the bin assigned to it is :math:`i = \textrm{floor}(x/n_x) \in [0, n_x- 1]`. It is important to notice that a particle located at exactly :math:`x = L` will be assigned the cell with index :math:`n_x`, special consideration must be taken into account to avoid this situation. In particular, in a periodic domain, a particle at :math:`x=L` should be assigned to the cell :math:`i=0`.
 
+
+The cell list stores a copy of the particle positions sorted in such a way that the indices of the particles that are located in the same cell lie contiguous in memory:
+ * SortPos: [all particles in cell 0, all particles in cell 1,..., all particles in cell ncells]
+
+Two other arrays are provided providing, for each cell, the index of the first and last particles in the cell in :cpp:`sortPos`.
+
 .. cpp:class:: CellList
 
 	       Besides the functions defined in :cpp:any:`NeighbourList`, the cell list also exposes some functions proper to this particular algorithm. 
@@ -99,10 +123,6 @@ We have to compute the assigned cell of a given position at several points durin
    .. cpp:function:: CellListBase::CellListData getCellList();
 
       Returns the internal structures of the CellList.
-
-
-The cell list stores a copy of the particle positions sorted in such a way that the indices of the particles that are located in the same cell lie contiguous in memory:
- * SortPos: [all particles in cell 0, all particles in cell 1,..., all particles in cell ncells]
 
 
       
@@ -114,11 +134,11 @@ The cell list stores a copy of the particle positions sorted in such a way that 
       
    .. cpp:member:: const int  * cellEnd;
 
-      Stores the last particle in :cpp:any:`sortPos` that lies in cell i.
+      :cpp:`cellEnd[i]` stores the last particle in :cpp:any:`sortPos` that lies in cell :cpp:`i`.
       
    .. cpp:member:: const real4 *sortPos;
 
-      Particle positions sorted in the order described by :cpp:any:`cellStart` and :cpp:any:`cellEnd`.
+      Particle positions sorted so that particles in the same cell are contiguous in this array.
 		   
    .. cpp:member:: const int* groupIndex; 
 
@@ -139,7 +159,12 @@ The cell list stores a copy of the particle positions sorted in such a way that 
 The Neighbour Container interface
 ---------------------------------
 
+A pseudo-container that provides, for each particle, a list of its neighbours.
 
+.. note:: In some instances a neighbour list algorithm does not need to build an actual list of neighbours. This is the case with the :cpp:any:`CellList`, where traversing the 27 neighbouring bins of a particle is enough to go through its neighbours  (and often more performant than constructing an individual list of neighbours for each particle).
+	  Furthermore, :cpp:any:`NeighbourContainer` allow to abstract away things like the underlying memory layout of a neighbour list (for instance to unify a row-major and a column-major layouts).
+	  
+	  
 .. cpp:class:: NeighbourContainer
 
 	       
@@ -181,7 +206,8 @@ Counting the number of neighbours of each particle using a :cpp:any:`NeighbourCo
 
   #include"uammd.cuh"
   #include"Interactor/NeighbourList/CellList.cuh"
-
+  using namespace uammd;
+  
   int main(){
     //Alias to show that any neighbour list could be used.
     using NeighbourList = CellList;
@@ -199,24 +225,28 @@ Counting the number of neighbours of each particle using a :cpp:any:`NeighbourCo
     //Use the container in the GPU to count the neighbours per particle
     auto cit = thrust::make_counting_iterator<int>(0);
     thrust::for_each(cit, cit + numberParticles,
-  		     [=] __device__ (int i){
-                       //Set ni to provide iterators for particle i
-                       ni.set(i);
-                       const real3 pi = make_real3(ni.getSortedPositions()[i]);
-                       int numberNeighbours = 0;
-                       real rc2 = rcut*rcut; 
-                       for(auto neigh: ni){
-                         //int j = neigh.getGroupIndex();
-                         const real3 pj = make_real3(neigh.getPos());
-                         const real3 rij = box.apply_pbc(pj-pi);
-                         const real r2 = dot(rij, rij);
-                         if(r2>0 and r2<rc2){
-                           numberNeighbours++;
-                         }
-			}
-                        //Assuming the group used to construct the list contains all the particles in the system.
-                        const int global_index = ni.getGroupIndexes()[i];
-                        printf("The particle with index %d has %d particles closer than %g\n", global_index, numberNeighbours, rcut);
-		     });
+      [=] __device__ (int i){
+           //Set ni to provide iterators for particle with index i (in the internal list order)
+           ni.set(i);
+	   //Position of a particle given an index in the internal list order
+           const real3 pi = make_real3(ni.getSortedPositions()[i]);
+           int numberNeighbours = 0;
+           real rc2 = rcut*rcut; 
+           for(auto neigh: ni){
+             //int j = neigh.getGroupIndex();			
+             const real3 pj = make_real3(neigh.getPos());
+             const real3 rij = box.apply_pbc(pj-pi);
+             const real r2 = dot(rij, rij);
+             if(r2>0 and r2<rc2){
+               numberNeighbours++;
+             }
+	 	}
+            //Assuming the group used to construct the list contains all the particles in the system.
+            const int global_index = ni.getGroupIndexes()[i];
+            printf("The particle with index %d has %d particles closer than %g\n", global_index, numberNeighbours, rcut);
+	 });
     return 0;
   }
+
+
+.. hint:: The group index of a particle in the above example can be used to get its global index (see :ref:`ParticleGroup`) and then any of its properties via :ref:`ParticleData`. When no group is used (as in the example above), the default group (containing all particles) is assumed and the group index is equal to the global index.
