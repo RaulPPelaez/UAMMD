@@ -36,13 +36,12 @@ class miniInteractor: public Interactor{
 public:
   using Interactor::Interactor;
   real3 F;
-  void sumForce(cudaStream_t st) override{
+  void sum(Computables comp, cudaStream_t st) override{
     auto force = pd->getForce(access::location::cpu, access::mode::write);
     force.raw()[0] = make_real4(F,0);
     if(pg->getNumberParticles()>1)
       force.raw()[1] = make_real4(real(-1.0)*F,0);
   }
-  real sumEnergy() override{return 0;}
 };
 
 
@@ -55,7 +54,6 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
   for(int i = 0; i<10000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
 
   Box box(L);
   BDHI::FCM::Parameters par;
@@ -66,9 +64,9 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   par.box = box;
   par.tolerance = tolerance;
 
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, par);
 
-  auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+  auto inter= make_shared<miniInteractor>(pd, "puller");
   bdhi->addInteractor(inter);
 
   M0 = bdhi->getSelfMobility();
@@ -108,8 +106,6 @@ void computeSelfMobilityMatrixRH(real3 L, double F, long double *M, long double 
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
   for(int i = 0; i<10000; i++) sys->rng().next();
   static auto pd = make_shared<ParticleData>(N, sys);
-  static auto pg = make_shared<ParticleGroup>(pd, sys, "All");
-
   Box box(L);
   BDHI::FCM::Parameters par;
   par.temperature = 0.0;
@@ -123,9 +119,9 @@ void computeSelfMobilityMatrixRH(real3 L, double F, long double *M, long double 
   par.dt = 1;
   par.box = box;
   par.tolerance = tolerance;
-  static auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+  static auto inter= make_shared<miniInteractor>(pd,  "puller");
   if(!bdhi){
-    bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
+    bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd,  par);
     bdhi->addInteractor(inter);
   }
   M0 = bdhi->getSelfMobility();
@@ -232,7 +228,7 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
   sys->rng().setSeed(0xabefa129f9173);
   for(int i = 0; i<100000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  
 
   Box box(L);
   BDHI::FCM::Parameters par;
@@ -243,9 +239,9 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
   par.box = box;
   par.tolerance = tolerance;
 
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd,  par);
 
-  auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+  auto inter= make_shared<miniInteractor>(pd,  "puller");
   bdhi->addInteractor(inter);
 
 
@@ -410,7 +406,7 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
   for(int i=0; i<10000; i++) sys->rng().next();
 
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  
 
   Box box(L);
   BDHI::FCM::Parameters par;
@@ -421,7 +417,7 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
   par.box = box;
   par.tolerance = tolerance;
 
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd,  par);
   M0 = bdhi->getSelfMobility();
   real_rh = bdhi->getHydrodynamicRadius();
 
@@ -500,8 +496,7 @@ double3 singleParticleNoise(real T, real3 L, long double &M0, long double &real_
   int N = 1;
   auto sys = make_shared<System>();
   sys->rng().setSeed(1234791);
-  auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  auto pd = make_shared<ParticleData>(N, sys);  
 
   Box box(L);
   BDHI::FCM::Parameters par;
@@ -513,7 +508,7 @@ double3 singleParticleNoise(real T, real3 L, long double &M0, long double &real_
   par.tolerance = tolerance;
 
 
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, par);
 
   M0 = bdhi->getSelfMobility();
   real_rh = bdhi->getHydrodynamicRadius();

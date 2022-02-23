@@ -29,12 +29,12 @@ int main(int argc, char * argv[]){
   par.viscosity = 1.0;
   par.hydrodynamicRadius = 1.0;
   par.dt = 0.1;
-  auto bd = make_shared<BD::EulerMaruyama>(pd, sys, par);
+  auto bd = make_shared<BD::EulerMaruyama>(pd, par);
   {
     using TorsionalBondType = TorsionalBondedForces_ns::TorsionalBond;
     using Torsional = TorsionalBondedForces<TorsionalBondType>;
     Torsional::Parameters ang_params;
-    Box box (128);
+    real3 box =make_real3(128,128,128);
     ang_params.readFile = "torsional.bonds";
     auto bondType = std::make_shared<TorsionalBondType>(box);
     auto abf = make_shared<Torsional>(pd, sys, ang_params, bondType);
@@ -45,17 +45,17 @@ int main(int argc, char * argv[]){
     using BondedForces = BondedForces<BondType>;
     BondedForces::Parameters params;
     params.file = "harmonic.bonds";
-    auto bf = make_shared<BondedForces>(pd, sys, params);
+    auto bf = make_shared<BondedForces>(pd, params);
     bd->addInteractor(bf);
   }
   {
     using AngularBondType = AngularBondedForces_ns::AngularBond;
     using Angular = AngularBondedForces<AngularBondType>;
     Angular::Parameters ang_params;
-    Box box (128);
+    real3 box =make_real3(128,128,128);
     ang_params.readFile = "angular.bonds";
     auto bondType = std::make_shared<AngularBondType>(box);
-    auto angbf = make_shared<Angular>(pd, sys, ang_params, bondType);
+    auto angbf = make_shared<Angular>(pd, ang_params, bondType);
     bd->addInteractor(angbf);
   }
   ofstream out("pos.dat");

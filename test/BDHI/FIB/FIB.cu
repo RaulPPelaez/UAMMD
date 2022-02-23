@@ -42,13 +42,12 @@ class miniInteractor: public Interactor{
 public:
   using Interactor::Interactor;
   real3 F;
-  void sumForce(cudaStream_t st) override{
+  void sum(Computables comp, cudaStream_t st) override{
     auto force = pd->getForce(access::location::cpu, access::mode::write);
     force.raw()[0] = make_real4(F,0);
     if(pg->getNumberParticles()>1)
       force.raw()[1] = make_real4(real(-1.0)*F,0);
   }
-  real sumEnergy() override{return 0;}
 };
 
 using std::make_shared;
@@ -60,7 +59,7 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, double &true_r
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
   for(int i = 0; i<1000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  
   Box box(L);
   BDHI::FIB::Parameters par;
   par.temperature = 0.0;
@@ -68,10 +67,10 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, double &true_r
   par.hydrodynamicRadius = rh;
   par.dt = 0.01;
   par.box = box;
-  auto bdhi = make_shared<BDHI::FIB>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::FIB>(pd, par);
   true_M0 = bdhi->getSelfMobility();
   true_rh = bdhi->getHydrodynamicRadius();
-  auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+  auto inter= make_shared<miniInteractor>(pd, "puller");
   bdhi->addInteractor(inter);
   for(int i = 0; i<9;i++){M[i] = 0;}
   int Ntest = 10;
@@ -127,7 +126,7 @@ void computePairMobilityMatrix(real3 L, double F, double3 dist, long double *M, 
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
   for(int i = 0; i<10000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  
 
   Box box(L);
   BDHI::FIB::Parameters par;
@@ -138,11 +137,11 @@ void computePairMobilityMatrix(real3 L, double F, double3 dist, long double *M, 
   par.box = box;
 
 
-  auto bdhi = make_shared<BDHI::FIB>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::FIB>(pd, par);
 
   double M0 = bdhi->getSelfMobility();
   true_rh = bdhi->getHydrodynamicRadius();
-  auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+  auto inter= make_shared<miniInteractor>(pd, "puller");
   bdhi->addInteractor(inter);
 
 
@@ -314,7 +313,7 @@ bool idealParticlesDiffusion(int N, real3 L, double &true_rh, std::string suffix
   for(int i=0; i<10000; i++) sys->rng().next();
 
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  
 
   Box box(L);
   BDHI::FIB::Parameters par;
@@ -325,7 +324,7 @@ bool idealParticlesDiffusion(int N, real3 L, double &true_rh, std::string suffix
   par.box = box;
 
 
-  auto bdhi = make_shared<BDHI::FIB>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::FIB>(pd, par);
   true_rh = bdhi->getHydrodynamicRadius();
   std::ofstream out("pos.noise.boxSize"+std::to_string(L.z/true_rh)+".rh"+std::to_string(true_rh)+".dt"+std::to_string(par.dt)+"."+suffix);
   {
@@ -403,7 +402,7 @@ double3 singleParticleNoise(real T, real3 L, double &true_rh){
   auto sys = make_shared<System>();
   sys->rng().setSeed(1234791);
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  
 
   Box box(L);
   BDHI::FIB::Parameters par;
@@ -414,7 +413,7 @@ double3 singleParticleNoise(real T, real3 L, double &true_rh){
   par.box = box;
 
 
-  auto bdhi = make_shared<BDHI::FIB>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::FIB>(pd, par);
   true_rh = bdhi->getHydrodynamicRadius();
   double3 prevp;
   {
@@ -473,7 +472,7 @@ void radialDistributionFunction_test(){
   double L = 32;
 
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+  
 
   Box box(L);
   BDHI::FIB::Parameters par;
@@ -484,7 +483,7 @@ void radialDistributionFunction_test(){
   par.box = box;
 
 
-  auto bdhi = make_shared<BDHI::FIB>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::FIB>(pd, par);
 
 
   std::ofstream out("rdf.pos");

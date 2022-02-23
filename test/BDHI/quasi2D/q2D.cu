@@ -29,14 +29,13 @@ public:
 
   real2 F = real2();
 
-  void sumForce(cudaStream_t st) override{
+  void sum(Computables comp, cudaStream_t st) override{
     auto force = pd->getForce(access::location::cpu, access::mode::write);
     force[0] = make_real4(F.x, F.y,0,0);
     if(pg->getNumberParticles() > 1)
       force[1] = make_real4(-F.x,-F.y, 0,0);
   }
 
-  real sumEnergy() override{return 0;}
 };
 
 template<class Scheme>
@@ -44,7 +43,7 @@ void selfMobilityTest(shared_ptr<System> sys, int dir){
   int N = 1;
   Box box(boxSize);
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
   typename Scheme::Parameters par;
   par.temperature = 0;
   par.viscosity = viscosity;
@@ -52,8 +51,8 @@ void selfMobilityTest(shared_ptr<System> sys, int dir){
   par.hydrodynamicRadius = hydrodynamicRadius;
   par.cells = cells;
   par.box = box;
-  auto bdhi = make_shared<Scheme>(pd, pg, sys, par);
-  auto inter= make_shared<miniInteractor>(pd, sys, "puller");
+  auto bdhi = make_shared<Scheme>(pd, par);
+  auto inter= make_shared<miniInteractor>(pd, "puller");
   if(dir==0)
     inter->F.x = F;
   else
@@ -90,7 +89,7 @@ void selfDiffusionTest(shared_ptr<System> sys){
   int N = in_numberParticles;
   Box box(boxSize);
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
   typename Scheme::Parameters par;
   par.temperature = temperature;
   par.viscosity = viscosity;
@@ -98,7 +97,7 @@ void selfDiffusionTest(shared_ptr<System> sys){
   par.hydrodynamicRadius = hydrodynamicRadius;
   par.cells = cells;
   par.box = box;
-  auto bdhi = make_shared<Scheme>(pd, pg, sys, par);
+  auto bdhi = make_shared<Scheme>(pd, par);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     fori(0, N){
@@ -156,7 +155,7 @@ int main(int argc, char *argv[]){
 
 void readParameters(shared_ptr<System> sys){
   std::string fileName = sys->getargv()[1];
-  InputFile in(fileName, sys);
+  InputFile in(fileName);
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y;
   in.getOption("cells", InputFile::Optional)>>cells.x>>cells.y;
   in.getOption("numberSteps", InputFile::Optional)>>numberSteps;
