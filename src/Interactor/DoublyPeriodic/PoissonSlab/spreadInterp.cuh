@@ -38,7 +38,7 @@ namespace uammd{
 	return make_int3(support.x, support.y, support.z);
       }
       
-      inline __host__  __device__ int3 getSupport(int3 cell) const{
+      inline __host__  __device__ int3 getSupport(real3 pos, int3 cell) const{
 	real ch = real(0.5)*Htot*cospi((real(cell.z))/(nz-1));
 	int czt = int((nz)*(acos(real(2.0)*(ch+rmax)/Htot)/real(M_PI)));
 	int czb = int((nz)*(acos(real(2.0)*(ch-rmax)/Htot)/real(M_PI)));
@@ -46,7 +46,7 @@ namespace uammd{
 	return make_int3(support.x, support.y, sz);
       }
 
-      inline __host__  __device__ real phi(real r) const{
+      inline __host__  __device__ real phi(real r, real3 pos) const{
 	return (abs(r)>=rmax)?0:(prefactor*exp(tau*r*r));
       }
 

@@ -51,7 +51,7 @@ namespace uammd{
 	    return a;
 	  }
 
-	  __host__ __device__ real phi(real r) const{
+	  __host__ __device__ real phi(real r, real3 pos) const{
 	    return r>=rmax?0:kern.phi(r);
 	  }
 
@@ -74,7 +74,7 @@ namespace uammd{
 	    rmax = support*h;
 	  }
 
-	  __host__ __device__ real phi(real r) const{
+	  __host__ __device__ real phi(real r, real3 pos) const{
 	    return r>=rmax?0:kern.phi(r);
 	  }
 
@@ -129,7 +129,7 @@ namespace uammd{
 	    return h/upsampling;
 	  }
 
-	  __host__ __device__ real phi(real r) const{
+	  __host__ __device__ real phi(real r, real3 pos) const{
 	    return bm.phi(r/a)/a;
 	  }
 
@@ -153,7 +153,7 @@ namespace uammd{
 	      return h;
 	    }
 
-	    __host__ __device__ real phi(real r) const{
+	    __host__ __device__ real phi(real r, real3 pos) const{
 	      return kern.phi(r);
 	    }
 
@@ -175,7 +175,7 @@ namespace uammd{
 	      return h*fac;
 	    }
 
-	    __device__ real phi(real r) const{
+	    __device__ real phi(real r, real3 pos) const{
 	      return kern.phi(r);
 	    }
 
@@ -199,7 +199,7 @@ namespace uammd{
 	      return h*fac;
 	    }
 
-	    __device__ real phi(real r) const{
+	    __device__ real phi(real r, real3 pos) const{
 	      return kern.phi_tabulated(r);
 	    }
 

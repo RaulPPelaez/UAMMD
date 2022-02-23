@@ -31,7 +31,7 @@ namespace uammd{
 	  this->tau = -0.5/(width*width);
 	}
 
-	inline __device__ real phi(real r) const{
+	inline __device__ real phi(real r, real3 pos) const{
 	  return prefactor*exp(tau*r*r);
 	}
 
