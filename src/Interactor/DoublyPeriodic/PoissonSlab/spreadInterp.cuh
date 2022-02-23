@@ -283,8 +283,9 @@ namespace uammd{
 	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(), charge.begin());
 	auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), Ep2fe);
 	int3 n = grid.cellDim;
-	IBM<Kernel, Grid> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-	ibm.gather(pos.begin(), f_tr, d_gridForcesEnergies, *qw, numberParticles, st);
+	IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM_ns::DefaultWeightCompute wc; //If non-default QuadratureWeights are used, a weight compute must also be passed.
+	ibm.gather(pos.begin(), f_tr, d_gridForcesEnergies, *qw, wc, numberParticles, st);
 	CudaCheckError();
       }
 
@@ -350,7 +351,7 @@ namespace uammd{
 	sys->log<System::DEBUG>("Spreading %d particles", group.numberParticles);
 	auto minusChargeIterator = thrust::make_transform_iterator(group.charge, thrust::negate<real>());
 	int3 n = grid.cellDim;
-	IBM<Kernel, Grid> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibm.spread(group.pos, minusChargeIterator, d_gridCharges, group.numberParticles, st);
 	CudaCheckError();
       }

@@ -75,8 +75,8 @@ namespace uammd{
 	}
       }
 
-      __device__ real computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
-	return weights[ii]*weights[support.x+jj]*weights[support.x+support.y+kk];
+      __device__ real3 computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
+	return make_real3(weights[ii], weights[support.x+jj], weights[support.x+support.y+kk]);
       }
       
     }
@@ -92,14 +92,15 @@ namespace uammd{
     */
     template<bool is2D, class Grid, class Index3D, class Kernel,
 	     class PosIterator,
-	     class ParticleQuantityIterator, class GridQuantityIterator>
+	     class ParticleQuantityIterator, class GridQuantityIterator, class WeightCompute>
     __global__ void particles2GridD(const PosIterator pos,
 				    const ParticleQuantityIterator  particleQuantity,
 				    GridQuantityIterator  __restrict__ gridQuantity,
 				    int numberParticles,
 				    Grid grid,
 				    Index3D cell2index,
-				    Kernel kernel){
+				    Kernel kernel,
+				    WeightCompute weightCompute){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
@@ -134,8 +135,8 @@ namespace uammd{
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
-	const auto weight = vi*kern;
-	if(kern)atomicAdd(&gridQuantity[jcell], weight);
+	const auto weight = weightCompute(vi,kern);
+        atomicAdd(&gridQuantity[jcell], weight);
       }
     }
 
@@ -156,6 +157,7 @@ namespace uammd{
       class InterpolationKernel,
       class ParticlePosIterator, class ParticleQuantityOutputIterator,
       class GridQuantityIterator,
+      class WeightCompute,	     
       class Index3D,
       class QuadratureWeights>
     __global__ void grid2ParticlesDTPP(const ParticlePosIterator pos,
@@ -165,8 +167,8 @@ namespace uammd{
 				       Grid grid,
 				       Index3D cell2index, //Index of a 3d cell in gridQuantity
 				       InterpolationKernel kernel,
-				       QuadratureWeights qw
-				       ){
+				       WeightCompute weightCompute,
+				       QuadratureWeights qw){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
@@ -204,7 +206,8 @@ namespace uammd{
 	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	  const real dV = qw(cellj, grid);
 	  const int jcell = cell2index(cellj);
-	  const auto weight = gridQuantity[jcell]*detail::computeWeightFromShared(weights, ii, jj, kk, support);
+	  const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
+	  const auto weight = weightCompute(gridQuantity[jcell], kern);
 	  result += dV*weight;
 	}
       }

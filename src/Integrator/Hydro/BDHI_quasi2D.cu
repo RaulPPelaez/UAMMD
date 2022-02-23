@@ -16,18 +16,11 @@
 #include<thrust/tuple.h>
 namespace uammd{
   namespace BDHI{
-    template<class HydroKernel>
-    BDHI2D<HydroKernel>::BDHI2D(shared_ptr<ParticleData> pd,
-				shared_ptr<System> sys,
-				Parameters par):
-      BDHI2D(pd, std::make_shared<ParticleGroup>(pd, sys, "All"), sys, par){}
 
     template<class HydroKernel>
-    BDHI2D<HydroKernel>::BDHI2D(shared_ptr<ParticleData> pd,
-	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys,
-	     Parameters par):
-      Integrator(pd, pg, sys, "BDHI::BDHI2D"),
+    BDHI2D<HydroKernel>::BDHI2D(shared_ptr<ParticleGroup> pg,
+				Parameters par):
+      Integrator(pg,"BDHI::BDHI2D"),
       dt(par.dt),
       temperature(par.temperature),
       tolerance(par.tolerance),
@@ -243,11 +236,11 @@ namespace uammd{
 	double width = hydroKernel->getGaussianVariance(hydrodynamicRadius);
 	const auto trX = thrust::make_constant_iterator<real2>({-temperature,0});
 	auto kernelX = std::make_shared<KernelThermalDrift<0>>(ibmKernel->support, width);
-	IBM<KernelThermalDrift<0>> ibmX(sys, kernelX, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<KernelThermalDrift<0>> ibmX(kernelX, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibmX.spread(pos.begin(), trX, d_gridVels, numberParticles, st);
 	const auto trY = thrust::make_constant_iterator<real2>({0,-temperature});
 	auto kernelY = std::make_shared<KernelThermalDrift<1>>(ibmKernel->support, width);
-	IBM<KernelThermalDrift<1>> ibmY(sys, kernelY, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<KernelThermalDrift<1>> ibmY(kernelY, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibmY.spread(pos.begin(), trY, d_gridVels, numberParticles, st);
 	CudaCheckError();
       }
@@ -269,7 +262,7 @@ namespace uammd{
 	const auto force = pd->getForce(access::location::gpu, access::mode::read);
 	const auto f_tr = thrust::make_transform_iterator(force.begin(), BDHI2D_ns::toReal2());
 	const auto n = grid.cellDim;
-	IBM<Kernel> ibm(sys, ibmKernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<Kernel> ibm(ibmKernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibm.spread(pos.begin(), f_tr, d_gridVels, numberParticles, st);
 	CudaCheckError();
       }
@@ -490,7 +483,7 @@ namespace uammd{
       real2* d_gridVels = (real2*)thrust::raw_pointer_cast(gridVels.data());
       real2* d_particleVels = thrust::raw_pointer_cast(particleVels.data());
       const auto n = grid.cellDim;
-      IBM<Kernel> ibm(sys, ibmKernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+      IBM<Kernel> ibm(ibmKernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
       ibm.gather(pos.begin(), d_particleVels, d_gridVels, numberParticles, st);
       CudaCheckError();
     }

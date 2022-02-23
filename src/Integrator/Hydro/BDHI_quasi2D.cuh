@@ -182,13 +182,10 @@ namespace uammd{
 	std::shared_ptr<HydroKernel> hydroKernel;
       };
 
-      BDHI2D(shared_ptr<ParticleData> pd,
-	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys,
-	     Parameters par);
-      BDHI2D(shared_ptr<ParticleData> pd,
-	     shared_ptr<System> sys,
-	     Parameters par);
+      BDHI2D(shared_ptr<ParticleData> pd, Parameters par):
+	BDHI2D(std::make_shared<ParticleGroup>(pd, "All"), par){}
+
+      BDHI2D(shared_ptr<ParticleGroup> pg,Parameters par);
 
       ~BDHI2D();
 
