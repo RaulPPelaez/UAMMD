@@ -71,6 +71,14 @@ namespace uammd{
 
       void finish_step(cudaStream_t st = 0){}
 
+      real getHydrodynamicRadius(){
+	return fcm->getHydrodynamicRadius();
+      }
+
+      real getSelfMobility(){
+	return fcm->getSelfMobility();
+      }
+
     };
 
     class FCMIntegrator: public Integrator{
