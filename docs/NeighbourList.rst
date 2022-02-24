@@ -17,7 +17,7 @@ All neighbour lists in UAMMD are provided under a common interface:
 .. cpp:class:: NeighbourList
 
 	       A conceptual interface class that all UAMMD neighbour lists share.
-
+	       
 
    .. cpp:function:: NeighbourList(std::shared_ptr<ParticleData> pd);
 

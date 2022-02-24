@@ -135,3 +135,5 @@ import uammd_cpp_lexer
 lexers['cpp'] = uammd_cpp_lexer.UAMMDCppLexer()
 lexers['c++'] = lexers['cpp']
 
+#pygments_style='pastie'
+#pygments_style='lovelace'
