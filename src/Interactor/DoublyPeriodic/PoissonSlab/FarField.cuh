@@ -116,7 +116,7 @@ namespace uammd{
 	setUpSurfaceValues(par.surfaceValues);
       }
 
-      void compute(cudaStream_t st){
+      void compute(cudaStream_t st, real4 *fieldAtParticles = nullptr){
 	System::log<System::DEBUG>("Far field");
 	auto separatedCharges = separateCharges(st);
 	auto gridCharges = ibm->spreadChargesNearWalls(separatedCharges, st);
@@ -129,7 +129,7 @@ namespace uammd{
 	auto surfaceValues_ptr = thrust::raw_pointer_cast(surfaceValuesFourier.data());
 	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st);
 	auto gridFields = fct->inverseTransform(insideSolution, st);
-	ibm->interpolateFieldsToParticles(gridFields, st);
+	ibm->interpolateFieldsToParticles(gridFields, st, fieldAtParticles);
 	CudaCheckError();
       }
 

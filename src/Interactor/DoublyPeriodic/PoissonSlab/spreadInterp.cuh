@@ -202,9 +202,10 @@ namespace uammd{
       real4* force;
       real* energy;
       real* charge;
+      real4* field;
       int i;
 
-      FieldPotential2ForceEnergy(real4* f, real* e, real *q):force(f), energy(e), charge(q), i(-1){}
+      FieldPotential2ForceEnergy(real4* f, real* e, real *q, real4* field):force(f), energy(e), charge(q), field(field), i(-1){}
 
       __device__ FieldPotential2ForceEnergy operator()(int ai){
 	this->i = ai;
@@ -214,6 +215,7 @@ namespace uammd{
       __device__ void operator += (real4 fande) const{
 	force[i] += charge[i]*make_real4(fande.x, fande.y, fande.z, 0);
 	energy[i] += charge[i]*fande.w;
+	if(field) field[i] += make_real4(fande.x, fande.y, fande.z, 0);
       }
     };
 
@@ -273,7 +275,7 @@ namespace uammd{
       }
 
       template<class Real4Container>
-      void interpolateFieldsToParticles(Real4Container &gridFieldPotential, cudaStream_t st){
+      void interpolateFieldsToParticles(Real4Container &gridFieldPotential, cudaStream_t st, real4* fieldAtParticles){
 	sys->log<System::DEBUG2>("[DPPoissonSlab] Interpolating forces and energies");
 	int numberParticles = pd->getNumParticles();
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
@@ -281,7 +283,7 @@ namespace uammd{
 	auto forces = pd->getForce(access::location::gpu, access::mode::readwrite);
 	auto energies = pd->getEnergy(access::location::gpu, access::mode::readwrite);
 	real4* d_gridForcesEnergies = (real4*)thrust::raw_pointer_cast(gridFieldPotential.data());
-	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(), charge.begin());
+	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(), charge.begin(), fieldAtParticles);
 	auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), Ep2fe);
 	int3 n = grid.cellDim;
 	IBM<Kernel, Grid> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));

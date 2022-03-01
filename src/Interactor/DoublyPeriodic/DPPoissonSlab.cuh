@@ -40,7 +40,7 @@ namespace uammd{
       sys->log<System::MESSAGE>("[DPPoissonSlab] Destroyed");
     }
     
-    virtual void sum(Computables comp, cudaStream_t st = 0) override{
+    void sum(Computables comp, cudaStream_t st = 0) override{
       farField->compute(st);
       nearField->compute(st);
       if(comp.virial){
@@ -49,6 +49,15 @@ namespace uammd{
       }
     }
 
+    thrust::device_vector<real4> computeFieldAtParticles(){
+      thrust::device_vector<real4> fieldAtParticles(pg->getNumberParticles());
+      thrust::fill(fieldAtParticles.begin(), fieldAtParticles.end(), real4());
+      auto field_ptr = thrust::raw_pointer_cast(fieldAtParticles.data());       
+      farField->compute(0, field_ptr);
+      nearField->compute(0, field_ptr);
+      return fieldAtParticles;
+    }
+    
     void setSurfaceValuesZeroModeFourier(cufftComplex2_t<real> zeroMode){
       farField->setSurfaceValuesZeroModeFourier(zeroMode);
     }
