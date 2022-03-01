@@ -98,7 +98,8 @@ namespace uammd{
       __device__ __host__ real operator()(int i){
 	real q = -charges[i];
 	real ep = permivityRatio;
-	return q*(ep-1)/(ep+1);
+	real epratio = isinf(ep)?real(1.0):(ep-1)/(ep+1);
+	return q*epratio;
       }
 
     };

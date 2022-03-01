@@ -154,14 +154,16 @@ namespace uammd{
 	   real3 pjim = make_real3(pj);
 	   pjim.z = (pj.z>0?H:-H) - pj.z;
 	   real ep = pj.z<0?perm.bottom:perm.top;
-           real chargeImage = -infoj.charge * (ep - perm.inside) / (ep + perm.inside);
+	   real epratio = isinf(ep)?real(1.0):(ep - perm.inside) / (ep + perm.inside);
+           real chargeImage = -infoj.charge * epratio;
 	   FandE += chargeImage*computeFieldPotential(make_real3(pi), pjim);
 	   //Image in the opposite side
 	   if(rcut >= H*real(0.5) ){
 	     pjim = make_real3(pj);
 	     pjim.z = (pj.z>0?-H:H) - pj.z;
 	     ep = pj.z<0?perm.top:perm.bottom;
-	     chargeImage = -infoj.charge * (ep - perm.inside) / (ep + perm.inside);
+	     epratio = isinf(ep)?real(1.0):(ep - perm.inside) / (ep + perm.inside);
+	     chargeImage = -infoj.charge * epratio;
 	     FandE += chargeImage*computeFieldPotential(make_real3(pi), pjim);
 	   }
          }
