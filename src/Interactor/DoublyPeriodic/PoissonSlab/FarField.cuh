@@ -134,7 +134,7 @@ namespace uammd{
       }
 
       void setSurfaceValuesZeroModeFourier(cufftComplex2 zeroMode){
-	surfaceValuesFourier[0] = zeroMode*cellDim.x*cellDim.y;
+	surfaceValuesFourier[1] = zeroMode*cellDim.x*cellDim.y;
       }
     private:
 
