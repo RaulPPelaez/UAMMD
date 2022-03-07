@@ -33,14 +33,18 @@ namespace uammd{
   private:
     T *ptr;
     size_t m_size;
-    bool *isBeingRead, *isBeingWritten;
+    bool *isBeingReadPtr, *isBeingWrittenPtr;
     bool isCopy = false; //true if this instance was created when passed to a cuda kernel
     access::location device;
     friend class thrust::iterator_core_access;
 
     void unlockProperty(){
-      *isBeingWritten = false;
-      *isBeingRead = false;
+      //This check is here in case the property_ptr was created wit hthe default constructor.
+      //It is here to differentiate between a property with N=0 elements and a null property_ptr.
+      if(isBeingReadPtr and isBeingWrittenPtr){
+	*isBeingWrittenPtr = false;
+	*isBeingReadPtr = false;
+      }
     }
 
   public:
@@ -49,7 +53,7 @@ namespace uammd{
       super_t(nullptr),
       ptr(nullptr),
       m_size(0),
-      isBeingRead(nullptr), isBeingWritten(nullptr), device(access::location::nodevice)
+      isBeingReadPtr(nullptr), isBeingWrittenPtr(nullptr), device(access::location::nodevice)
       {}
 
     property_ptr(T* ptr,
@@ -59,8 +63,8 @@ namespace uammd{
       super_t(ptr),
       ptr(ptr),
       m_size(in_size),
-      isBeingWritten(isBeingWritten),
-      isBeingRead(isBeingRead), device(dev)
+      isBeingWrittenPtr(isBeingWritten),
+      isBeingReadPtr(isBeingRead), device(dev)
     {}
 
     __host__ __device__ property_ptr(const property_ptr& _orig ):super_t(_orig.ptr) { *this = _orig; isCopy = true; }
@@ -69,8 +73,8 @@ namespace uammd{
       super_t::operator=(_orig);
       this->ptr = _orig.ptr;
       this->m_size = _orig.m_size;
-      this->isBeingRead = _orig.isBeingRead;
-      this->isBeingWritten = _orig.isBeingWritten;
+      this->isBeingReadPtr = _orig.isBeingReadPtr;
+      this->isBeingWrittenPtr = _orig.isBeingWrittenPtr;
       this->device = _orig.device;
       this->isCopy = true;
       return *this;
@@ -81,8 +85,7 @@ namespace uammd{
       return;
 #else
       if(isCopy) return;
-      if(ptr)
-	unlockProperty();
+      unlockProperty();
 #endif
     }
 
