@@ -66,7 +66,7 @@ namespace uammd{
 	}
 	else{
 	  const auto potentialAtTopWallFourier = surfaceValueFourier.x;
-	  mismatch.mPH = evalthetaInside.y - potentialAtTopWallFourier;
+	  mismatch.mPH = evalthetaInside.y + potentialAtTopWallFourier;
 	}
 	if(not metallicBottom){
 	  const auto surfaceChargeAtBottomWallFourier = surfaceValueFourier.y;
@@ -75,7 +75,7 @@ namespace uammd{
 	}
 	else{
 	  const auto potentialAtBottomWallFourier = surfaceValueFourier.y;
-	  mismatch.mP0 = evalthetaInside.x - potentialAtBottomWallFourier;
+	  mismatch.mP0 = evalthetaInside.x + potentialAtBottomWallFourier;
 	}	
 	return mismatch;
       }
