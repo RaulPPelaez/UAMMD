@@ -456,6 +456,7 @@ Any Grid type adhering to the :cpp:any:`Grid` concept can be used to specialize 
     #include<uammd.cuh>
     #include<misc/IBM.cuh>
     #include<misc/IBM_kernels.cuh>
+    #include<utils/Grid.cuh>
     using namespace uammd;
 
     //A grid that simply inherits everything from UAMMD's default regular grid
