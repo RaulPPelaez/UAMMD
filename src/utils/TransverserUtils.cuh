@@ -16,6 +16,7 @@ namespace uammd{
     template<class ...T> static constexpr inline __host__ __device__ int compute(T...){ return 0;}
     template<class ...T> static inline __host__ __device__ void accumulate(T...){}
     template<class ...T> static inline __host__ __device__ void set(T...){}
+    template<class... T> static inline __host__ __device__ real getCutOff2BetweenTypes(int ti, int tj) {return 0;}
   };
 
 

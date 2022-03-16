@@ -241,11 +241,11 @@ namespace uammd{
 
       const auto pi = cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos + i);
       const auto pib = nl.box.apply_pbc(make_real3(pi));
-
-      auto quantity = tr.zero();
-      const int ori = globalIndex[nl.groupIndex[i]];
-      SFINAE::Delegator<Transverser> del;
-      del.getInfo(tr, ori);
+      using Adaptor = SFINAE::TransverserAdaptor<Transverser>;
+      Adaptor adaptor;
+      auto quantity = Adaptor::zero(tr);
+      const int ori = globalIndex[nl.groupIndex[i]];     
+      adaptor.getInfo(tr, ori);
       //For every type tree
       for(int treecount = 0; treecount<nl.Ntrees; treecount++){
 	//Reset p_shifted to main box
@@ -272,10 +272,8 @@ namespace uammd{
 		const int j = -left-numberParticles+1;
 		const auto pj = cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos + j);
 		const int global_index =  globalIndex[nl.groupIndex[j]];
-		tr.accumulate(quantity,
-			      del.compute(tr,
-					  global_index,
-					  pi, pj));
+		Adaptor::accumulate(tr, quantity,
+				    adaptor.compute(tr, global_index, pi, pj));
 	      }
 	      else current_node = left;
 	    }
@@ -292,7 +290,6 @@ namespace uammd{
 
 	}while(true);
       }
-
       tr.set(ori, quantity);
     }
 
@@ -804,6 +801,7 @@ namespace uammd{
 
     //Check if the cell list needs updating
     bool needsRebuild(Box box, real cutOff = 0){
+      auto pd = pg->getParticleData();
       pd->hintSortByHash(box, box.boxSize/1023.f);
       if(force_next_update){
 	force_next_update = false;
