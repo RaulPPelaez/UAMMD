@@ -218,7 +218,7 @@ Bonds with three particles per bond.
 
 .. cpp:class:: BondedType::Angular
 	       
-	       Implements the potential :math:`U(\theta) = 2K\left[\sin(\theta/2) - 2sin(\theta_0/2)\right]^2`.
+	       Implements the potential :math:`U(\theta) = 2K\left[\sin(\theta/2) - sin(\theta_0/2)\right]^2`.
 	       Requires the strength, :math:`K`, and the equilibrium angle :math:`\theta_0` in the bond file.
 	       The constructor requires a box to apply periodic boundary conditions.
 
