@@ -44,24 +44,21 @@ Although "Molecular Dynamics" is part of the name,the UAMMD framework allows for
 
 Building blocks are provided for the user to construct a certain simulation. Most are highly templated to ease adaptability.
 
-For example, there is no harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the ExternalForces module. Similar things can be achieved with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...
+For example, there is no harmonic trap module, but you can write a simple functor (directly in device code!) stating that each particle should experiment a force when it is trying to leave the box. Then you can pass this functor to the :ref:`ExternalForces` module. Similar things can be achieved with a bonded force, an interaction that needs to trasverse a neighbour list, an nbody interaction...
 
 Hop on to the examples folder for an introduction or check the docs for more information.
 
 
-**Compiling and running any code containing UAMMD requires a GPU and a system with a working CUDA environment**. CUDA is free and you can download it here:
+.. important::
 
- - https://developer.nvidia.com/cuda-toolkit
+   **Compiling and running any code containing UAMMD requires a GPU and a system with a working CUDA environment**. CUDA is free and you can download it here: https://developer.nvidia.com/cuda-toolkit
 
-On the other hand **understanding and modifying UAMMD code will require at least basic knowledge of GPU programming with CUDA**. There are a lot of resources online to learn CUDA, but you can start here:
+   On the other hand **understanding and modifying UAMMD code will require at least basic knowledge of GPU programming with CUDA**. There are a lot of resources online to learn CUDA, but you can start here: https://developer.nvidia.com/blog/even-easier-introduction-cuda/
 
- - https://developer.nvidia.com/blog/even-easier-introduction-cuda/  
 
-If this is the first time you encounter UAMMD and want a quick start guide check the :doc:`QuickStart`.
+If this is the first time you encounter UAMMD and want a quick start guide check the :doc:`QuickStart`. The :doc:`FAQ` is also a good source of knowledge.  
 
-Look in :doc:`Compiling-UAMMD` if some Makefile gives you troubles. The :doc:`FAQ` is also a good source of knowledge.  
-
-UAMMD is a header only framework and it is mostly self contained in terms of dependencies so compilation should not be too troubling.  
+Look in :doc:`Compiling-UAMMD` if some Makefile gives you troubles. UAMMD is a header only framework and it is mostly self contained in terms of dependencies so compilation should not be too troubling.  
 
 
 .. _basic-assumptions:
@@ -71,12 +68,11 @@ The four basic assumptions
 
 
 .. figure:: img/sketchUAMMD.*
-	    :scale: 90	    
-
+		    
 	    The basic conceptual hierarchy in UAMMD.
 
 
-The foundational concepts of UAMMD are supported on a handful of (deliberately) vague assumptions which can be summarize in four:
+The foundational concepts of UAMMD are supported on a handful of (deliberately) vague assumptions which can be summarized in four:
 
 .. rst-class:: centered
 
@@ -116,7 +112,7 @@ Here you have a short example of how a typical UAMMD code looks like:
 
 .. code:: cpp
 	  
-  //Ideal brownian particles
+  //Ideal Brownian particles
   #include"uammd.cuh"
   #include"Integrator/BrownianDynamics.cuh"
   using namespace uammd;
@@ -150,18 +146,21 @@ About this documentation
 
 This documentation constitutes an ongoing effort to port and update the old `UAMMD wiki <https://github.com/RaulPPelaez/UAMMD/wiki>`_ (which pertains to UAMMD v1.x) to ReadTheDocs, describing the new interfaces of the modules that have change since then. Thus, the pages for many modules are not yet available in this documentation. Although this documentation should be your primary source of knowledge for UAMMD, you should also consider, for the time being, the `old wiki <https://github.com/RaulPPelaez/UAMMD/wiki>`_.
 
+An in depth theoretical description of most of the algorithms and physics behind UAMMD can be found in Raul's PhD manuscript, available here: https://github.com/RaulPPelaez/tesis/raw/main/manuscript.pdf
+
 
 .. toctree::
    :hidden:
    :maxdepth: 4
    :caption: First steps
-	     
+
    QuickStart
    Compiling-UAMMD
    SimulationFile
    FAQ
    Examples
-
+   Contact
+   
 .. toctree::
    :hidden:
    :maxdepth: 4
@@ -178,11 +177,12 @@ This documentation constitutes an ongoing effort to port and update the old `UAM
    :caption: Concepts
 	     
    SimulationDomain   
-   NeighbourLists
+   NeighbourList
    ImmersedBoundary
    Transverser
    Potential
-      
+   ParticleGroup
+
 .. toctree::
    :maxdepth: 4
    :hidden:
@@ -220,8 +220,10 @@ This documentation constitutes an ongoing effort to port and update the old `UAM
    ErrorHandling
    ProgrammingTools
    Postprocessing
-   
-   
+   VectorTypes
+
+
+
 	     
 Indices and tables
 ==================
@@ -229,3 +231,6 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+  
+

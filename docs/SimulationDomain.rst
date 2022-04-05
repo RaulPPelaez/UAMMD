@@ -9,33 +9,33 @@ In these cases the :cpp:class:`Box` class is used.
 
    A structure containing a domain size. Can describe a domain that is periodic in any direction.
    
-   .. cpp:function:: Box::Box(real3 L)
+   .. cpp:function:: Box(real3 L)
 
       Constructor taking a box size in each direction. The resulting box is periodic by default except when L is infinite in some direction.
 
-   .. cpp:function:: real3 Box::apply_pbc(real3 position)
+   .. cpp:function:: real3 apply_pbc(real3 position)
 
       Applies the minimum image convention (MIC) to the provided position in the directions in which the box is periodic (leaving the rest untouched).
       Returns :math:`q^\alpha= q^\alpha - \text{floor}\left(q^\alpha/L^\alpha + 0.5\right)L^\alpha` applied only to the periodic directions. Being :math:`L^\alpha` the box size in the direction :math:`\alpha`.
       Note that this functions works for finding the minimum distance between two particles as well as for finding the position of the provided image in the primary cell.
 
-   .. cpp:function:: void Box::setPeriodicity(bool x, bool y, bool z)
+   .. cpp:function:: void setPeriodicity(bool x, bool y, bool z)
 
       Sets the periodicity of the box in each direction (note that the box can be finite yet non-periodic).
 
-   .. cpp:function:: bool Box::isPeriodicX()
+   .. cpp:function:: bool isPeriodicX()
 
       Returns true if the box is periodic in the X direction, false otherwise.
 
-   .. cpp:function:: bool Box::isPeriodicY()
+   .. cpp:function:: bool isPeriodicY()
 
       Returns true if the box is periodic in the Y direction, false otherwise.
       
-   .. cpp:function:: bool Box::isPeriodicZ()
+   .. cpp:function:: bool isPeriodicZ()
 
       Returns true if the box is periodic in the Z direction, false otherwise.
 
-   .. cpp:member:: real3 Box::boxSize
+   .. cpp:member:: real3 boxSize
 
       A public member that holds the box size in each direction.
 

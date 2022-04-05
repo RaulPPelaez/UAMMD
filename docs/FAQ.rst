@@ -17,8 +17,8 @@ Frequently Asked Questions
 How can I access the different properties of each particle?
 ------------------------------------------------------------
 
-The information about each particle is handled by the :doc:`ParticleData` class, every UAMMD module needs a pointer to an instance of this class, which is typically created early in the :doc:`simulation code <SimulationFile>`. This means you will usually have access to a ParticleData instance, usually called "pd".  
-ParticleData provides an interface allowing to read and or modify the properties of each individual particle such as the position, force, mass... Refer to :doc:`ParticleData` for more information on how to do this.  
+The information about each particle is handled by the :ref:`ParticleData` class, every UAMMD module needs a pointer to an instance of this class, which is typically created early in the :doc:`simulation code <SimulationFile>`. This means you will usually have access to a ParticleData instance, usually called "pd".  
+ParticleData provides an interface allowing to read and or modify the properties of each individual particle such as the position, force, mass... Refer to :ref:`ParticleData` for more information on how to do this.  
 Here is some copy-pastable example:
 
 .. code:: cpp
@@ -41,7 +41,7 @@ How can I perform a simple Brownian Dynamics simulation?
 
 #. Create an instance of :doc:`ParticleData`.  
 #. Initialize particle positions.
-#. Configure and create an instance of the :doc:`BD Integrator <Integrator/BrownianDynamics>`.
+#. Configure and create an instance of the :ref:`BD Integrator <Brownian Dynamics>`.
 #. Call its forwardTime method as many times as necessary.
 
 
@@ -87,7 +87,7 @@ Why are the "force" container elements of type real4?
 -------------------------------------------------------
 
 Originally it was designed this way for the performance befits of this type in the CUDA architecture as opposed to float3. The fourth element is currently unused by UAMMD, although some modules might set it to zero when summing their force contributions. You might be able to use it for your purpose, but keep in mind that it is not guaranteed to be untouched by UAMMD.  
-If you need a new per particle property you should append it to ALL_PROPERTIES_LIST in :doc:`ParticleData` as explained :ref:`here <list-of-available-properties>`.  
+If you need a new per particle property you should append it to ALL_PROPERTIES_LIST in :ref:`ParticleData` as explained :ref:`here <list-of-available-properties>`.  
 
 
 *************
@@ -98,7 +98,7 @@ I need particles to have the X property not provided by UAMMD
 Say you implement a new Integrator which needs a currently not present property of a particle, for example the torque. You might just treat this as an internal implementation detail of your Integrator and be done with it. But now you realize that this new Interactor you are writing also needs the same torque to compute the force/energy.  
 
 The UAMMD way to do this would be to add the property "torque" to ParticleData as described :ref:`here <list-of-available-properties>`.  
-By doing so, a family of functions will be auto generated to allow access to the new property "torque". These are, among others described in :doc:`ParticleData`, :code:`getTorque()`, :code:`isTorqueAllocated()`, etc.  
+By doing so, a family of functions will be auto generated to allow access to the new property "torque". These are, among others described in :ref:`ParticleData`, :code:`getTorque()`, :code:`isTorqueAllocated()`, etc.  
 Now you can write to :code:`pd->getTorque()` in your Integrator and make use of it in your Interactor through the UAMMD provided interface.  
 Adding new properties is not expected to have a negative performance impact, and no memory will be wasted when the property is unused so do not fear adding new properties to this list.   
 
@@ -109,10 +109,10 @@ Adding new properties is not expected to have a negative performance impact, and
 How do I use a neighbour list?
 --------------------------------
 
-You can find the workings of UAMMD's neighbour lists :doc:`here <Interactor/NeighbourList>.
+You can find the workings of UAMMD's neighbour lists :ref:`here <NeighbourList>`.
 UAMMD offers several ways to interface with a neighbour list. The prefered way is to use a so-called :doc:`"Transverser" <Interactor/Transverser>`, although there are other ways. This structure provides the building blocks for a very generic computation using a neighbour list, in the below example you have a simple "neighbour counter" you can adapt.  
 
-Here you have some copy pastable example on how to use a :doc:`CellList <Interactor/CellList>` (although any neighbour list will behave the same).
+Here you have some copy pastable example on how to use a :ref:`CellList` (although any neighbour list will behave the same).
 
 .. code:: cpp
 	  
@@ -178,7 +178,7 @@ Here you have some copy pastable example on how to use a :doc:`CellList <Interac
     return 0;
   }
   
-There are other ways to get use a neighbour list besides a Transverser. for instance you can call :code:`getNeighbourList()` to get linear arrays with the information of neighbours or you can use the :doc:`NeighbourContainer <Interactor/NeighbourContainer>` interface (which is usually the fastest and the one that CellList internally uses).  
+There are other ways to get use a neighbour list besides a Transverser. for instance you can call :code:`getNeighbourList()` to get linear arrays with the information of neighbours or you can use the :ref:`NeighbourContainer` interface (which is usually the fastest and the one that CellList internally uses).  
 
 ******************
 

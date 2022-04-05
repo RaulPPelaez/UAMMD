@@ -11,38 +11,38 @@ The Interactor interface exposes the following functions:
 
 .. cpp:class:: Interactor
 
-   .. cpp:function:: Interactor::Interactor(std::shared_ptr<ParticleData> pd, std::string name = "noName");
+   .. cpp:function:: Interactor(std::shared_ptr<ParticleData> pd, std::string name = "noName");
 		    
       Constructor
 	       
-   .. cpp:function:: virtual void Interactor::sum(Interactor::Computables comp, cudaStream_t st = 0) = 0;
+   .. cpp:function:: virtual void sum(Interactor::Computables comp, cudaStream_t st = 0) = 0;
 
      Computes the forces, energies and/or virials on each particle according to the interaction. Adds the results to the relevant arrays in the :ref:`ParticleData` instance that was provided to it at creation.
      
      :param comp: An interactor is expected to update the properties of the particles in :ref:`ParticleData` for the members of :cpp:any:`Interactor::Computables` that are true.
      :param st: (Optional) A CUDA stream.
 	      
-   .. cpp:function:: std::string Interactor::getName();
+   .. cpp:function:: std::string getName();
 
      Returns the given name of the Interactor.
 
 
      
-.. cpp:type:: Interactor::Computables
+   .. cpp:type:: Computables
 
-   A POD structure containing three booleans called :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
+      A POD structure containing three booleans called :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
 
-   .. cpp:member:: bool force
+      .. cpp:member:: bool force
 
 		   Defaults to :cpp:`false`.
 		   
 
-   .. cpp:member:: bool energy
+      .. cpp:member:: bool energy
 
 		   Defaults to :cpp:`false`.
 		   
 				   
-   .. cpp:member:: bool virial
+      .. cpp:member:: bool virial
 
 		   Defaults to :cpp:`false`.
 		   
@@ -50,7 +50,7 @@ The Interactor interface exposes the following functions:
    
 Additionally, the following members are available as private members for any class inheriting Interactor:
   * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.
-  * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :code:`pd->getSystem()`.
+  * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :cpp:any:`ParticleData::getSystem`.
 
 After calling :code:`sum` on a given Interactor the relevant particle properties will be updated and can be accessed via :ref:`ParticleData`.  
 

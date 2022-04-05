@@ -45,6 +45,9 @@ Where we have defined :math:`\vec{\beta} := \sqrt{2\xi\kT}\vec{\noise}`.
 Technically, the restrictions for :math:`\vec{\beta}` would be compatible with any random distribution for the noise, :math:`\vec{\noise}`, that has zero mean and variance :math:`dt`. However, as the noise term comes from the action of countless independent random variables (collisions with the solvent particles) the central limit theorem applies. Thus, it is convenient to choose :math:`\vec{\noise}` as a Gaussian white noise (i.e. a Wiener process).
 
 
+.. hint:: At the Langevin level of description, particles move so slowly compared to the solvent characteristic times that hydrodynamic interactions are effectively instantaneous. Only the positions and momenta of the particles remain as relevant variables (Lagrangian description :ref:`once again <Molecular Dynamics>`), which obey a Langevin equation. The characteristic decorrelation time of the particle's velocities governs this scale with :math:`\tau\sim 10^{-5}s`.
+
+
 UAMMD exposes a Verlet-like algorithm to numerically integrate the Langevin SDE called Grønbech-Jensen [1]_ 
 
 
@@ -216,7 +219,116 @@ The following parameters are available for the DPD :ref:`Potential`:
 .. note:: The :code:`UAMMD` structure in this example is taken from the :code:`example/` folders in the repository, containing, for convenience, an instance of :ref:`ParticleData` and a set of parameters
 
 
+.. _sph:
+
+Smoothed Particle Hydrodynamics
+=================================
+
+.. todo:: More detailed description of SPH
+
+
+In SPH [3]_, particles are understood as interpolation points from which the fluid properties can be calculated. At the end of the day these "points" behave like particles for all intents and purposes. As a matter of fact the equations of motion for particles in SPH are just the Newton equations (see :ref:`Molecular Dynamics`) with a specially crafted interparticle force given by
+
+.. note:: Similarly to DPD, SPH [3]_ is encoded as a :ref:`Molecular Dynamics`  :ref:`Integrator` coupled with a special  :ref:`Interactor` encoding the SPH forces.
+
+	  The force-computing code for this module is located in the source code :code:`Interactor/SPH.cuh`
+
+
+.. math::
+   
+  \vec{F}_i = \sum_j\left[  m_j\left(\frac{P_j}{\rho_j^2} + \frac{P_i}{\rho_i^2} + \eta_{ij}\right)\cdot\nabla_i \omega(r_{ij}/h) \right],
+  
+where :math:`j` are the indices of the particles that are neighbours of :math:`i` (i.e. those within the support distance beyond which the interpolation kernel is zero), :math:`m` are the masses of the particles. Here :math:`h` is a length scale and :math:`\omega(r)` is a smooth decaying interpolation function with a close support, the so-called cubic spline kernel is commonly used,
+
+.. math::
+
+   \omega(r) := M_4(r) = \left\{\begin{aligned}
+   &\frac{1}{6}\left[(2-r)^3 -4(1-r)^3\right], &\quad\text{if}\quad 0\le r\le 1\\
+   &\frac{1}{6}(2-r)^3, &\quad\text{if}\quad 1\le r\le 2\\
+   &0, &\quad\text{if}\quad 0\le r> 2
+   \end{aligned}\right.
+
+
+.. hint:: The source file "Interactor/SPH/Kernel.cuh" contains the interpolation function, as well as an easy way to introduce new ones.
+
+	  
+The density, :math:`\rho`, on a given particle is interpolated from its neighbours as
+
+.. math::
+   
+      \rho_i = \sum_j m_j \omega(r_{ij}/h).
+
+On the other hand :math:`P` is the pressure on the particle as given by a certain equation of state, in UAMMD's implementation we use an ideal gas approximation given by
+
+.. math::
+
+    P_i = K(\rho_i-\rho_0),
+
+.. hint:: The source file "Interactor/SPH.cu" contains the equation of state for the pressure, which is easily modified.
+
+	  
+where :math:`K` is a gas stiffness and :math:`\rho_0` is a rest density.
+
+Finally, :math:`\eta` is an artificial viscosity introduced to improve numerical stability, in UAMMD's implementation we use
+
+.. math::
+   
+   \eta_{ij} = -\nu\frac{\vec{v}_{ij}\cdot \vec{r}_{ij}}{r_{ij}^2+\epsilon h^2},
+
+where :math:`\nu` is a provided viscosity, and :math:`\vec{v}_{ij} = \vec{v}_j - \vec{v}_i` is the relative velocity of particles i and j. :math:`\epsilon ~ 0.001` is introduced to prevent the singularity at :math:`r_{ij} = 0`.
+
+
+.. hint:: The source file "Interactor/SPH.cu" contains the computation of the artificial viscosity, which is easily modified.
+	  
+	  
+Usage
+-------------
+
+We couple an SPH :ref:`Interactor` with a :ref:`VerletNVE`  :ref:`Integrator`.
+
+The following parameters are available for the SPH :ref:`Interactor`:
+ * :cpp:`real support`. The length scale :math:`h`.
+ * :cpp:`real viscosity`. The prefactor for the artificial viscosity, :math:`\mu`.
+ * :cpp:`real gasStiffness`. The prefactor for the ideal gas equation of state, :math:`K`.
+ * :cpp:`real restDensity`. The rest density in the equation of state, :math:`\rho_0`.
+ * :cpp:`Box box`. A :cpp:any:`Box` with the simulation domain information.
+  
+.. code:: c++
+	  
+  #include "Integrator/VerletNVE.cuh"
+  #include "Interactor/SPH.cuh"
+  using namespace uammd;
+  //SPH is handled by UAMMD as a VerletNVE integrator with a special interaction
+  std::shared_ptr<Integrator> createIntegratorSPH(std::shared_ptr<ParticleData> pd){
+    using NVE = VerletNVE;
+    NVE::Parameters par;
+    par.dt = 0.1;
+    par.initVelocities = false;
+    auto verlet = std::make_shared<NVE>(pd, par);
+    SPH::Parameters params;
+    real3 L = make_real3(32,32,32);
+    params.box = Box(L);
+    //Pressure for a given particle "i" in SPH will be computed as gasStiffness·(density_i - restDensity)
+    //Where density is computed as a function of the masses of the surroinding particles
+    //Particle mass starts as 1, but you can change this in customizations.cuh
+    params.support = 2.4;   //Cut off distance for the SPH kernel
+    params.viscosity = 1.0;   //Environment viscosity
+    params.gasStiffness = 1.0;
+    params.restDensity = 1.0;
+    auto sph = std::make_shared<SPH>(pd, params);
+    verlet->addInteractor(sph);
+    return verlet;
+  }
+	  
+
+
+
+
+
+
 .. rubric:: References
 
 .. [1] A simple and effective Verlet-type algorithm for simulating Langevin dynamics. Niels   Grønbech-Jensen  and  Oded   Farago 2013. https://doi.org/10.1080/00268976.2012.760055
 .. [2] Statistical Mechanics of Dissipative Particle Dynamics. P Español and P Warren 1995. https://doi.org/10.1209/0295-5075/30/4/001
+
+.. [3] Smoothed particle hydrodynamics. JJ Monaghan. Rep. Prog. Phys. 68 (2005) 1703–1759 https://doi.org/10.1088/0034-4885/68/8/R01  

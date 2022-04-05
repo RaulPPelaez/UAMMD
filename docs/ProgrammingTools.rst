@@ -7,6 +7,11 @@ Pointers and memory addresses
 Smart Pointers
 ----------------
 
+
+.. cpp:class:: template<typename T>\
+	       std::shared_ptr
+
+
 Instead of using raw C-style pointers, when creating references UAMMD usually uses c++ smart pointers. Specifically most objects are created and shared using `shared_ptr <https://en.wikipedia.org/wiki/Smart_pointer>`_.  
 shared_ptr handles the creation and destruction of the object (replaces malloc/free new/delete). The interesting thing about shared_ptr is that the object lives until the last shared_ptr to it lives.
 

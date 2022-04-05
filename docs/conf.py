@@ -15,6 +15,7 @@ import sys
 import sphinx_rtd_theme
 
 sys.path.insert(0, os.path.abspath('../src/'))
+sys.path.insert(0, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
@@ -38,8 +39,13 @@ extensions = [
     'sphinx_rtd_theme',
     'sphinx.ext.imgmath',
     'sphinxcontrib.inkscapeconverter',
+    'sphinx.ext.todo',
+    "sphinx_disqus.disqus"
 ]
 
+disqus_shortname = 'uammd-readthedocs'
+
+todo_include_todos=True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -47,8 +53,11 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'global.rst']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'global.rst', 'README.md', 'uammd_cpp_lexer.py']
 
+
+cpp_id_attributes = ["__device__","__host__"]
+cpp_paren_attributes = ["__device__","__host__"]
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -77,6 +86,7 @@ html_theme_options = {
     'titles_only': False
 }
 
+html_logo = "img/logo.png"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
@@ -117,3 +127,13 @@ imgmath_latex_preamble = r'''
 '''
 
 latex_elements = {'preamble': imgmath_latex_preamble}
+
+
+from sphinx.highlighting import lexers
+import uammd_cpp_lexer
+
+lexers['cpp'] = uammd_cpp_lexer.UAMMDCppLexer()
+lexers['c++'] = lexers['cpp']
+
+#pygments_style='pastie'
+#pygments_style='lovelace'

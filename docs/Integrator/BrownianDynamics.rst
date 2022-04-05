@@ -1,3 +1,5 @@
+.. _BD:
+
 Brownian Dynamics
 =================
 
@@ -10,9 +12,9 @@ In BD, the coupling between the submerged particles and the solvent is instantan
 Furthermore, since the particle velocities decorrelate instantly, the only remaining relevant variables are the positions of the colloidal particles.
 
 
-Neglecting hydrodynamic interactions (see :ref:`Brownian Hydrodynamics`) we will focus on the simple case of the mobility being non-zero only on the diagonal. In the case of a no-slip sphere of radius :math:`a` moving inside a fluid with viscosity :math:`\eta` the bare self-mobility is given by the well-known Stokes drag :math:`M = (6\pi\eta a)^{-1}`.
+Neglecting hydrodynamic interactions (see :ref:`Brownian Hydrodynamics`) we will focus on the simple case of a mobility tensor which is non-zero only on the diagonal. In the case of a no-slip sphere of radius :math:`a` moving inside a fluid with viscosity :math:`\eta` the bare self-mobility is given by the well-known Stokes drag :math:`M = (6\pi\eta a)^{-1}`.
 
-The Brownian dynamics equation of motion are
+The Brownian dynamics equation of motion (without hydrodynamic interactions) are
 
 .. math::
    
@@ -26,6 +28,9 @@ Where:
   * :math:`M = (6\pi \eta a)^{-1}` - Mobility -> :math:`M = D/\kT`. Here :math:`\eta` is the fluid viscosity and :math:`a` the hydrodynamic radius of the particles.
   * :math:`d\vec{\noise}`- Brownian noise vector (gaussian numbers with mean=0, std=1)
 
+
+.. hint:: Brownian Dynamics are proper to the so-called Smoluchowski level of description. Particle positions change slowly enough that their velocity decorrelates effectively instantaneously, inertia can be disregarded and positions are the only relevant variable. The dynamics are described by the BD equations of motion (an over-damped Langevin equation). The diffusion time of the particles, :math:`\tau \sim 10^{-3} s`, dominates this level.
+    
 
 
 -----------------------------------------------------
@@ -43,7 +48,7 @@ The simplest algorithm, described in [6]_, advances the simulation with the foll
 
 .. math::
    
-  \vec{\ppos}^{n+1} = \vec{\ppos}^n + dt(M\vec{F}^n) + \sqrt{2*\kT M dt}d\vec{W}
+  \vec{\ppos}^{n+1} = \vec{\ppos}^n + dt(M\vec{F}^n) + \sqrt{2\kT M dt}d\vec{W}^n
   
   
 This algorithm has a convergence scaling of 1/2 (:math:`dt^{0.5}`).  
@@ -102,10 +107,6 @@ The following parameters are available:
 
 \* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. In the latter case, if particle radii has not been set in :ref:`ParticleData` prior to the construction of the module an error will be thrown.  
 
-
------------------------------------------------------
-Example
------------------------------------------------------
 
 .. code:: cpp
 	  
