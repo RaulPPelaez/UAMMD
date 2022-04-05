@@ -66,6 +66,7 @@ namespace uammd{
 	}
 	else{
 	  const auto potentialAtTopWallFourier = surfaceValueFourier.x;
+	  mismatch.mEH = cufftComplex();
 	  mismatch.mPH = evalthetaInside.y - potentialAtTopWallFourier;
 	}
 	if(not metallicBottom){
@@ -75,6 +76,7 @@ namespace uammd{
 	}
 	else{
 	  const auto potentialAtBottomWallFourier = surfaceValueFourier.y;
+	  mismatch.mE0 = cufftComplex();
 	  mismatch.mP0 = evalthetaInside.x - potentialAtBottomWallFourier;
 	}	
 	return mismatch;
@@ -93,9 +95,9 @@ namespace uammd{
 	const auto E = real(2.0)/(eb + real(1.0))*evalThetaOutside.z;
 	cufftComplex A0 = cufftComplex();
 	cufftComplex B0 = cufftComplex();
-	if(metallicTop and not metallicBottom){	  
+	if(metallicTop and not metallicBottom){
 	  A0 = E*eb - mismatchFieldZBottom.x/perm.inside;
-	  B0 = -mismatchPotentialBottom;
+	  B0 = -mismatchPotentialTop - A0*H;
 	}
 	else if(metallicBottom and not metallicTop){
 	  A0 = C*et - mismatchFieldZTop/perm.inside;

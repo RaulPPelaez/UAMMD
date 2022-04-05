@@ -154,7 +154,7 @@ namespace uammd{
 	   real3 pjim = make_real3(pj);
 	   pjim.z = (pj.z>0?H:-H) - pj.z;
 	   real ep = pj.z<0?perm.bottom:perm.top;
-	   real epratio = isinf(ep)?real(1.0):(ep - perm.inside) / (ep + perm.inside);
+	   real epratio = isinf(ep)?real(1.0):((ep - perm.inside) / (ep + perm.inside));
            real chargeImage = -infoj.charge * epratio;
 	   FandE += chargeImage*computeFieldPotential(make_real3(pi), pjim);
 	   //Image in the opposite side
@@ -162,7 +162,7 @@ namespace uammd{
 	     pjim = make_real3(pj);
 	     pjim.z = (pj.z>0?-H:H) - pj.z;
 	     ep = pj.z<0?perm.top:perm.bottom;
-	     epratio = isinf(ep)?real(1.0):(ep - perm.inside) / (ep + perm.inside);
+	     epratio = isinf(ep)?real(1.0):((ep - perm.inside) / (ep + perm.inside));
 	     chargeImage = -infoj.charge * epratio;
 	     FandE += chargeImage*computeFieldPotential(make_real3(pi), pjim);
 	   }
@@ -193,9 +193,9 @@ namespace uammd{
 	real3 rij = box.apply_pbc(pi-pj);
         real r2 = dot(rij, rij);
 	if(r2 >= rcut*rcut) return real4();
-        real2 greensFunctions = GreensFunctionFieldAndPotential(r2);
-	// real2 greensFunctions = make_real2(nearField_ns::GreensFunctionNearPotential(r2, split, gw, perm.inside),
-	// 				   nearField_ns::GreensFunctionNearField(r2, split, gw, perm.inside));
+        //real2 greensFunctions = GreensFunctionFieldAndPotential(r2);
+	real2 greensFunctions = make_real2(nearField_ns::GreensFunctionNearPotential(r2, split, gw, perm.inside),
+					   nearField_ns::GreensFunctionNearField(r2, split, gw, perm.inside));
 	real potential = greensFunctions.x;
 	real3 field = greensFunctions.y*rij;
 	return make_real4(field, potential);
