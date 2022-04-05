@@ -193,9 +193,9 @@ namespace uammd{
 	real3 rij = box.apply_pbc(pi-pj);
         real r2 = dot(rij, rij);
 	if(r2 >= rcut*rcut) return real4();
-        //real2 greensFunctions = GreensFunctionFieldAndPotential(r2);
-	real2 greensFunctions = make_real2(nearField_ns::GreensFunctionNearPotential(r2, split, gw, perm.inside),
-					   nearField_ns::GreensFunctionNearField(r2, split, gw, perm.inside));
+        real2 greensFunctions = GreensFunctionFieldAndPotential(r2);
+	//real2 greensFunctions = make_real2(nearField_ns::GreensFunctionNearPotential(r2, split, gw, perm.inside),
+	//				   nearField_ns::GreensFunctionNearField(r2, split, gw, perm.inside));
 	real potential = greensFunctions.x;
 	real3 field = greensFunctions.y*rij;
 	return make_real4(field, potential);
