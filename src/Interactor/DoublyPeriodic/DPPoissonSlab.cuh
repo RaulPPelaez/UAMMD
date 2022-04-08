@@ -29,6 +29,8 @@ namespace uammd{
       real split = -1;
       //Either Charge of potential depending on whether the walls are metallic or not
       std::shared_ptr<SurfaceValueDispatch> surfaceValues = std::make_shared<SurfaceValueDispatch>();
+
+      bool printK0Mode = false;
     };
 
     DPPoissonSlab(shared_ptr<ParticleGroup> pg, Parameters par);

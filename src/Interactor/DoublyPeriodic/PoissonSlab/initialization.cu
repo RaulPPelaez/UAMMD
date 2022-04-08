@@ -96,6 +96,7 @@ namespace uammd{
     ffpar.upsampling = par.upsampling;
     ffpar.surfaceValues = par.surfaceValues;
     ffpar.support = par.support;
+    ffpar.printK0Mode = par.printK0Mode;
     this->farField = std::make_shared<DPPoissonSlab_ns::FarField>(sys, pd, pg, ffpar);
   }
 }
