@@ -61,7 +61,11 @@ namespace uammd{
     void setSurfaceValuesZeroModeFourier(cufftComplex2_t<real> zeroMode){
       farField->setSurfaceValuesZeroModeFourier(zeroMode);
     }
-    
+
+    auto getK0Mode(){
+      return this->farField->getK0Mode();
+    }
+
   private:
     shared_ptr<DPPoissonSlab_ns::NearField> nearField;
     shared_ptr<DPPoissonSlab_ns::FarField> farField;

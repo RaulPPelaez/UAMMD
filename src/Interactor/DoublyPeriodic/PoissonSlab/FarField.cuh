@@ -66,7 +66,8 @@ namespace uammd{
 	real tolerance = -1;
 	real numberStandardDeviations =-1;
 	real upsampling = -1;
-	int support = -1;	
+	int support = -1;
+	bool printK0Mode = false;
 	std::shared_ptr<SurfaceValueDispatch> surfaceValues = std::make_shared<SurfaceValueDispatch>();
       };
 
@@ -82,7 +83,7 @@ namespace uammd{
       real farFieldGaussianWidth;
       real He;
       const Parameters par;
-
+      thrust::device_vector<cufftComplex4> solutionZeroMode;
     public:
 
       FarField(shared_ptr<System> sys, shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg,
@@ -128,6 +129,11 @@ namespace uammd{
 	auto insideSolution = bvp->solveFieldPotential(gridChargesFourier, st);
 	auto surfaceValues_ptr = thrust::raw_pointer_cast(surfaceValuesFourier.data());
 	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st);
+	if(par.printK0Mode){
+	  thrust::copy(thrust::cuda::par.on(st),
+		       insideSolution.begin(), insideSolution.begin() + cellDim.z,
+		       solutionZeroMode.begin());
+	}
 	auto gridFields = fct->inverseTransform(insideSolution, st);
 	ibm->interpolateFieldsToParticles(gridFields, st, fieldAtParticles);
 	CudaCheckError();
@@ -135,6 +141,12 @@ namespace uammd{
 
       void setSurfaceValuesZeroModeFourier(cufftComplex2 zeroMode){
 	surfaceValuesFourier[0] = zeroMode*cellDim.x*cellDim.y;
+      }
+      
+      auto getK0Mode(){
+	std::vector<cufftComplex4> h_zeroMode(solutionZeroMode.size());
+	thrust::copy(solutionZeroMode.begin(), solutionZeroMode.end(), h_zeroMode.begin());
+	return h_zeroMode;
       }
     private:
 
