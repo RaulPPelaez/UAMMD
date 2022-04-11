@@ -273,12 +273,12 @@ namespace uammd{
 	FarField(Parameters par, std::shared_ptr<System> sys):
 	  box(par.box),
 	  viscosity(par.viscosity),
-	  hydrodynamicRadius(par.hydrodynamicRadius),
-	  shearStrain(par.shearStrain),
+	  hydrodynamicRadius(par.hydrodynamicRadius),	 
 	  psi(par.psi),
 	  sys(sys)
 	{
 	  this->seed = sys->rng().next32();
+	  setShearStrain(par.shearStrain);
 	  initializeGrid(par.tolerance);
 	  initializeKernel(par.tolerance);
 	  initializeCuFFT();
@@ -301,6 +301,10 @@ namespace uammd{
 	*/
 	void computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *Mv, int numberParticles,
 					      real temperature, real prefactor, cudaStream_t st);
+
+	void setShearStrain(real newStrain){
+	  this->shearStrain = newStrain;
+	}
 
       private:
 	template<class T> using cached_vector = uninitialized_cached_vector<T>;

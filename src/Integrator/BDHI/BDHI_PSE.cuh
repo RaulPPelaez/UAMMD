@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017-2020. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
+/*Raul P. Pelaez 2017-2022. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
 
 
   As this is a BDHI module. BDHI_PSE computes the terms M·F and B·dW in the differential equation:
@@ -130,6 +130,12 @@ namespace uammd{
 						   temperature, noise_prefactor, st);
       }
 
+      void setShearStrain(real newStrain){
+	System::log<System::DEBUG>("[BDHI::PSE] Shear strain changed to %g", newStrain);
+        nearField->setShearStrain(newStrain);
+	farField->setShearStrain(newStrain);
+      }
+      
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
       }

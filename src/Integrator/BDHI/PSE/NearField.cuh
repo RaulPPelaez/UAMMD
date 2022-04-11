@@ -29,10 +29,11 @@ namespace uammd{
       public:
 	using NeighbourList = CellList;
 	NearField(Parameters par, std::shared_ptr<System> sys, std::shared_ptr<ParticleData> pd, std::shared_ptr<ParticleGroup> pg):
-	  box(par.box),shearStrain(par.shearStrain),
+	  box(par.box),
 	  sys(sys), pd(pd), pg(pg),
 	  tolerance(par.tolerance)
 	{
+	  setShearStrain(par.shearStrain);
 	  initializeDeterministicPart(par);
 	  this->seed = sys->rng().next32();
 	  CudaCheckError();
@@ -46,6 +47,10 @@ namespace uammd{
 	//Computes the stochastic part of the hydrodynamic displacements as prefactor*sqrt(2*T*M)*dW
 	void computeStochasticDisplacements(real3* BdW, real temperature, real prefactor, cudaStream_t st);
 
+	void setShearStrain(real newStrain){
+	  this->shearStrain = newStrain;
+	}
+	
       private:
 	shared_ptr<ParticleData> pd;
 	shared_ptr<ParticleGroup> pg;
