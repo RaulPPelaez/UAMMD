@@ -2,6 +2,7 @@
 
 Near field
 
+Ondrej implemented the sheared-cell functionality.
 */
 
 #ifndef BDHI_PSE_NEARFIELD_CUH
@@ -15,10 +16,15 @@ Near field
 #include "Interactor/NeighbourList/CellList.cuh"
 //#include"Interactor/NeighbourList/VerletList.cuh"
 #include"misc/LanczosAlgorithm.cuh"
+#include "Interactor/NBody.cuh"
 namespace uammd{
   namespace BDHI{
     namespace pse_ns{
-
+      real cutOffShearedSafetyFactor(real shearStrain){
+	real g = shearStrain;
+	return 1+0.5*g*g+0.5*sqrt(g*g*(g*g+4.0));
+      }
+      
       class NearField{
       public:
 	using NeighbourList = CellList;
@@ -27,6 +33,7 @@ namespace uammd{
 	  pg(pg),
 	  tolerance(par.tolerance)
 	{
+	  setShearStrain(par.shearStrain);
 	  initializeDeterministicPart(par);
 	  this->seed = pg->getParticleData()->getSystem()->rng().next32();
 	  CudaCheckError();
@@ -40,10 +47,15 @@ namespace uammd{
 	//Computes the stochastic part of the hydrodynamic displacements as prefactor*sqrt(2*T*M)*dW
 	void computeStochasticDisplacements(real3* BdW, real temperature, real prefactor, cudaStream_t st);
 
+	void setShearStrain(real newStrain){
+	  this->shearStrain = newStrain;
+	}
+	
       private:
 	shared_ptr<ParticleGroup> pg;
 	Box box;
 	real rcut;
+	real shearStrain;
 	//Rodne Prager Yamakawa PSE real space part textures
 	thrust::device_vector<real2> tableDataRPY;
 	shared_ptr<TabulatedFunction<real2>> RPY_near;
@@ -51,11 +63,11 @@ namespace uammd{
 	shared_ptr<NeighbourList> cl;
 	real tolerance;
 	shared_ptr<LanczosAlgorithm> lanczos;
-
+	
 	void initializeDeterministicPart(Parameters par){
 	  const double split = par.psi;
 	  /*Near neighbour list cutoff distance, see sec II:C in [1]*/
-	  this->rcut = sqrt(-log(par.tolerance))/split;	  
+	  this->rcut = sqrt(-log(par.tolerance))/split;
 	  if(0.5*box.boxSize.x < rcut){
 	    System::log<System::WARNING>("[BDHI::PSE] A real space cut off (%e) larger than half the box size (%e) can result in artifacts!, try increasing the splitting parameter (%e)", rcut, 0.5*box.boxSize.x, split);
 	    rcut = box.boxSize.x*0.5;
@@ -77,6 +89,8 @@ namespace uammd{
 	  System::log<System::MESSAGE>("[BDHI::PSE] Number of real RPY texture points: %d", nPointsTable);
 	  System::log<System::MESSAGE>("[BDHI::PSE] Close range distance cut off: %f", rcut);
 	}
+
+	void updateNeighbourList(cudaStream_t st);
       };
 
       namespace pse_ns{
@@ -101,20 +115,39 @@ namespace uammd{
 	  RPYNearTransverser(vtype *v, real3 *Mv,
 			     /*RPY_near(r) = F(r)·(I-r^r) + G(r)·r^r*/
 			     TabulatedFunction<real2> FandG, real rcut,
-			     Box box):
-	    v(v), Mv(Mv), FandG(FandG), box(box){
+			     Box box, real shearStrain):
+	    v(v), Mv(Mv), FandG(FandG), box(box), shearStrain(shearStrain){
 	    this->rcut2 = (rcut*rcut);
 	  }
 
 	  inline __device__ infoType getInfo(int pi){
 	    return make_real3(v[pi]);
 	  }
-	
+
+	  __device__ real3 computeShearedDistancePBC(real3 pi, real3 pj){
+	    // You are passing in sheared coordinates
+	    real3 rij = make_real3(pj)-make_real3(pi);
+	    const real Ly = box.boxSize.y;
+	    const real Lx = box.boxSize.x;
+	    const real Lz = box.boxSize.z;
+	    // Make standard coordinates from sheared
+	    rij.x += shearStrain*rij.y; // standard coordinates
+	    // Now periodically shift on sheared domain
+	    real s1 = round(rij.y/Ly);
+	    // Shift in (y', z') directions
+	    rij.x-= shearStrain*Ly*s1;
+	    rij.y-= Ly*s1;
+	    rij.z-= Lz*round(rij.z/Lz);
+	    // Shift in x direction
+	    rij.x-= Lx*round(rij.x/Lx);
+	    return rij;
+	  }
 	  /*Compute the dot product Mr_ij(3x3)·vj(3)*/
 	  inline __device__ computeType compute(const real4 &pi, const real4 &pj,
-						const infoType &vi, const infoType &vj){
-	    real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
+						const infoType &vi, const infoType &vj){	    
+	    real3 rij = computeShearedDistancePBC(make_real3(pi), make_real3(pj));
 	    const real r2 = dot(rij, rij);
+	    if(r2>=rcut2) return real3();
 	    /*Fetch RPY coefficients from a table, see RPYPSE_near*/
 	    /* Mreal(r) = (F(r)·I + (G(r)-F(r))·rr)/(6*pi*vis*a) */
 	    //f and g are divided by 6*pi*vis*a in the texture
@@ -147,6 +180,7 @@ namespace uammd{
 	  TabulatedFunction<real2> FandG;
 	  real rcut2;
 	  Box box;
+	  real shearStrain;
 	};
 
 	/*LanczosAlgorithm needs a functor that computes the product M·v*/
@@ -185,12 +219,19 @@ namespace uammd{
       
       }
 
+      void NearField::updateNeighbourList(cudaStream_t st){
+	//Sheared coordinates fix. The rcut must be increased by a safety factor
+	real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
+	System::log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);	
+	cl->update(box, rcut*safetyFactor, st);
+      }
+
       void NearField::Mdot(real4* forces, real3 *MF, cudaStream_t st){
-	//The deterministic part can be skipped if there are no forces
 	if(forces){
-	  cl->update(box, rcut, st);
+	  updateNeighbourList(st);
 	  System::log<System::DEBUG1>("[BDHI::PSE] Computing MF real space...");
-	  pse_ns::RPYNearTransverser<real4> tr(forces, MF, *RPY_near, rcut, box);
+	  pse_ns::RPYNearTransverser<real4> tr(forces, MF, *RPY_near, rcut, box, shearStrain);
+	  System::log<System::DEBUG1>("[BDHI::PSE] Shear strain %f", shearStrain);
 	  cl->transverseList(tr, st);
 	}
       }
@@ -198,13 +239,13 @@ namespace uammd{
       void NearField::computeStochasticDisplacements(real3* BdW, real temperature, real prefactor, cudaStream_t st){
 	//Compute stochastic term only if T>0 
 	if(temperature == real(0.0)) return;
+	updateNeighbourList(st);
+	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box, shearStrain);
 	if(not lanczos){
 	  //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
 	  auto lanczosTolerance = this->tolerance; //std::min(0.05f, sqrt(par.tolerance));
 	  this->lanczos = std::make_shared<LanczosAlgorithm>(lanczosTolerance);
 	}
-	cl->update(box, rcut, st);
-	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box);
 	int numberParticles = pg->getNumberParticles();
 	pse_ns::Dotctor Mvdot_near(tr, cl, numberParticles, st);
 	/*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/

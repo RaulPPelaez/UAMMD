@@ -2,6 +2,7 @@
 
 Far field
 
+Ondrej implemented the sheared cell functionality.
 */
 
 #ifndef BDHI_PSE_FARFIELD_CUH
@@ -67,8 +68,9 @@ namespace uammd{
 
 	/* Precomputes the fourier scaling factor B (see eq. 9 and 20.5 in [1]),
 	   Returns B(||k||^2, xi, eta) = 1/(vis·Vol) · sinc(k·rh)^2/k^2·Hashimoto(k,xi,eta)
-      */
+	*/
 	__device__ real greensFunction(real3 waveVector,
+				       real shearStrain,
 				       real rh, //Hydrodynamic radius
 				       real viscosity,
 				       real split, //Ewald splitting
@@ -78,18 +80,26 @@ namespace uammd{
 	  if(k2 == 0){
 	    return real(0.0);
 	  }
+	  const real3 K_NUFFT = waveVector;
+	  const real3 K_Ewald = shearWaveVector(waveVector, shearStrain);
 	  /*Compute the scaling factor for this node*/
-	  const real k = sqrt(k2);
-	  const real sinck = sin(k*rh)/k;
-	  const real k2_invsplit2_4 = k2/(4.0*split*split);
+	  double K_Ewald2 = dot(K_Ewald,K_Ewald);
+	  double K_NUFFT2 = dot(K_NUFFT,K_NUFFT);
+	  double kmod = sqrt(K_Ewald2);
+	  double invk2 = 1.0/K_Ewald2;
+	  double sink = sin(kmod*rh);
+	  double kEw2_invsplit2_4 = K_Ewald2/(4.0*split*split);
+	  double kNU2_invsplit2_4 = K_NUFFT2/(4.0*split*split);
 	  /*The Hashimoto splitting function,
 	    split is the splitting between near and far contributions,
 	    eta is the splitting of the gaussian kernel used in the grid interpolation, see sec. 2 in [2]*/
 	  /*See eq. 11 in [1] and eq. 11 and 14 in [2]*/
-	  const real tau = -k2_invsplit2_4*(1.0-eta);
-	  const real hashimoto = (1.0 + k2_invsplit2_4)*exp(tau)/k2;
+	  /* Modification for shear strain: the right exponential is 
+	     exp ((eta*kNUFFT^2- kEwald^2)/(4*xi^2)) */
+	  double tau = eta*kNU2_invsplit2_4-kEw2_invsplit2_4;
+	  double hashimoto = (1.0 + kEw2_invsplit2_4)*exp(tau)/K_Ewald2;
 	  /*eq. 20.5 in [1]*/
-	  real B = sinck*sinck*hashimoto/(viscosity*rh*rh);
+	  real B = sink*sink*invk2*hashimoto/(viscosity*rh*rh);
 	  B /= real(n.x*n.y*n.z);
 	  //B(k)*(I- k^k/k^2)
 	  return B;
@@ -104,6 +114,7 @@ namespace uammd{
 	*/
 	__global__ void forceFourier2Vel(cufftComplex3 * gridForces, /*Input array*/
 					 cufftComplex3 * gridVels, /*Output array, can be the same as input*/
+					 real shearStrain,
 					 real hydrodynamicRadius, real viscosity, real split, real eta,
 					 Grid grid){
 	  const int id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -114,8 +125,8 @@ namespace uammd{
 	  }
 	  if(id>=(ncells.z*ncells.y*(ncells.x/2+1))) return;
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
-	  const real3 waveVector = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
-	  const real B = greensFunction(waveVector,
+	  const real3 waveVector = waveNumberToWaveVector(waveNumber, grid.box.boxSize, shearStrain);
+	  const real B = greensFunction(waveVector, shearStrain,
 					hydrodynamicRadius, viscosity, split, eta, ncells);
 	  gridVels[id] = B*projectFourier(waveVector, gridForces[id]);
 	}
@@ -175,15 +186,16 @@ namespace uammd{
 	}
 
 	/*Computes the long range stochastic velocity term
-	Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
-	= σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
-	See sec. B.2 in [1]
-	This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds 1/√σ·√B(k)·dWw.
-	Keeping special care that v_k = v*_{N-k}, which implies that dWw_k = dWw*_{N-k}
+	  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
+	  = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
+	  See sec. B.2 in [1]
+	  This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds 1/√σ·√B(k)·dWw.
+	  Keeping special care that v_k = v*_{N-k}, which implies that dWw_k = dWw*_{N-k}
 	*/
 	__global__ void fourierBrownianNoise(cufftComplex3 *gridVelsFourier,
 					     Grid grid,
 					     real prefactor,/* sqrt(2·T/dt)*/
+					     real shearStrain,
 					     real hydrodynamicRadius, real viscosity, real split, real eta,
 					     uint seed1, uint seed2){
 	  const uint id = blockIdx.x*blockDim.x + threadIdx.x;
@@ -218,8 +230,8 @@ namespace uammd{
 	  /*Z = sqrt(B)·(I-k^k)·dW*/
 	  {// Compute for v_k wave number
 	    const int3 ik = indexToWaveNumber(id, nk);
-	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
-	    const real B = greensFunction(k, hydrodynamicRadius, viscosity, split, eta, nk);
+	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, shearStrain);
+	    const real B = greensFunction(k, shearStrain, hydrodynamicRadius, viscosity, split, eta, nk);
 	    gridVelsFourier[id] += sqrt(B)*projectFourier(k, noise);
 	  }
 	  /*Compute for conjugate v_{N-k} if needed*/
@@ -233,13 +245,13 @@ namespace uammd{
 	    int zc = (cell.z > 0)*(nk.z - cell.z);
 	    int id_conj =  xc + (nk.x/2 + 1)*(yc + zc*nk.y);
 	    const int3 ik = indexToWaveNumber(id_conj, nk);
-	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
+	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, shearStrain);
 	    cufftComplex3 factor = noise;
 	    /*v_{N-k} = v*_k, so the complex noise must be conjugated*/
 	    factor.x.y *= real(-1.0);
 	    factor.y.y *= real(-1.0);
 	    factor.z.y *= real(-1.0);
-	    const real B = greensFunction(k, hydrodynamicRadius, viscosity, split, eta, nk);
+	    const real B = greensFunction(k, shearStrain, hydrodynamicRadius, viscosity, split, eta, nk);
 	    gridVelsFourier[id_conj] += sqrt(B)*projectFourier(k, factor);
 	  }
 	}
@@ -265,6 +277,7 @@ namespace uammd{
 	  hydrodynamicRadius(par.hydrodynamicRadius),
 	  psi(par.psi){
 	  this->seed = sys->rng().next32();
+	  setShearStrain(par.shearStrain);
 	  initializeGrid(par.tolerance);
 	  initializeKernel(par.tolerance);
 	  initializeCuFFT();
@@ -288,6 +301,10 @@ namespace uammd{
 	void computeHydrodynamicDisplacements(real4* pos, real4* forces, real3 *Mv, int numberParticles,
 					      real temperature, real prefactor, cudaStream_t st);
 
+	void setShearStrain(real newStrain){
+	  this->shearStrain = newStrain;
+	}
+
       private:
 	std::shared_ptr<System> sys;
 	template<class T> using cached_vector = uninitialized_cached_vector<T>;
@@ -295,6 +312,7 @@ namespace uammd{
 	Box box;
 	uint seed;
 
+	real shearStrain;
 	real hydrodynamicRadius;
 	real viscosity;
 	real psi; /*Splitting factor*/
@@ -350,6 +368,7 @@ namespace uammd{
 	  int Nthreads = 128;
 	  int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
 	  detail::forceFourier2Vel<<<Nblocks, Nthreads, 0, st>>> (d_gridVelsFourier, d_gridVelsFourier,
+								  shearStrain,
 								  hydrodynamicRadius, viscosity, psi, eta,
 								  grid);
 	  CudaCheckError();
@@ -394,6 +413,7 @@ namespace uammd{
 	    //In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
 	    detail::fourierBrownianNoise<<<Nblocks, Nthreads, 0, st>>>(d_gridVelsFourier, grid,
 								       noise_prefactor, // 1/√σ· sqrt(2*T/dt),
+								       shearStrain,
 								       hydrodynamicRadius, viscosity, psi, eta,
 								       seed, //Saru needs two seeds apart from thread id
 								       seed2);
@@ -449,7 +469,7 @@ namespace uammd{
 	interpolateVelocity(gridVels, pos, MF, numberParticles, st);
 	System::log<System::DEBUG2>("[BDHI::PSE] MF wave space Done");
       }
-      
+
       void FarField::initializeCuFFT(){
 	CufftSafeCall(cufftCreate(&cufft_plan_forward));
 	CufftSafeCall(cufftCreate(&cufft_plan_inverse));
@@ -533,7 +553,7 @@ namespace uammd{
 	this->eta = pow(2.0*psi*w/gaussM, 2);
 	System::log<System::MESSAGE>("[BDHI::PSE] eta: %g", eta);
 	kernel = std::make_shared<Kernel>(P, sqrt(eta)/(2.0*psi));
-}
+      }
 
       void FarField::initializeGrid(real tolerance){
 	real kcut = 2*psi*sqrt(-log(tolerance));
@@ -542,7 +562,7 @@ namespace uammd{
 	int3 cellDim = make_int3(2*box.boxSize/hgrid)+1;
 	cellDim = nextFFTWiseSize3D(cellDim);
 	this->grid = Grid(box, cellDim);
-}
+      }
     }
   }
 }
