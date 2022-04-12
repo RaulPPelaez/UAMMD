@@ -130,6 +130,7 @@ namespace uammd{
 	auto surfaceValues_ptr = thrust::raw_pointer_cast(surfaceValuesFourier.data());
 	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st);
 	if(par.printK0Mode){
+	  solutionZeroMode.resize(cellDim.z);
 	  thrust::copy(thrust::cuda::par.on(st),
 		       insideSolution.begin(), insideSolution.begin() + cellDim.z,
 		       solutionZeroMode.begin());
@@ -144,6 +145,7 @@ namespace uammd{
       }
       
       auto getK0Mode(){
+	System::log<System::DEBUG1>("[DPPoissonSlab] Downloading zero mode data");
 	std::vector<cufftComplex4> h_zeroMode(solutionZeroMode.size());
 	thrust::copy(solutionZeroMode.begin(), solutionZeroMode.end(), h_zeroMode.begin());
 	return h_zeroMode;
