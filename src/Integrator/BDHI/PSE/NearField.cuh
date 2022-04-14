@@ -69,8 +69,8 @@ namespace uammd{
 	  /*Near neighbour list cutoff distance, see sec II:C in [1]*/
 	  this->rcut = sqrt(-log(par.tolerance))/split;
 	  if(0.5*box.boxSize.x < rcut){
-	    System::log<System::WARNING>("[BDHI::PSE] A real space cut off (%e) larger than half the box size (%e) can result in artifacts!, try increasing the splitting parameter (%e)", rcut, 0.5*box.boxSize.x, split);
-	    rcut = box.boxSize.x*0.5;
+	    System::log<System::EXCEPTION>("[BDHI::PSE] A real space cut off (%e) larger than half the box size (%e) can result in artifacts!, try increasing the splitting parameter (%e)", rcut, 0.5*box.boxSize.x, split);
+	    throw std::runtime_error("[BDHI::PSE] Cut off is too large, try decrasing psi");	    
 	  }
 	  this->cl = std::make_shared<NeighbourList>(pg);
 	  const double a = par.hydrodynamicRadius;
