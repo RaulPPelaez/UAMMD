@@ -36,9 +36,9 @@ namespace uammd{
 	return kvec;
       }
 
-      __device__ real3 waveNumberToWaveVector(int3 ik, real3 L, real shearStrain){
+      __device__ real3 waveNumberToWaveVector(int3 ik, real3 L){
 	auto kvec = (real(2.0)*real(M_PI)/L)*make_real3(ik.x, ik.y, ik.z);
-	return shearWaveVector(kvec, shearStrain);
+	return kvec;
       }
     }
   }

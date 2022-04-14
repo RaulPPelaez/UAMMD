@@ -125,10 +125,10 @@ namespace uammd{
 	  }
 	  if(id>=(ncells.z*ncells.y*(ncells.x/2+1))) return;
 	  const int3 waveNumber = indexToWaveNumber(id, ncells);
-	  const real3 waveVector = waveNumberToWaveVector(waveNumber, grid.box.boxSize, shearStrain);
+	  const real3 waveVector = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
 	  const real B = greensFunction(waveVector, shearStrain,
 					hydrodynamicRadius, viscosity, split, eta, ncells);
-	  gridVels[id] = B*projectFourier(waveVector, gridForces[id]);
+	  gridVels[id] = B*projectFourier(shearWaveVector(waveVector, shearStrain), gridForces[id]);
 	}
 
 	/*Compute gaussian complex noise dW, std = prefactor -> ||z||^2 = <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
@@ -230,9 +230,9 @@ namespace uammd{
 	  /*Z = sqrt(B)·(I-k^k)·dW*/
 	  {// Compute for v_k wave number
 	    const int3 ik = indexToWaveNumber(id, nk);
-	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, shearStrain);
+	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
 	    const real B = greensFunction(k, shearStrain, hydrodynamicRadius, viscosity, split, eta, nk);
-	    gridVelsFourier[id] += sqrt(B)*projectFourier(k, noise);
+	    gridVelsFourier[id] += sqrt(B)*projectFourier(shearWaveVector(k, shearStrain), noise);
 	  }
 	  /*Compute for conjugate v_{N-k} if needed*/
 	  /*Take care of conjugate wave number -> v_{Nx-kx,Ny-ky, Nz-kz}*/
@@ -245,14 +245,14 @@ namespace uammd{
 	    int zc = (cell.z > 0)*(nk.z - cell.z);
 	    int id_conj =  xc + (nk.x/2 + 1)*(yc + zc*nk.y);
 	    const int3 ik = indexToWaveNumber(id_conj, nk);
-	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize, shearStrain);
+	    const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
 	    cufftComplex3 factor = noise;
 	    /*v_{N-k} = v*_k, so the complex noise must be conjugated*/
 	    factor.x.y *= real(-1.0);
 	    factor.y.y *= real(-1.0);
 	    factor.z.y *= real(-1.0);
 	    const real B = greensFunction(k, shearStrain, hydrodynamicRadius, viscosity, split, eta, nk);
-	    gridVelsFourier[id_conj] += sqrt(B)*projectFourier(k, factor);
+	    gridVelsFourier[id_conj] += sqrt(B)*projectFourier(shearWaveVector(k, shearStrain), factor);
 	  }
 	}
 
