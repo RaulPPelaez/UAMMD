@@ -100,7 +100,6 @@ namespace uammd{
 	int numberParticles = pg->getNumberParticles();
 	auto pos = pd->getPos(access::gpu, access::read);
 	auto force = pd->getForce(access::gpu, access::read);	
-	nearField->Mdot(force.begin(), MF, st);
 	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles,
 						   0.0, 0.0, st);
       }
