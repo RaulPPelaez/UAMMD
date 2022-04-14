@@ -83,21 +83,21 @@ namespace uammd{
 	  const real3 K_NUFFT = waveVector;
 	  const real3 K_Ewald = shearWaveVector(waveVector, shearStrain);
 	  /*Compute the scaling factor for this node*/
-	  double K_Ewald2 = dot(K_Ewald,K_Ewald);
-	  double K_NUFFT2 = dot(K_NUFFT,K_NUFFT);
-	  double kmod = sqrt(K_Ewald2);
-	  double invk2 = 1.0/K_Ewald2;
-	  double sink = sin(kmod*rh);
-	  double kEw2_invsplit2_4 = K_Ewald2/(4.0*split*split);
-	  double kNU2_invsplit2_4 = K_NUFFT2/(4.0*split*split);
+	  real K_Ewald2 = dot(K_Ewald,K_Ewald);
+	  real K_NUFFT2 = dot(K_NUFFT,K_NUFFT);
+	  real kmod = sqrt(K_Ewald2);
+	  real invk2 = real(1.0)/K_Ewald2;
+	  real sink = sin(kmod*rh);
+	  real kEw2_invsplit2_4 = K_Ewald2/(real(4.0)*split*split);
+	  real kNU2_invsplit2_4 = K_NUFFT2/(real(4.0)*split*split);
 	  /*The Hashimoto splitting function,
 	    split is the splitting between near and far contributions,
 	    eta is the splitting of the gaussian kernel used in the grid interpolation, see sec. 2 in [2]*/
 	  /*See eq. 11 in [1] and eq. 11 and 14 in [2]*/
 	  /* Modification for shear strain: the right exponential is 
 	     exp ((eta*kNUFFT^2- kEwald^2)/(4*xi^2)) */
-	  double tau = eta*kNU2_invsplit2_4-kEw2_invsplit2_4;
-	  double hashimoto = (1.0 + kEw2_invsplit2_4)*exp(tau)/K_Ewald2;
+	  real tau = eta*kNU2_invsplit2_4-kEw2_invsplit2_4;
+	  real hashimoto = (real(1.0) + kEw2_invsplit2_4)*exp(tau)/K_Ewald2;
 	  /*eq. 20.5 in [1]*/
 	  real B = sink*sink*invk2*hashimoto/(viscosity*rh*rh);
 	  B /= real(n.x*n.y*n.z);
@@ -128,7 +128,8 @@ namespace uammd{
 	  const real3 waveVector = waveNumberToWaveVector(waveNumber, grid.box.boxSize);
 	  const real B = greensFunction(waveVector, shearStrain,
 					hydrodynamicRadius, viscosity, split, eta, ncells);
-	  gridVels[id] = B*projectFourier(shearWaveVector(waveVector, shearStrain), gridForces[id]);
+	  gridVels[id] = projectFourier(shearWaveVector(waveVector, shearStrain),
+					B*gridForces[id]);
 	}
 
 	/*Compute gaussian complex noise dW, std = prefactor -> ||z||^2 = <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
