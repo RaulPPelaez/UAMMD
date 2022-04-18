@@ -131,8 +131,10 @@ namespace uammd{
 	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st);
 	if(par.printK0Mode){
 	  solutionZeroMode.resize(cellDim.z);
+	  Index3D indexer(cellDim.x/2+1, cellDim.y, cellDim.z);
+	  auto k0z = make_third_index_iterator(insideSolution.begin(), 0,0, indexer);
 	  thrust::copy(thrust::cuda::par.on(st),
-		       insideSolution.begin(), insideSolution.begin() + cellDim.z,
+		       k0z, k0z + cellDim.z,
 		       solutionZeroMode.begin());
 	}
 	auto gridFields = fct->inverseTransform(insideSolution, st);
