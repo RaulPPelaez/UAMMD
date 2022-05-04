@@ -55,3 +55,39 @@ You can define the following preprocessor macros to change compile options:
   * **-DUAMMD_DEBUG** Will enable CudaCheckError() calls. These calls imply a synchronization barrier and will halt the execution if an error is found with information about what went wrong. You can see these lines scattered all around the code base.  
   * **-DUSE_NVTX** Will enable nvtx ranges. If undefined (default) PUSH/POP_RANGE calls will be ignored. See utils/NVTXTools.h.  
   
+
+COMMON ERRORS
+---------------
+
+CUB and CUDA versions
+.....................
+
+You might get an error similar to this one:
+
+.. code:: bash
+
+	  
+	  thrust/system/cuda/config.h:79:2: error: #error The version of CUB in your include path is not compatible with this release of Thrust. CUB is now included in the CUDA Toolkit, so you no longer need to use your own checkout of CUB. Define THRUST_IGNORE_CUB_VERSION_CHECK to ignore this.
+	  
+CUB comes bundled with newer CUDA toolkits (11+) and interferes with the version stored under third_party. In that case simply remove or rename third_party/cub.
+
+Bug in GCC >11.2.1 with CUDA 11
+......................
+
+You might get an error containing something like:
+
+.. code:: bash
+
+    /usr/include/c++/11/bits/std_function.h:435:145: error: parameter packs not expanded with ‘...’:
+    435 |         function(_Functor&& __f)
+        |                                                                                                                                                 ^
+  /usr/include/c++/11/bits/std_function.h:435:145: note:         ‘_ArgTypes’
+  /usr/include/c++/11/bits/std_function.h:530:146: error: parameter packs not expanded with ‘...’:
+    530 |         operator=(_Functor&& __f)
+        |                                                                                                                                                  ^
+  /usr/include/c++/11/bits/std_function.h:530:146: note:         ‘_ArgTypes’
+
+
+This is a bug in GCC that prevents from compiling CUDA code. Related discussion: `https://github.com/pytorch/pytorch/issues/71518`_
+
+If you encounter this, downgrade GCC to 11.2.1 or use Clang 12 instead. Check in the CUDA documentation that you have valid versions of the different compilers: `https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements`_
