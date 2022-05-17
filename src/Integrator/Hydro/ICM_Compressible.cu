@@ -229,9 +229,25 @@ namespace uammd{
 	if(direction == subgrid::y) return {0,1,0};
 	if(direction == subgrid::z) return {0,0,1};
       }
+      
+      inline __host__  __device__ int pbc_cell_coord(int cell, int ncells) {
+	if(cell <= -1) cell += ncells;
+	else if(cell >= ncells) cell -= ncells;
+	return cell;
+      }
+
+      inline __host__  __device__ int3 pbc_cell(int3 cell, int3 cellDim){
+	int3 cellPBC;
+	cellPBC.x = pbc_cell_coord(cell.x, cellDim.x);
+	cellPBC.y = pbc_cell_coord(cell.y, cellDim.y);
+	cellPBC.z = pbc_cell_coord(cell.z, cellDim.z);
+	return cellPBC;
+    }
+
 
       template<class ScalarIterator>
       __device__ real fetchScalar(ScalarIterator scalar, int3 cell, int3 n){
+	cell = pbc_cell(cell, n);
 	int ic = linearIndex3D(cell, n);
 	return scalar[ic];
       }
@@ -656,6 +672,7 @@ namespace uammd{
     auto ICM_Compressible::callRungeKuttaSubStep(const DataXYZ &fluidForcingAtHalfStep,
 						 cached_vector<real2> &fluidStochasticTensor,
 						 FluidPointers fluidAtSubTime){
+      System::log<System::DEBUG>("[ICM_Compressible] Runge Kutta sub step %d", subStep);
       using namespace icm_compressible;
       FluidData fluidAtNewTime(grid);
       FluidPointers currentFluid(currentFluidDensity, currentFluidVelocity);
