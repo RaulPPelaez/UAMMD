@@ -165,11 +165,13 @@ namespace uammd{
 	bulkViscosity = par.bulkViscosity;
 	temperature = par.temperature;
 	seed = (par.seed==0)?sys->rng().next32():par.seed;
-	int3 ncells = make_int3(par.box.boxSize/0.91);
+	int3 ncells = make_int3(par.box.boxSize/(0.91*par.hydrodynamicRadius));
 	grid = Grid(par.box, ncells);
 	densityToPressure->isothermalSpeedOfSound = par.speedOfSound;
 	currentFluidDensity.resize(grid.getNumberCells());
+	thrust::fill(currentFluidDensity.begin(), currentFluidDensity.end(), 1.0);
 	currentFluidVelocity.resize(grid.getNumberCells());
+	currentFluidVelocity.fillWithZero();
       }
 
       void forwardTime() override;
