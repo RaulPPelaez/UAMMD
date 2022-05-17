@@ -172,6 +172,17 @@ namespace uammd{
 	thrust::fill(currentFluidDensity.begin(), currentFluidDensity.end(), 1.0);
 	currentFluidVelocity.resize(grid.getNumberCells());
 	currentFluidVelocity.fillWithZero();
+
+	System::log<System::MESSAGE>("[ICM_Compressible] dt: %g", dt);
+	System::log<System::MESSAGE>("[ICM_Compressible] shear viscosity: %g", shearViscosity);
+	System::log<System::MESSAGE>("[ICM_Compressible] bulk viscosity: %g", bulkViscosity);
+	System::log<System::MESSAGE>("[ICM_Compressible] isothermal speed of sound: %g", par.speedOfSound);
+	System::log<System::MESSAGE>("[ICM_Compressible] temperature: %g", temperature);
+	
+	System::log<System::MESSAGE>("[ICM_Compressible] Box size: %g %g %g", par.box.boxSize.x, par.box.boxSize.y, par.box.boxSize.z);
+	System::log<System::MESSAGE>("[ICM_Compressible] Fluid cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
+	System::log<System::MESSAGE>("[ICM_Compressible] seed: %ux", seed);
+	
       }
 
       void forwardTime() override;
