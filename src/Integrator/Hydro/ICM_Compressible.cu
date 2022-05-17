@@ -62,6 +62,7 @@ namespace uammd{
   namespace Hydro{
 
     auto ICM_Compressible::storeCurrentPositions(){
+      System::log<System::DEBUG>("[ICM_Compressible] Store current particle positions");
       int numberParticles = pg->getNumberParticles();
       ICM_Compressible::cached_vector<real4> v(numberParticles);
       auto pos = pd->getPos(access::gpu, access::read);
@@ -155,6 +156,7 @@ namespace uammd{
     }
 
     auto ICM_Compressible::interpolateFluidVelocityToParticles(const DataXYZ &fluidVelocity){
+      System::log<System::DEBUG>("[ICM_Compressible] Interpolate fluid velocities");
       using namespace icm_compressible;
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::gpu, access::read);
@@ -672,6 +674,7 @@ namespace uammd{
 
     void ICM_Compressible::updateFluidWithRungeKutta3(const DataXYZ &fluidForcingAtHalfStep,
 						      cached_vector<real2> &fluidStochasticTensor){
+      System::log<System::DEBUG>("[ICM_Compressible] Update fluid with RK3");
       auto fluidPrediction = callRungeKuttaSubStep<1>(fluidForcingAtHalfStep, fluidStochasticTensor);
       auto fluidAtHalfStep = callRungeKuttaSubStep<2>(fluidForcingAtHalfStep,
 						      fluidStochasticTensor, fluidPrediction.getPointers());
@@ -682,6 +685,7 @@ namespace uammd{
     }
 
     auto ICM_Compressible::computeStochasticTensor(){
+      System::log<System::DEBUG>("[ICM_Compressible] Compute stochastic tensor");
       using namespace icm_compressible;
       cached_vector<real2> fluidStochasticTensor(randomNumbersPerCell*grid.getNumberCells());
       auto fluidStochasticTensor_ptr = thrust::raw_pointer_cast(fluidStochasticTensor.data());
@@ -693,11 +697,13 @@ namespace uammd{
     }
 
     void ICM_Compressible::forwardFluidDensityAndVelocityToNextStep(const DataXYZ &fluidForcingAtHalfStep){
+      System::log<System::DEBUG>("[ICM_Compressible] Forward fluid to next step");
       auto fluidStochasticTensor = computeStochasticTensor();
       updateFluidWithRungeKutta3(fluidForcingAtHalfStep, fluidStochasticTensor);
     }
 
     auto ICM_Compressible::spreadCurrentParticleForcesToFluid(){
+      System::log<System::DEBUG>("[ICM_Compressible] Spread particle forces");
       using namespace icm_compressible;
       auto forces = pd->getForce(access::gpu, access::read);
       auto pos = pd->getPos(access::gpu, access::read);
@@ -708,12 +714,14 @@ namespace uammd{
     }
 
     void ICM_Compressible::updateParticleForces(){
+      System::log<System::DEBUG>("[ICM_Compressible] Compute particle forces");
       auto force = pd->getForce(access::gpu, access::write);
       thrust::fill(thrust::cuda::par, force.begin(), force.end(), real4());
       for(auto i: interactors) i->sum({.force=true});
     }
 
     auto ICM_Compressible::computeCurrentFluidForcing(){
+      System::log<System::DEBUG>("[ICM_Compressible] Compute fluid forcing");
       updateParticleForces();
       auto fluidForcing = spreadCurrentParticleForcesToFluid();
       addFluidExternalForcing(fluidForcing);
@@ -744,6 +752,7 @@ namespace uammd{
     }
     
     void ICM_Compressible::forwardPositionsToHalfStep(){
+      System::log<System::DEBUG>("[ICM_Compressible] Forward particles to n+1/2");
       auto velocities = interpolateFluidVelocityToParticles(currentFluidVelocity);
       auto pos = pd->getPos(access::gpu, access::readwrite);
       thrust::transform(thrust::cuda::par,
@@ -754,6 +763,7 @@ namespace uammd{
 
     void ICM_Compressible::forwardPositionsToNextStep(cached_vector<real4> positionsAtN,
 						      DataXYZ &fluidVelocitiesAtN){
+      System::log<System::DEBUG>("[ICM_Compressible] Forward particles to n+1");
       auto fluidVelocitiesAtMidStep = icm_compressible::sumVelocities(fluidVelocitiesAtN, currentFluidVelocity);
       auto velocities = interpolateFluidVelocityToParticles(fluidVelocitiesAtMidStep);
       auto pos = pd->getPos(access::gpu, access::readwrite);
@@ -765,6 +775,7 @@ namespace uammd{
     }
 
     void ICM_Compressible::forwardTime(){
+      System::log<System::DEBUG>("[ICM_Compressible] Forward time");
       auto positionsAtN = storeCurrentPositions();
       auto fluidVelocitiesAtN = currentFluidVelocity;
       forwardPositionsToHalfStep();
