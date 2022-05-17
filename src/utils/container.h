@@ -75,6 +75,10 @@ namespace uammd{
 	m_data = create(0);
 	capacity = 0;
       }
+
+      void swap(UninitializedCachedContainer<T> & another){
+        m_data.swap(another.m_data);
+      }
     };
   }
 
