@@ -46,15 +46,7 @@ namespace uammd{
 	  auto zip = thrust::make_zip_iterator(thrust::make_tuple(m_x.begin(), m_y.begin(), m_z.begin()));
 	  thrust::transform(input, input + size, zip, AoSToSoAReal3());
 	}
-	
-	// template<class VectorTypeIterator, std::enable_if<
-	// 	 std::is_same_v<typename std::iterator_traits<VectorTypeIterator>::value_type, real>
-	// 			, bool> = true>
-	// DataXYZ(VectorTypeIterator &input, int size):DataXYZ(size){
-	//   auto zip = thrust::make_zip_iterator(m_x.begin(), m_y.begin(), m_z.begin());
-	//   thrust::transform(input, input+size, zip, AoSToSoA());
-	// }
-	
+		
 	DataXYZ(int size){
 	  resize(size);
 	}
@@ -162,11 +154,21 @@ namespace uammd{
 	real hydrodynamicRadius = -1;
 	real dt = -1;
 	Box box;
+	uint seed = 0;
       };
       
       ICM_Compressible(std::shared_ptr<ParticleData> pd, Parameters par):
 	Integrator(pd, "ICM::Compressible"){
-
+	densityToPressure = std::make_shared<DensityToPressure>();
+	dt = par.dt;
+	shearViscosity = par.shearViscosity;
+	bulkViscosity = par.bulkViscosity;
+	temperature = par.temperature;
+	seed = (par.seed==0)?sys->rng().next32():par.seed;
+	int3 ncells = make_int3(par.box.boxSize/0.91);
+	grid = Grid(par.box, ncells);
+	currentFluidDensity.resize(grid.getNumberCells());
+	currentFluidVelocity.resize(grid.getNumberCells());
       }
 
       void forwardTime() override;
