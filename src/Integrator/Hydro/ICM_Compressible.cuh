@@ -43,7 +43,7 @@ namespace uammd{
 
 	template<class VectorTypeIterator>
 	DataXYZ(VectorTypeIterator &input, int size):DataXYZ(size){
-	  auto zip = thrust::make_zip_iterator(m_x.begin(), m_y.begin(), m_z.begin());
+	  auto zip = thrust::make_zip_iterator(thrust::make_tuple(m_x.begin(), m_y.begin(), m_z.begin()));
 	  thrust::transform(input, input + size, zip, AoSToSoAReal3());
 	}
 	
