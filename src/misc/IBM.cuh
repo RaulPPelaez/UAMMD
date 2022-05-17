@@ -107,7 +107,7 @@ namespace uammd{
     void spread(const PosIterator &pos, const QuantityIterator &v,
 		GridDataIterator &gridData,
 		WeightCompute &weightCompute,
-		int numberParticles, cudaStream_t st = 0){
+		int numberParticles, cudaStream_t st = 0) const{
       System::log<System::DEBUG2>("[IBM] Spreading");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
@@ -123,11 +123,11 @@ namespace uammd{
     template<bool is2D,
       class PosIterator, class ResultIterator, class GridQuantityIterator,
 	     class QuadratureWeights, class WeightCompute>
-    void gather(const PosIterator &pos, const ResultIterator &Jq,
+    void gather(const PosIterator &pos, ResultIterator &Jq,
 		const GridQuantityIterator &gridData,
 		const QuadratureWeights &qw,
 		const WeightCompute &wc,
-		int numberParticles, cudaStream_t st = 0){
+		int numberParticles, cudaStream_t st = 0) const{
       System::log<System::DEBUG2>("[IBM] Gathering");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
@@ -152,7 +152,7 @@ namespace uammd{
     }
 
     template<class ...T>
-    void gather(T... args){      
+    void gather(T... args) const{
       if(grid.cellDim.z == 1)
 	gather<true>(args...);
       else
@@ -160,16 +160,16 @@ namespace uammd{
     }
 
     template<class PosIterator, class ResultIterator, class GridQuantityIterator>
-    void gather(const PosIterator &pos, const ResultIterator &Jq,
-		const GridQuantityIterator &gridData,
-		int numberParticles, cudaStream_t st = 0){
+    void gather(PosIterator pos, ResultIterator Jq,
+	        GridQuantityIterator gridData,
+		int numberParticles, cudaStream_t st = 0) const{
       IBM_ns::DefaultQuadratureWeights qw;
       IBM_ns::DefaultWeightCompute wc;
       this->gather(pos, Jq, gridData, qw, wc, numberParticles, st);
     }
 
     template<class ...T>
-    void spread(T... args){      
+    void spread(T... args) const{
       if(grid.cellDim.z == 1)
 	spread<true>(args...);
       else
@@ -180,7 +180,7 @@ namespace uammd{
 	     class GridDataIterator>
     void spread(const PosIterator &pos, const QuantityIterator &v,
 		GridDataIterator &gridData,
-		int numberParticles, cudaStream_t st = 0){
+		int numberParticles, cudaStream_t st = 0) const{
       IBM_ns::DefaultWeightCompute wc;
       spread(pos, v, gridData, wc, numberParticles, st);
     }
