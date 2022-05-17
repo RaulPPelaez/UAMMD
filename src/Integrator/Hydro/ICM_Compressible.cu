@@ -526,9 +526,10 @@ namespace uammd{
 
       template<int subStep, subgrid alpha, subgrid beta>
       __device__ real getFlucutatingTensorElement(int3 cell_i, int3 n, const real2* noise){
+	cell_i = pbc_cell(cell_i, n);
 	const int id = linearIndex3D(cell_i, n);
 	constexpr real timePrefactorA = getFluctuatingTimeAPrefactor<subStep>();
-	const real timePrefactorB = getFluctuatingTimeBPrefactor<subStep>();
+	const real timePrefactorB = getFluctuatingTimeBPrefactor<subStep>();	
 	real2 W_AB = noise[n.x*n.y*n.z*getSymmetric3x3Index<alpha,beta>() + id];
 	return timePrefactorA*W_AB.x + timePrefactorB*W_AB.y;
       }
