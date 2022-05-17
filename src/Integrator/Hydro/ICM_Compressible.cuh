@@ -167,6 +167,7 @@ namespace uammd{
 	seed = (par.seed==0)?sys->rng().next32():par.seed;
 	int3 ncells = make_int3(par.box.boxSize/0.91);
 	grid = Grid(par.box, ncells);
+	densityToPressure->isothermalSpeedOfSound = par.speedOfSound;
 	currentFluidDensity.resize(grid.getNumberCells());
 	currentFluidVelocity.resize(grid.getNumberCells());
       }
