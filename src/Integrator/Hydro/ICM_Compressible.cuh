@@ -77,7 +77,7 @@ namespace uammd{
 	Iterator z()const{return thrust::raw_pointer_cast(m_z.data());}
 	
         auto xyz() const{
-	  auto zip = thrust::make_zip_iterator(x(), y(), z());
+	  auto zip = thrust::make_zip_iterator(thrust::make_tuple(x(), y(), z()));
 	  const auto tr = thrust::make_transform_iterator(zip, SoAToAoSReal3());
 	  return tr;
 	}
@@ -111,7 +111,7 @@ namespace uammd{
 	__host__ __device__ Iterator z()const{return m_z;}
 
 	__host__ __device__ auto xyz() const{
-	  auto zip = thrust::make_zip_iterator(x(), y(), z());
+	  auto zip = thrust::make_zip_iterator(thrust::make_tuple(x(), y(), z()));
 	  const auto tr = thrust::make_transform_iterator(zip, SoAToAoSReal3());
 	  return tr;
 	}
