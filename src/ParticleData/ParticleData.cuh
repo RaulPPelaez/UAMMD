@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2021. ParticleData.
+/*Raul P. Pelaez 2019-2022. ParticleData.
   Handles and stores all properties a particle can have.
   However they are only initialized when they are asked for the first time.
   Offers a way to access this properties.
@@ -137,11 +137,11 @@ namespace uammd{
 
   template<class T> using signal = typename nod::unsafe_signal<T>;
   using connection = nod::connection;
-  /*
-    UAMMD uses this class to handle particle information, such as positions, forces, charges,...
-    Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from
-    CPU or GPU transparently.
-  */
+
+  //A GPU-CPU multicontainer for particle properties.
+  //UAMMD uses this class to handle particle information, such as positions, forces, charges,...
+  //Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from
+  //CPU or GPU transparently.
   class ParticleData{
   public:
     //Hints to ParticleData about how to perform different task. Mainly how to sort the particles.
