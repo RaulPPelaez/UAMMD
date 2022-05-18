@@ -5,7 +5,7 @@ UAMMD is header-only, so a module is compiled only when its header is included. 
 
 **In order to compile a file that includes an UAMMD module you will need the following external dependencies**:  
 
-  #. CUDA 7.5+  (https://developer.nvidia.com/cuda-downloads )  
+  #. CUDA 8.0+  (https://developer.nvidia.com/cuda-downloads )  
   #. A C++ compiler with C++14 support (g++ 5+ will probably do)  
   #. Thrust (The version shipped with the cuda release will do)  
   #. LAPACKE/CBLAS or Intel MKL (For some modules only)  
@@ -91,3 +91,16 @@ You might get an error containing something like:
 This is a bug in GCC that prevents from compiling CUDA code. Related discussion: `https://github.com/pytorch/pytorch/issues/71518`_
 
 If you encounter this, downgrade GCC to 11.2.1 or use Clang 12 instead. Check in the CUDA documentation that you have valid versions of the different compilers: `https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements`_
+
+
+Compiling with MKL
+.....................
+
+Some UAMMD headers require LAPACK and/or BLAS functions. Many systems lack the LAPACKE and/or CBLAS libraries and instead provide Intel's MKL. UAMMD allows to use MKL if you define the USE_MKL macro (by passing -DUSE_MKL when compiling an code including some UAMMD header). 
+Then, instead of linking with lapacke/cblas (for instance with -llapacke -lcblas) you will need to set up a compilation line using intel's mkl link line advisor:
+
+`https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html`_
+
+Which will provide you with a set of flags, for instance: :code:`-L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl`
+
+   
