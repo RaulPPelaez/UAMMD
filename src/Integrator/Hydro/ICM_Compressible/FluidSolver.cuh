@@ -24,7 +24,7 @@ Where U might be the density or the fluid velocity and (a,b,c) are three
 different time points inside a time step In order to go from the time step n to
 n+1 the solver must be called three times for the density and then the velocity:
  1- a=0, b=n and c=n+1/3
- 2- a=3/4, b=1/4 and c=n+2/2
+ 2- a=3/4, b=1/4 and c=n+2/3
  3- a=1/3, b=2/3 and c=n+1
 
 In both cases, we can define \Delta U = -dt\nabla\cdot\tens{F} + dt\vec{f}
