@@ -88,18 +88,21 @@ You might get an error containing something like:
   /usr/include/c++/11/bits/std_function.h:530:146: note:         ‘_ArgTypes’
 
 
-This is a bug in GCC that prevents from compiling CUDA code. Related discussion: `https://github.com/pytorch/pytorch/issues/71518`_
+This is a bug in GCC that prevents from compiling CUDA code. Related discussion: https://github.com/pytorch/pytorch/issues/71518
 
-If you encounter this, downgrade GCC to 11.2.1 or use Clang 12 instead. Check in the CUDA documentation that you have valid versions of the different compilers: `https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements`_
+If you encounter this, downgrade GCC to 11.2.1 or use Clang 12 instead. Check in the CUDA documentation that you have valid versions of the different compilers: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements
 
 
 Compiling with MKL
 .....................
 
-Some UAMMD headers require LAPACK and/or BLAS functions. Many systems lack the LAPACKE and/or CBLAS libraries and instead provide Intel's MKL. UAMMD allows to use MKL if you define the USE_MKL macro (by passing -DUSE_MKL when compiling an code including some UAMMD header). 
+Some UAMMD headers require LAPACK and/or BLAS functions. Many systems lack the LAPACKE and/or CBLAS libraries and instead provide Intel's MKL. UAMMD allows to use MKL if you define the USE_MKL macro (by passing -DUSE_MKL when compiling an code including some UAMMD header).
+
 Then, instead of linking with lapacke/cblas (for instance with -llapacke -lcblas) you will need to set up a compilation line using intel's mkl link line advisor:
 
-`https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html`_
+
+https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
+
 
 Which will provide you with a set of flags, for instance: :code:`-L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl`
 
