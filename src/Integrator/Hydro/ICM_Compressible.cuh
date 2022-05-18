@@ -86,7 +86,7 @@ namespace uammd{
 	  return isothermalSpeedOfSound*isothermalSpeedOfSound*density;
 	}
       };
-      
+
       struct RandGen{
 	uint s1, s2;
 	real temperature, dV;
@@ -96,7 +96,7 @@ namespace uammd{
 	__device__ real operator()(int id){
 	  Saru rng (s1, s2, id);
 	  real x = rng.gf(0,1).x;
-	  return sqrt(temperature/dV)*x;	  
+	  return sqrt(temperature/dV)*x;
 	}
       };
 
@@ -105,9 +105,9 @@ namespace uammd{
 	real3 pos = (make_real3(cell)/make_real3(n)+0.5)*L;
 	return pos;
       }
-      
+
     }
-    
+
     class ICM_Compressible: public Integrator{
       template<class T>
       using cached_vector = icm_compressible::cached_vector<T>;
@@ -131,7 +131,7 @@ namespace uammd{
 	std::function<real(real3)> initialVelocityY;
 	std::function<real(real3)> initialVelocityZ;
       };
-      
+
       ICM_Compressible(std::shared_ptr<ParticleData> pd, Parameters par):
 	Integrator(pd, "ICM::Compressible"){
 	densityToPressure = std::make_shared<DensityToPressure>();
@@ -145,7 +145,7 @@ namespace uammd{
 	if(par.hydrodynamicRadius>0){
 	  //0.91 only works for Peskin three point
 	  ncells = make_int3(par.boxSize/(0.91*par.hydrodynamicRadius));
-	}	
+	}
 	grid = Grid(Box(par.boxSize), ncells);
 	densityToPressure->isothermalSpeedOfSound = par.speedOfSound;
 	printInitialMessages(par);
@@ -189,7 +189,7 @@ namespace uammd{
 	if((par.cellDim.x <= 0 and par.hydrodynamicRadius <=0)
 	   or (par.cellDim.x > 0 and par.hydrodynamicRadius >0)){
 	  throw std::runtime_error("[ICM_Compressible] I need either an hydrodynamic radius or a number of cells");
-	}	
+	}
       }
 
       void printInitialMessages(Parameters par) const{
@@ -197,15 +197,15 @@ namespace uammd{
 	System::log<System::MESSAGE>("[ICM_Compressible] shear viscosity: %g", shearViscosity);
 	System::log<System::MESSAGE>("[ICM_Compressible] bulk viscosity: %g", bulkViscosity);
 	System::log<System::MESSAGE>("[ICM_Compressible] isothermal speed of sound: %g", par.speedOfSound);
-	System::log<System::MESSAGE>("[ICM_Compressible] temperature: %g", temperature);	
+	System::log<System::MESSAGE>("[ICM_Compressible] temperature: %g", temperature);
 	System::log<System::MESSAGE>("[ICM_Compressible] Box size: %g %g %g", par.boxSize.x, par.boxSize.y, par.boxSize.z);
 	System::log<System::MESSAGE>("[ICM_Compressible] Fluid cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
 	const real effective_a = 0.91*(grid.cellDim.x/par.boxSize.x);
 	const real d0 = par.temperature/(6*M_PI*par.shearViscosity*effective_a);
-	System::log<System::MESSAGE>("[ICM_Compressible] Expected long time particle self diffusion coefficient : %g", d0);	
+	System::log<System::MESSAGE>("[ICM_Compressible] Expected long time particle self diffusion coefficient : %g", d0);
 	System::log<System::MESSAGE>("[ICM_Compressible] seed: %u", seed);
       }
-      
+
       void initializeFluid(Parameters par){
 	currentFluidDensity.resize(grid.getNumberCells());
 	currentFluidVelocity.resize(grid.getNumberCells());
@@ -215,7 +215,7 @@ namespace uammd{
 	std::vector<real> d_h(ncells, defaultDensity);
 	std::vector<real> d_vx(ncells, defaultVelocity);
 	std::vector<real> d_vy(ncells, defaultVelocity);
-	std::vector<real> d_vz(ncells, defaultVelocity);	
+	std::vector<real> d_vz(ncells, defaultVelocity);
 	for(int i = 0; i<ncells; i++){
 	  real3 pos = icm_compressible::cellIndex2CenterPos(i, grid.cellDim, grid.box.boxSize);
 	  if(par.initialDensity) d_h[i] = par.initialDensity(pos);
@@ -228,13 +228,13 @@ namespace uammd{
 	thrust::copy(d_vy.begin(), d_vy.end(), currentFluidVelocity.y());
 	thrust::copy(d_vz.begin(), d_vz.end(), currentFluidVelocity.z());
       }
-      
+
       auto storeCurrentPositions();
       void forwardPositionsToHalfStep();
       auto computeCurrentFluidForcing();
        void updateParticleForces();
        auto spreadCurrentParticleForcesToFluid();
-      
+
       auto interpolateFluidVelocityToParticles(const DataXYZ &fluidVelocities);
       void forwardFluidDensityAndVelocityToNextStep(const DataXYZ &fluidForcingAtHalfStep);
       auto computeStochasticTensor();
@@ -255,7 +255,7 @@ namespace uammd{
       uint seed = 1234;
     };
 
-  }  
+  }
 }
 #include"ICM_Compressible.cu"
 #endif

@@ -27,7 +27,7 @@ namespace uammd{
       auto vel = staggered::interpolateFluidVelocities(fluidVelocity, pos.begin(), kernel, numberParticles, grid);
       return vel;
     }
-    
+
     auto ICM_Compressible::spreadCurrentParticleForcesToFluid(){
       System::log<System::DEBUG2>("[ICM_Compressible] Spread particle forces");
       using namespace icm_compressible;
@@ -110,9 +110,9 @@ namespace uammd{
       // thrust::transform(fluidForcingAtHalfStep.x(),
       // 			fluidForcingAtHalfStep.x() + fluidForcingAtHalfStep.size(),
       // 			fluidForcingAtHalfStep.x(),
-      // 			[=]__device__(real fx){ return fx +=1; });			
+      // 			[=]__device__(real fx){ return fx +=1; });
     }
-    
+
     auto ICM_Compressible::computeCurrentFluidForcing(){
       System::log<System::DEBUG2>("[ICM_Compressible] Compute fluid forcing");
       updateParticleForces();
@@ -131,7 +131,7 @@ namespace uammd{
 
 	__device__ auto operator()(real4 p, real3 v){
 	  return make_real4(make_real3(p)+real(0.5)*dt*v, p.w);
-	}       
+	}
       };
 
       auto sumVelocities(const DataXYZ &v1, const DataXYZ &v2){
@@ -139,7 +139,7 @@ namespace uammd{
 	DataXYZ v3(size);
 	thrust::transform(thrust::cuda::par, v1.x(), v1.x() + size, v2.x(), v3.x(), thrust::plus<real>());
 	thrust::transform(thrust::cuda::par, v1.y(), v1.y() + size, v2.y(), v3.y(), thrust::plus<real>());
-	thrust::transform(thrust::cuda::par, v1.z(), v1.z() + size, v2.z(), v3.z(), thrust::plus<real>());			
+	thrust::transform(thrust::cuda::par, v1.z(), v1.z() + size, v2.z(), v3.z(), thrust::plus<real>());
 	return v3;
       }
     }

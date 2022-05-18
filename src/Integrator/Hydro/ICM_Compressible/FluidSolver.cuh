@@ -54,7 +54,7 @@ namespace uammd{
   namespace Hydro{
     namespace icm_compressible{
 
-      //Returns -nabla\cdot\vec{g}dt. Being \vec{g} = \rho\vec{v} the fluid momentum.      
+      //Returns -nabla\cdot\vec{g}dt. Being \vec{g} = \rho\vec{v} the fluid momentum.
       __device__ real computeDensityIncrement(int3 cell_i, FluidPointers fluid, real dt, Grid grid){
 	const real3 h = grid.getCellSize(cell_i);
 	const auto n = grid.cellDim;
@@ -94,7 +94,7 @@ namespace uammd{
 	momentumIncrement -= computeDeterministicStressDivergence(cell_i, fluid, par, densityToPressure, grid);
 	return -par.dt*momentumIncrement;
       }
-      
+
       class RungeKutta3{
 	real timePrefactorA, timePrefactorB;
 	auto setTimePrefactors(int subStep){
@@ -184,4 +184,4 @@ namespace uammd{
     }
   }
 }
-#endif  
+#endif

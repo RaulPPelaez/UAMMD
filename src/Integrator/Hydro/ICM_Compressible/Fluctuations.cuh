@@ -65,7 +65,7 @@ namespace uammd{
 	  return derivative_beta;
 	}
       }
-      
+
       template<int subStep, subgrid alpha>
       __device__ real computeFluctuatingDerivativeElement(int3 cell_i, const real2* fluidStochasticTensor, Grid grid){
 	const auto n = grid.cellDim;

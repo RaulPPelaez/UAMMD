@@ -18,7 +18,7 @@ namespace uammd{
 	  }
 
 	};
-            
+
 	template<class PositionIterator>
 	auto make_shift_iterator(const PositionIterator &positions, real3 shift){
 	  return thrust::make_transform_iterator(positions, ShiftTransform(shift));
@@ -92,6 +92,6 @@ namespace uammd{
 	}
       }
     }
-  }  
+  }
 }
 #endif

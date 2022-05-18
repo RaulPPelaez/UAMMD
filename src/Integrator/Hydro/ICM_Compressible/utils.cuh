@@ -10,7 +10,7 @@
 namespace uammd{
   namespace Hydro{
     namespace icm_compressible{
-      
+
       template<class T>
       using cached_vector = uammd::uninitialized_cached_vector<T>;
 
@@ -28,10 +28,10 @@ namespace uammd{
       };
 
       struct ToReal3{template<class T> __device__ real3 operator()(T v){return make_real3(v);}};
-      
+
       struct DataXYZ{
         uninitialized_cached_vector<real> m_x, m_y, m_z;
-	
+
 	DataXYZ():DataXYZ(0){}
 
 	template<class VectorTypeIterator>
@@ -39,7 +39,7 @@ namespace uammd{
 	  auto zip = thrust::make_zip_iterator(thrust::make_tuple(m_x.begin(), m_y.begin(), m_z.begin()));
 	  thrust::transform(input, input + size, zip, AoSToSoAReal3());
 	}
-		
+
 	DataXYZ(int size){
 	  resize(size);
 	}
@@ -49,7 +49,7 @@ namespace uammd{
 	  m_y.resize(newSize);
 	  m_z.resize(newSize);
 	}
-	
+
 	void fillWithZero() const{
 	  thrust::fill(m_x.begin(), m_x.end(), 0);
 	  thrust::fill(m_y.begin(), m_y.end(), 0);
@@ -60,7 +60,7 @@ namespace uammd{
 	Iterator x()const{return thrust::raw_pointer_cast(m_x.data());}
 	Iterator y()const{return thrust::raw_pointer_cast(m_y.data());}
 	Iterator z()const{return thrust::raw_pointer_cast(m_z.data());}
-	
+
         auto xyz() const{
 	  auto zip = thrust::make_zip_iterator(thrust::make_tuple(x(), y(), z()));
 	  const auto tr = thrust::make_transform_iterator(zip, SoAToAoSReal3());
@@ -76,7 +76,7 @@ namespace uammd{
 	void clear(){
 	  m_x.clear();
 	  m_y.clear();
-	  m_z.clear();	  
+	  m_z.clear();
 	}
 
 	auto size() const{
@@ -138,7 +138,7 @@ namespace uammd{
 	real shearViscosity, bulkViscosity;
 	real dt;
       };
-      
+
       __device__ int3 getCellFromThreadId(int id, int3 n){
 	const int3 cell = make_int3(id%n.x, (id/n.x)%n.y, id/(n.x*n.y));
 	return cell;
@@ -178,7 +178,7 @@ namespace uammd{
 	if(direction == subgrid::y) return fluid.velocityY;
 	if(direction == subgrid::z) return fluid.velocityZ;
       }
-      
+
     }
   }
 }

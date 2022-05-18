@@ -14,7 +14,7 @@ the position \vec{r}_i. Then, the different fields, corresponding to cell
 
   - p_\vec{i} \rightarrow \vec{r}_\vec{i}
   - \vec{v}^\alpha_{\vec{i}} \rightarrow \vec{r}_\vec{i} + h/2\vec{\alpha}
-  - \tens{E}^{\alpha\beta}_{\vec{i}} \rightarrow \vec{r}_\vec{i} +
+  - \tens{E}^{\alpha\beta}_{\vec{i}} \rightarrow \vec{r}_\vec{i}
               h/2\vec{\alpha} + h/2\vec{\beta}
 
 Where \vec{\alpha} and \vec{\beta} are the unit vectors in those directions and
@@ -46,7 +46,7 @@ defined at the vector subgrids).
 + p_\vec{i})*v^\alpha_\vec{i}
 
 For more information, check out Raul's manuscript.
-  
+
  */
 #ifndef ICM_COMPRESSIBLE_SPATIALDISCRETIZATION_CUH
 #define ICM_COMPRESSIBLE_SPATIALDISCRETIZATION_CUH
@@ -66,7 +66,7 @@ namespace uammd{
 	  if(direction == subgrid::z) return {0,0,1};
 	}
 
-	//Interpolates an scalar (defined at cell centers) in staggered grid to the position of a vector (cell faces) in the provided direction.	
+	//Interpolates an scalar (defined at cell centers) in staggered grid to the position of a vector (cell faces) in the provided direction.
 	template<subgrid direction, class ScalarIterator>
 	__device__ real interpolateScalar(ScalarIterator scalar, int3 cell, int3 n){
 	  const auto si = fetchScalar(scalar, cell, n);
@@ -164,7 +164,7 @@ namespace uammd{
 	divergence += momentumDivergenceElement<subgrid::z>(cell_i, n, fluid, h.z);
 	return divergence;
       }
-      
+
       //The gradient of the divergence is a vector with components given by:
       //(GDv)^\alpha = 1/h_alpha\partial_\alpha( (D\vec{v})_{i+\alpha} - (D\vec{v})_i ).g
       //This function computes the element \alpha, which is a sum with three elements.
@@ -226,7 +226,7 @@ namespace uammd{
 	tensorDivergence += kineticTensorDivergenceSubElement<alpha, subgrid::z>(cell_i, n, fluid, h.z);
 	return tensorDivergence;
       }
-      
+
       //Returns \vec{K}=\nabla\cdot(\vec{g}\otimes\vec{v}), being \vec{g} = \rho\vec{v} the momentum.
       //The divergence of a tensor is applied elementwise, K^\alpha = \nabla\cdot(g^\alpha\vec{v})
       __device__ real3 computeKineticDerivative(int3 cell_i, FluidPointers fluid, Grid grid){
@@ -298,13 +298,13 @@ namespace uammd{
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id >= n.x*n.y*n.z) return;
 	auto cell_i = getCellFromThreadId(id, n);
-	real vx_np12 = fetchScalar(staggeredVelocity.x(), cell_i, n);	
+	real vx_np12 = fetchScalar(staggeredVelocity.x(), cell_i, n);
 	real vx_nm12 = fetchScalar(staggeredVelocity.x(), cell_i-staggered::getSubgridOffset<subgrid::x>(), n);
 	real vx = real(0.5)*(vx_np12 + vx_nm12);
-	real vy_np12 = fetchScalar(staggeredVelocity.y(), cell_i, n);	
+	real vy_np12 = fetchScalar(staggeredVelocity.y(), cell_i, n);
 	real vy_nm12 = fetchScalar(staggeredVelocity.y(), cell_i-staggered::getSubgridOffset<subgrid::y>(), n);
 	real vy = real(0.5)*(vy_np12 + vy_nm12);
-	real vz_np12 = fetchScalar(staggeredVelocity.z(), cell_i, n);	
+	real vz_np12 = fetchScalar(staggeredVelocity.z(), cell_i, n);
 	real vz_nm12 = fetchScalar(staggeredVelocity.z(), cell_i-staggered::getSubgridOffset<subgrid::z>(), n);
 	real vz = real(0.5)*(vz_np12 + vz_nm12);
 	collocatedVelocity[id] = {vx,vy,vz};
