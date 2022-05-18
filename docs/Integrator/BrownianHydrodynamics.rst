@@ -497,7 +497,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 Fluctuating Immersed Boundary
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Identical to :ref:`FCM`, but using a staggered grid [10]_.
+Identical to :ref:`FCM`, but using a :ref:`staggered grid<Staggered grid>` [10]_.
 
 .. todo:: fill
 
