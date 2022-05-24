@@ -174,6 +174,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
       default_options<<"outputFile /dev/stdout"<<std::endl;
       default_options<<"temperature 1.0"<<std::endl;
       default_options<<"friction 1"<<std::endl;
+      default_options<<"rcutmult 1.2"<<std::endl;
       default_options<<"periodicity 1 1 1"<<std::endl;
     }
   }
