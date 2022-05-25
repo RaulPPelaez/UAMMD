@@ -47,7 +47,7 @@ You can request the current indices of the particles in a group with:
 #include"ParticleData.cuh"
 #include<thrust/device_vector.h>
 #include<vector>
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 #include"third_party/type_names.h"
 #include<memory>
 namespace uammd{

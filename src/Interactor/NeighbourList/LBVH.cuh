@@ -53,7 +53,7 @@ pp. 95–102.
 #include<thrust/gather.h>
 #include<thrust/for_each.h>
 
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 
 #include<limits>
 #include<fstream>
