@@ -3,7 +3,7 @@
  */
 #include"IBM.cuh"
 #include<type_traits>
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 #include"utils/atomics.cuh"
 namespace uammd{
   namespace IBM_ns{
