@@ -24,8 +24,7 @@
 #ifndef TABULATEDFUNCTION_CUH
 #define TABULATEDFUNCTION_CUH
 
-#include "cub/iterator/cache_modified_input_iterator.cuh"
-#include "cub/thread/thread_load.cuh"
+#include "third_party/uammd_cub.cuh"
 #include"global/defines.h"
 #include"utils/debugTools.h"
 #include <vector>
