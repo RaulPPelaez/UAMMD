@@ -19,7 +19,7 @@ Additionally, UAMMD makes use of the following external libraries, **which are a
   * nod (https://github.com/fr00b0/nod ) (A lightweight C++11 signal/slot library)
   * SaruPRNG (http://dx.doi.org/10.1016/j.cpc.2012.12.003 ) (A parallel friendly RNG)
     
-\*cub 1.8.0 might give compilation errors for GPU arquitecture < 30. If you need to compile for these arquitectures please replace cub for a previous version. cub is included with CUDA starting with CUDA 11, if you are using an older CUDA installation you must place cub in the include path (for example by renaming cub_bak to cub in third_party).
+\*cub 1.8.0 might give compilation errors for GPU arquitecture < 30. If you need to compile for these arquitectures please replace cub for a previous version. cub is included with CUDA starting with CUDA 11, if you are using an older CUDA installation and get some related compilation problem, check third_party/uammd_cub.cuh.
 
 Each module might need a different set of libraries and/or compiler flags, specified in the header of each module.
 
@@ -68,8 +68,7 @@ You might get an error similar to this one:
 
 	  
 	  thrust/system/cuda/config.h:79:2: error: #error The version of CUB in your include path is not compatible with this release of Thrust. CUB is now included in the CUDA Toolkit, so you no longer need to use your own checkout of CUB. Define THRUST_IGNORE_CUB_VERSION_CHECK to ignore this.
-	  
-CUB comes bundled with newer CUDA toolkits (11+) and interferes with the version stored under third_party. In that case simply remove or rename third_party/cub.
+
 
 Bug in GCC >11.2.1 with CUDA 11
 ......................
