@@ -69,6 +69,7 @@ You might get an error similar to this one:
 	  
 	  thrust/system/cuda/config.h:79:2: error: #error The version of CUB in your include path is not compatible with this release of Thrust. CUB is now included in the CUDA Toolkit, so you no longer need to use your own checkout of CUB. Define THRUST_IGNORE_CUB_VERSION_CHECK to ignore this.
 
+This error might arise if the mechanism UAMMD uses to include cub in older CUDA versions fails and :code:`third_party/cub_bak` is included instead (in which case the version provided by the CUDA installation should be used). In order to fix this, start looking in the file :code:`third_party/cub_bak`.
 
 Bug in GCC >11.2.1 with CUDA 11
 ......................
