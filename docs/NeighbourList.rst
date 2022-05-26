@@ -153,8 +153,74 @@ Two other arrays are provided providing, for each cell, the index of the first a
       A value in cellStart less than VALID_CELL means the cell is empty. Subject to change between updates.
 
 
+.. cpp:class:: CellListBase
 
-Verlet list
+   This class exposes the same functions as :cpp:any:`CellList`, but it does not depend on :ref:`ParticleData` (to facilitate its usage outside the ecosystem). In particular, this class offers an alternative constructor and update function.
+
+   
+   .. cpp:function:: CellListBase();
+
+      Default constructor.
+      
+      
+   .. cpp:member:: template<class PositionIterator>  void update(PositionIterator pos, int numberParticles, Grid grid, cudaStream_t st = 0);
+
+      This function works similar to :cpp:any:`NeighbourList::update`, but constructs the list based on the contents of the provided :cpp:`pos` iterator and grid.
+
+      
+Example
+...........
+
+The different ways of using a :ref:`CellList` in UAMMD.
+
+.. code:: cpp
+
+  #include<uammd.cuh>
+  #include<Interactor/NeighbourList/CellList.cuh>
+  using namespace uammd;
+  
+  //Construct a list using the UAMMD ecosystem
+  void constructListWithUAMMD(UAMMD sim){
+    //Create the list object
+    //It is wise to create once and store it
+    CellList cl(sim.pd);
+    //Update the list using the current positions in sim.pd
+    cl.update(sim.par.box, sim.par.rcut);
+    //Now the list can be used via the
+    //  various common interfaces
+    //-Providing a Transverser:
+    //cl.transverseList(some_transverser);
+    //-Requesting a NeighbourContainer
+    auto nc = cl.getNeighbourContainer();
+    //Or by getting the internal structure of the Cell List
+    auto cldata = cl.getCellList();
+  }
+  //Construct a CellList without UAMMD
+  template<class Iterator>
+  void constructListWithPositions(Iterator positions, 
+                                  int numberParticles,
+                                  real3 boxSize, 
+                                  int3 numberCells){
+    //Create the list object
+    //It is wise to create once and store it
+    CellListBase cl;
+    //CellListBase requires specific cell 
+    // dimensions for its construction
+    Grid grid(Box(boxSize), numberCells);
+    //Update the list using the positions
+    cl.update(positions, numberParticles, grid);
+    //Now the internal structure of the Cell List
+    // can be requested
+    auto cldata = cl.getCellList();
+    //And a NeighbourContainer can be constructed from it
+    auto nc = CellList_ns::NeighbourContainer(cldata);
+  }	  
+
+.. note:: Here the :cpp:`UAMMD` struct contains an instance of :ref:`ParticleData` and a series of parameters related to this particular example.
+  
+.. hint:: This example makes use of the :ref:`Transverser` and :ref:`NeighbourContainer<NeighbourContainer>` interfaces.
+  
+VerletList
 ~~~~~~~~~~~~
 
 This list uses :ref:`CellList` to construct a neighbour list up to a distance :math:`r_{s} > r_{cut}`, in this case the list only has to be reconstructed when any given particle has travelled more than a threshold distance,
@@ -298,6 +364,9 @@ The different ways of using a :ref:`VerletList`.
     int nbuild = vl.getNumberOfStepsSinceLastUpdate();
   }
 
+
+.. note:: Here the :cpp:`UAMMD` struct contains an instance of :ref:`ParticleData` and a series of parameters related to this particular example.
+
 .. hint:: The :ref:`Transverser` and :ref:`NeighbourContainer<NeighbourContainer>` options are identical to the case of a :ref:`CellList`.
 
   
@@ -305,8 +374,59 @@ Linear Bounding Volume Hierarchy list (LBVH)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
+The Linear Bounding Volume Hierarchy (LBVH) neighbour list works by partitioning space into boxes according to a tree hierarchy in such a way that interacting pairs of particles can be located quickly. The innermost level of partitioning encases single particles, and boxes sharing faces are hierarchically bubbled together to form a tree structure. In contrast, the cell list partitions space in identical cubes independently of the particles positions or their distribution inside the domain. The "object awareness" of the LBVH results in a better handling of systems with large density fluctuations or objects of highly different size.
 
-      
+.. note:: In contrast, the cell list is not aware of the size of the particles, only accepting a cut off distance. If a system contains particles of different sizes (and therefore interaction cut offs), the cell list must be constructed using the largest one. In the presence of large size disparities (say a set of large particles interacting with tiny ones), a lot of unnecessary particle pairs will be visited (in particular when checking the neighbours of a tiny particle).
+
+	  
+A full detailed description of the algorithm is beautifully laid out in detail in references [Howard2016]_, [Howard2019]_ and [Torres2009]_, with only minor modifications to them present in UAMMD's implementation.
+
+A brief summary of the algorithm:
+  * We start by assigning a different type to each particle based on its size (understanding that if particles have not been assigned a size, they will all have the same type).
+  * Then, we sort the particles by assigning a hash to each one in a way such that two given particles of the same type that are close in physical space tend to be close in memory. We achieve this by sorting particles first by type and then by Z-order hash (actually, UAMMD uses the Morton hash presented at \ref{alg:mortonhash]_, encoding the type in the last two bits, which are typically unused).
+  * The sorted particle hashes are included in a binary tree structure following Karra's algorithm [Karras2012]_. By including the type in the particle hashing, we can generate a single tree, ensuring that a different subtree is constructed for each type. The root of the subtree for each type can be then identified by descending the tree. This appears to scale well with the number of types when compared to generating an entirely new tree for every type as in [Howard2016]_, [Howard2019]_.
+  * After, we Assign an Axis Aligned Bounding Box (AABB) to each node of the tree that joins the AABBs of the nodes below it (with the particles, aka leaf nodes, being at the innermost level). This is done using Karra's algorithm [Karras2012]_. The AABBs are stored in a ``quantized'' manner that allows to store a node in a single int4, improving traversal time [Howard2019]_. The bubbling of boxes stops at the root of every type subtree.
+  * Finally, the neighbours of a given particle are found by traversing the AABB subtrees of every type [Torres2009]_.
+
+
+Tree traversal is carried out in a top-down approach, where each particle starts by checking its distance to the root of a given subtree and subsequently descending as needed. If a particle's AABB overlaps a node within a given cut off, the algorithm goes to the next child node, otherwise it skips to the next node/tree.
+For a given particle, overlap with the 27 (in 3D) periodic images of the current subtree is computed before traversal of a tree and encoded in a single integer to reduce divergence (except the main box, which is traversed first by default) (see [Howard2019]_).
+After a type subtree is entirely processed, the process is repeated with next one until none remain.
+
+In my personal experience, the sheer raw power of the cell list in the GPU makes this algorithm not worth the effort in general. Note, however, that this algorithm is bound to outperform the cell list in certain situations, mainly when the size disparities between the different particles in the simulation is pronounced (as in the largest particle having at least twice the size of the smallest) or when the configuration presents a very low density (in terms of the cut-off distance of the interaction).
+
+
+
+Example
+..........
+
+The interface for this neighbour list in UAMMD is more restricted than those of the previously introduced ones. The reason for this being its, yet to be found, applicability in our simulations. Nonetheless, it can be used in any place where :ref:`CellList` or :ref:`VerletList` can be used.
+
+The internal data structure of the LBVH list can be queried, but we have not discussed in detail the algorithm in this manuscript. A reader who is particularly interested in making use of the LBVH list or a more in-depth understanding of its inner workings is referred to the code itself, located at the source file :code:`Interactor/NeighboutList/LBVH.cuh`.
+
+.. code:: cpp
+  
+  #include<uammd.cuh>
+  #include<Interactor/NeighbourList/LBVHList.cuh>
+  using namespace uammd;
+  
+  //Construct a list using the UAMMD ecosystem
+  void constructListWithUAMMD(UAMMD sim){
+    //Create the list object
+    //It is wise to create once and store it
+    LBVHList vl(sim.pd);
+    //Update the list using the current positions in sim.pd
+    vl.update(sim.par.box, sim.par.rcut);
+    //Now the list can be used via the
+    //  various common interfaces
+    //-With a Transverser:
+    //vl.transverseList(some_transverser);
+    //-Requesting a NeighbourContainer
+    auto nc = vl.getNeighbourContainer();
+    //Or by getting the internal structure of the LBVH List
+    auto vldata = vl.getLBVHList();
+  }
+  	  
 .. _NeighbourContainer:
 
 The Neighbour Container interface
@@ -403,3 +523,15 @@ Counting the number of neighbours of each particle using a :cpp:any:`NeighbourCo
 
 
 .. hint:: The group index of a particle in the above example can be used to get its global index (see :ref:`ParticleGroup`) and then any of its properties via :ref:`ParticleData`. When no group is used (as in the example above), the default group (containing all particles) is assumed and the group index is equal to the global index.
+
+
+
+.. rubric:: References:
+
+.. [Karras2012] Maximizing Parallelism in the Construction of BVHs, Octrees, and k-d Trees. Karras 2012.
+
+.. [Torres2009] Ray Casting Using a Roped BVH with CUDA. Torres et.al. 2009. https://doi.org/10.1145/1980462.1980483
+
+.. [Howard2019] Quantized bounding volume hierarchies for neighbor search in molecular simulations on graphics processing units. Howard et. al. 2019. https://doi.org/10.1016/j.commatsci.2019.04.004
+
+.. [Howard2016] Efficient neighbor list calculation for molecular simulation of colloidal systems using graphics processing units. Howard et. al. 2016. https://doi.org/10.1016/j.cpc.2016.02.003
