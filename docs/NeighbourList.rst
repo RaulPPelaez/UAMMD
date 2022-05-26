@@ -154,6 +154,159 @@ Two other arrays are provided providing, for each cell, the index of the first a
 
 
 
+Verlet list
+~~~~~~~~~~~~
+
+This list uses :ref:`CellList` to construct a neighbour list up to a distance :math:`r_{s} > r_{cut}`, in this case the list only has to be reconstructed when any given particle has travelled more than a threshold distance,
+
+.. math::
+   
+   r_t = \frac{r_{s}-r_{c}}{2}.
+
+See the representation at the start of :ref:`NeighbourList`.
+
+.. hint:: A good default is usually around :math:`r_s\approx 1.15r_c`. 
+
+The list is constructed by storing a private list of neighbours for each particle in a column-major fashion. In order to achieve a cache-friendly memory pattern this "private" lists are stored in the same contiguous array. Since we do not know in advance how many neighbours each particle has we set up a maximum number of neighbours per particle, :math:`N_{\text{max}}`, and allocate an array of size :math:`N_{\text{max}}N` elements. Later on we traverse the list by assigning a thread per particle, which prompts for a column-major layout of the list. That is, threads will tend to read contiguous memory locations if we place the first neighbours of all particles contiguously, then the second, and so forth and so on.
+
+.. note::
+   
+   A row-major layout (in which we place all neighbours of a certain particle contiguously) will be beneficial if we assign a block of threads per particle when traversing.
+   Measuring is required to know which strategy is best in each case (thread-per-particle vs block-per-particle). UAMMD chooses a column-major format, as testing suggests this is the better choice in our habitual use-cases.\footnote{
+   Nonetheless this fact is abstracted away in the interface and changing between column- and row-major formats can be done easily and without affecting the users code.
+
+Finally, the maximum number of neighbours per particles, which affects both performance and memory consumption, is autotuned at each update to be the nearest multiple of 32 (the CUDA warp size) of the particle with the greatest number of neighbours.
+	  
+As with the :cpp:any:`CellList`, UAMMD exposes the Verlet list algorithm as part of the ecosystem and as an external accelerator. If the internal option is used the safety factor is automatically autotuned. Regardless, the safety radius can be modified via the :cpp:any:`VerletList::setCutOffMultiplier` member function.
+
+In both cases, accessing the :cpp:any:`VerletList` via the common UAMMD interfaces (:ref:`Transverser` and :ref:`NeighbourContainer<NeighbourContainer>`) makes it interchangeable with a :cpp:any:`CellList`, as evidenced in the example code below.
+
+.. cpp:class:: VerletList
+
+   This class adheres to the :cpp:any:`NeighbourList` UAMMD interface. Besides the functions defined in :cpp:any:`NeighbourList`, the cell list also exposes some functions proper to this particular algorithm.
+
+   .. cpp:member:: VerletListBase::VerletListData getVerletListData();
+
+		   Returns the internal structures of the Verlet list
+
+   .. cpp:member:: void setCutOffMultiplier(real newMultiplier);
+		   
+		   Sets the cutoff multiplier, i.e :math:`r_s/r_c=`  :cpp:`newMultiplier`.
+
+   .. cpp:member:: int getNumberOfStepsSinceLastUpdate();
+
+		   Returns the number of times the update has been called since the last time a list rebuild was required.
+
+.. cpp:struct:: VerletListBase::VerletListData;
+
+   .. cpp:member:: real4* sortPos;
+
+      Positions sorted to be contiguous if they fall into the same cell. Same as with :ref:`CellList`.
+		
+   .. cpp:member:: int* groupIndex;
+
+      Given the index of a particle in :cpp:`sortPos`, this array returns the index of that particle in :ref:`ParticleData` (or the original positions array if the list is used outside the ecosystem). This indirection is necessary when something other than the positions is needed (like the forces). Same as with :ref:`CellList`.
+      
+   .. cpp:member:: int* numberNeighbours;
+
+      The number of neighbours for each particle in sortPos.
+      
+   .. cpp:member:: StrideIterator particleStride;
+
+      For a given particle index, :cpp:`i`, :cpp:`particleStride[i]` holds the index of its first neighbour in :cpp:`neighbourList`. :cpp:`StrideIterator` is a random access iterator. 
+
+      .. note:: Note that, as evidenced by its type name, the particle stride (or offset) is not necessarily a raw array but rather a generic C++ random access iterator (that behaves as a raw array for most purposes). For instance the offset might just be the same for all particles. In UAMMD's current implementation, the particle stride is simply the maximum number of neighbours per particle. However, this interface allows for the possibility of compacting the list in the future, with a similar behavior as the :cpp:`cellStart` array in :ref:`CellList`.
+		
+      .. hint:: In particular, in the current implementation this iterator simply returns, for a given index :cpp:`i`, :cpp:`maxNeighboursPerParticle*i`.
+
+	     
+   .. cpp:member:: int* neighbourList;
+		   
+      The actual neighbour list. The neighbour :cpp:`j` for particle with index :cpp:`i` (of a maximum of :cpp:`j=numberNeighbours[i]`) is located at :cpp:`neighbourList[particleStride[i] + j];`.
+
+
+
+.. cpp:class:: VerletListBase
+
+   This class exposes the same functions as :cpp:any:`VerletList`, but it does not depend on :ref:`ParticleData` (to facilitate its usage outside the ecosystem). In particular, this class offers an alternative constructor and update function.
+
+   
+   .. cpp:function:: VerletListBase();
+
+      Default constructor.
+      
+      
+   .. cpp:member:: template<class PositionIterator>  void update(PositionIterator pos, int numberParticles, Box box, real cutOff, cudaStream_t st = 0);
+
+      This function works similar to :cpp:any:`NeighbourList::update`, but constructs the list based on the contents of the provided :cpp:`pos` iterator.
+      
+Example
+.........
+      
+The different ways of using a :ref:`VerletList`.
+
+.. code:: cpp
+	  
+  #include<uammd.cuh>
+  #include<Interactor/NeighbourList/VerletList.cuh>
+  using namespace uammd;
+  
+  //Construct a list using the UAMMD ecosystem
+  void constructListWithUAMMD(UAMMD sim){
+    //Create the list object
+    //It is wise to create once and store it
+    VerletList vl(sim.pd);
+    //Update the list using the current positions in sim.pd
+    vl.update(sim.par.box, sim.par.rcut);
+    //Now the list can be used via the
+    //  various common interfaces
+    //-With a Transverser:
+    //vl.transverseList(some_transverser);
+    //-Requesting a NeighbourContainer
+    auto nc = vl.getNeighbourContainer();
+    //Or by getting the internal structure of the Verlet List
+    auto vldata = vl.getVerletList();
+    //The safety radius can be specified
+    vl.setCutOffMultiplier(sim.par.rsafe/sim.par.rcut);
+    //The number of update calls since the last time
+    // it was necessary to rebuild the list can be 
+    // obtained
+    int nbuild = vl.getNumberOfStepsSinceLastUpdate();
+  }
+  //Construct a VerletList without UAMMD
+  template<class Iterator>
+  void constructListWithPositions(Iterator positions, 
+                                  int numberPartivles,
+                                  real3 boxSize, 
+                                  int3 numberParticles){
+    //Create the list object
+    //It is wise to create once and store it
+    VerletListBase vl;
+    //The safety radius can be specified
+    vl.setCutOffMultiplier(sim.par.rsafe/sim.par.rcut);
+    //Update the list using the positions
+    vl.update(positions, numberParticles, 
+              sim.par.box, sim.par.rcut);
+    //Now the internal structure of the Verlet List
+    // can be requested
+    auto vldata = vl.getVerletList();
+    //And a NeighbourContainer can be constructed from it
+    auto nc = VerletList_ns::NeighbourContainer(vldata);
+    //The number of update calls since the last time
+    // it was necessary to rebuild the list can be 
+    // obtained
+    int nbuild = vl.getNumberOfStepsSinceLastUpdate();
+  }
+
+.. hint:: The :ref:`Transverser` and :ref:`NeighbourContainer<NeighbourContainer>` options are identical to the case of a :ref:`CellList`.
+
+  
+Linear Bounding Volume Hierarchy list (LBVH)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+      
 .. _NeighbourContainer:
 
 The Neighbour Container interface
