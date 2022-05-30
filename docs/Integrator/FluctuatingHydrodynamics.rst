@@ -15,7 +15,7 @@ Where:
 	  
     :math:`\vec{v}(\vec{r},t)`: Fluid velocity.
 	  
-    :math:`\vec{g}=\rho\vec{g}`: Fluid momentum.
+    :math:`\vec{g}=\rho\vec{v}`: Fluid momentum.
 	  
     :math:`\tens{\sigma} = \nabla\pi - \eta\nabla^2\vec{v} - (\xi+\eta/3)\nabla(\nabla\cdot\vec{v})`: Deterministic stress tensor
 
@@ -30,7 +30,7 @@ Where:
 
 Depending on the particular solver, some terms might be zero. For instance, if the solver is incompressible, the term :math:`\nabla\cdot\vec{v}` vanishes and the density is constant.
 
-When inertia is disregarded the equations fall back to the Stokes equations, UAMMD offers solvers for this regime, referred to as :ref:`Brownian Hydrodynamics`.
+When inertia is disregarded the equations fall back to the Stokes equations, UAMMD offers solvers for this regime, referred to as :ref:`Brownian Hydrodynamics`. Not that in any case we disregard particle inertia (i.e the particles follow the local fluid exactly).
 
 In particular, UAMMD offers fluctuating hydrodynamics solvers in two regimes:
  * **Incompressible**: :ref:`ICM`.
@@ -58,7 +58,7 @@ the position :math:`\vec{r}_i`. Then, the different fields, corresponding to cel
 
   - :math:`\rho_{\vec{i}} \rightarrow \vec{r}_{\vec{i}}`
   - :math:`\vec{v}^\alpha_{\vec{i}} \rightarrow \vec{r}_{\vec{i}} + h/2\vec{\alpha}`
-  - :math:`\tens{E}^{\alpha\beta}_{\vec{i}} \rightarrow \vec{r}_{\vec{i}} + h/2\vec{\alpha} + h/2\vec{\beta}`
+  - :math:`\tens{Z}^{\alpha\beta}_{\vec{i}} \rightarrow \vec{r}_{\vec{i}} + h/2\vec{\alpha} + h/2\vec{\beta}`
 
 Where :math:`\vec{\alpha}` and :math:`\vec{\beta}` are the unit vectors in those directions and :math:`h` is the size of a cell.
 
@@ -83,8 +83,8 @@ Where each symbol represents:
   * ○: :math:`\rho` (Cell center, at :math:`\vec{r}_{\vec{i}}`)
   * ◨: :math:`v^x`
   * ⬒: :math:`v^y`
-  * △: :math:`E^{xx}`
-  * ▽: :math:`E^{xy}`
+  * △: :math:`\tens{Z}^{xx}`
+  * ▽: :math:`\tens{Z}^{xy},\tens{Z}^{yx}`
 
 
 Naturally, this discretisation requires special handling of the discretized versions of the (differential) operators. See for instance :code:`ICM_Compressible/SpatialDiscretization.cuh` to see how UAMMD deals with them.
@@ -252,8 +252,148 @@ FAQ
 Incompressible Inertial Coupling Method
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: FILL
 
+In the incompressible scheme density is constant and the divergence of the velocity is null, simplifying the equations to
+
+.. math::
+
+   \rho\partial_t{\vec{\fvel}} +\rho\nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})  + \nabla \pi &= \eta \nabla^2\vec{\fvel} + \vec{f} + \nabla\cdot \mathcal{Z}\\
+    \nabla\cdot\vec{\fvel} &= 0
+
+
+This scheme uses the same staggered grid spatial discretization as the compressible scheme and solves the equations in a triply periodic environment.
+
+We can rewrite the incompressible Navier-Stokes equation above as
+
+.. math::
+   
+  \dot{\vec{\fvel}} = \rho^{-1} \oper{P}\left(\vec{\mathfrak{f}} + \tilde{\vec{f}}\right) = \rho^{-1} \oper{P}\vec{f}^*.
+
+Where we have introduced a new fluid forcing,
+
+.. math::
+   
+  \vec{\mathfrak{f}} = -\rho\nabla\cdot (\vec{\fvel}\otimes\vec{\fvel}) + \eta\nabla^2\vec{\fvel},
+
+that includes the advective and diffusive terms to simplify the notation.
+
+The projection operator, :math:`\oper{P}`, is formally defined as
+
+.. math::
+   
+  \oper{P}  :=  \mathbb{I} - \nabla\nabla^{-2}\nabla.
+
+Finally, the external fluid forcing :math:`\tilde{\vec{f}}` is defined as
+
+.. math::
+
+   \tilde{\vec{f}} = \vec{f} + \nabla\cdot\tens{Z}
+
+
+We apply the projection operator in Fourier space, as we did in, for instance the :ref:`FCM`. Since we now have to solve the temporal variation of the velocity and we have non-linear terms, the diffusive and advective terms will be evaluated in real space. In the ICM, the divergence of the noise is also evaluated in real space.
+
+We use a second-order accurate predictor-corrector scheme for temporal discretization. We can discretize the coupled fluid-particle equations as
+
+.. math::
+   
+    &\vec{\ppos}^{n+\half} = \vec{\ppos}^n + \frac{\dt}{2}\oper{J}^n\vec{\fvel}^n,\\
+    &\rho\frac{\vec{\fvel}^{n+1} - \vec{\fvel}^n}{\dt} = \oper{P}\left(\vec{\mathfrak{f}}^{n+\half} + \tilde{\vec{f}}^{n+\half} \right),\\
+    &\vec{\ppos}^{n+1} = \vec{\ppos}^n + \frac{\dt}{2}\oper{J}^{n+\half}\left(\vec{\fvel}^{n+1} + \vec{\fvel}^{n}\right).
+
+Which requires evaluating the non-linear fluid forcing terms at mid step (i.e advection and diffusion).
+The convective term is discretized using a second order explicit Adams-Bashforth method (Eq. 35 in [4]_ ),
+
+.. math::
+   
+  \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^{n+\half} = \frac{3}{2} \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^n - \half \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^{n-1}.
+
+Advection is therefore stored each step to be reused in the next.
+The diffusive term is similarly discretized to second-order by
+
+.. math::
+   
+  \nabla^2\vec{\fvel}^{n+\half} = \half\nabla^2\left(\vec{\fvel}^{n+1} + \vec{\fvel}^{n}\right).
+
+Replacing both equations and solving for the velocity at time :math:`n+1` leads to the full form of the velocity solve, depending only on the velocity from previous time steps
+
+.. math::
+
+    &\vec{\fvel}^{n+1} = \tilde{\oper{P}}\vec{g}^n =\tilde{\oper{P}}\Big[    \left(\frac{\rho}{\dt}\mathbb{I} + \frac{\eta}{2}\nabla^2\right)\vec{\fvel}^n- \\
+    & \frac{3\dt}{2} \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^n - \frac{\dt}{2} \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^{n-1}+\\
+    &\oper{S}\vec{F}^{n+\half} + \nabla\cdot\mathcal{Z}^n \Big],
+
+where the modified projection operator is defined as
+
+.. math::
+   
+  \tilde{\oper{P}} :=\left(\frac{\rho}{\dt}\mathbb{I} - \frac{\eta}{2}\nabla^2\right)^{-1}\oper{P}
+
+and is applied in Fourier space.
+
+The full algorithm can be summarized as follows:
+  * Take particle positions to time :math:`n+\half`: :math:`\vec{\ppos}^{n+\half} = \vec{\ppos}^n + \frac{\dt}{2}\oper{J}^n\vec{\fvel}^n`.
+  * Spread forces on particles to the staggered grid: :math:`\oper{S}\vec{F}^{n+\half}`.
+  * Compute and store advection: :math:`\nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^n`.
+  * Compute the rest of the terms in :math:`\vec{f}^*`, using the advective term just computed in addition to the one stored in the previous step.
+  * Take :math:`\vec{f}^*` to Fourier space and apply :math:`\tilde{\oper{P}}`: :math:`\fou{\vec{\fvel}}^{n+1} = \fou{\tilde{\oper{P}}}\fou{\vec{f}^*}`.
+  * Take :math:`\fou{\vec{\fvel}}^{n+1}` back to real space.
+  * Evaluate particle positions at :math:`n+1` by interpolating: :math:`\vec{\ppos}^{n+1} = \vec{\ppos}^n + \frac{\dt}{2}\oper{J}^{n+\half}\left(\vec{\fvel}^{n+1} + \vec{\fvel}^{n}\right)`.
+
+We use the discrete form of the differential operators for a staggered grid (see :ref:`Staggered grid`).
+
+
+
+Usage
+.......
+
+Usage of the ICM :ref:`Integrator` requires a list of the familiar parameters for hydrodynamics thus far plus the fluid density, which is constant.
+
+.. sidebar::
+
+   .. warning:: Note that the temperature is provided in units of energy.
+
+The following parameters are available:  
+
+  * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
+  * :cpp:`real viscosity` Shear viscosity of the solvent.
+  * :cpp:`real density` Density of the solvent.
+  * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles).
+  * :cpp:`real dt`  Time step.
+  * :cpp:`Box box` The domain size.
+  * :cpp:`int3 cells` Number of fluid cells, if set the hydrodynamicRadius is ignored.
+  * :cpp:`uint seed` 0 (default) will take a value from the UAMMD generator
+  * :cpp:`bool sumThermalDrift = false` Thermal drift has a neglegible contribution in ICM (and formally null), but can still be computed via random finite differences if desired.
+  * :cpp:`bool removeTotalMomentum = true` Set the total fluid momentum to zero in each step
+
+
+.. code:: cpp
+
+  #include<uammd.cuh>
+  #include<Integrator/Hydro/ICM.cuh>
+  int main(){
+    //...
+    //Assume an instance of ParticleData exists
+    //auto pd = std::make_shared<ParticleData>(numberParticles);
+    //...
+    Hydro::ICM::Parameters par;
+    par.temperature = 1.0;
+    par.viscosity = 1.0; 
+    par.density = 1.0;
+    par.hydrodynamicRadius = 1;
+    par.dt = 0.01;
+    par.box = Box({32, 32, 32});
+    auto icm = std::make_shared<Hydro::ICM>(pd, par);
+    //Now use it as any other integrator module
+    //icm->addInteractor...
+    //icm->forwardTime();
+    //...
+    return 0;
+  }
+  
+
+Here, :code:`pd` is a :ref:`ParticleData` instance.
+
+.. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
 
 
 .. rubric:: References:  
@@ -264,3 +404,4 @@ Incompressible Inertial Coupling Method
        
 .. [3] Ph.D. manuscript. Florencio Balboa.
 
+.. [4] Inertial coupling method for particles in an incompressible fluctuating fluid. F. Balboa et. al. 2014.
