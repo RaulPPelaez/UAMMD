@@ -12,19 +12,19 @@ In general, we can write the Navier-Stokes equation as:
 
 Where:
     :math:`\rho(\vec{r},t)`: Fluid density.
-	  
+
     :math:`\vec{v}(\vec{r},t)`: Fluid velocity.
-	  
+
     :math:`\vec{g}=\rho\vec{v}`: Fluid momentum.
-	  
-    :math:`\tens{\sigma} = \nabla\pi - \eta\nabla^2\vec{v} - (\xi+\eta/3)\nabla(\nabla\cdot\vec{v})`: Deterministic stress tensor
+
+    :math:`\nabla\cdot \tens{\sigma} = \nabla\pi - \eta\nabla^2\vec{v} - (\xi+\eta/3)\nabla(\nabla\cdot\vec{v})`: Deterministic stress tensor
 
     :math:`\pi`: Pressure.
 
     :math:`\vec{f}`: Any external fluid forcing, typically :math:`\oper{S}\vec{F}`, the spreaded particle forces.
-	  
+
     :math:`\vec{g}\otimes\vec{v}`: I call this the kinetic tensor.
-	  
+
     :math:`\tens{Z}`: Fluctuating stress tensor.
 
 
@@ -69,15 +69,15 @@ to cell :math:`\vec{i}` lie in the neighbouring cells (represented below is also
 :math:`\vec{i} + (1,0,0)`).
 
 .. code::
-   
+
                     <------h---->
-	+-----⬒-----▽-----------+  
-	|      	    |	       	|  
-	|      	    |	       	|  
+	+-----⬒-----▽-----------+
+	|      	    |	       	|
+	|      	    |	       	|
 	|     ○	    ◨  	  △    	|
-	| 	    |  	       	|  
-	|      	    |		|  
-	+-----------+-----------+  
+	| 	    |  	       	|
+	|      	    |		|
+	+-----------+-----------+
 
 Where each symbol represents:
   * ○: :math:`\rho` (Cell center, at :math:`\vec{r}_{\vec{i}}`)
@@ -118,7 +118,7 @@ with the following form: :math:`U^c = AU^a + B(U^b + \Delta U(U^b, W^c))`
 
 Where :math:`U` might be the density or the fluid velocity and :math:`(a,b,c)` are three different time points inside a time step (we use a third order Runge Kutta integrator).
 In order to go from the time step :math:`n` to :math:`n+1` the solver must be called three times for the density and then the velocity:
-      
+
   1. :math:`a=0`, :math:`b=n` and :math:`c=n+1/3`
   2. :math:`a=3/4`, :math:`b=1/4` and :math:`c=n+2/3`
   3. :math:`a=1/3`, :math:`b=2/3` and :math:`c=n+1`
@@ -128,7 +128,7 @@ The values of :math:`A` and :math:`B` allow to choose between different temporal
 The current implementation uses, for each subtime respectively:
   1.  :math:`A=0, B=1`
   2.  :math:`A=3/4, B=1/4`
-  3.  :math:`A=1/3, B=2/3` 
+  3.  :math:`A=1/3, B=2/3`
 
 In both cases, we can define :math:`\Delta U = -dt\nabla\cdot\tens{F} + dt\vec{f}`.
 
@@ -137,17 +137,17 @@ Where :math:`\tens{F}(U,W,t)` means one thing or another depending on the equati
 :math:`W^c` represents the fluctuating stress tensor (:math:`\tens{Z}` above), which are defined as:
 
 .. math::
-   
+
    W^{n+1/3} &= W_A- \sqrt(3)W_B\\
    W^{n+2/3} &= W_A+ \sqrt(3)W_B\\
    W^{n+1} &= W_A
-   
+
 Where :math:`W_A` and :math:`W_B` are uncorrelated Gaussian random 3x3 tensors defined as:
 
 .. math::
 
    \tens{W} = \sqrt{\frac{2\eta\kT}{h^3 dt}}\widetilde{\tens{W}} + \left(\sqrt{\frac{\xi\kT}{3h^3 dt}} - \frac{1}{3}\sqrt{\frac{2\eta\kT}{h^3dt}}\right)\text{Tr}\left(\widetilde{\tens{W}}\right)\mathbb{I}
-   
+
 Where :math:`\widetilde{\tens{W}} = \left(\tens{W}_v + \tens{W}_v^T\right)/\sqrt{2}` is a symmetric 3x3 tensor with
 
 .. math::
@@ -155,7 +155,7 @@ Where :math:`\widetilde{\tens{W}} = \left(\tens{W}_v + \tens{W}_v^T\right)/\sqrt
    \left\langle \tens{W}_v^{\alpha\beta}(\vec{r}, t)\tens{W}_v^{\gamma\delta}(\vec{r}', t')\right\rangle = \delta_{\alpha\gamma}\delta_{\beta\delta}\delta_{\vec{r}\vec{r}'}\delta_{tt'}
 
 
-The solver is described in more detail in Appendix A of [1]_. 
+The solver is described in more detail in Appendix A of [1]_.
 
 Other substepping schemes might be used with slight modifications to this code (see Florencio Balboa's Ph.D manuscript)
 
@@ -173,7 +173,7 @@ Use as the rest of the :ref:`Integrator` modules.
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
+The following parameters are available:
 
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real shearViscosity` Shear viscosity of the solvent.
@@ -188,16 +188,16 @@ The following parameters are available:
   * :cpp:`std::function<real(real3)> initialVelocityX`. A function to set the initial X velocity, will be called for each point in the domain
   * :cpp:`std::function<real(real3)> initialVelocityY`. A function to set the initial Y velocity, will be called for each point in the domain
   * :cpp:`std::function<real(real3)> initialVelocityZ`. A function to set the initial Z velocity, will be called for each point in the domain
-  
+
 .. code:: c++
-	  
+
 	#include"Integrator/Hydro/ICM_Compressible.cuh"
 	int main(){
 	  //...
 	  //Assume an instance of ParticleData exists
 	  //auto pd = std::make_shared<ParticleData>(numberParticles);
 	  //...
-	  
+
 	  using namespace ICM = Hydro::ICM_Compressible;
 	  ICM::Parameters par;
 	  par.shearViscosity = 1.0;
@@ -208,15 +208,15 @@ The following parameters are available:
 	  par.cellDim = {32,32,32}; //Number of fluid cells, if set the hydrodynamicRadius is ignored
 	  par.dt = 0.1;
 	  par.boxSize = {32,32,32}; //Simulation domain
-	  par.seed = 1234; 
+	  par.seed = 1234;
 	  //The initial fluid density and velocity can be customized:
 	  par.initialDensity = [](real3 position){return 1.0;};
 	  par.initialVelocityX = [](real3 position){return sin(2*M_PI*position.y);};
 	  par.initialVelocityY = [](real3 position){return 1.0;};
 	  par.initialVelocityZ = [](real3 position){return 1.0;};
-	  
+
 	  auto compressible = std::make_shared<ICM>(pd, par);
-	  
+
 	  //Now use it as any other integrator module
 	  //compressible->addInteractor...
 	  //compressible->forwardTime();
@@ -228,7 +228,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
 
-   
+
 FAQ
 ......
 
@@ -266,13 +266,13 @@ This scheme uses the same staggered grid spatial discretization as the compressi
 We can rewrite the incompressible Navier-Stokes equation above as
 
 .. math::
-   
+
   \dot{\vec{\fvel}} = \rho^{-1} \oper{P}\left(\vec{\mathfrak{f}} + \tilde{\vec{f}}\right) = \rho^{-1} \oper{P}\vec{f}^*.
 
 Where we have introduced a new fluid forcing,
 
 .. math::
-   
+
   \vec{\mathfrak{f}} = -\rho\nabla\cdot (\vec{\fvel}\otimes\vec{\fvel}) + \eta\nabla^2\vec{\fvel},
 
 that includes the advective and diffusive terms to simplify the notation.
@@ -280,7 +280,7 @@ that includes the advective and diffusive terms to simplify the notation.
 The projection operator, :math:`\oper{P}`, is formally defined as
 
 .. math::
-   
+
   \oper{P}  :=  \mathbb{I} - \nabla\nabla^{-2}\nabla.
 
 Finally, the external fluid forcing :math:`\tilde{\vec{f}}` is defined as
@@ -295,7 +295,7 @@ We apply the projection operator in Fourier space, as we did in, for instance th
 We use a second-order accurate predictor-corrector scheme for temporal discretization. We can discretize the coupled fluid-particle equations as
 
 .. math::
-   
+
     &\vec{\ppos}^{n+\half} = \vec{\ppos}^n + \frac{\dt}{2}\oper{J}^n\vec{\fvel}^n,\\
     &\rho\frac{\vec{\fvel}^{n+1} - \vec{\fvel}^n}{\dt} = \oper{P}\left(\vec{\mathfrak{f}}^{n+\half} + \tilde{\vec{f}}^{n+\half} \right),\\
     &\vec{\ppos}^{n+1} = \vec{\ppos}^n + \frac{\dt}{2}\oper{J}^{n+\half}\left(\vec{\fvel}^{n+1} + \vec{\fvel}^{n}\right).
@@ -304,14 +304,14 @@ Which requires evaluating the non-linear fluid forcing terms at mid step (i.e ad
 The convective term is discretized using a second order explicit Adams-Bashforth method (Eq. 35 in [4]_ ),
 
 .. math::
-   
+
   \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^{n+\half} = \frac{3}{2} \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^n - \half \nabla\cdot (\vec{\fvel}\otimes\vec{\fvel})^{n-1}.
 
 Advection is therefore stored each step to be reused in the next.
 The diffusive term is similarly discretized to second-order by
 
 .. math::
-   
+
   \nabla^2\vec{\fvel}^{n+\half} = \half\nabla^2\left(\vec{\fvel}^{n+1} + \vec{\fvel}^{n}\right).
 
 Replacing both equations and solving for the velocity at time :math:`n+1` leads to the full form of the velocity solve, depending only on the velocity from previous time steps
@@ -325,7 +325,7 @@ Replacing both equations and solving for the velocity at time :math:`n+1` leads 
 where the modified projection operator is defined as
 
 .. math::
-   
+
   \tilde{\oper{P}} :=\left(\frac{\rho}{\dt}\mathbb{I} - \frac{\eta}{2}\nabla^2\right)^{-1}\oper{P}
 
 and is applied in Fourier space.
@@ -352,7 +352,7 @@ Usage of the ICM :ref:`Integrator` requires a list of the familiar parameters fo
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
+The following parameters are available:
 
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real viscosity` Shear viscosity of the solvent.
@@ -377,7 +377,7 @@ The following parameters are available:
     //...
     Hydro::ICM::Parameters par;
     par.temperature = 1.0;
-    par.viscosity = 1.0; 
+    par.viscosity = 1.0;
     par.density = 1.0;
     par.hydrodynamicRadius = 1;
     par.dt = 0.01;
@@ -389,19 +389,19 @@ The following parameters are available:
     //...
     return 0;
   }
-  
+
 
 Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
 
 
-.. rubric:: References:  
+.. rubric:: References:
 
 .. [1] Inertial coupling for point particle fluctuating hydrodynamics. F. Balboa et. al. 2013
-       
+
 .. [2] STAGGERED SCHEMES FOR FLUCTUATING HYDRODYNAMICS. F. Balboa et. al. 2012
-       
+
 .. [3] Ph.D. manuscript. Florencio Balboa.
 
 .. [4] Inertial coupling method for particles in an incompressible fluctuating fluid. F. Balboa et. al. 2014.
