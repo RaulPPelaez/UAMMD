@@ -169,13 +169,12 @@ int main(int argc, char* argv[]){
   //Now we add the interaction to the verlet Integrator:
   verlet->addInteractor(lj_interaction);
 
-  //Interactors are relatively small interface that only expose the following functions:
-  //sumForce(); //Sums to pd->getForce() the forces acting on each particle due to the interaction
-  //sumEnergy(); //Sums to pd->getEnergy() the energies acting on each particle due to the interaction
-  //sumForceEnergy(); //Can be implemented as {sumForce(); sumEnergy();}, computes both at the same time.
-  
+  //Interactors are relatively small interface that only exposes one function called sum:
+  //The sum function takes a structure defining whether force, energy and/or virial are desired. For instance:
+  // lj_interaction->sum({.force=true, .energy=false, .virial=false});
+  //In this instance, the contents of pd->getForce will be updated with the ones comming from the LJ interaction.
   //When we call forwardTime now verlet will ask lj_interaction for the forces acting on each particle and use them when integrating the movement.
-  //Note that this integrator does not need the particle energies, so they are not computed. If you want them, you may call lj_interaction->sumEnergy(); But remember to set the contents of pd->getEnergy() to zero first!
+  //Note that this integrator does not need the particle energies, so they are not computed. If you want them, you may call lj_interaction->sum({.energy=true}); But remember to set the contents of pd->getEnergy() to zero first!
 
   int Nsteps = 1000;
   for(int i = 0; i< Nsteps; i++){

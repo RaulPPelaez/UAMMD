@@ -56,7 +56,7 @@ References:
 #include"System/System.h"
 #include"ParticleData/ParticleData.cuh"
 #include"ParticleData/ParticleGroup.cuh"
-#include"cub/thread/thread_load.cuh"
+#include"third_party/uammd_cub.cuh"
 #include"utils/Box.cuh"
 #include"utils/Grid.cuh"
 #include"utils/cxx_utils.h"
