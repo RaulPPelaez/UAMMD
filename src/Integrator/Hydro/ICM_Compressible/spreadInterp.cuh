@@ -28,17 +28,19 @@ namespace uammd{
 	auto spreadParticleForces(const ParticleIterator &particleData, const PositionIterator &positions,
 				  std::shared_ptr<Kernel> kernel,
 				  int numberParticles, Grid grid){
-	  DataXYZ particleDataXYZ(particleData, numberParticles);
 	  DataXYZ gridData(grid.getNumberCells());
 	  gridData.fillWithZero();
-	  const real3 h = grid.cellSize;
-	  IBM<Kernel> ibm(kernel, grid);
-	  auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
-	  ibm.spread(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
-	  auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
-	  ibm.spread(posY, particleDataXYZ.y(), gridData.y(), numberParticles);
-	  auto posZ = make_shift_iterator(positions, {0, 0, real(0.5)*h.z});
-	  ibm.spread(posZ, particleDataXYZ.z(), gridData.z(), numberParticles);
+	  if(numberParticles > 0){
+	    DataXYZ particleDataXYZ(particleData, numberParticles);
+	    const real3 h = grid.cellSize;
+	    IBM<Kernel> ibm(kernel, grid);
+	    auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
+	    ibm.spread(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
+	    auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
+	    ibm.spread(posY, particleDataXYZ.y(), gridData.y(), numberParticles);
+	    auto posZ = make_shift_iterator(positions, {0, 0, real(0.5)*h.z});
+	    ibm.spread(posZ, particleDataXYZ.z(), gridData.z(), numberParticles);
+	  }
 	  return gridData;
 }
 
@@ -48,14 +50,16 @@ namespace uammd{
 					int numberParticles, Grid grid){
 	  DataXYZ particleDataXYZ(numberParticles);
 	  particleDataXYZ.fillWithZero();
-	  const real3 h = grid.cellSize;
-	  IBM<Kernel> ibm(kernel, grid);
-	  auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
-	  ibm.gather(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
-	  auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
-	  ibm.gather(posY, particleDataXYZ.y(), gridData.y(), numberParticles);
-	  auto posZ = make_shift_iterator(positions, {0, 0, real(0.5)*h.z});
-	  ibm.gather(posZ, particleDataXYZ.z(), gridData.z(), numberParticles);
+	  if(numberParticles > 0){
+	    const real3 h = grid.cellSize;
+	    IBM<Kernel> ibm(kernel, grid);
+	    auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
+	    ibm.gather(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
+	    auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
+	    ibm.gather(posY, particleDataXYZ.y(), gridData.y(), numberParticles);
+	    auto posZ = make_shift_iterator(positions, {0, 0, real(0.5)*h.z});
+	    ibm.gather(posZ, particleDataXYZ.z(), gridData.z(), numberParticles);
+	  }
 	  return particleDataXYZ;
 	}
 
@@ -65,29 +69,16 @@ namespace uammd{
 	auto spreadParticleForces(ParticleIterator &particleData, PositionIterator &positions,
 				  std::shared_ptr<Kernel> kernel,
 				  int numberParticles, Grid grid){
-	  DataXYZ particleDataXYZ(particleData, numberParticles);
 	  DataXYZ gridData(grid.getNumberCells());
 	  gridData.fillWithZero();
-	  const real3 h = grid.cellSize;
-	  IBM<Kernel> ibm(kernel, grid);
-	  ibm.spread(positions, particleDataXYZ.x(), gridData.x(), numberParticles);
-	  ibm.spread(positions, particleDataXYZ.y(), gridData.y(), numberParticles);
-	  ibm.spread(positions, particleDataXYZ.z(), gridData.z(), numberParticles);
-	  return gridData;
-	}
-
-	template<class ParticleIterator, class PositionIterator, class Kernel>
-	auto interpolateFluidVelocities(ParticleIterator &particleData, PositionIterator &positions,
-					std::shared_ptr<Kernel> kernel,
-					int numberParticles, Grid grid){
-	  DataXYZ particleDataXYZ(particleData, numberParticles);
-	  DataXYZ gridData(grid.getNumberCells());
-	  gridData.fillWithZero();
-	  const real3 h = grid.cellSize;
-	  IBM<Kernel> ibm(kernel, grid);
-	  ibm.gather(positions, particleDataXYZ.x(), gridData.x(), numberParticles);
-	  ibm.gather(positions, particleDataXYZ.y(), gridData.y(), numberParticles);
-	  ibm.gather(positions, particleDataXYZ.z(), gridData.z(), numberParticles);
+	  if(numberParticles > 0){
+	    DataXYZ particleDataXYZ(particleData, numberParticles);
+	    const real3 h = grid.cellSize;
+	    IBM<Kernel> ibm(kernel, grid);
+	    ibm.spread(positions, particleDataXYZ.x(), gridData.x(), numberParticles);
+	    ibm.spread(positions, particleDataXYZ.y(), gridData.y(), numberParticles);
+	    ibm.spread(positions, particleDataXYZ.z(), gridData.z(), numberParticles);
+	  }
 	  return gridData;
 	}
       }

@@ -294,29 +294,31 @@ namespace uammd{
       }
 
       //Returns the velocity in a collocated grid, interpolating the staggered velocities to cell centers
-      __global__ void computeCollocatedVelocityD(DataXYZPtr staggeredVelocity, real3* collocatedVelocity, int3 n){
+      __global__ void computeCollocatedVelocityD(DataXYZPtr staggeredVelocity, DataXYZPtr collocatedVelocity, int3 n){
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id >= n.x*n.y*n.z) return;
 	auto cell_i = getCellFromThreadId(id, n);
 	real vx_np12 = fetchScalar(staggeredVelocity.x(), cell_i, n);
 	real vx_nm12 = fetchScalar(staggeredVelocity.x(), cell_i-staggered::getSubgridOffset<subgrid::x>(), n);
 	real vx = real(0.5)*(vx_np12 + vx_nm12);
+	collocatedVelocity.x()[id] = vx;
 	real vy_np12 = fetchScalar(staggeredVelocity.y(), cell_i, n);
 	real vy_nm12 = fetchScalar(staggeredVelocity.y(), cell_i-staggered::getSubgridOffset<subgrid::y>(), n);
 	real vy = real(0.5)*(vy_np12 + vy_nm12);
+	collocatedVelocity.y()[id] = vy;
 	real vz_np12 = fetchScalar(staggeredVelocity.z(), cell_i, n);
 	real vz_nm12 = fetchScalar(staggeredVelocity.z(), cell_i-staggered::getSubgridOffset<subgrid::z>(), n);
 	real vz = real(0.5)*(vz_np12 + vz_nm12);
-	collocatedVelocity[id] = {vx,vy,vz};
+	collocatedVelocity.z()[id] = vz;
       }
 
       auto computeCollocatedVelocity(const DataXYZ &staggeredVelocity, int3 n){
-	cached_vector<real3> collocatedVelocity(staggeredVelocity.size());
+	DataXYZ collocatedVelocity(staggeredVelocity.size());
 	DataXYZPtr staggeredVelocity_ptr(staggeredVelocity);
 	int threads = 128;
 	int blocks = staggeredVelocity.size()/threads+1;
 	computeCollocatedVelocityD<<<blocks, threads>>>(staggeredVelocity,
-							thrust::raw_pointer_cast(collocatedVelocity.data()),
+							DataXYZPtr(collocatedVelocity),
 							n);
 	return collocatedVelocity;
       }

@@ -146,13 +146,15 @@ namespace uammd{
 
     //Takes positions to n+1/2: \vec{q}^{n+1/2} = \vec{q}^n + dt/2\oper{J}^n\vec{v}^n
     void ICM_Compressible::forwardPositionsToHalfStep(){
-      System::log<System::DEBUG2>("[ICM_Compressible] Forward particles to n+1/2");
-      auto velocities = interpolateFluidVelocityToParticles(currentFluidVelocity);
-      auto pos = pd->getPos(access::gpu, access::readwrite);
-      thrust::transform(thrust::cuda::par,
-			pos.begin(), pos.end(), velocities.xyz(),
-			pos.begin(),
-			icm_compressible::MidStepEulerFunctor(dt));
+      if(pg->getNumberParticles() > 0){
+	System::log<System::DEBUG2>("[ICM_Compressible] Forward particles to n+1/2");
+	auto velocities = interpolateFluidVelocityToParticles(currentFluidVelocity);
+	auto pos = pd->getPos(access::gpu, access::readwrite);
+	thrust::transform(thrust::cuda::par,
+			  pos.begin(), pos.end(), velocities.xyz(),
+			  pos.begin(),
+			  icm_compressible::MidStepEulerFunctor(dt));
+      }
     }
 
     //Takes positions to n+1: \vec{q}^{n+1} = \vec{q}^n + dt/2\oper{J}^{n+1/2}(\vec{v}^n + \vec{v}^{n+1})

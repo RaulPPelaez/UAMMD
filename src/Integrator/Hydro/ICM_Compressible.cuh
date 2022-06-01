@@ -146,10 +146,13 @@ namespace uammd{
 	  //0.91 only works for Peskin three point
 	  ncells = make_int3(par.boxSize/(0.91*par.hydrodynamicRadius));
 	}
+	else{
+	  par.hydrodynamicRadius = 0.91*par.boxSize.x/par.cellDim.x;
+	}
 	grid = Grid(Box(par.boxSize), ncells);
 	densityToPressure->isothermalSpeedOfSound = par.speedOfSound;
-	printInitialMessages(par);
 	initializeFluid(par);
+	printInitialMessages(par);
       }
 
       void forwardTime() override;
@@ -159,19 +162,18 @@ namespace uammd{
 	return this->grid.cellDim;
       }
 
-      //Returns the fluid density in CPU memory.
+      //Returns the fluid density in GPU memory.
       auto getCurrentDensity() const{
-	std::vector<real> dens(grid.getNumberCells());
+	cached_vector<real> dens(grid.getNumberCells());
 	thrust::copy(currentFluidDensity.begin(), currentFluidDensity.end(), dens.begin());
 	return dens;
       }
 
-      //Returns the fluid velocity, interpolated to the cell centers. In CPU memory
+      //Returns the fluid velocity, interpolated to the cell centers. In GPU memory
       auto getCurrentVelocity() const{
-	std::vector<real3> velocityCPU(grid.getNumberCells());
 	auto collocatedVelocityGPU = icm_compressible::computeCollocatedVelocity(currentFluidVelocity, grid.cellDim);
-	thrust::copy(collocatedVelocityGPU.begin(), collocatedVelocityGPU.end(), velocityCPU.begin());
-	return velocityCPU;
+	//thrust::copy(collocatedVelocityGPU.begin(), collocatedVelocityGPU.end(), velocityCPU.begin());
+	return collocatedVelocityGPU;
       }
 
     private:
@@ -204,6 +206,24 @@ namespace uammd{
 	const real d0 = par.temperature/(6*M_PI*par.shearViscosity*effective_a);
 	System::log<System::MESSAGE>("[ICM_Compressible] Expected long time particle self diffusion coefficient : %g", d0);
 	System::log<System::MESSAGE>("[ICM_Compressible] seed: %u", seed);
+	const real h =grid.cellSize.x;
+	real a_c = par.speedOfSound*par.dt/h;
+	real maxvx = *thrust::max_element(currentFluidVelocity.x(), currentFluidVelocity.x() + currentFluidVelocity.size());
+	real maxvy = *thrust::max_element(currentFluidVelocity.y(), currentFluidVelocity.y() + currentFluidVelocity.size());
+	real maxvz = *thrust::max_element(currentFluidVelocity.z(), currentFluidVelocity.z() + currentFluidVelocity.size());
+	real maxv = std::max({maxvx, maxvy, maxvz});
+	real a_v = maxv*par.dt/h;
+	System::log<System::MESSAGE>("[ICM_Compressible] Advective CFL Numbers: α_c ~ %g; α_v ~ %g", a_c, a_v);
+	real maxDensity = *thrust::max_element(currentFluidDensity.begin(), currentFluidDensity.end());
+	real kinematicViscosity = par.shearViscosity/maxDensity;
+	real b = kinematicViscosity*par.dt/(h*h);
+	real selfDiffusion = par.temperature/(6*M_PI*par.shearViscosity*par.hydrodynamicRadius);
+	real b_c = selfDiffusion*par.dt/(h*h);
+	System::log<System::MESSAGE>("[ICM_Compressible] Viscous CFL Numbers: β ~ %g; β_c ~ %g", b, b_c);
+	System::log<System::MESSAGE>("[ICM_Compressible] Fluid cell Re=α_c/β=%g", a_c/b);
+	real Sc = kinematicViscosity/selfDiffusion;
+	System::log<System::MESSAGE>("[ICM_Compressible] Schmidt number: %g", Sc);
+
       }
 
       void initializeFluid(Parameters par){

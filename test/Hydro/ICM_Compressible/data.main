@@ -1,0 +1,16 @@
+#Parameters to reproduce Figure 2.8 in Florencio Balboa's Ph.D. manuscript.
+dt  1
+boxSize  3000 3000 3000
+cellDim  30 30 30
+bulkViscosity  127.05
+speedOfSound  14.67
+shearViscosity  53.71
+temperature  1
+initialDensity  0.632
+
+# Number of frequencies to compute. The maximum frequency computed to be larger than the peaks
+numberFreq 300
+waveNumber 2 2 2 # Compute the structure factors for this wave number
+
+#If enabled computes and prints the velocity autocorrelation function, averaged for every step.
+#measureVACF

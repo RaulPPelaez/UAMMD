@@ -12,7 +12,7 @@ src/Interactor/Experimental
 *.o
 *.so
 *log
-*test
+*.test
 a.out
 *~
 *.particles
