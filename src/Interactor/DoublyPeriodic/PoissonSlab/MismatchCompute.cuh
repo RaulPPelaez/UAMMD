@@ -13,7 +13,7 @@ namespace uammd{
     struct MismatchVals{
       cufftComplex mP0, mPH, mE0, mEH;
     };
-    
+
     struct MismatchPtr{
       cufftComplex* potentialTop;
       cufftComplex* potentialBottom;
@@ -78,7 +78,7 @@ namespace uammd{
 	  const auto potentialAtBottomWallFourier = surfaceValueFourier.y;
 	  mismatch.mE0 = cufftComplex();
 	  mismatch.mP0 = evalthetaInside.x - potentialAtBottomWallFourier;
-	}	
+	}
 	return mismatch;
       }
 
@@ -88,7 +88,7 @@ namespace uammd{
 							   cufftComplex mismatchPotentialBottom,
 							   cufftComplex mismatchPotentialTop,
 							   Iterator outsideSolutionMode0){
-	auto evalThetaOutside = evaluateThetas(outsideSolutionMode0, 0, real(M_PI), nz);
+	auto evalThetaOutside = evaluateThetas(outsideSolutionMode0, thetaTop, thetaBottom, nz);
 	const real et = perm.top/perm.inside;
 	const real eb = perm.bottom/perm.inside;
 	const auto C = real(2.0)/(et + real(1.0))*evalThetaOutside.w;
@@ -104,12 +104,12 @@ namespace uammd{
 	  B0 = -mismatchPotentialBottom - A0*H;
 	}
 	else if(metallicTop and metallicBottom){
-	  A0 = (mismatchPotentialTop - mismatchPotentialBottom)/H;
+	  A0 = -(mismatchPotentialTop - mismatchPotentialBottom)/H;
 	  B0 = -mismatchPotentialBottom;
 	}
 	else if(not metallicTop and not metallicBottom){
 	  A0 = (E*eb - mismatchFieldZBottom.x/perm.inside + C*et - mismatchFieldZTop/perm.inside)*real(0.5);
-	  B0 = cufftComplex();	 
+	  B0 = cufftComplex();
 	}
 	return {A0, B0};
       }
@@ -187,9 +187,9 @@ namespace uammd{
 	fieldZBottom.resize(numberElements);
 	linearModeCorrection.resize(1);
 	real He = extraHeight;
-	real Lz = 0.5*(H + 4*He);
-	this->thetaTop = acos((2*He+H)/Lz-1);
-	this->thetaBot = acos((2*He)/Lz-1);
+	real Lz = 0.5*(H + 6*He);
+	this->thetaTop = acos((3*He+H)/Lz-1);
+	this->thetaBot = acos((3*He)/Lz-1);
       }
 
       //surfaceValues hold surface charges of the walls. If the permittivity is infinite (metallic boundary) at some wall, surfaceValues hold the potential at the wall instead.

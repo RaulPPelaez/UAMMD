@@ -123,7 +123,7 @@ namespace uammd{
 	auto tmp = bvp_ns::setUpBVPKernelTemporalStorage(numberSystems, n.z);
 	cached_vector<char> tmp_storage(tmp.allocationSize);
 	auto tmp_storage_ptr = thrust::raw_pointer_cast(tmp_storage.data());
-	auto gpuSolver = bvpSolver->getGPUSolver();	
+	auto gpuSolver = bvpSolver->getGPUSolver();
 	const int blockSize = 64;
 	const int numberBlocks = numberSystems/blockSize+1;
         bvp_ns::solveBVPFieldPotential<<<numberBlocks, blockSize, 0, st>>>(gpuSolver, n.x, n.y, n.z,

@@ -21,26 +21,26 @@ namespace uammd{
       auto emHpz = exp(k*(-H + z))*(double(1.0) + eb)*(-mis.mEH/perm.inside + et*k*mis.mPH);
       cufftComplex2 EzAndPhi;
       //field Z
-      EzAndPhi.x = (ezm2H + emz + emHmz + emHpz) / denominator;
+      EzAndPhi.x = -(ezm2H + emz + emHmz + emHpz) / denominator;
       //phi
       EzAndPhi.y = (-ezm2H + emz + emHmz - emHpz) / (denominator * k);
       return EzAndPhi;
     }
-    
+
     __device__ cufftComplex2 analyticalCorrectionOneMetallicWall(double k, double z, double H, Permitivity perm, MismatchVals mis, bool isMetallicTop){
       if(isMetallicTop){
-	const double eb = perm.bottom/perm.inside;      
+	const double eb = perm.bottom/perm.inside;
 	const double denominator = k*(exp(-k*H)*(1.0-eb) + exp(k*H)*(1.0+eb));
 	const cufftComplex Ai = (-(1.0+eb)*k*mis.mPH + exp(-k*H)*(mis.mE0/perm.inside + eb*k*mis.mP0))/denominator;
 	const cufftComplex Bi = ((-1.0+eb)*k*mis.mPH + exp(k*H)*(-mis.mE0/perm.inside - eb*k*mis.mP0))/denominator;
 	cufftComplex2 EzAndPhi;
 	//field Z
-	EzAndPhi.x = -(k*Ai*exp(k*z) - k*Bi*exp(-k*z));
+	EzAndPhi.x = k*Ai*exp(k*z) - k*Bi*exp(-k*z);
 	//phi
-	EzAndPhi.y = Ai*exp(k*z) +Bi*exp(-k*z);
+	EzAndPhi.y = Ai*exp(k*z) + Bi*exp(-k*z);
 	return EzAndPhi;
       }else{
-	const double et = perm.top/perm.inside;      
+	const double et = perm.top/perm.inside;
 	cufftComplex2 EzAndPhi;
 	//TODO: bottom metallic not implemented
 	//field Z
@@ -50,18 +50,30 @@ namespace uammd{
 	return EzAndPhi;
       }
     }
-    
-    __device__ cufftComplex2 analyticalCorrectionTwoMetallicWalls(double k, double z, double H, Permitivity perm, MismatchVals mis){
-      const auto Ai = (mis.mPH - exp(-k*H)*mis.mP0)/(exp(-k*H) - exp(k*H));
-      const auto Bi = (-mis.mP0 + mis.mPH*exp(-k*H))/(1.0-exp(-2.0*k*H));
+
+    __device__ cufftComplex2 analyticalCorrectionTwoMetallicWalls(float k, float z, float H, Permitivity perm, MismatchVals mis){
+      // const auto Ai = (mis.mPH - exp(-k*H)*mis.mP0)/(exp(-k*H) - exp(k*H));
+      // const auto Bi = (-mis.mP0 + mis.mPH*exp(-k*H))/(1.0-exp(-2.0*k*H));
+      // cufftComplex2 EzAndPhi;
+      // //field Z
+      // EzAndPhi.x = k*Ai*exp(k*z) - k*Bi*exp(-k*z);
+      // //phi
+      // EzAndPhi.y = Ai*exp(k*z) + Bi*exp(-k*z);
+      // return EzAndPhi;
+      const real ekzmH = exp(k*(z-H));
+      const real em2kH= exp(-2*k*H);
+      const real emkz = exp(-k*z);
+      const real denominator = em2kH -1;
+      const auto firstTerm = (mis.mPH*ekzmH+mis.mP0*emkz)/denominator;
+      const auto secondTerm = (mis.mP0*emkz - mis.mPH*exp(-k*(z+H)))/denominator;
       cufftComplex2 EzAndPhi;
       //field Z
-      EzAndPhi.x = -(k*Ai*exp(k*z) - k*Bi*exp(-k*z));
+      EzAndPhi.x = k*firstTerm - k*secondTerm;
       //phi
-      EzAndPhi.y = Ai*exp(k*z) + Bi*exp(-k*z);
+      EzAndPhi.y =  firstTerm + secondTerm;
       return EzAndPhi;
     }
-    
+
     template<class Iterator>
     __device__ void fillCorrectionForWaveNumber(Permitivity perm, real k, real kmax,
 						MismatchVals mis,
@@ -70,7 +82,7 @@ namespace uammd{
 						real H, int Nz, real He, Iterator &correction){
       const real halfH = real(0.5)*H;
       for(int i = 0; i<Nz; i++){
-        real z =  (halfH+real(2.0)*He)*cospi(i/real(Nz-1));
+        real z =  (halfH+real(3.0)*He)*cospi(i/real(Nz-1));
 	if(abs(z) < halfH+He and k <= kmax){
 	  z = z + halfH;
 	  if(k>0){
@@ -80,12 +92,12 @@ namespace uammd{
 	    else if(isMetallicBottom and isMetallicTop)
 	      res = analyticalCorrectionTwoMetallicWalls(k, z, H, perm, mis);
 	    else if(isMetallicBottom or isMetallicTop)
-	      res = analyticalCorrectionOneMetallicWall(k, z, H, perm, mis, isMetallicTop);	    
+	      res = analyticalCorrectionOneMetallicWall(k, z, H, perm, mis, isMetallicTop);
 	    correction[i] = res;
 	  }
 	  else{
-	    correction[i].x = linearModeCorrection.x;
-	    correction[i].y = linearModeCorrection.x*z +linearModeCorrection.y;
+	    correction[i].x = -linearModeCorrection.x;
+	    correction[i].y = linearModeCorrection.x*z + linearModeCorrection.y;
 	  }
 	}
 	else{
@@ -113,7 +125,7 @@ namespace uammd{
       auto corr = make_third_index_iterator(correctionRealSpace, ik.x, ik.y, Index3D(nkx/2+1, nky, 2*nz-2));
       auto mis = mismatch.fetchMisMatch(ik, {nkx, nky});
       fillCorrectionForWaveNumber(perm, k, kmax, mis, mismatch.linearModeCorrection[0],
-				  isMetallicTop, isMetallicBottom, 
+				  isMetallicTop, isMetallicBottom,
 				  H, nz, He, corr);
     }
 
@@ -150,7 +162,7 @@ namespace uammd{
       thrust::transform(thrust::cuda::par.on(st),
 			insideSolution.begin(), insideSolution.end(),
 			correction.begin(), insideSolution.begin(),
-			thrust::minus<cufftComplex4>());
+			thrust::plus<cufftComplex4>());
     }
 
     __global__ void computeFullCorrectionXYD(const cufftComplex2* analyticalCorrection,
@@ -212,7 +224,7 @@ namespace uammd{
 	this->isMetallicTop = std::isinf(perm.top);
 	this->isMetallicBottom = std::isinf(perm.bottom);
       }
-      
+
       ~Correction(){
 	CufftSafeCall(cufftDestroy(cufft_plan_forward));
       }
@@ -221,24 +233,26 @@ namespace uammd{
 			   cached_vector<cufftComplex4> &outsideSolution,
 			   const cufftComplex2* surfaceValuesFourier, cudaStream_t st){
 	System::log<System::DEBUG>("Mismatch");
-	auto mismatchData = mismatch->compute(insideSolution, outsideSolution, surfaceValuesFourier, st);
+	auto mismatchData = mismatch->compute(insideSolution, outsideSolution, surfaceValuesFourier, st); //Step 4,5
 	System::log<System::DEBUG>("Correction");
 	real3 boxSize = make_real3(Lxy, H);
-	auto analyticalCorrection = computeAnalyticalCorrectionRealSpace(mismatchData, st);
-	takeAnalyticalCorrectionToChebyshevSpace(analyticalCorrection, st);
-	auto fullCorrection = computeFullCorrectionXY(analyticalCorrection, boxSize, cellDim);
-	sumCorrectionToInsideSolution(fullCorrection, insideSolution, st);
+	auto analyticalCorrection = computeAnalyticalCorrectionFourierSpace(mismatchData, st); //Step 4
+	DPPoissonSlab_ns::writeComplex2Field(analyticalCorrection, cellDim, H, "correctionFourier.dat");
+	takeAnalyticalCorrectionToChebyshevSpace(analyticalCorrection, st); //Step 4
+	auto fullCorrection = computeFullCorrectionXY(analyticalCorrection, boxSize, cellDim); //Step 4
+	DPPoissonSlab_ns::writeComplexField(fullCorrection, cellDim, H, "correctionCheb.dat");
+	sumCorrectionToInsideSolution(fullCorrection, insideSolution, st); //Step 5, 6
       }
 
     private:
 
-      cached_vector<cufftComplex2> computeAnalyticalCorrectionRealSpace(MismatchPtr mis, cudaStream_t st){
+      cached_vector<cufftComplex2> computeAnalyticalCorrectionFourierSpace(MismatchPtr mis, cudaStream_t st){
 	System::log<System::DEBUG>("Analytical Correction");
 	const int3 n = cellDim;
 	cached_vector<cufftComplex2> analyticalCorrection((n.x/2+1)*n.y*(2*n.z-2));
 	auto corr = thrust::raw_pointer_cast(analyticalCorrection.data());
 	//kmax must be chosen carefully so that there is no overflow in exp(kmax*HE) when evaluating the correction
-	//Maximum exponents for an exponential that do not result in inf: 
+	//Maximum exponents for an exponential that do not result in inf:
 #ifdef DOUBLE_PRECISION
 	constexpr double maxAllowedExponent = 709.0;
 #else

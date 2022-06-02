@@ -97,11 +97,11 @@ namespace uammd{
 	this->He = detail::computeExtraHeight(par.numberStandardDeviations, par.gw, par.split);
 	const real minimumBoxSize = std::min({par.Lxy.x, par.Lxy.y, par.H});
 	detail::throwIfInvalidConfiguration(He, minimumBoxSize);
-	real3 totalBoxSize = make_real3(par.Lxy, par.H+4*He);
+	real3 totalBoxSize = make_real3(par.Lxy, par.H+6*He);
 	this->cellDim = detail::proposeCellDim(farFieldGaussianWidth, par.upsampling, totalBoxSize);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] cells: %d %d %d", cellDim.x, cellDim.y, cellDim.z);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] box size: %g %g %g (enlarged to %g)",
-				  par.Lxy.x, par.Lxy.y, par.H, par.H + He*4);
+				  par.Lxy.x, par.Lxy.y, par.H, par.H + He*6);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] Extra height: %g", He);
 	if(par.split> 0){
 	  sys->log<System::MESSAGE>("[DPPoissonSlab] Ewald split mode enabled");
@@ -119,16 +119,21 @@ namespace uammd{
 
       void compute(cudaStream_t st, real4 *fieldAtParticles = nullptr){
 	System::log<System::DEBUG>("Far field");
-	auto separatedCharges = separateCharges(st);
-	auto gridCharges = ibm->spreadChargesNearWalls(separatedCharges, st);
-	auto gridChargesFourier = fct->forwardTransform(gridCharges, st);
-	auto outsideSolution = bvp->solveFieldPotential(gridChargesFourier, st);
-	ibm->spreadChargesFarFromWallAdd(separatedCharges, gridCharges, st);
-	ibm->spreadImageChargesAdd(separatedCharges, gridCharges, par.permitivity, st);
-	gridChargesFourier = fct->forwardTransform(gridCharges, st);
-	auto insideSolution = bvp->solveFieldPotential(gridChargesFourier, st);
+	auto separatedCharges = separateCharges(st); //Step 1
+	auto gridCharges = ibm->spreadChargesNearWalls(separatedCharges, st); //Step 2
+	DPPoissonSlab_ns::writeRealField<real>(gridCharges, cellDim, "gf_C1.dat");
+	auto gridChargesFourier = fct->forwardTransform(gridCharges, st);//Step 2
+	auto outsideSolution = bvp->solveFieldPotential(gridChargesFourier, st); //Step 2
+	DPPoissonSlab_ns::writeComplexField(outsideSolution, cellDim, par.H,"solOut.dat");
+	ibm->spreadChargesFarFromWallAdd(separatedCharges, gridCharges, st); //Step 3
+	ibm->spreadImageChargesAdd(separatedCharges, gridCharges, par.permitivity, st); //Step 3
+	DPPoissonSlab_ns::writeRealField<real>(gridCharges, cellDim, "gf_C1pC2pC1star.dat");
+	gridChargesFourier = fct->forwardTransform(gridCharges, st); //Step 3
+	auto insideSolution = bvp->solveFieldPotential(gridChargesFourier, st); //Step 3
+	DPPoissonSlab_ns::writeComplexField(insideSolution, cellDim, par.H,"solIn.dat");
 	auto surfaceValues_ptr = thrust::raw_pointer_cast(surfaceValuesFourier.data());
-	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st);
+	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st); //Steps 4,5,6
+	DPPoissonSlab_ns::writeComplexField(insideSolution, cellDim, par.H,"solCorrected.dat");
 	if(par.printK0Mode){
 	  solutionZeroMode.resize(cellDim.z);
 	  Index3D indexer(cellDim.x/2+1, cellDim.y, cellDim.z);
@@ -138,6 +143,7 @@ namespace uammd{
 		       solutionZeroMode.begin());
 	}
 	auto gridFields = fct->inverseTransform(insideSolution, st);
+	DPPoissonSlab_ns::writeRealField<real4>(gridFields, cellDim, "solGrid.dat");
 	ibm->interpolateFieldsToParticles(gridFields, st, fieldAtParticles);
 	CudaCheckError();
       }
@@ -145,7 +151,7 @@ namespace uammd{
       void setSurfaceValuesZeroModeFourier(cufftComplex2 zeroMode){
 	surfaceValuesFourier[0] = zeroMode*cellDim.x*cellDim.y;
       }
-      
+
       auto getK0Mode(){
 	System::log<System::DEBUG1>("[DPPoissonSlab] Downloading zero mode data");
 	std::vector<cufftComplex4> h_zeroMode(solutionZeroMode.size());
@@ -154,9 +160,9 @@ namespace uammd{
       }
     private:
 
-      shared_ptr<SpreadInterpolateCharges> createImmersedBoundary(){
+      std::shared_ptr<SpreadInterpolateCharges> createImmersedBoundary(){
 	SpreadInterpolateCharges::Parameters ibmpar;
-	real3 L = make_real3(par.Lxy, par.H + 4*He);
+	real3 L = make_real3(par.Lxy, par.H + 6*He);
 	ibmpar.grid = Grid(Box(L), cellDim);
 	ibmpar.H = par.H;
 	ibmpar.He = He;
@@ -164,8 +170,8 @@ namespace uammd{
 	ibmpar.tolerance = par.tolerance;
 	ibmpar.support = par.support;
 	if(par.split>0){
-	  real Htot = par.H + 4*He;
-	  int czmax = int((cellDim.z-1)*(acos(2.0*(0.5*par.H + He)/Htot)/real(M_PI)));
+	  real Htot = par.H + 6*He;
+	  int czmax = int((cellDim.z-1)*(acos(2.0*(0.5*par.H + 2*He)/Htot)/real(M_PI)));
 	  ibmpar.maximumSupport = 2*czmax+1;
 	}
 	else{
@@ -177,14 +183,14 @@ namespace uammd{
       SeparatedCharges separateCharges(cudaStream_t st){
 	SeparatedCharges sep;
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	sep.separate(pos, par.H, He, st);
+	sep.separate(pos, par.H, 2*He, st);
 	return sep;
       }
 
       std::shared_ptr<BVPPoissonSlab> createBVP(Parameters par){
 	BVPPoissonSlab::Parameters bvppar;
 	bvppar.Lxy = par.Lxy;
-	bvppar.H = 0.5*(par.H + 4*He);
+	bvppar.H = 0.5*(par.H + 6*He);
 	bvppar.cellDim = cellDim;
 	bvppar.permitivity = par.permitivity.inside;
 	return std::make_shared<BVPPoissonSlab>(bvppar);
@@ -195,7 +201,8 @@ namespace uammd{
       gpu_container<cufftComplex2> surfaceValuesFourier;
     };
 
-    gpu_container<cufftComplex2> takeSurfaceValueDensityToFourier(cached_vector<real> &surfaceValueTop, cached_vector<real> &surfaceValueBottom, int2 gridSize){
+    gpu_container<cufftComplex2> takeSurfaceValueDensityToFourier(cached_vector<real> &surfaceValueTop,
+								  cached_vector<real> &surfaceValueBottom, int2 gridSize){
       int2 n = gridSize;
       gpu_container<cufftComplex2> surfaceValuesFourier(n.y*(n.x/2+1));
       int2 cdtmp = {n.y, n.x};

@@ -8,7 +8,7 @@
 #include "utils/cufftPrecisionAgnostic.h"
 #include "utils/cufftComplex4.cuh"
 #include "utils/cufftComplex2.cuh"
-
+#include<fstream>
 namespace uammd{
   namespace DPPoissonSlab_ns{
     struct Permitivity{
@@ -28,7 +28,7 @@ namespace uammd{
       }
 
     };
-  
+
     namespace detail{
       //This is a very barebones container. Its purpose is only to avoid the unnecessary unninitialized_fill kernel that thrust issues on device_vector creation. Thus it mascarades as a thrust::device_vector.
       template<class T, class Allocator = System::allocator<T>>
@@ -101,8 +101,6 @@ namespace uammd{
     template<class T> using gpu_container = thrust::device_vector<T, managed_allocator<T>>;
     template<class T> using cached_vector = thrust::device_vector<T, managed_allocator<T>>;
 #endif
-
-
 
     class IndexToWaveNumber{
       const int nkx, nky;
@@ -221,6 +219,65 @@ namespace uammd{
     using cufftReal = cufftReal_t<real>;
 
 
+    template<class Container>
+    void writeComplexField(Container & field, int3 dim, real H, std::string file){
+      int nkx = dim.x;
+      int nky = dim.y;
+      int nz = dim.z;
+      int ntot = (nkx/2+1)*nky*nz;
+      std::ofstream out(file);
+      std::vector<cufftComplex4> h_field(ntot);
+      thrust::copy(field.begin(), field.begin() + ntot, h_field.begin());
+      for (int id = 0; id<(nkx/2+1)*nky; id++){
+	int2 ik = make_int2(id%(nkx/2+1), id/(nkx/2+1));
+	Index3D indexer(nkx/2+1, nky, nz);
+	auto fn = make_third_index_iterator(h_field.data(), ik.x, ik.y, indexer);
+	fori(0,nz){
+	  //real z = real(0.5)*H*cos(M_PI*i/(nz-1));
+	  real z = i;
+	  auto f = fn[i];
+	  out<<ik.x<<" "<<ik.y<<" "<<z<<" "<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w<<"\n";
+	}
+      }
+    }
+    template<class Container>
+    void writeComplex2Field(Container & field, int3 dim, real H, std::string file){
+      int nkx = dim.x;
+      int nky = dim.y;
+      int nz = dim.z;
+      int ntot = (nkx/2+1)*nky*nz;
+      std::ofstream out(file);
+      std::vector<cufftComplex2> h_field(ntot);
+      thrust::copy(field.begin(), field.begin() + ntot, h_field.begin());
+      for (int id = 0; id<(nkx/2+1)*nky; id++){
+	int2 ik = make_int2(id%(nkx/2+1), id/(nkx/2+1));
+	Index3D indexer(nkx/2+1, nky, nz);
+	auto fn = make_third_index_iterator(h_field.data(), ik.x, ik.y, indexer);
+	fori(0,nz){
+	  //real z = real(0.5)*H*cos(M_PI*i/(nz-1));
+	  real z = i;
+	  auto f = fn[i];
+	  out<<ik.x<<" "<<ik.y<<" "<<z<<" "<<f.x<<" "<<f.y<<"\n";
+	}
+      }
+    }
+
+    template<class T, class Container>
+    void writeRealField(Container & field, int3 dim, std::string file){
+      int nx = dim.x;
+      int ny = dim.y;
+      int nz = dim.z;
+      int ntot = nx*ny*nz;
+      std::ofstream out(file);
+      std::vector<T> h_field(ntot);
+      thrust::copy(field.begin(), field.begin() + ntot, h_field.begin());
+      for (int id = 0; id<ntot; id++){
+        int3 ik = {id%nx, (id/nx)%ny, id/(nx*ny)};
+	Index3D indexer(nx, ny, nz);
+	auto f = h_field[id];
+	out<<ik.x<<" "<<ik.y<<" "<<ik.z<<" "<<f<<"\n";
+      }
+    }
   }
 }
 
