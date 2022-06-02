@@ -377,7 +377,7 @@ auto createIntegrator(UAMMD sim){
     integrator = createIntegratorICM(sim);
   }
   else{
-    sim.sys->log<System::CRITICAL>("Invalid integrator. Choose BD, BDHI, FIB, ICM, VerletNVT, VerletNVE, SPH or DPD");
+    System::log<System::CRITICAL>("Invalid integrator. Choose BD, BDHI, FIB, ICM, VerletNVT, VerletNVE, SPH or DPD");
   }
   return integrator;
 }

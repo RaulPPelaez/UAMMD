@@ -28,21 +28,19 @@ namespace uammd{
       using KernelTorque = FCM_ns::Kernels::GaussianTorque;
       using FCM_super = FCM_impl<Kernel, KernelTorque>;
       std::shared_ptr<FCM_super> fcm;
-      shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
-      shared_ptr<System> sys;
       real temperature, dt;
     public:
       using Parameters = FCM_super::Parameters;
+
+      FCM(shared_ptr<ParticleData> pd, Parameters par):
+	FCM(std::make_shared<ParticleGroup>(pd, "All"), par){}
       
-      FCM(shared_ptr<ParticleData> pd,
-	  shared_ptr<ParticleGroup> pg,
-	  shared_ptr<System> sys,
-	  Parameters par):
-	pd(pd), pg(pg), sys(sys),
+      FCM(shared_ptr<ParticleGroup> pg, Parameters par):
+        pg(pg),
 	temperature(par.temperature), dt(par.dt){
 	if(par.seed == 0)
-	  par.seed = sys->rng().next32();
+	  par.seed = pg->getParticleData()->getSystem()->rng().next32();
 	this->fcm = std::make_shared<FCM_super>(par);
       }
 
@@ -54,7 +52,8 @@ namespace uammd{
       = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
     */
       void computeMF(real3* MF, cudaStream_t st = 0){
-	sys->log<System::DEBUG1>("[BDHI::FCM] Computing MF....");
+	System::log<System::DEBUG1>("[BDHI::FCM] Computing MF....");
+	auto pd = pg->getParticleData();
 	auto force = pd->getForce(access::gpu, access::read);
 	auto pos = pd->getPos(access::gpu, access::read);
 	int numberParticles = pg->getNumberParticles();
@@ -71,6 +70,14 @@ namespace uammd{
       }
 
       void finish_step(cudaStream_t st = 0){}
+
+      real getHydrodynamicRadius(){
+	return fcm->getHydrodynamicRadius();
+      }
+
+      real getSelfMobility(){
+	return fcm->getSelfMobility();
+      }
 
     };
 

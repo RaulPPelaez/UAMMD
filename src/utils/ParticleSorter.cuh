@@ -35,8 +35,8 @@ REFERENCES:
 #include"System/System.h"
 #include"utils/debugTools.h"
 #include"third_party/type_names.h"
-#include<cub/cub.cuh>
-#include<thrust/device_vector.h>
+#include <thrust/device_vector.h>
+#include<third_party/uammd_cub.cuh>
 #include<bits/stdc++.h>
 namespace uammd{
 

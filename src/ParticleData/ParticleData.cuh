@@ -323,6 +323,9 @@ namespace uammd{
     PROPERTY_LOOP(INIT_PROPERTIES)
   {
     sys->log<System::MESSAGE>("[ParticleData] Created with %d particles.", numberParticles);
+    if(numberParticles == 0){
+      sys->log<System::WARNING>("[ParticleData] Initialized with zero particles.");
+    }
     id.resize(numberParticles);
     CudaCheckError();
     auto id_prop = id.data(access::location::gpu, access::mode::write);

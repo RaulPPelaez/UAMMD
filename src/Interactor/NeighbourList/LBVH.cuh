@@ -53,7 +53,7 @@ pp. 95–102.
 #include<thrust/gather.h>
 #include<thrust/for_each.h>
 
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 
 #include<limits>
 #include<fstream>
@@ -241,11 +241,11 @@ namespace uammd{
 
       const auto pi = cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos + i);
       const auto pib = nl.box.apply_pbc(make_real3(pi));
-
-      auto quantity = tr.zero();
-      const int ori = globalIndex[nl.groupIndex[i]];
-      SFINAE::Delegator<Transverser> del;
-      del.getInfo(tr, ori);
+      using Adaptor = SFINAE::TransverserAdaptor<Transverser>;
+      Adaptor adaptor;
+      auto quantity = Adaptor::zero(tr);
+      const int ori = globalIndex[nl.groupIndex[i]];     
+      adaptor.getInfo(tr, ori);
       //For every type tree
       for(int treecount = 0; treecount<nl.Ntrees; treecount++){
 	//Reset p_shifted to main box
@@ -272,10 +272,8 @@ namespace uammd{
 		const int j = -left-numberParticles+1;
 		const auto pj = cub::ThreadLoad<cub::LOAD_LDG>(nl.sortPos + j);
 		const int global_index =  globalIndex[nl.groupIndex[j]];
-		tr.accumulate(quantity,
-			      del.compute(tr,
-					  global_index,
-					  pi, pj));
+		Adaptor::accumulate(tr, quantity,
+				    adaptor.compute(tr, global_index, pi, pj));
 	      }
 	      else current_node = left;
 	    }
@@ -292,7 +290,6 @@ namespace uammd{
 
 	}while(true);
       }
-
       tr.set(ori, quantity);
     }
 
@@ -610,9 +607,7 @@ namespace uammd{
 
   class LBVHList{
   private:
-    shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
-    shared_ptr<System> sys;
 
     //If true, the next issued neighbour list update will always result in a reconstruction of the list.
     bool force_next_update = true;
@@ -625,11 +620,11 @@ namespace uammd{
     connection numParticlesChangedConnection, posWriteConnection;
 
     void handleNumParticlesChanged(int Nnew){
-      sys->log<System::DEBUG>("[LBVHList] Number particles changed signal handled.");
+      System::log<System::DEBUG>("[LBVHList] Number particles changed signal handled.");
       force_next_update = true;
     }
     void handlePosWriteRequested(){
-      sys->log<System::DEBUG1>("[LBVHList] Issuing a list update after positions were written to.");
+      System::log<System::DEBUG1>("[LBVHList] Issuing a list update after positions were written to.");
       force_next_update = true;
     }
 
@@ -651,7 +646,7 @@ namespace uammd{
     ParticleSorter ps;
     template<class T>
     std::shared_ptr<T> allocate_temporary_vector(int numberElements){
-      auto alloc = sys->getTemporaryDeviceAllocator<T>();
+      auto alloc = System::getTemporaryDeviceAllocator<T>();
       return std::shared_ptr<T>(alloc.allocate(numberElements),
 				[=](T* ptr){ alloc.deallocate(ptr);});
 
@@ -659,7 +654,8 @@ namespace uammd{
 
 
     int countParticleTypes(cudaStream_t st){
-      auto alloc = sys->getTemporaryDeviceAllocator<char>();
+      auto pd = pg->getParticleData();
+      auto alloc = System::getTemporaryDeviceAllocator<char>();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto groupPos = pg->getPropertyIterator(pos.begin(), access::location::gpu);
       int numberParticles = pg->getNumberParticles();
@@ -672,7 +668,7 @@ namespace uammd{
       real4 h_temp;
       CudaSafeCall(cudaMemcpy(&h_temp, temp.get(), sizeof(real4), cudaMemcpyDeviceToHost));
       int Ntypes = int(h_temp.w+0.5)+1;
-      sys->log<System::DEBUG3>("[LBVHList] Found %d particle types", Ntypes);
+      System::log<System::DEBUG3>("[LBVHList] Found %d particle types", Ntypes);
       return Ntypes;
     }
 
@@ -682,21 +678,19 @@ namespace uammd{
       int maxNtypes = 0;
       int maxNcells = 2048;
       int3 ncellsMorton;
+      auto pd = pg->getParticleData();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       const real maxL = std::max({currentBox.boxSize.x, currentBox.boxSize.y, currentBox.boxSize.z});
       do{
 	maxNcells = maxNcells/2;
 	real h = maxL/maxNcells;
 	ncellsMorton = make_int3(currentBox.boxSize/h+0.5);
-
 	Grid grid(currentBox, ncellsMorton);
 	LBVH_ns::MortonPlusTypeHash hasher(grid, pos.raw());
 	maxNtypes = hasher.getMaxNumberTypes()-1;
       }while(maxNtypes < Ntypes or maxNcells > 1024);
-
-      sys->log<System::DEBUG3>("[LBVHList] Choosing (%d, %d, %d) morton cells",
+      System::log<System::DEBUG3>("[LBVHList] Choosing (%d, %d, %d) morton cells",
 			       ncellsMorton.x, ncellsMorton.y, ncellsMorton.z);
-
       Grid grid(currentBox, ncellsMorton);
       LBVH_ns::MortonPlusTypeHash hasher(grid, pos.raw());
       auto maxHash = hasher.hash(grid.cellDim-1, Ntypes-1);
@@ -707,11 +701,10 @@ namespace uammd{
 				   numberParticles,
 				   maxHash,
 				   st);
-
       ps.applyCurrentOrder(pos.begin(), sortPos.begin(), numberParticles, st);
-
       return lastMortonBit;
     }
+
     void generateHierarchy(Node* d_nodes, int * d_lefts, int lastMortonBit, cudaStream_t st){
       int numberParticles = sortPos.size();
       int Nthreads=128;
@@ -723,7 +716,7 @@ namespace uammd{
 							  lastMortonBit,
 							  numberParticles);
       CudaCheckError();
-      sys->log<System::DEBUG3>("[LBVHList] Find roots");
+      System::log<System::DEBUG3>("[LBVHList] Find roots");
       LBVH_ns::findRoots<<<Nblocks, Nthreads, 0, st>>>(d_nodes,
 						       thrust::raw_pointer_cast(treeRoots.data()),
 						       mhsh,
@@ -731,11 +724,11 @@ namespace uammd{
 						       numberParticles);
       CudaCheckError();
     }
+
     void generateAABB(Node* d_nodes, cudaStream_t st){
       int numberParticles = sortPos.size();
       int NInternalNodes= numberParticles-1;
       int NtotalNodes = NInternalNodes + numberParticles;
-
       auto visitCount = allocate_temporary_vector<int>(NtotalNodes);
       fillWithGPU<<<NtotalNodes/128+1, 128, 0, st>>>(visitCount.get(), 0, NtotalNodes);
       auto d_aabbs = thrust::raw_pointer_cast(aabbs.data());
@@ -754,7 +747,7 @@ namespace uammd{
 	CudaCheckError();
 	if(treeRoots.size()>1){
 	  auto tr = thrust::make_permutation_iterator(aabbs.begin(), treeRoots.begin());
-	  auto alloc = sys->getTemporaryDeviceAllocator<char>();
+	  auto alloc = System::getTemporaryDeviceAllocator<char>();
 	  AABB root = thrust::reduce(thrust::cuda::par(alloc).on(st),
 				     tr, tr+treeRoots.size(),
 				     AABB(),
@@ -766,22 +759,17 @@ namespace uammd{
     }
   public:
 
-    LBVHList(shared_ptr<ParticleData> pd,
-	     shared_ptr<System> sys): LBVHList(pd, std::make_shared<ParticleGroup>(pd, sys), sys){
-    }
+    LBVHList(shared_ptr<ParticleData> pd): LBVHList(std::make_shared<ParticleGroup>(pd)){}
 
-    LBVHList(shared_ptr<ParticleData> pd,
-	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys){
-      sys->log<System::MESSAGE>("[LBVHList] Created");
-
-
+    LBVHList(shared_ptr<ParticleGroup> pg): pg(pg){
+      System::log<System::MESSAGE>("[LBVHList] Created");
+      auto pd = pg->getParticleData();
       pd->getNumParticlesChangedSignal()->connect([this](int Nnew){this->handleNumParticlesChanged(Nnew);});
       pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});
-
     }
+
     ~LBVHList(){
-      sys->log<System::DEBUG>("[LBVHList] Destroyed");
+      System::log<System::DEBUG>("[LBVHList] Destroyed");
       numParticlesChangedConnection.disconnect();
       posWriteConnection.disconnect();
       CudaCheckError();
@@ -791,15 +779,11 @@ namespace uammd{
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
       int numberParticles = pg->getNumberParticles();
-      sys->log<System::DEBUG2>("[LBVHList] Transversing LBVH List with %s", type_name<Transverser>().c_str());
-
+      System::log<System::DEBUG2>("[LBVHList] Transversing LBVH List with %s", type_name<Transverser>().c_str());
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
-
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(tr);
-
       auto nl = this->getLBVHList();
       LBVH_ns::transverseLBVHList<<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
 									   globalIndex,
@@ -811,12 +795,13 @@ namespace uammd{
     template<class Transverser>
     void transverseListWithNeighbourList(Transverser &tr, cudaStream_t st = 0){
       int numberParticles = pg->getNumberParticles();
-      sys->log<System::CRITICAL>("[LBVHList] The transverseListWithNeighbourList capability is not available yet");
+      System::log<System::CRITICAL>("[LBVHList] The transverseListWithNeighbourList capability is not available yet");
       CudaCheckError();
     }
 
     //Check if the cell list needs updating
     bool needsRebuild(Box box, real cutOff = 0){
+      auto pd = pg->getParticleData();
       pd->hintSortByHash(box, box.boxSize/1023.f);
       if(force_next_update){
 	force_next_update = false;
@@ -824,44 +809,34 @@ namespace uammd{
       }
       if(box != currentBox) return true;
       return false;
-
     }
 
     void update(Box box, real cutOff = 0, cudaStream_t st = 0){
       if(this->needsRebuild(box) == false) return;
-      sys->log<System::DEBUG2>("[LBVHList] Updating list");
+      System::log<System::DEBUG2>("[LBVHList] Updating list");
       currentBox = box;
-
       const int numberParticles = pg->getNumberParticles();
-
       sortPos.resize(numberParticles);
-
-      sys->log<System::DEBUG3>("[LBVHList] Hashing and sorting");
+      System::log<System::DEBUG3>("[LBVHList] Hashing and sorting");
       const int Ntypes = countParticleTypes(st);
       treeRoots.resize(Ntypes);
-
       int lastMortonBit = sortParticlesWithMortonPlusTypesHash(Ntypes, st);
-
-      sys->log<System::DEBUG3>("[LBVHList] Generate hierarchy");
+      System::log<System::DEBUG3>("[LBVHList] Generate hierarchy");
       //Generate tree
       const int NLeafNodes = numberParticles;
       const int NInternalNodes = NLeafNodes-1;
       const int NtotalNodes = NInternalNodes + NLeafNodes;
-
       auto nodes = allocate_temporary_vector<Node>(NtotalNodes);
       auto lefts = allocate_temporary_vector<int>(NtotalNodes);
       generateHierarchy(nodes.get(), lefts.get(), lastMortonBit, st);
-
-      sys->log<System::DEBUG3>("[LBVHList] Compute AAABBs");
+      System::log<System::DEBUG3>("[LBVHList] Compute AAABBs");
       //Compute AABB
       aabbs.resize(NtotalNodes);
       generateAABB(nodes.get(), st);
-
-      sys->log<System::DEBUG3>("[LBVHList] Compute ropes");
+      System::log<System::DEBUG3>("[LBVHList] Compute ropes");
       {//Compute traversal ropes between nodes. see [3]
 	int Nthreads = 128;
 	int Nblocks=(NtotalNodes)/Nthreads + (((NtotalNodes)%Nthreads)?1:0);
-
 	LBVH_ns::computeRopes<<<Nblocks, Nthreads, 0, st>>>(nodes.get(),
 							    lefts.get(),
 							    thrust::raw_pointer_cast(treeRoots.data()),
@@ -869,9 +844,8 @@ namespace uammd{
 							    thrust::raw_pointer_cast(aabbs.data()),
 							    numberParticles);
 	CudaCheckError();
-
       }
-      sys->log<System::DEBUG1>("[LBVHList] Tree built");
+      System::log<System::DEBUG1>("[LBVHList] Tree built");
       CudaCheckError();
       rebuildNlist = true;
     }
@@ -886,8 +860,9 @@ namespace uammd{
       int Ntrees;
       //real *cutOffPerType;
     };
+
     LBVHListData getLBVHList(){
-      sys->log<System::DEBUG2>("[LBVHList] List requested");
+      System::log<System::DEBUG2>("[LBVHList] List requested");
       this->update(currentBox, 0);
       LBVHListData cl;
       cl.aabbs = thrust::raw_pointer_cast(aabbs.data());
@@ -1070,14 +1045,15 @@ namespace uammd{
 
     NeighbourContainer getNeighbourContainer(){
       auto nl = getLBVHList();
-      sys->log<System::DEBUG1>("[LBVHList] Neighbour container issued");
+      System::log<System::DEBUG1>("[LBVHList] Neighbour container issued");
       return NeighbourContainer(nl);
     }
 #endif
-
+    
     const real4* getSortedPositionIterator(){
       return thrust::raw_pointer_cast(sortPos.data());
     }
+    
     const int* getGroupIndexIterator(){
       auto nl = getLBVHList();
       return nl.groupIndex;

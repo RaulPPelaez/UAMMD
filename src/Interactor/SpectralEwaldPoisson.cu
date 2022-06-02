@@ -215,19 +215,19 @@ namespace uammd{
       NearFieldForceTransverser(real4* force_ptr, real* charge, TabulatedFunction<real> gff, Box box):
 	 force_ptr(force_ptr), greensFunctionField(gff), charge(charge), box(box){}
 
-      inline __device__ returnInfo zero() const{ return returnInfo();}
+      __device__ returnInfo zero() const{ return returnInfo();}
 
-      inline __device__ real getInfo(int pi) const{ return charge[pi];}
+      __device__ real getInfo(int pi) const{ return charge[pi];}
 
-      inline __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
+      __device__ returnInfo compute(const real4 &pi, const real4 &pj, real chargei, real chargej) const{
 	real3 rij = box.apply_pbc(make_real3(pj)-make_real3(pi));
 	real r2 = dot(rij, rij);
 	real r = sqrt(r2);
 	real fmod = -chargei*chargej*greensFunctionField(r);
 	return (r2>0)?(fmod*rij/r):real3();
       }
-      inline __device__ void accumulate(returnInfo &total, const returnInfo &current) const {total += current;}
-      inline __device__ void set(uint pi, const returnInfo &total) const {force_ptr[pi] += make_real4(total);}
+      __device__ void accumulate(returnInfo &total, const returnInfo &current) const {total += current;}
+      __device__ void set(uint pi, const returnInfo &total) const {force_ptr[pi] += make_real4(total);}
     private:
       TabulatedFunction<real> greensFunctionField;
       real4* force_ptr;
@@ -255,7 +255,7 @@ namespace uammd{
   void Poisson::nearFieldForce(cudaStream_t st){
     if(split>0){
       sys->log<System::DEBUG2>("[Poisson] Near field force computation");
-      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
+      if(!nl) nl = std::make_shared<NeighbourList>(pg);
       nl->update(box, nearFieldCutOff, st);
       auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
@@ -268,7 +268,7 @@ namespace uammd{
     if(split>0){
       int numberParticles = pg->getNumberParticles();
       sys->log<System::DEBUG2>("[Poisson] Near field energy computation");
-      if(!nl) nl = std::make_shared<NeighbourList>(pd, pg, sys);
+      if(!nl) nl = std::make_shared<NeighbourList>(pg);
       nl->update(box, nearFieldCutOff, st);
       auto charge = pd->getCharge(access::location::gpu, access::mode::read);
       auto energy = pd->getEnergy(access::location::gpu, access::mode::read);
@@ -345,7 +345,7 @@ namespace uammd{
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     auto charges = pd->getCharge(access::location::gpu, access::mode::read);
     int3 n = grid.cellDim;
-    IBM<Kernel> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+    IBM<Kernel> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
     ibm.spread(pos.begin(), charges.begin(), gridCharges, numberParticles, st);
     CudaCheckError();
   }
@@ -411,7 +411,7 @@ namespace uammd{
     auto gridData2ForceAndEnergy = Poisson_ns::UnZip2Real4(charge.begin(), forces.begin(), energy.begin());
     auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), gridData2ForceAndEnergy);
     int3 n = grid.cellDim;
-    IBM<Kernel> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+    IBM<Kernel> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
     ibm.gather(pos.begin(), f_tr, gridFieldPotential, numberParticles, st);
   }
 

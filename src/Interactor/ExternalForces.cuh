@@ -2,33 +2,30 @@
   Computes the effect of an external potential acting on each particle independently.
   i.e harmonic confinement, gravity...
 
-  Needs a functor with at least one of function out of these; force, energy that takes any needed parameters and return the force or energy for a given particle, i.e:
-
+  Needs a functor with of the following form:
+//External potential acting on each particle independently.
 struct HarmonicWall{
-  real zwall;
-  real k = 0.1;
-  HarmonicWall(real zwall):zwall(zwall){
+real k, zwall;
+HarmonicWall(real k, real zwall):k(k), zwall(zwall){}
+  //This function will be called for each particle
+  //The arguments will be modified according to what was returned by getArrays below
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, real4 pos,// real mass){
+    //The decision to compute energy/virial and or force should come from the members of
+    // comp (comp.force, comp.energy)
+    real3 force = (comp.force or comp.virial)?make_real3(0.0f, 0.0f, -k*(pos.z-zwall)):real3();
+    real energy = comp.energy?real(0.5)*k*pow(pos.z-zwall, 2):0;
+    real virial = comp.virial?dot(f,make_real3(pos)):0;
+    return {force,energy, virial};
   }
-
-  __device__ real3 force(real4 pos){
-
-    return {0.0f, 0.0f, -k*(pos.z-zwall)};
-
-  }
-
-  //If this function is not present, energy is assumed to be zero
-  // __device__ real energy(real4 pos){
-
-  //   return real(0.5)*k*pow(pos.z-zwall, 2);
-  // }
-
+    
   auto getArrays(ParticleData* pd){
-    auto pos = pd->getPos(access::location::gpu, access::mode::read);
+    auto pos = pd->getPos(access::gpu, access::read);    
     return pos.begin();
+    //If more than one property is needed this would be the way to do it:
+    //auto mass = pd->getMass(access::gpu, access::read);
+    //return std::make_tuple(pos.begin(), mass.begin());
+    //In this case the additional arrays must appear as additional arguments in "sum"
   }
-
-
-};
 
 ExternalForces will call getArrays expecting a list of arrays (with size pd->getNumParticles() and the order of the particle properties).
 It will then read for each particle index from the array list and pass the values to the force/energy functions
@@ -41,11 +38,12 @@ struct ReallyComplexExternalForce{
   real drag;
   ReallyComplexExternalForce(real drag):drag(drag){}
 
-  __device__ real3 force(real4 pos, real3 vel, int id, real mass){
-  if(id>1000)
-    return {0.0f, 0.0f, -0.1f*pos.z*mass-drag*vel};
-  else
-    return real3();
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, real4 pos, real3 vel, int id, real mass){
+  //...
+  //real3 force =...
+  //real energy =...
+  //real virial =...
+  return {force, energy, virial};
   }
 
   auto getArrays(ParticleData* pd){
@@ -59,8 +57,6 @@ struct ReallyComplexExternalForce{
 
 References:
 [1] https://www.murrayc.com/permalink/2015/12/05/modern-c-variadic-template-parameters-and-tuples/
-
-};
 
 */
 #ifndef EXTERNALFORCES_CUH

@@ -2,7 +2,7 @@
  */
 #ifndef NEIGHBOURLIST_COMMON_CUH
 #define NEIGHBOURLIST_COMMON_CUH
-#include"cub/thread/thread_load.cuh"
+#include"third_party/uammd_cub.cuh"
 #include"utils/TransverserUtils.cuh"
 namespace uammd{
   namespace NeighbourList_ns{

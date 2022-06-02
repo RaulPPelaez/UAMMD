@@ -24,7 +24,12 @@ src/aradillo.*
 star*
 armadillo*
 *.nvvp
+.\#*
 \#*
 work
 examples/data.main*
 *.dat
+
+docs/_static
+docs/_build
+docs/uammd

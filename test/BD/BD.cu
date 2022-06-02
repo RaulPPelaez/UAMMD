@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2020. BD  test code.
+/*Raul P. Pelaez 2020-2022. BD  test code.
     Requires a data.main with the parameters (see the readParameters function).
     Intended to be used by test.bash
  */
@@ -9,7 +9,7 @@
 #include"Interactor/NeighbourList/CellList.cuh"
 #include"Interactor/NeighbourList/VerletList.cuh"
 #include"Interactor/PairForces.cuh"
-#include"Interactor/IBM_Poisson.cuh"
+#include"Interactor/SpectralEwaldPoisson.cuh"
 #include"Interactor/Potential/Potential.cuh"
 #include"SoftPotential.cuh"
 #include"RepulsivePotential.cuh"
@@ -49,9 +49,7 @@ struct Parameters{
 };
 
 struct UAMMD{
-  std::shared_ptr<System> sys;
   std::shared_ptr<ParticleData> pd;
-  std::shared_ptr<ParticleGroup> pg;
   Parameters parameters;
 };
 
@@ -66,7 +64,7 @@ std::shared_ptr<Poisson> createElectrostaticInteractor(UAMMD sim){
   par.tolerance = sim.parameters.tolerance;
   par.gw = sim.parameters.gw;
   par.split = sim.parameters.split;
-  return std::make_shared<Poisson>(sim.pd, sim.pg, sim.sys, par);
+  return std::make_shared<Poisson>(sim.pd, par);
 }
 
 std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim);
@@ -86,20 +84,19 @@ int main(int argc, char *argv[]){
   Timer tim; tim.tic();
   runSimulation(sim, mc);
   auto totalTime = tim.toc();
-  sim.sys->log<System::MESSAGE>("mean FPS: %.2f", sim.parameters.numberSteps/totalTime);
-  sim.sys->finish();
+  System::log<System::MESSAGE>("mean FPS: %.2f", sim.parameters.numberSteps/totalTime);
   CudaCheckError();
   return 0;
 }
 
-Parameters readParameters(std::string datamain, shared_ptr<System> sys);
+Parameters readParameters(std::string datamain);
 
 void initializePositions(UAMMD sim){
   auto pos = sim.pd->getPos(access::location::cpu, access::mode::write);
   auto initial =  initLattice(sim.parameters.boxSize, sim.parameters.numberParticles, sc);
   std::copy(initial.begin(), initial.end(), pos.begin());
   std::generate(pos.begin(), pos.end(),
-		[&](){return make_real4(make_real3(sim.sys->rng().uniform3(-0.5, 0.5))*sim.parameters.boxSize, 0);});
+		[&](){return make_real4(make_real3(sim.pd->getSystem()->rng().uniform3(-0.5, 0.5))*sim.parameters.boxSize, 0);});
 }
 void initializeCharges(UAMMD sim){
   auto charges = sim.pd->getCharge(access::location::cpu, access::mode::write);
@@ -123,15 +120,15 @@ void initializeFromFile(UAMMD sim){
 
 UAMMD initialize(int argc, char* argv[]){
   UAMMD sim;
-  sim.sys = std::make_shared<System>(argc, argv);
+  auto sys =  std::make_shared<System>(argc, argv);
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
-  sim.sys->rng().setSeed(seed);
+  sys->rng().setSeed(seed);
   std::string fileName = "data.main";
   if(argc>1){
     fileName = argv[1];
   }
-  sim.parameters = readParameters(fileName, sim.sys);
-  sim.pd = std::make_shared<ParticleData>(sim.parameters.numberParticles, sim.sys);
+  sim.parameters = readParameters(fileName);
+  sim.pd = std::make_shared<ParticleData>(sim.parameters.numberParticles);
   if(!sim.parameters.readFile.empty()){
     initializeFromFile(sim);
   }
@@ -139,7 +136,6 @@ UAMMD initialize(int argc, char* argv[]){
     initializePositions(sim);
     initializeCharges(sim);
   }
-  sim.pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
   return sim;
 }
 
@@ -150,7 +146,7 @@ std::shared_ptr<BDMethod> createIntegratorBD(UAMMD sim){
   par.viscosity = sim.parameters.viscosity;
   par.hydrodynamicRadius = sim.parameters.hydrodynamicRadius;
   par.dt = sim.parameters.dt;
-  return std::make_shared<BDMethod>(sim.pd, sim.pg, sim.sys, par);
+  return std::make_shared<BDMethod>(sim.pd,  par);
 }
 
 std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
@@ -167,7 +163,7 @@ std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
     return createIntegratorBD<BD::Leimkuhler>(sim);
   }
   else{
-    sim.sys->log<System::CRITICAL>("Unrecognized scheme, use EulerMaruyama, MidPoint, AdamsBashforth or Leimkuhler");
+    System::log<System::CRITICAL>("Unrecognized scheme, use EulerMaruyama, MidPoint, AdamsBashforth or Leimkuhler");
     exit(1);
     return nullptr;
   }
@@ -178,7 +174,7 @@ std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
 template <class UsePotential> std::shared_ptr<UsePotential> createPotential(UAMMD sim);
 
 template<> std::shared_ptr<Potential::LJ> createPotential(UAMMD sim){
-  auto pot = std::make_shared<Potential::LJ>(sim.sys);
+  auto pot = std::make_shared<Potential::LJ>();
   Potential::LJ::InputPairParameters ppar;
   ppar.epsilon = sim.parameters.epsilon;
   ppar.shift = sim.parameters.shift;
@@ -190,7 +186,7 @@ template<> std::shared_ptr<Potential::LJ> createPotential(UAMMD sim){
 
 
 template<> std::shared_ptr<SoftPotential> createPotential(UAMMD sim){
-  auto pot = std::make_shared<SoftPotential>(sim.sys);
+  auto pot = std::make_shared<SoftPotential>();
   SoftPotential::InputPairParameters ppar;
   ppar.cutOff = sim.parameters.cutOff;
   ppar.U0 = sim.parameters.U0;
@@ -201,14 +197,14 @@ template<> std::shared_ptr<SoftPotential> createPotential(UAMMD sim){
 }
 
 template<> std::shared_ptr<RepulsivePotential> createPotential(UAMMD sim){
-  auto pot = std::make_shared<RepulsivePotential>(sim.sys);
+  auto pot = std::make_shared<RepulsivePotential>();
   RepulsivePotential::InputPairParameters ppar;
   ppar.cutOff = sim.parameters.cutOff;
   ppar.U0 = sim.parameters.U0;
   ppar.sigma = sim.parameters.sigma;
   ppar.r_m = sim.parameters.r_m;
   ppar.p = sim.parameters.p;
-  sim.sys->log<System::MESSAGE>("Repulsive rcut: %g", ppar.cutOff);
+  System::log<System::MESSAGE>("Repulsive rcut: %g", ppar.cutOff);
   pot->setPotParameters(0, 0, ppar);
  return pot;
 }
@@ -219,7 +215,7 @@ template<class UsePotential> std::shared_ptr<Interactor> createShortRangeInterac
   using SR = PairForces<UsePotential, VerletList>;
   typename SR::Parameters params;
   params.box = Box(sim.parameters.boxSize);
-  auto pairForces = std::make_shared<SR>(sim.pd, sim.pg, sim.sys, params, pot);
+  auto pairForces = std::make_shared<SR>(sim.pd,  params, pot);
   return pairForces;
 }
 
@@ -254,7 +250,7 @@ public:
   }
 
   void writeCurrent(){
-    sim.sys->log<System::DEBUG1>("[System] Writing to disk...");
+    System::log<System::DEBUG1>("[System] Writing to disk...");
     auto par = sim.parameters;
     auto pos = sim.pd->getPos(access::location::cpu, access::mode::read);
     auto charge = sim.pd->getCharge(access::location::cpu, access::mode::read);
@@ -289,8 +285,8 @@ void runSimulation(UAMMD sim, std::shared_ptr<NVT> mc){
   }
 }
 
-Parameters readParameters(std::string datamain, shared_ptr<System> sys){
-  InputFile in(datamain, sys);
+Parameters readParameters(std::string datamain){
+  InputFile in(datamain);
   Parameters par;
   in.getOption("boxSize", InputFile::Required)>>par.boxSize.x>>par.boxSize.y>>par.boxSize.z;
   in.getOption("numberSteps", InputFile::Required)>>par.numberSteps;
@@ -338,5 +334,4 @@ Parameters readParameters(std::string datamain, shared_ptr<System> sys){
 
   return par;
 }
-
 

@@ -11,7 +11,7 @@ MC::ForceBiased::Parameters par;
 par.beta = 1.0; //Inverse of temperature
 par.stepSize = 0.0001; //Initial step size (will be auto optimized)
 par.acceptanceRatio = 0.5;//Desired ratio of trial acceptance/rejection.
-auto mala = std::make_shared<MC::ForceBiased>(pd, pg, sys, par);
+auto mala = std::make_shared<MC::ForceBiased>(pd, par);
 ...
 mala->addInteractor(myinteractor);
 ...
@@ -158,11 +158,11 @@ namespace uammd{
 	real acceptanceRatio = 0.5; //Desired acceptance ratio
       };
 
-      ForceBiased(shared_ptr<ParticleData> pd,
-		  shared_ptr<ParticleGroup> pg,
-		  shared_ptr<System> sys,
-		  Parameters par):
-	Integrator(pd, pg, sys, "MC::ForceBiased"),
+      ForceBiased(shared_ptr<ParticleData> pd, Parameters par):
+	ForceBiased(std::make_shared<ParticleGroup>(pd, "All"), par){}
+      
+      ForceBiased(shared_ptr<ParticleGroup> pg, Parameters par):
+	Integrator(pg, "MC::ForceBiased"),
 	beta(par.beta),
 	optimizeStepSize(par.acceptanceRatio, par.stepSize){
 	sys->log<System::MESSAGE>("[MC::ForceBiased] Initialized");
@@ -334,8 +334,8 @@ namespace uammd{
       real updateForceEnergyEstimation(){
 	sys->log<System::DEBUG2>("[MC::ForceBiased] Computing current force and energy");
 	resetForceAndEnergy();
-	for(auto &i: interactors){
-	  currentEnergy += i->sumForceEnergy(st);
+	for(auto inter: interactors){
+	  inter->sum({.force = true, .energy= true, .virial = false}, st);
 	}
 	auto energy = pd->getEnergy(access::location::gpu, access::mode::read);
         currentEnergy += thrust::reduce(thrust::cuda::par.on(st), energy.begin(), energy.end());

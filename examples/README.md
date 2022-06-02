@@ -3,6 +3,8 @@ In these folders you will find a lot of examples showcasing the different capabi
 
 UAMMD is presented with two distinct identities, it can work as a standalone molecular simulation GPU code (such as gromacs or hoomd) or as a library exposing GPU algorithms for you to use to accelerate your own code. Keep in mind that UAMMD is designed to be hackable and copy pastable, so feel free to take what you want and give nothing back!  
 
+The Makefile in this folder simply goes into each folder and runs the Makefiles there.  
+
 This folder is organized in the following way:  
 
 ### basic_concepts  

@@ -81,7 +81,7 @@ namespace uammd{
     nfpar.Lxy = par.Lxy;
     nfpar.tolerance = par.tolerance;
     nfpar.numberStandardDeviations = par.numberStandardDeviations;
-    this->nearField = std::make_shared<DPPoissonSlab_ns::NearField>(sys, pd, pg, nfpar);
+    this->nearField = std::make_shared<DPPoissonSlab_ns::NearField>(pg, nfpar);
   }
 
   void DPPoissonSlab::initializeFarField(Parameters par){

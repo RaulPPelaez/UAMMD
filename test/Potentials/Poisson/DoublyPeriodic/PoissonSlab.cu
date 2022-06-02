@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2020. DP Poisson test
+/*Raul P. Pelaez 2020-2022. DP Poisson test
 
 This file encodes the following simulation:
 
@@ -79,24 +79,27 @@ using std::make_shared;
 using std::endl;
 
 
+
 class RepulsiveWall{
   RepulsivePotentialFunctor::PairParameters params;
   real H;
 public:
-  RepulsiveWall(real H, RepulsivePotentialFunctor::PairParameters ip):H(H),params(ip){}
+  RepulsiveWall(real H, RepulsivePotentialFunctor::PairParameters ip):
+    H(H),params(ip){}
 
-  __device__ __forceinline__ real3 force(real4 pos){
+  __device__ ForceEnergyVirial sum(Interactor::Computables comp, real4 pos /*, real mass */){
     real distanceToImage = abs(abs(pos.z) - H * real(0.5))*real(2.0);
     real fz = RepulsivePotentialFunctor::force(distanceToImage * distanceToImage, params) * distanceToImage;
-    return make_real3(0, 0, fz*(pos.z<0?real(-1.0):real(1.0)));
+    ForceEnergyVirial fev;
+    fev.force = make_real3(0, 0, fz*(pos.z<0?real(-1.0):real(1.0)));    
+    return fev;
   }
 
-  std::tuple<const real4 *> getArrays(ParticleData *pd){
-    auto pos = pd->getPos(access::location::gpu, access::mode::read);
+  auto getArrays(ParticleData *pd){
+    auto pos = pd->getPos(access::gpu, access::read);
     return std::make_tuple(pos.raw());
   }
 };
-  
 struct Parameters{
   int numberParticles;
   real Lxy, H;
@@ -127,7 +130,7 @@ struct UAMMD{
   Parameters par;
 };
 
-Parameters readParameters(std::string fileName, shared_ptr<System> sys);
+Parameters readParameters(std::string fileName);
 
 void initializeParticles(UAMMD sim){
   auto pos = sim.pd->getPos(access::location::cpu, access::mode::write);
@@ -171,7 +174,7 @@ UAMMD initialize(int argc, char *argv[]){
   if(datamain.empty()){
     datamain = "data.main";
   }
-  sim.par = readParameters(datamain, sim.sys); 
+  sim.par = readParameters(datamain); 
   sim.pd = std::make_shared<ParticleData>(sim.par.numberParticles, sim.sys);
   sim.savedPositions = std::make_shared<thrust::device_vector<real4>>();
   sim.savedPositions->resize(sim.par.numberParticles);
@@ -185,8 +188,8 @@ std::shared_ptr<BDMethod> createIntegrator(UAMMD sim){
   par.viscosity = sim.par.viscosity;
   par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
   par.dt = sim.par.dt;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<BDMethod>(sim.pd, pg, sim.sys, par);
+
+  return std::make_shared<BDMethod>(sim.pd, par);
 }
 
 std::shared_ptr<DPPoissonSlab> createElectrostaticInteractor(UAMMD sim){  
@@ -220,8 +223,8 @@ std::shared_ptr<DPPoissonSlab> createElectrostaticInteractor(UAMMD sim){
   }
   par.support = sim.par.support;
   par.numberStandardDeviations = sim.par.numberStandardDeviations;
-  auto pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
-  return std::make_shared<DPPoissonSlab>(sim.pd, pg, sim.sys, par);
+
+  return std::make_shared<DPPoissonSlab>(sim.pd, par);
 }
 
 
@@ -232,11 +235,11 @@ std::shared_ptr<Interactor> createWallRepulsionInteractor(UAMMD sim){
   potpar.U0 = sim.par.U0;
   potpar.r_m = sim.par.r_m;
   potpar.p = sim.par.p;
-  return make_shared<ExternalForces<RepulsiveWall>>(sim.pd, sim.sys, make_shared<RepulsiveWall>(sim.par.H, potpar));
+  return make_shared<ExternalForces<RepulsiveWall>>(sim.pd, make_shared<RepulsiveWall>(sim.par.H, potpar));
 }
 
 std::shared_ptr<RepulsivePotential> createPotential(UAMMD sim){
-  auto pot = std::make_shared<RepulsivePotential>(sim.sys);
+  auto pot = std::make_shared<RepulsivePotential>();
   RepulsivePotential::InputPairParameters ppar;
   ppar.cutOff = sim.par.cutOff;
   ppar.U0 = sim.par.U0;
@@ -256,7 +259,7 @@ template<class UsePotential> std::shared_ptr<Interactor> createShortRangeInterac
   real H = sim.par.H;
   params.box = Box(make_real3(Lxy, Lxy, H));
   params.box.setPeriodicity(1,1,0);
-  auto pairForces = std::make_shared<SR>(sim.pd, sim.sys, params, pot);
+  auto pairForces = std::make_shared<SR>(sim.pd, params, pot);
   return pairForces;
 }
 
@@ -388,8 +391,8 @@ int main(int argc, char *argv[]){
   return 0;
 }
 
-Parameters readParameters(std::string datamain, shared_ptr<System> sys){
-  InputFile in(datamain, sys);
+Parameters readParameters(std::string datamain){
+  InputFile in(datamain);
   Parameters par;
   in.getOption("Lxy", InputFile::Required)>>par.Lxy;
   in.getOption("H", InputFile::Required)>>par.H;

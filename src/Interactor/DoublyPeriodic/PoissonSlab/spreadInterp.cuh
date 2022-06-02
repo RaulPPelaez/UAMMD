@@ -38,7 +38,7 @@ namespace uammd{
 	return make_int3(support.x, support.y, support.z);
       }
       
-      inline __host__  __device__ int3 getSupport(int3 cell) const{
+      inline __host__  __device__ int3 getSupport(real3 pos, int3 cell) const{
 	real ch = real(0.5)*Htot*cospi((real(cell.z))/(nz-1));
 	int czt = int((nz)*(acos(real(2.0)*(ch+rmax)/Htot)/real(M_PI)));
 	int czb = int((nz)*(acos(real(2.0)*(ch-rmax)/Htot)/real(M_PI)));
@@ -46,7 +46,7 @@ namespace uammd{
 	return make_int3(support.x, support.y, sz);
       }
 
-      inline __host__  __device__ real phi(real r) const{
+      inline __host__  __device__ real phi(real r, real3 pos) const{
 	return (abs(r)>=rmax)?0:(prefactor*exp(tau*r*r));
       }
 
@@ -286,8 +286,9 @@ namespace uammd{
 	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(), charge.begin(), fieldAtParticles);
 	auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), Ep2fe);
 	int3 n = grid.cellDim;
-	IBM<Kernel, Grid> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-	ibm.gather(pos.begin(), f_tr, d_gridForcesEnergies, *qw, numberParticles, st);
+	IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM_ns::DefaultWeightCompute wc; //If non-default QuadratureWeights are used, a weight compute must also be passed.
+	ibm.gather(pos.begin(), f_tr, d_gridForcesEnergies, *qw, wc, numberParticles, st);
 	CudaCheckError();
       }
 
@@ -353,7 +354,7 @@ namespace uammd{
 	sys->log<System::DEBUG>("Spreading %d particles", group.numberParticles);
 	auto minusChargeIterator = thrust::make_transform_iterator(group.charge, thrust::negate<real>());
 	int3 n = grid.cellDim;
-	IBM<Kernel, Grid> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibm.spread(group.pos, minusChargeIterator, d_gridCharges, group.numberParticles, st);
 	CudaCheckError();
       }

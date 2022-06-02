@@ -67,9 +67,7 @@ namespace uammd{
 
   class VerletList{
   protected:
-    shared_ptr<ParticleData> pd;
     shared_ptr<ParticleGroup> pg;
-    shared_ptr<System> sys;
     VerletListBase nl;
     bool forceNextUpdate = true;
     connection posWriteConnection, reorderConnection;
@@ -78,28 +76,27 @@ namespace uammd{
 
   public:
 
-    VerletList(shared_ptr<ParticleData> pd,
-	       shared_ptr<System> sys):
-      VerletList(pd, std::make_shared<ParticleGroup>(pd, "All"), sys){}
+    VerletList(shared_ptr<ParticleData> pd):
+      VerletList(std::make_shared<ParticleGroup>(pd, "All")){}
 
-    VerletList(shared_ptr<ParticleData> pd,
-	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys): pd(pd), pg(pg), sys(sys){
-      sys->log<System::MESSAGE>("[VerletList] Created");
+    VerletList(shared_ptr<ParticleGroup> pg): pg(pg){
+      System::log<System::MESSAGE>("[VerletList] Created");
+      auto pd = pg->getParticleData();
       posWriteConnection = pd->getPosWriteRequestedSignal()->connect([this](){this->handlePosWriteRequested();});
       reorderConnection = pd->getReorderSignal()->connect([this](){this->handleReorder();});
       CudaCheckError();
     }
 
     ~VerletList(){
-      sys->log<System::DEBUG>("[VerletList] Destroyed");
+      System::log<System::DEBUG>("[VerletList] Destroyed");
       posWriteConnection.disconnect();
       reorderConnection.disconnect();
     }
 
     void update(Box box, real cutOff, cudaStream_t st = 0){
       if(needsRebuild(box, cutOff)){
-	sys->log<System::DEBUG1>("[VerletList] Updating verlet list.");
+	System::log<System::DEBUG1>("[VerletList] Updating verlet list.");
+	auto pd = pg->getParticleData();
 	pd->hintSortByHash(box, make_real3(cutOff*0.5));
 	currentBox = box;
 	currentCutOff = cutOff;
@@ -116,7 +113,7 @@ namespace uammd{
 
     void update(Box box, real3 cutOff, cudaStream_t st = 0){
       if(cutOff.x != cutOff.y or cutOff.x != cutOff.z){
-	sys->log<System::ERROR>("[VerletList] Cannot work with a different cut off in each direction");
+	System::log<System::ERROR>("[VerletList] Cannot work with a different cut off in each direction");
 	throw std::runtime_error("[VerletList] Invalid argument");
       }
       real rcut = cutOff.x;
@@ -125,12 +122,12 @@ namespace uammd{
 
     template<class Transverser>
     void transverseList(Transverser &tr, cudaStream_t st = 0){
-      sys->log<System::DEBUG2>("[VerletList] Transversing Neighbour List with %s", type_name<Transverser>().c_str());
+      System::log<System::DEBUG2>("[VerletList] Transversing Neighbour List with %s", type_name<Transverser>().c_str());
       const int numberParticles = pg->getNumberParticles();
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
-      SFINAE::TransverserAdaptor<Transverser>::prepare(tr, pd);
+      SFINAE::TransverserAdaptor<Transverser>::prepare(tr, pg->getParticleData());
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<Transverser>().getSharedMemorySize(tr);
       NeighbourList_ns::transverseWithNeighbourContainer<<<Nblocks, Nthreads, shMemorySize, st>>>(tr,
 									       globalIndex,
@@ -153,14 +150,18 @@ namespace uammd{
       nl.setCutOffMultiplier(newMultiplier);
     }
 
+    int getNumberOfStepsSinceLastUpdate(){
+      return nl.getNumberOfStepsSinceLastUpdate();
+    }
+
   private:
     void handlePosWriteRequested(){
-      sys->log<System::DEBUG1>("[VerletList] Issuing a list update after positions were written to.");
+      System::log<System::DEBUG1>("[VerletList] Issuing a list update after positions were written to.");
       forceNextUpdate = true;
     }
 
     void handleReorder(){
-      sys->log<System::DEBUG1>("[VerletList] Issuing a list update after a reorder.");
+      System::log<System::DEBUG1>("[VerletList] Issuing a list update after a reorder.");
       forceNextUpdate = true;
       nl.forceNextUpdate();
     }

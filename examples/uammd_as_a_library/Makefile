@@ -2,7 +2,7 @@
 LOG_LEVEL=5
 
 NVCC=nvcc
-CUDA_ROOT=/usr/local/cuda
+CUDA_ROOT=$(shell dirname `which nvcc`)/..
 #Python is required for the python_wrappers example
 PYTHON=python3
 UAMMD_ROOT=../../

@@ -27,18 +27,17 @@ namespace uammd{
   void LanczosAlgorithm::init(){
     //Init cuBLAS for Lanczos process
     CublasSafeCall(cublasCreate_v2(&cublas_handle));
-    sys->log<System::DEBUG1>("[LanczosAlgorithm] Success!");
+    System::log<System::DEBUG1>("[LanczosAlgorithm] Success!");
   }
 
-  LanczosAlgorithm::LanczosAlgorithm(shared_ptr<System> sys, real tolerance):
-    sys(sys),
+  LanczosAlgorithm::LanczosAlgorithm(real tolerance):
     N(0),
     max_iter(3), check_convergence_steps(3), tolerance(tolerance)
   {
-    sys->log<System::DEBUG1>("[LanczosAlgorithm] Initializing");
+    System::log<System::DEBUG1>("[LanczosAlgorithm] Initializing");
 #ifdef SINGLE_PRECISION
     if(tolerance < 1e-6){
-      sys->log<System::WARNING>("[LanczosAlgorithm] Lanczos might not be able to converge with such a low tolerance in single precision. Use double precision or increase the tolerance. I will perform 100 iterations at most");
+      System::log<System::WARNING>("[LanczosAlgorithm] Lanczos might not be able to converge with such a low tolerance in single precision. Use double precision or increase the tolerance. I will perform 100 iterations at most");
     }
 #endif
 
@@ -48,7 +47,7 @@ namespace uammd{
   }
 
   void LanczosAlgorithm::numElementsChanged(int newN){
-    sys->log<System::DEBUG3>("[LanczosAlgorithm] Number of elements changed.");
+    System::log<System::DEBUG3>("[LanczosAlgorithm] Number of elements changed.");
     this-> N = newN;
     try{
       w.resize(N+1, real3());
@@ -56,12 +55,12 @@ namespace uammd{
       oldBz.resize(N+1, real3());
     }
     catch(thrust::system_error &e){
-      sys->log<System::CRITICAL>("[LanczosAlgorithm] Thrust could not resize temporal storage with error: %s.", e.what());
+      System::log<System::CRITICAL>("[LanczosAlgorithm] Thrust could not resize temporal storage with error: %s.", e.what());
     }
   }
   //Increase maximum dimension of Krylov subspace, reserve necessary memory
   void LanczosAlgorithm::increment_max_iter(int inc){
-    sys->log<System::DEBUG3>("[LanczosAlgorithm] Increasing subspace dimension.");
+    System::log<System::DEBUG3>("[LanczosAlgorithm] Increasing subspace dimension.");
 
     V.resize(3*N*(max_iter+inc),0);
     P.resize((max_iter+inc)*(max_iter+inc),0);
@@ -77,7 +76,7 @@ namespace uammd{
 
   //After a certain number of iterations (iter), computes the current result guess sqrt(M)·v, stores in BdW
   void LanczosAlgorithm::compResult(real z2, int N, int iter, real * BdW, cudaStream_t st){
-    sys->log<System::DEBUG3>("[LanczosAlgorithm] Computing result");
+    System::log<System::DEBUG3>("[LanczosAlgorithm] Computing result");
     iter++;
     real alpha = 1.0;
     real beta = 0.0;
@@ -101,7 +100,7 @@ namespace uammd{
 			      iter, &htemp[0], &htemp[0]+iter,
 			      h_P, iter);
     if(info!=0){
-      sys->log<System::CRITICAL>("[LanczosAlgorithm] Could not diagonalize tridiagonal krylov matrix, steqr failed with code %d", info);
+      System::log<System::CRITICAL>("[LanczosAlgorithm] Could not diagonalize tridiagonal krylov matrix, steqr failed with code %d", info);
     }
 
     /***Hdiag_temp = Hdiag·P·e1****/
@@ -152,7 +151,7 @@ namespace uammd{
 			      d_htempGPU, 1,
 			      &beta,
 			      BdW, 1));
-    //sys->log<System::MESSAGE>("[LanczosAlgorithm] H**1/2[0][0] = %e %e %e %e", htemp[iter], htemp[iter+1], htemp[iter+2], htemp[iter+3]);
+    //System::log<System::MESSAGE>("[LanczosAlgorithm] H**1/2[0][0] = %e %e %e %e", htemp[iter], htemp[iter+1], htemp[iter+2], htemp[iter+3]);
   }
 
 }

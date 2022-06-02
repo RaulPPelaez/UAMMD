@@ -49,7 +49,7 @@ namespace uammd{
     }
     if(useNeighbourList){
       if(!nl){
-	nl = std::make_shared<NL>(pd, pg, sys);
+	nl = std::make_shared<NL>(pg);
       }
       nl->update(box, rcut, st);
       sys->log<System::DEBUG2>("[PairForces] Transversing neighbour list");
@@ -57,7 +57,7 @@ namespace uammd{
     }
     else{
       if(!nb){
-	nb = std::make_shared<NBody>(pd, pg, sys);
+	nb = std::make_shared<NBody>(pg);
       }
       sys->log<System::DEBUG2>("[PairForces] Transversing NBody");
       nb->transverse(tr, st);

@@ -8,7 +8,7 @@ TODO:
 */
 
 #include"BondedForces.cuh"
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 #include <stdexcept>
 #include<thrust/sort.h>
 #include<thrust/reduce.h>

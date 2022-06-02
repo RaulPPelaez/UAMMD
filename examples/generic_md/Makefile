@@ -7,7 +7,7 @@ ARCH=
 CXX=g++
 
 UAMMD_ROOT=../../
-CUDA_ROOT=/usr/local/cuda
+CUDA_ROOT=$(shell dirname `which nvcc`)/..
 NVCC=$(CUDA_ROOT)/bin/nvcc
 
 #Uncomment to compile in double precision mode, single by default

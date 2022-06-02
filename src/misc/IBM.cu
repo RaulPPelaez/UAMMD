@@ -3,7 +3,7 @@
  */
 #include"IBM.cuh"
 #include<type_traits>
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 #include"utils/atomics.cuh"
 namespace uammd{
   namespace IBM_ns{
@@ -12,10 +12,10 @@ namespace uammd{
       SFINAE_DEFINE_HAS_MEMBER(getSupport)
       template<class Kernel, bool def = has_getSupport<Kernel>::value> struct GetSupport;
       template<class Kernel> struct GetSupport<Kernel, true>{
-	static __host__  __device__ int3 get(Kernel &kernel, int3 cell){return kernel.getSupport(cell);}
+	static __host__  __device__ int3 get(Kernel &kernel, real3 pos, int3 cell){return kernel.getSupport(pos, cell);}
       };
       template<class Kernel> struct GetSupport<Kernel, false>{
-	static __host__  __device__ int3 get(Kernel &kernel, int3 cell){return make_int3(kernel.support);}
+	static __host__  __device__ int3 get(Kernel &kernel, real3 pos, int3 cell){return make_int3(kernel.support);}
       };
 
       SFINAE_DEFINE_HAS_MEMBER(getMaxSupport)
@@ -32,12 +32,12 @@ namespace uammd{
       SFINAE_DEFINE_HAS_MEMBER(phiZ)
 #define ENABLE_PHI_IF_HAS(foo) template<class Kernel> __device__ inline SFINAE::enable_if_t<has_phi##foo<Kernel>::value, real>
 #define ENABLE_PHI_IF_NOT_HAS(foo) template<class Kernel> __device__ inline SFINAE::enable_if_t<not has_phi##foo<Kernel>::value, real>
-      ENABLE_PHI_IF_HAS(X) phiX(Kernel &kern, real r){return kern.phiX(r);}
-      ENABLE_PHI_IF_HAS(Y) phiY(Kernel &kern, real r){return kern.phiY(r);}
-      ENABLE_PHI_IF_HAS(Z) phiZ(Kernel &kern, real r){return kern.phiZ(r);}
-      ENABLE_PHI_IF_NOT_HAS(X) phiX(Kernel &kern, real r){return kern.phi(r);}
-      ENABLE_PHI_IF_NOT_HAS(Y) phiY(Kernel &kern, real r){return kern.phi(r);}
-      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r){return kern.phi(r);}
+      ENABLE_PHI_IF_HAS(X) phiX(Kernel &kern, real r, real3 pos){return kern.phiX(r, pos);}
+      ENABLE_PHI_IF_HAS(Y) phiY(Kernel &kern, real r, real3 pos){return kern.phiY(r, pos);}
+      ENABLE_PHI_IF_HAS(Z) phiZ(Kernel &kern, real r, real3 pos){return kern.phiZ(r, pos);}
+      ENABLE_PHI_IF_NOT_HAS(X) phiX(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
+      ENABLE_PHI_IF_NOT_HAS(Y) phiY(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
+      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
 
       template<class Grid>
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
@@ -59,24 +59,24 @@ namespace uammd{
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
 	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
-	  weightsX[i] = detail::phiX(kernel, rij);
+	  weightsX[i] = detail::phiX(kernel, rij, pi);
 	}
 	real *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
 	  const real rij = grid.distanceToCellCenter(pi, cellj).y;
-	  weightsY[i] = detail::phiY(kernel,rij);
+	  weightsY[i] = detail::phiY(kernel,rij, pi);
 	}
 	real *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
 	  const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	  weightsZ[i] = detail::phiZ(kernel, rij);
+	  weightsZ[i] = detail::phiZ(kernel, rij, pi);
 	}
       }
 
-      __device__ real computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
-	return weights[ii]*weights[support.x+jj]*weights[support.x+support.y+kk];
+      __device__ real3 computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
+	return make_real3(weights[ii], weights[support.x+jj], weights[support.x+support.y+kk]);
       }
       
     }
@@ -92,14 +92,15 @@ namespace uammd{
     */
     template<bool is2D, class Grid, class Index3D, class Kernel,
 	     class PosIterator,
-	     class ParticleQuantityIterator, class GridQuantityIterator>
+	     class ParticleQuantityIterator, class GridQuantityIterator, class WeightCompute>
     __global__ void particles2GridD(const PosIterator pos,
 				    const ParticleQuantityIterator  particleQuantity,
 				    GridQuantityIterator  __restrict__ gridQuantity,
 				    int numberParticles,
 				    Grid grid,
 				    Index3D cell2index,
-				    Kernel kernel){
+				    Kernel kernel,
+				    WeightCompute weightCompute){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
@@ -115,7 +116,7 @@ namespace uammd{
 	pi = make_real3(pos[id]);
 	vi = particleQuantity[id];
 	celli = grid.getCell(pi);
-	support = detail::GetSupport<Kernel>::get(kernel, celli);
+	support = detail::GetSupport<Kernel>::get(kernel, pi, celli);
 	P = detail::computeSupportShift(pi, celli, grid, support);
 	if(is2D){
 	  P.z = 0;
@@ -134,8 +135,8 @@ namespace uammd{
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
-	const auto weight = vi*kern;
-	if(kern)atomicAdd(&gridQuantity[jcell], weight);
+	const auto weight = weightCompute(vi,kern);
+        atomicAdd(&gridQuantity[jcell], weight);
       }
     }
 
@@ -156,6 +157,7 @@ namespace uammd{
       class InterpolationKernel,
       class ParticlePosIterator, class ParticleQuantityOutputIterator,
       class GridQuantityIterator,
+      class WeightCompute,	     
       class Index3D,
       class QuadratureWeights>
     __global__ void grid2ParticlesDTPP(const ParticlePosIterator pos,
@@ -165,8 +167,8 @@ namespace uammd{
 				       Grid grid,
 				       Index3D cell2index, //Index of a 3d cell in gridQuantity
 				       InterpolationKernel kernel,
-				       QuadratureWeights qw
-				       ){
+				       WeightCompute weightCompute,
+				       QuadratureWeights qw){
       const int id = blockIdx.x;
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
@@ -183,7 +185,7 @@ namespace uammd{
 	if(tid==0){
 	  pi = make_real3(pos[id]);
 	  celli = grid.getCell(pi);
-	  support = detail::GetSupport<InterpolationKernel>::get(kernel, celli);
+	  support = detail::GetSupport<InterpolationKernel>::get(kernel, pi, celli);
 	  P = detail::computeSupportShift(pi, celli, grid, support);
 	  if(is2D){
 	    P.z = 0;
@@ -204,7 +206,8 @@ namespace uammd{
 	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	  const real dV = qw(cellj, grid);
 	  const int jcell = cell2index(cellj);
-	  const auto weight = gridQuantity[jcell]*detail::computeWeightFromShared(weights, ii, jj, kk, support);
+	  const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
+	  const auto weight = weightCompute(gridQuantity[jcell], kern);
 	  result += dV*weight;
 	}
       }

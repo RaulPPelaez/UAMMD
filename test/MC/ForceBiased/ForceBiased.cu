@@ -101,8 +101,6 @@ struct Parameters{
 
 struct UAMMD{
   std::shared_ptr<ParticleData> pd;
-  std::shared_ptr<ParticleGroup> pg;
-  std::shared_ptr<System> sys;
   Parameters parameters;
 };
 
@@ -122,12 +120,11 @@ int main(int argc, char *argv[]){
   Timer tim; tim.tic();
   runSimulation(sim, mc);
   auto totalTime = tim.toc();
-  sim.sys->log<System::MESSAGE>("mean FPS: %.2f", sim.parameters.numberSteps/totalTime);
-  sim.sys->finish();
+  System::log<System::MESSAGE>("mean FPS: %.2f", sim.parameters.numberSteps/totalTime);
   return 0;
 }
 
-Parameters readParameters(std::string datamain, shared_ptr<System> sys);
+Parameters readParameters(std::string datamain);
 
 void initializePositions(UAMMD sim){
   auto pos = sim.pd->getPos(access::location::cpu, access::mode::write);
@@ -137,13 +134,12 @@ void initializePositions(UAMMD sim){
 
 UAMMD initialize(int argc, char* argv[]){
   UAMMD sim;
-  sim.sys = std::make_shared<System>(argc, argv);
+  auto sys = std::make_shared<System>(argc, argv);
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
-  sim.sys->rng().setSeed(seed);
-  sim.parameters = readParameters("data.main", sim.sys);
-  sim.pd = std::make_shared<ParticleData>(sim.parameters.numberParticles, sim.sys);
+  sys->rng().setSeed(seed);
+  sim.parameters = readParameters("data.main");
+  sim.pd = std::make_shared<ParticleData>(sim.parameters.numberParticles, sys);
   initializePositions(sim);
-  sim.pg = std::make_shared<ParticleGroup>(sim.pd, sim.sys, "All");
   return sim;
 }
 
@@ -152,7 +148,7 @@ std::shared_ptr<MC::ForceBiased> createIntegratorForceBiased(UAMMD sim){
   par.beta = 1.0/sim.parameters.temperature;
   par.stepSize = sim.parameters.dt;
   par.acceptanceRatio = sim.parameters.acceptanceRatio;
-  return std::make_shared<MC::ForceBiased>(sim.pd, sim.pg, sim.sys, par);
+  return std::make_shared<MC::ForceBiased>(sim.pd, par);
 }
 
 std::shared_ptr<BD::EulerMaruyama> createIntegratorBD(UAMMD sim){
@@ -161,15 +157,15 @@ std::shared_ptr<BD::EulerMaruyama> createIntegratorBD(UAMMD sim){
   par.viscosity = 1/(6*M_PI*2);
   par.hydrodynamicRadius = 0.5;
   par.dt = sim.parameters.dt;
-  return std::make_shared<BD::EulerMaruyama>(sim.pd, sim.pg, sim.sys, par);
+  return std::make_shared<BD::EulerMaruyama>(sim.pd, par);
 }
 
 std::shared_ptr<VerletNVT::GronbechJensen> createIntegratorMD(UAMMD sim){
   typename VerletNVT::GronbechJensen::Parameters par;
   par.temperature = sim.parameters.temperature;
-  par.viscosity = 1/(6*M_PI*2);
+  par.friction = 1/(6*M_PI*2);
   par.dt = sim.parameters.dt;
-  return std::make_shared<VerletNVT::GronbechJensen>(sim.pd, sim.pg, sim.sys, par);
+  return std::make_shared<VerletNVT::GronbechJensen>(sim.pd, par);
 }
 
 std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
@@ -192,7 +188,7 @@ std::shared_ptr<Integrator> createIntegrator(UAMMD sim){
 template <class UsePotential> std::shared_ptr<UsePotential> createPotential(UAMMD sim);
 
 template<> std::shared_ptr<Potential::LJ> createPotential(UAMMD sim){
-  auto pot = std::make_shared<Potential::LJ>(sim.sys);
+  auto pot = std::make_shared<Potential::LJ>();
   Potential::LJ::InputPairParameters ppar;
   ppar.epsilon = sim.parameters.epsilon;
   ppar.shift = sim.parameters.shift;
@@ -203,7 +199,7 @@ template<> std::shared_ptr<Potential::LJ> createPotential(UAMMD sim){
 }
 
 template<> std::shared_ptr<SoftPotential> createPotential(UAMMD sim){
-  auto pot = std::make_shared<SoftPotential>(sim.sys);
+  auto pot = std::make_shared<SoftPotential>();
   SoftPotential::InputPairParameters ppar;
   ppar.cutOff = sim.parameters.cutOff;
   ppar.U0 = sim.parameters.U0;
@@ -218,7 +214,7 @@ template<class UsePotential> std::shared_ptr<Interactor> createShortRangeInterac
   using SR = PairForces<UsePotential>;
   typename SR::Parameters params;
   params.box = Box(sim.parameters.boxSize);
-  auto pairForces = std::make_shared<SR>(sim.pd, sim.pg, sim.sys, params, pot);
+  auto pairForces = std::make_shared<SR>(sim.pd, params, pot);
   return pairForces;
 }
 
@@ -238,17 +234,16 @@ std::shared_ptr<Interactor> createShortRangeInteractor(UAMMD sim){
 
 template <class NVT>
 real getCurrentEnergy(UAMMD sim, std::shared_ptr<NVT> mc){
-  real currentEnergy = 0;
   {
     auto energy = sim.pd->getEnergy(access::location::gpu, access::mode::write);
     thrust::fill(thrust::cuda::par, energy.begin(), energy.end(), real());
   }
   auto interactors = mc->getInteractors();
   for(auto &i: interactors){
-    currentEnergy += i->sumEnergy();
+    i->sum({false, true, false});
   }
   auto energy = sim.pd->getEnergy(access::location::gpu, access::mode::read);
-  currentEnergy += thrust::reduce(thrust::cuda::par, energy.begin(), energy.end());
+  auto currentEnergy = thrust::reduce(thrust::cuda::par, energy.begin(), energy.end());
   return 0.5*currentEnergy/sim.pd->getNumParticles();
 }
 
@@ -267,7 +262,7 @@ public:
   }
 
   void writeCurrent(){
-    sim.sys->log<System::DEBUG1>("[System] Writing to disk...");
+    System::log<System::DEBUG1>("[System] Writing to disk...");
     auto par = sim.parameters;
     auto pos = sim.pd->getPos(access::location::cpu, access::mode::read);
     const int * sortedIndex = sim.pd->getIdOrderedIndices(access::location::cpu);
@@ -300,8 +295,8 @@ void runSimulation(UAMMD sim, std::shared_ptr<NVT> mc){
   }
 }
 
-Parameters readParameters(std::string datamain, shared_ptr<System> sys){
-  InputFile in(datamain, sys);
+Parameters readParameters(std::string datamain){
+  InputFile in(datamain);
   Parameters par;
   in.getOption("potential", InputFile::Required)>>par.potential;
   in.getOption("integrator", InputFile::Required)>>par.integrator;

@@ -44,19 +44,19 @@ namespace uammd{
       par(par),
       steps(0)
     {
-      bdhi = std::make_shared<Method>(pd, pg, sys, par);
-      sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Initialized");
+      bdhi = std::make_shared<Method>(pg, par);
+      System::log<System::MESSAGE>("[BDHI::EulerMaruyama] Initialized");
       int numberParticles = pg->getNumberParticles();
-      sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Temperature: %f", par.temperature);
-      sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Viscosity: %f", par.viscosity);
-      sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Time step: %f", par.dt);
+      System::log<System::MESSAGE>("[BDHI::EulerMaruyama] Temperature: %f", par.temperature);
+      System::log<System::MESSAGE>("[BDHI::EulerMaruyama] Viscosity: %f", par.viscosity);
+      System::log<System::MESSAGE>("[BDHI::EulerMaruyama] Time step: %f", par.dt);
       if(par.hydrodynamicRadius>0)
-	sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Hydrodynamic Radius: %f", par.hydrodynamicRadius);
+	System::log<System::MESSAGE>("[BDHI::EulerMaruyama] Hydrodynamic Radius: %f", par.hydrodynamicRadius);
       if(par.K.size()==3){
 	real3 Kx = par.K[0];
 	real3 Ky = par.K[1];
 	real3 Kz = par.K[2];
-	sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Shear Matrix: [ %f %f %f; %f %f %f; %f %f %f ]",
+	System::log<System::MESSAGE>("[BDHI::EulerMaruyama] Shear Matrix: [ %f %f %f; %f %f %f; %f %f %f ]",
 				  Kx.x, Kx.y, Kx.z,
 				  Ky.x, Ky.y, Ky.z,
 				  Kz.x, Kz.y, Kz.z);
@@ -67,7 +67,7 @@ namespace uammd{
     }
     template<class Method>
     EulerMaruyama<Method>::~EulerMaruyama(){
-      sys->log<System::MESSAGE>("[BDHI::EulerMaruyama] Destroyed");
+      System::log<System::MESSAGE>("[BDHI::EulerMaruyama] Destroyed");
       cudaStreamDestroy(stream);
     }
 
@@ -120,7 +120,7 @@ namespace uammd{
     //Advance the simulation one time step
     template<class Method>
     void EulerMaruyama<Method>::forwardTime(){
-      sys->log<System::DEBUG1>("[BDHI::EulerMaruyama] Performing integration step %d", steps);
+      System::log<System::DEBUG1>("[BDHI::EulerMaruyama] Performing integration step %d", steps);
       //dR = dt(KR+MF) + sqrt(2*T*dt)·BdW
       steps++;
       for(auto updatable: updatables) updatable->updateSimulationTime(steps*par.dt);

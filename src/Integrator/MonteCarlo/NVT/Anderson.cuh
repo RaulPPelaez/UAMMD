@@ -51,8 +51,6 @@ namespace uammd {
       };
 
       Anderson(shared_ptr<ParticleData> pd,
-	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
 	       shared_ptr<Pot> pot,
 	       Parameters par);
 

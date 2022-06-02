@@ -31,10 +31,10 @@ namespace uammd{
     class Cholesky{
     public:
       using Parameters = BDHI::Parameters;
-      Cholesky(shared_ptr<ParticleData> pd,
-	       shared_ptr<ParticleGroup> pg,
-	       shared_ptr<System> sys,
-	       Parameters par);
+      Cholesky(shared_ptr<ParticleData> pd, Parameters par):
+	Cholesky(std::make_shared<ParticleGroup>(pd, "All"), par){}
+
+      Cholesky(shared_ptr<ParticleGroup> pg, Parameters par);
       ~Cholesky();
       void init();
       void setup_step(              cudaStream_t st = 0);
@@ -54,9 +54,7 @@ namespace uammd{
       }
 
     private:
-      shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
-      shared_ptr<System> sys;
 
       thrust::device_vector<real> mobilityMatrix; /*The full mobility matrix*/
       thrust::device_vector<real3> force3;

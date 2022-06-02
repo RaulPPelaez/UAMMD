@@ -2,7 +2,7 @@
 LOG_LEVEL=5
 
 NVCC=nvcc
-CUDA_ROOT=/usr/local/cuda
+CUDA_ROOT=$(shell dirname `which nvcc`)/..
 UAMMD_ROOT=../../
 #Uncomment to compile in double precision mode
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION

@@ -90,8 +90,6 @@ namespace uammd{
     private:
       using NeighbourList = CellList;
 
-      shared_ptr<System> sys;
-      shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
       shared_ptr<NeighbourList> nl;
       Parameters par;
@@ -101,11 +99,11 @@ namespace uammd{
       real split, gw;
     public:
 
-      NearField(shared_ptr<System> sys, shared_ptr<ParticleData> pd, shared_ptr<ParticleGroup> pg,
-		Parameters par):sys(sys), pd(pd), pg(pg), par(par), split(par.split), gw(par.gw){	
+      NearField(shared_ptr<ParticleGroup> pg, Parameters par):
+	pg(pg), par(par), split(par.split), gw(par.gw){	
 	this->rcut = nearField_ns::computeCutOffDistance(par);
 	nearField_ns::throwIfInvalidConfiguration(rcut, par.H);
-	sys->log<System::MESSAGE>("[DPPoissonSlab] Near field cut off: %g", rcut);
+	System::log<System::MESSAGE>("[DPPoissonSlab] Near field cut off: %g", rcut);
 	initializeTabulatedGreensFunctions();
       }
 
@@ -118,7 +116,7 @@ namespace uammd{
     void NearField::initializeTabulatedGreensFunctions(){
       //TODO: I need a better heuristic to select the table size
       int Ntable = std::max(1<<16, std::min(1<<20, 2*int(rcut/(par.gw*par.tolerance*1e2))));
-      sys->log<System::MESSAGE>("[Poisson] Elements in near field table: %d", Ntable);
+      System::log<System::MESSAGE>("[Poisson] Elements in near field table: %d", Ntable);
       greensFunctionsTableData.resize(Ntable);
       real2* ptr = thrust::raw_pointer_cast(greensFunctionsTableData.data());
       greenTables = std::make_shared<TabulatedFunction<real2>>(ptr, Ntable, 0, rcut*rcut,
@@ -205,13 +203,14 @@ namespace uammd{
 
     void NearField::compute(cudaStream_t st, real4* fieldAtParticles){
       if(par.split){
-	sys->log<System::DEBUG2>("[DPPoissonSlab] Near field energy computation");
+	System::log<System::DEBUG2>("[DPPoissonSlab] Near field energy computation");
 	Box box(make_real3(par.Lxy, par.H));
 	box.setPeriodicity(1, 1, 0);
 	if(!nl){
-	  nl = std::make_shared<NeighbourList>(pd, pg, sys);
+	  nl = std::make_shared<NeighbourList>(pg);
 	}
 	nl->update(box, rcut, st);
+	auto pd = pg->getParticleData();
 	auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
 	auto charge = pd->getCharge(access::location::gpu, access::mode::read);
 	auto force = pd->getForce(access::location::gpu, access::mode::readwrite);	

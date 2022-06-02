@@ -31,7 +31,7 @@ namespace uammd{
 	prefactor(pow(2.0*M_PI*width*width, -0.5)),
 	tau(-0.5/(width*width)){}
 
-      __host__ __device__ real phi(real r) const{
+      __host__ __device__ real phi(real r, real3 pos = real3()) const{
 	return prefactor*exp(tau*r*r);
       }
     };
@@ -76,7 +76,7 @@ namespace uammd{
 	this->invnorm = 1.0/computeNorm();
       }
 
-      inline __host__  __device__ real phi(real zz) const{
+      inline __host__  __device__ real phi(real zz, real3 pos = real3()) const{
 	return BM(zz, w, beta)*invnorm;
       }
     };
@@ -88,7 +88,7 @@ namespace uammd{
 	const real invh;
 	static constexpr int support = 3;
 	threePoint(real h):invh(1.0/h){}
-	__host__ __device__ real phi(real rr) const{
+	__host__ __device__ real phi(real rr, real3 pos = real3()) const{
 	  const real r = fabs(rr)*invh;
 	  if(r<real(0.5)){
 	    constexpr real onediv3 = real(1/3.0);
@@ -109,7 +109,7 @@ namespace uammd{
 	static constexpr int support = 4;
 	fourPoint(real h):invh(1.0/h){}
 
-	 __host__  __device__ real phi(real rr) const{
+	__host__  __device__ real phi(real rr, real3 pos = real3()) const{
 	   const real r = fabs(rr)*invh;
 	   constexpr real onediv8 = real(0.125);
 	   if(r<real(1.0)){
@@ -187,7 +187,7 @@ namespace uammd{
 
 	~sixPoint() = default;
 
-	inline __host__  __device__ real phi(real r) const{
+	inline __host__  __device__ real phi(real r, real3 pos = real3()) const{
 	  return phi_impl(fabs(r)*invh)*invh;
 	}
 

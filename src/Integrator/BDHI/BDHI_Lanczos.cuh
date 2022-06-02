@@ -22,11 +22,13 @@ namespace uammd{
     class Lanczos{
     public:
       using Parameters = BDHI::Parameters;
-      Lanczos(shared_ptr<ParticleData> pd,
-	      shared_ptr<ParticleGroup> pg,
-	      shared_ptr<System> sys,
-	      Parameters par);
-      ~Lanczos();
+      Lanczos(shared_ptr<ParticleData> pd, Parameters par):
+	Lanczos(std::make_shared<ParticleGroup>(pd, "All"), par){}
+
+      Lanczos(shared_ptr<ParticleGroup> pg, Parameters par);
+
+      ~Lanczos(){}
+
       void setup_step(              cudaStream_t st = 0){};
       void computeMF(real3* MF,     cudaStream_t st = 0);
       void computeBdW(real3* BdW,   cudaStream_t st = 0);
@@ -44,9 +46,7 @@ namespace uammd{
 
 
     private:
-      shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
-      shared_ptr<System> sys;
 
       /*Rodne Prager Yamakawa device functions and parameters*/
       BDHI::RotnePragerYamakawa rpy;

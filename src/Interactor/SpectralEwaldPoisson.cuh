@@ -63,7 +63,7 @@ namespace uammd{
 	support = std::max(3, int(2*rmax/h+0.5));
       }
 
-      inline __device__ real phi(real r) const{
+      inline __device__ real phi(real r, real3 pos) const{
 	return prefactor*exp(tau*r*r);
       }
     private:
