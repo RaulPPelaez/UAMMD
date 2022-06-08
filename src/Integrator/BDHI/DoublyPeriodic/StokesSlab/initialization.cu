@@ -7,11 +7,32 @@
 #include"misc/ChevyshevUtils.cuh"
 namespace uammd{
   namespace DPStokesSlab_ns{
+    namespace detail{
+      void checkInputValidity(DPStokes::Parameters par){
+	if(par.viscosity <= 0){
+	  System::log<System::EXCEPTION>("[DPStokes] Viscosity was not set");
+	  throw std::runtime_error("[DPStokes] Invalid argument");
+	}
+	if(par.H <= 0){
+	  System::log<System::EXCEPTION>("[DPStokes] H (height) was not set");
+	  throw std::runtime_error("[DPStokes] Invalid argument");
+	}
+	if(par.Lx <= 0 or par.Ly<=0){
+	  System::log<System::EXCEPTION>("[DPStokes] Domain width (Lx, Ly) was not set");
+	  throw std::runtime_error("[DPStokes] Invalid argument");
+	}
+	if(par.dt <= 0){
+	  System::log<System::EXCEPTION>("[DPStokes] dt was not set");
+	  throw std::runtime_error("[DPStokes] Invalid argument");
+	}
+      }
+    };
     DPStokes::DPStokes(DPStokes::Parameters par):
       viscosity(par.viscosity),
       H(par.H), Lx(par.Lx),Ly(par.Ly),
       tolerance(par.tolerance),
       mode(par.mode){
+      detail::checkInputValidity(par);
       setUpGrid(par);
       this->fct = std::make_shared<FastChebyshevTransform>(grid.cellDim);
       if(par.mode != WallMode::none){ //Correction is only needed for walls
@@ -70,7 +91,7 @@ namespace uammd{
       if(Lx!=Ly)
 	System::log<System::WARNING>("[DPStokes] Domains with Lx=Ly are largely untested");
     }
-    
+
     namespace detail{
       //BCs are H*du/dz(k, +-H) +- k*H*H*u(k, +-H) = RHS
       //"u" is the second integral and du/dz the first integral
