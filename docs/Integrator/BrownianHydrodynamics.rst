@@ -6,22 +6,22 @@ In Brownian Hydrodynamics (BDHI) we reintroduce the hydrodynamic interactions ne
 An stochastic differential equation for the time evolution of the positions of a collection of colloidal particles with positions :math:`\vec{q} =\{\vec{q}_1,\vec{q}_2,\dots, \vec{q}_N\}` from the Smoluchowski description of the two-body level marginal probability [1]_ as
 
 .. math::
-   
+
    d\vec{\ppos} = \tens{M}\vec{F}dt + \sqrt{2\kT\tens{M}}d\vec{\noise} + \kT\vec{\partial}_{\vec{\ppos}}\cdot\tens{M}dt
 
 Where :math:`\vec{F}` are the forces acting on the particles (in UAMMD :ref:`Interactors <Interactor>` are used to provide forces) and the (so-called) Brownian motion, :math:`d\vec{\noise}`, is a collection of Wienner increments with zero mean and
 
 .. math::
-   
+
    \left\langle d\noise_{i}^\alpha(t)d\noise_{j}^\beta(t') \right\rangle = dt\delta(t-t')\delta_{ij}\delta_{\alpha\beta}.
 
 The pairwise mobility tensor, :math:`\tens{M}`, encodes in its elements the hydrodynamic transfer of the force at one point :math:`\vec{q}_i`, to the displacement at another point :math:`\vec{q}_j`. It thus determines the correlations between two particle displacements.
 The mobility tensor is then related to the diffusion coefficients via the Einstein relation,
 
 .. math::
-   
+
    \tens{D}(\vec{\ppos}) = \kT \tens{M}(\vec{\ppos}).
-   
+
 The Einstein relation coupled with the fluctuation dissipation balance (stating that, in the absence of forces, :math:`\left\langle d\vec{\ppos}\otimes d\vec{\ppos}\right\rangle = 2\tens{D} dt`) hints that mobility tensor should be symmetric and positive semi-definite, so that we can define a tensor :math:`\tens{B}:=\sqrt{\tens{M}}` such that
 
 .. math::
@@ -42,7 +42,7 @@ One of the usual choices for the mobility tensor is the Rotne-Prager-Yamakawa (R
 .. _RPY:
 
 .. math::
-   
+
   \tens{M}^{\textrm{RPY}}(\vec{r} = \vec{q}_i-\vec{q}_j) = M_0\left\{
   \begin{aligned}
     &\left( \frac{3a}{4r} + \frac{a^3}{2r^3} \right)\mathbb{I} + \left(\frac{3a}{4r} - \frac{3a^3}{2r^3}\right)\frac{\vec{r}\otimes\vec{r}}{r^2}  & r > 2a\\
@@ -53,7 +53,7 @@ The self mobility, :math:`M_0 := \tens{M}(0) = (6\pi\eta a)^{-1}` is, by no coin
 
 .. note:: Most UAMMD hydrodynamic modules work at the RPY level, although the pseudo-spectral, immersed-boundary-like, algorithms offered by UAMMD (see for instance the :ref:`Force Coupling Method`) regularize the mobility slightly differently in the near field.
 
-.. hint:: The distinction between BD and BDHI in this documentation (and therefore UAMMD) is a bit arbitrary. We call BD to the particular case of BDHI in which we neglect hydrodynamic interactions. This distinction is, however, useful for us due to the much more complex nature of the algorithms employed to solve BDHI (as opposed to the quite simple ones that our so-called BD allows). In the literature, both BDHI and BD are typically referred to as simply "BD". 
+.. hint:: The distinction between BD and BDHI in this documentation (and therefore UAMMD) is a bit arbitrary. We call BD to the particular case of BDHI in which we neglect hydrodynamic interactions. This distinction is, however, useful for us due to the much more complex nature of the algorithms employed to solve BDHI (as opposed to the quite simple ones that our so-called BD allows). In the literature, both BDHI and BD are typically referred to as simply "BD".
 
 Given the, in general, long-ranged nature of the hydrodynamic interaction numerical integration of the BDHI equations is not trivial (and quite the field on its own). The main difficulties are related to evaluating the :math:`\tens{M}\vec{F}` product (a :math:`O(N^2)` operation in principle) and the square root of the mobility for the thermal fluctuations (an even more complex operation). Different algorithms exists depending on the boundary conditions and the geometry of the domain. UAMMD offers hydrodynamic solvers (in the form of :ref:`Integrators`) for open, triply periodic and doubly periodic boundary conditions.
 
@@ -86,17 +86,17 @@ Here is an example of the Euler-Maruyama integration scheme being specialized wi
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
+The following parameters are available:
 
   * :code:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :code:`real viscosity` Viscosity of the solvent.
   * :code:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles*)
   * :code:`real dt`  Time step
-    
-\* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. In the latter case, if particle radii has not been set in :ref:`ParticleData` prior to the construction of the module an error will be thrown.  
+
+\* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. In the latter case, if particle radii has not been set in :ref:`ParticleData` prior to the construction of the module an error will be thrown.
 
 .. code:: c++
-	  
+
   #include"uammd.cuh"
   #include<Integrator/BDHI/BDHI_EulerMaruyama.cuh>
   #include<Integrator/BDHI/BDHI_Cholesky.cuh>
@@ -110,7 +110,7 @@ The following parameters are available:
     par.temperature = 1.0;
     par.viscosity = 1.0;
     //For Cholesky the radius is optional.
-    //If not selected, the module will use the individual 
+    //If not selected, the module will use the individual
     //  radius of each particle.
     //par.hydrodynamicRadius = 1.0;
     par.dt = 0.01;
@@ -134,7 +134,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 .. note:: Cholesky uses a generalized form of the RPY tensor that accounts for differently sized particles, if an hydrodynamic radius is not provided, the radius in :ref:`ParticleData` will be used for each particle.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
-	  
+
 .. _Lanczos:
 
 Lanczos
@@ -144,7 +144,7 @@ Fixman proposed a method based on Chebyshev polynomials [7]_ to compute the squa
 
 .. note:: The Lanczos iterative algorithm for fast computation of :math:`\sqrt{\tens{M}}\vec{v}` (being :math:`\tens{M}` an arbitrary matrix and :math:`\vec{v}` an arbitrary vector) is also available as a separate repository here https://github.com/RaulPPelaez/LanczosAlgorithm
 
-Another benefit of this method over Cholesky is that it is not required to store the full mobility matrix in order to compute the fluctuations. The product of the mobility tensor by a vector (the forces in the deterministic term and a random noise in the fluctuating one) can be computed by recomputing the necessary terms. This will be particularly useful later, when most elements in the mobility tensor become zero, reducing the complexity of the computation for both terms. In particular, UAMMD's implementation of the Lanczos iterative method is templated for any object capable of providing the product of any given vector with the mobility matrix. In the current instance we use the :ref:`NBody` algorithm coupled with a :ref:`Transverser` because the mobility is a dense matrix. 
+Another benefit of this method over Cholesky is that it is not required to store the full mobility matrix in order to compute the fluctuations. The product of the mobility tensor by a vector (the forces in the deterministic term and a random noise in the fluctuating one) can be computed by recomputing the necessary terms. This will be particularly useful later, when most elements in the mobility tensor become zero, reducing the complexity of the computation for both terms. In particular, UAMMD's implementation of the Lanczos iterative method is templated for any object capable of providing the product of any given vector with the mobility matrix. In the current instance we use the :ref:`NBody` algorithm coupled with a :ref:`Transverser` because the mobility is a dense matrix.
 
 
 Usage
@@ -156,19 +156,19 @@ Using the Lanczos strategy in UAMMD is similar to using :ref:`Cholesky`. With th
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
+The following parameters are available:
 
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real viscosity` Viscosity of the solvent.
   * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles*)
   * :cpp:`real dt`  Time step
   * :cpp:`real tolerance` Tolerance for the Lanczos iterative solver.
-    
-\* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. In the latter case, if particle radii has not been set in :ref:`ParticleData` prior to the construction of the module an error will be thrown.  
+
+\* If this parameter is not provided, the module will try to use the particle's radius as the hydrodynamic radius of each particle. In the latter case, if particle radii has not been set in :ref:`ParticleData` prior to the construction of the module an error will be thrown.
 
 
 .. code:: c++
-	  
+
   #include"uammd.cuh"
   #include<Integrator/BDHI/BDHI_EulerMaruyama.cuh>
   #include<Integrator/BDHI/BDHI_Cholesky.cuh>
@@ -182,7 +182,7 @@ The following parameters are available:
     par.temperature = 1.0;
     par.viscosity = 1.0;
     //For Lanczos the radius is optional.
-    //If not selected, the module will use the individual 
+    //If not selected, the module will use the individual
     //  radius of each particle.
     //par.hydrodynamicRadius = 1.0;
     par.dt = 0.01;
@@ -203,7 +203,7 @@ The following parameters are available:
 Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. hint:: Being an open boundary solver, Lanczos does not require a simulation box as a parameter. Additionally, since this is an (approximate) iterative solver, a tolerance is also required.
-	  
+
 .. note:: Lanczos uses a generalized form of the RPY tensor that accounts for differently sized particles, if an hydrodynamic radius is not provided, the radius in :ref:`ParticleData` will be used for each particle.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
@@ -214,9 +214,9 @@ Triply periodic BDHI solvers
 UAMMD's triply periodic solvers are based on solving the fluctuating steady Stokes equation for a fluid coupled with a group of particles (as opposed to the BDHI dynamical equation above). We wont go into much detail here, a more in depth description of the mathematical machinery behind these methods is provided, for instance, in [10]_ or [11]_
 
 .. sidebar::
-   
+
    .. note:: Neglecting convection is valid for small Reynolds number hydrodynamics, i.e, :math:`\text{Re} = \frac{\eta v}{\rho L} \ll 1` with :math:`L` the smallest characteristic length of the system (e.g. particle radius). Moreover, we assume that the Schmidt number is very large, :math:`S_c = \eta/(\rho D_0) \gg 1`, where :math:`\rho`is the fluid density and :math:`D_0 = \kT/(6\pi\eta a)` is the typical diffusion coefficient of a submerged particle, which implies that fluid momentum propagates much faster than particle diffusion. For :math:`S_c\gg 1` the transient term :math:`\rho\partial_t\vec{v}` can be neglected, which is a sane approximation (even for proteins in water).
-	     
+
 If we take the overdamped limit of Navier-Stokes equation, where the momentum of the fluid can be eliminated as a fast variable (allowing to neglect the transient term :math:`\partial_t \vec{\fvel}` as well as the convection) we get the so-called Stokes equations
 
 .. math::
@@ -255,26 +255,26 @@ Where :math:`\vec{k}` are the wave numbers.
 Finally, we can identify
 
 .. math::
-   
+
    \oper{L} := -\nabla^{-2}\oper{P}
-   
+
 
 as the Stokes solution operator to arrive at
 
 .. math::
-   
+
   \vec{\fvel} = \eta^{-1}\oper{L}\tilde{\vec{f}}
 
 The Green's function, :math:`\tens{G}`, of this equation in the case of an unbounded domain can be written in Fourier space as
 
 .. math::
-   
+
    \eta^{-1}\oper{L}(\vec{k})\rightarrow \fou{\tens{G}}(\vec{k}) := \eta^{-1}k^{-2}\fou{\oper{P}}(\vec{k})
 
 The inverse transform of this Green's function can be computed analytically to get
 
 .. math::
-   
+
    \tens{O}(\vec{r}) := \frac{1}{8\pi\eta r}\left(\mathbb{I} - \frac{\vec{r}\otimes\vec{r}}{r^2}\right)
 
 This solution is known as the Oseen tensor, the response of a three dimensional unbounded fluid at rest at infinity to a delta forcing.
@@ -301,7 +301,7 @@ where :math:`\vec{\pvel}_i` is the velocity of particle :math:`i`.
 Putting it all together, we can write the equation for the particle dynamics as
 
 .. math::
-   
+
    \frac{d\vec{q}_i}{dt} = \vec{u}_i = \eta^{-1}\oper{J}_{\vec{\ppos}_i}\oper{L}(\oper{S}\vec{F} + \nabla\cdot\mathcal Z).
 
 Which can be shown to be equivalent to the BDHI equations of motion for the particles by defining
@@ -313,20 +313,20 @@ Which can be shown to be equivalent to the BDHI equations of motion for the part
 or without the operator notation, the element mobility between particle :math:`i` and :math:`j` as
 
 .. math::
-   
+
      \tens{M}_{ij} = \eta^{-1}\iint{\delta_a(\vec{q}_j-\vec{r})\oper{L}(\vec{r}, \vec{r}')\delta_a(\vec{q}_i -\vec{r}')d\vec{r}d\vec{r}'}.
 
 .. note:: The :ref:`RPY` tensor arises from evaluating the double convolution of the Oseen tensor with a delta function integrated over the surface of two spheres centered at :math:`\vec{q}_i` and :math:`\vec{q}_j`.
 
-   
+
 Finally, its "square root" can be defined as
 
 
 .. math::
-   
+
    \tens{M}^{1/2} = \eta^{-1/2}\oper{J}\oper{L}\nabla\cdot.
 
-   
+
 
 .. _FCM:
 
@@ -356,12 +356,12 @@ Here :math:`\mathfrak{F}` represents the Fourier transform operator.
 Once the particle velocities are computed, the dynamics can be integrated using, for instance, the Euler-Maruyama scheme devised for :ref:`BD`. The update rule in the case of Euler-Maruyama is
 
 .. math::
-   
+
   \vec{\ppos}^{n+1} = \vec{\ppos}^n + \vec{\pvel}^n\dt,
-  
+
 where the particle velocities already include the stochastic displacements.
 
-	  
+
 
 Usage
 *******
@@ -372,7 +372,7 @@ Use as the rest of the :ref:`Integrator` modules.
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
+The following parameters are available:
 
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real viscosity` Viscosity of the solvent.
@@ -386,12 +386,12 @@ The following parameters are available:
 
   #include"uammd.cuh"
   #include<Integrator/BDHI/BDHI_EulerMaruyama.cuh>
-  #include<Integrator/BDHI/BDHI_FCM.cuh>  
+  #include<Integrator/BDHI/BDHI_FCM.cuh>
   using namespace uammd;
   int main(){
     //Assume an instance of ParticleData, called "pd", is available
     ...
-    //A strategy is mixed with an integration scheme  
+    //A strategy is mixed with an integration scheme
     using FCM = BDHI::EulerMaruyama<BDHI::FCM>;
     FCM::Parameters par;
     par.temperature = 1.0;
@@ -414,7 +414,7 @@ The following parameters are available:
 Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. hint:: Being a triply periodic solver, FCM requires a simulation box as a parameter. Additionally, since this is a non-exact solver (with spatial discretization errors), a tolerance is also required.
-	  
+
 .. warning:: Contrary to the open boundary methods, in FCM all particles must have the same hydrodynamic radius.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
@@ -423,7 +423,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. note:: Although this is undocumented at the moment, the FCM module can also deal with torques/angular displacements.
 
-	  
+
 .. _PSE:
 
 Positively Split Ewald
@@ -443,7 +443,7 @@ Use as the rest of the :ref:`Integrator` modules.
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
+The following parameters are available:
 
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real viscosity` Viscosity of the solvent.
@@ -451,18 +451,18 @@ The following parameters are available:
   * :cpp:`real dt`  Time step
   * :cpp:`real tolerance` Overall tolerance of the algorithm (FCM in the far field and Lanczos iterative solver in the near field).
   * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.
-  * :cpp:`real split` The splitting parameter of the PSE algorithm in units of inverse hydrodynamic radius. This parameter only affects performance and must be manually tuned in a case by case basis to find the optimal (usually between 0-1).
+  * :cpp:`real split` The splitting parameter of the PSE algorithm in units of inverse of length. This parameter only affects performance and must be manually tuned in a case by case basis to find the optimal (usually between 0.1/hydrodynamicRadius-1/hydrodynamicRadius).
 
 .. code:: c++
 
   #include"uammd.cuh"
   #include<Integrator/BDHI/BDHI_EulerMaruyama.cuh>
-  #include<Integrator/BDHI/BDHI_PSE.cuh>  
+  #include<Integrator/BDHI/BDHI_PSE.cuh>
   using namespace uammd;
   int main(){
     //Assume an instance of ParticleData, called "pd", is available
     ...
-    //A strategy is mixed with an integration scheme  
+    //A strategy is mixed with an integration scheme
     using PSE = BDHI::EulerMaruyama<BDHI::PSE>;
     PSE::Parameters par;
     par.temperature = 1.0;
@@ -486,7 +486,7 @@ The following parameters are available:
 Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. hint:: Being a triply periodic solver, PSE requires a simulation box as a parameter. Additionally, since this is a non-exact solver (with spatial discretization errors), a tolerance is also required.
-	  
+
 .. warning:: Contrary to the open boundary methods, in PSE all particles must have the same hydrodynamic radius.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
@@ -511,7 +511,7 @@ Use as the rest of the :ref:`Integrator` modules.
 
    .. warning:: Note that the temperature is provided in units of energy.
 
-The following parameters are available:  
+The following parameters are available:
 
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real viscosity` Viscosity of the solvent.
@@ -525,12 +525,12 @@ The following parameters are available:
 
   #include"uammd.cuh"
   #include<Integrator/BDHI/BDHI_EulerMaruyama.cuh>
-  #include<Integrator/BDHI/BDHI_FIB.cuh>  
+  #include<Integrator/BDHI/BDHI_FIB.cuh>
   using namespace uammd;
   int main(){
     //Assume an instance of ParticleData, called "pd", is available
     ...
-    //A strategy is mixed with an integration scheme  
+    //A strategy is mixed with an integration scheme
     using FIB = BDHI::EulerMaruyama<BDHI::FIB>;
     FIB::Parameters par;
     par.temperature = 1.0;
@@ -553,7 +553,7 @@ The following parameters are available:
 Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. hint:: Being a triply periodic solver, FIB requires a simulation box as a parameter. Additionally, since this is a non-exact solver (with spatial discretization errors), a tolerance is also required.
-	  
+
 .. warning:: Contrary to the open boundary methods, in FIB all particles must have the same hydrodynamic radius.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
@@ -579,7 +579,7 @@ Usage
 
 
 .. _DPStokes:
-   
+
 Doubly Periodic Stokes (DPStokes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -592,7 +592,7 @@ Usage
 
 
 
-.. rubric:: References:  
+.. rubric:: References:
 
 .. [1] An Introduction to Dynamics of Colloids. Dhont, J.K.G. 1996. https://www.elsevier.com/books/an-introduction-to-dynamics-of-colloids/dhont/978-0-444-82009-9
 
@@ -608,7 +608,7 @@ Usage
 
 .. [7] Construction of Langevin forces in the simulation of hydrodynamic interaction. Fixman, Marshall 1986. https://doi.org/10.1021/ma00158a043
 
-.. [8] Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations. Ando,Tadashi et. al. 2012.   https://doi.org/10.1063/1.4742347 
+.. [8] Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations. Ando,Tadashi et. al. 2012.   https://doi.org/10.1063/1.4742347
 
 .. [9] Fluctuating force-coupling method for simulations of colloidal suspensions. Keaveny 2014. https://doi.org/10.1016/j.jcp.2014.03.013
 
@@ -617,4 +617,3 @@ Usage
 .. [11] Complex fluids in the GPU era. Raul P. Pelaez tesis manuscript 2022. https://github.com/RaulPPelaez/tesis/raw/main/manuscript.pdf
 
 .. [12] Rapid sampling of stochastic displacements in Brownian dynamics simulations. Fiore et. al. 2017. https://doi.org/10.1063/1.4978242
-
