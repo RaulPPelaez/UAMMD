@@ -50,6 +50,11 @@ namespace uammd{
 	return (abs(r)>=rmax)?0:(prefactor*exp(tau*r*r));
       }
 
+      inline __host__  __device__ real delta(real3 rvec, real3 h) const{
+	const real r2 = dot(rvec, rvec);
+	return (abs(rvec.z)>=rmax)?0:(prefactor*prefactor*prefactor*exp(tau*r2));
+      }
+
     private:
       real prefactor;
       real tau;
