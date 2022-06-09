@@ -40,7 +40,7 @@ namespace uammd{
 
       UninitializedCachedContainer(const std::vector<T> &other):
 	UninitializedCachedContainer(other.size()){
-	thrust::copy(other.begin(), other.end(), thrust::device_ptr<T>(begin()));
+	thrust::copy(other.begin(), other.end(), begin());
       }
 
       iterator begin() const{ return iterator(data()); }
