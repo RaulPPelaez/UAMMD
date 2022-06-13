@@ -39,39 +39,64 @@ namespace uammd{
       return fluidForcing;
     }
 
+    template<class Container>
+    void checkDensity(Container &dens, int3 n){
+      std::vector<real> h_d(dens.size(), 0);
+      thrust::copy(dens.begin(), dens.end(), h_d.begin());
+      int jj= 0;
+      fori(0, h_d.size()){
+	int3 cell = icm_compressible::getCellFromThreadId(i, n+2);
+	//int ii = icm_compressible::linearIndexGhost3D(cell, n+2);
+	if(h_d[i]<=0.0){
+	  std::cerr<<"Density is bad at "<<i<<": "<<cell.x<<" "<<cell.y<<" "<<cell.z<<": "<<h_d[i]<<std::endl;
+	  jj++;
+	  if(jj==5) break;
+	}
+      }
+    }
+
     template<int subStep>
     auto ICM_Compressible::callRungeKuttaSubStep(const DataXYZ &fluidForcingAtHalfStep,
 						 const cached_vector<real2> &fluidStochasticTensor,
 						 FluidPointers fluidAtSubTime){
       System::log<System::DEBUG2>("[ICM_Compressible] Runge Kutta sub step %d", subStep);
       using namespace icm_compressible;
-      FluidData fluidAtNewTime(grid);
-      FluidPointers currentFluid(currentFluidDensity, currentFluidVelocity);
-      if(subStep==1)
-	fluidAtSubTime = currentFluid;
-      FluidTimePack fluid{currentFluid, fluidAtSubTime, fluidAtNewTime.getPointers()};
+      FluidData fluidAtNewTime(getGhostGridSize());
+      FluidTimePack fluid{currentFluid.getPointers(), fluidAtSubTime, fluidAtNewTime.getPointers()};
       FluidParameters params{shearViscosity, bulkViscosity, dt};
       callRungeKuttaSubStepGPU<subStep>(grid,
 					fluid,
 					DataXYZPtr(fluidForcingAtHalfStep),
 					thrust::raw_pointer_cast(fluidStochasticTensor.data()),
-					params, *densityToPressure);
-      callMomentumToVelocityGPU(grid, fluidAtNewTime.getPointers());
+					params, *densityToPressure, steps);
+      icm_compressible::callUpdateGhostCells(thrust::raw_pointer_cast(fluidAtNewTime.density.data()),
+					     ghostCells, grid.cellDim);
+      callMomentumToVelocityGPU(getGridSize(), fluidAtNewTime.getPointers());
+      fillGhostCells(fluidAtNewTime.getPointers());
+      //      checkDensity(fluidAtNewTime.density, grid.cellDim);
       return fluidAtNewTime;
+    }
+
+    void ICM_Compressible::fillGhostCells(FluidPointers fluid){
+      System::log<System::DEBUG2>("[ICM_Compressible] Updating ghost cells");
+      icm_compressible::callUpdateGhostCells(fluid, ghostCells, grid.cellDim);
     }
 
     //Uses the RK3 solver in FluidSolver.cuh
     void ICM_Compressible::updateFluidWithRungeKutta3(const DataXYZ &fluidForcingAtHalfStep,
 						      const cached_vector<real2> &fluidStochasticTensor){
       System::log<System::DEBUG2>("[ICM_Compressible] Update fluid with RK3");
-      auto fluidPrediction = callRungeKuttaSubStep<1>(fluidForcingAtHalfStep, fluidStochasticTensor);
-      auto fluidAtHalfStep = callRungeKuttaSubStep<2>(fluidForcingAtHalfStep,
-      						      fluidStochasticTensor, fluidPrediction.getPointers());
+      fillGhostCells(currentFluid.getPointers());
+      auto fluidPrediction = callRungeKuttaSubStep<1>(fluidForcingAtHalfStep, fluidStochasticTensor,
+						      currentFluid.getPointers());
+      auto fluidAtHalfStep = callRungeKuttaSubStep<2>(fluidForcingAtHalfStep, fluidStochasticTensor,
+						      fluidPrediction.getPointers());
       fluidPrediction.clear();
-           fluidPrediction = callRungeKuttaSubStep<3>(fluidForcingAtHalfStep,
-      						      fluidStochasticTensor, fluidAtHalfStep.getPointers());
-      currentFluidDensity.swap(fluidPrediction.density);
-      currentFluidVelocity.swap(fluidPrediction.velocity);
+           fluidPrediction = callRungeKuttaSubStep<3>(fluidForcingAtHalfStep, fluidStochasticTensor,
+						      fluidAtHalfStep.getPointers());
+      currentFluid.density.swap(fluidPrediction.density);
+      currentFluid.velocity.swap(fluidPrediction.velocity);
+      currentFluid.momentum.swap(fluidPrediction.momentum);
     }
 
     auto ICM_Compressible::computeStochasticTensor(){
@@ -79,12 +104,15 @@ namespace uammd{
       using namespace icm_compressible;
       cached_vector<real2> fluidStochasticTensor;
       if(temperature > 0){
-	fluidStochasticTensor.resize(randomNumbersPerCell*grid.getNumberCells());
+	auto cellDim = getGhostGridSize();
+	int numberCells = cellDim.x*cellDim.y*cellDim.z;
+	fluidStochasticTensor.resize(randomNumbersPerCell*numberCells);
 	auto fluidStochasticTensor_ptr = thrust::raw_pointer_cast(fluidStochasticTensor.data());
 	FluidParameters params{shearViscosity, bulkViscosity, dt};
 	callFillStochasticTensorGPU(grid,
 				    fluidStochasticTensor_ptr,
 				    seed, uint(steps), params, temperature);
+	icm_compressible::callUpdateGhostCellsFluctuations(fluidStochasticTensor, ghostCells, grid.cellDim);
       }
       return fluidStochasticTensor;
     }
@@ -148,7 +176,7 @@ namespace uammd{
     void ICM_Compressible::forwardPositionsToHalfStep(){
       if(pg->getNumberParticles() > 0){
 	System::log<System::DEBUG2>("[ICM_Compressible] Forward particles to n+1/2");
-	auto velocities = interpolateFluidVelocityToParticles(currentFluidVelocity);
+	auto velocities = interpolateFluidVelocityToParticles(currentFluid.velocity);
 	auto pos = pd->getPos(access::gpu, access::readwrite);
 	thrust::transform(thrust::cuda::par,
 			  pos.begin(), pos.end(), velocities.xyz(),
@@ -161,7 +189,7 @@ namespace uammd{
     void ICM_Compressible::forwardPositionsToNextStep(const cached_vector<real4> &positionsAtN,
 						      const DataXYZ &fluidVelocitiesAtN){
       System::log<System::DEBUG2>("[ICM_Compressible] Forward particles to n+1");
-      auto fluidVelocitiesAtMidStep = icm_compressible::sumVelocities(fluidVelocitiesAtN, currentFluidVelocity);
+      auto fluidVelocitiesAtMidStep = icm_compressible::sumVelocities(fluidVelocitiesAtN, currentFluid.velocity);
       auto velocities = interpolateFluidVelocityToParticles(fluidVelocitiesAtMidStep);
       auto pos = pd->getPos(access::gpu, access::readwrite);
       thrust::transform(thrust::cuda::par,
@@ -174,7 +202,7 @@ namespace uammd{
     void ICM_Compressible::forwardTime(){
       System::log<System::DEBUG>("[ICM_Compressible] Forward time");
       auto positionsAtN = storeCurrentPositions();
-      auto fluidVelocitiesAtN = currentFluidVelocity;
+      auto fluidVelocitiesAtN = currentFluid.velocity;
       forwardPositionsToHalfStep();
       for(auto i: interactors) i->updateSimulationTime((steps+0.5)*dt);
       {

@@ -8,6 +8,20 @@
 namespace uammd{
   namespace Hydro{
     namespace icm_compressible{
+
+      //Cell to index transformation for the IBM module, takes into account ghost cells
+      struct LinearIndexGhost3D{
+	LinearIndexGhost3D(int3 n):n(n){}
+
+	//Returns the index of a certain cell, c, including ghost cells
+	inline __device__ int operator()(int3 c) const{
+	  return linearIndex3D(c, n);
+	}
+
+      private:
+	const int3 n;
+      };
+
       namespace staggered{
 	struct ShiftTransform{
 	  real3 shift;
@@ -28,12 +42,15 @@ namespace uammd{
 	auto spreadParticleForces(const ParticleIterator &particleData, const PositionIterator &positions,
 				  std::shared_ptr<Kernel> kernel,
 				  int numberParticles, Grid grid){
-	  DataXYZ gridData(grid.getNumberCells());
+	  const int3 n = grid.cellDim;
+	  const int3 numberCellsWithGhosts = n+2;
+	  const int ntot = numberCellsWithGhosts.x*numberCellsWithGhosts.y*numberCellsWithGhosts.z;
+	  DataXYZ gridData(ntot);
 	  gridData.fillWithZero();
 	  if(numberParticles > 0){
 	    DataXYZ particleDataXYZ(particleData, numberParticles);
 	    const real3 h = grid.cellSize;
-	    IBM<Kernel> ibm(kernel, grid);
+	    IBM<Kernel, Grid, LinearIndexGhost3D> ibm(kernel, grid, LinearIndexGhost3D(n));
 	    auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
 	    ibm.spread(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
 	    auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
@@ -51,8 +68,9 @@ namespace uammd{
 	  DataXYZ particleDataXYZ(numberParticles);
 	  particleDataXYZ.fillWithZero();
 	  if(numberParticles > 0){
+	    const int3 n = grid.cellDim;
 	    const real3 h = grid.cellSize;
-	    IBM<Kernel> ibm(kernel, grid);
+	    IBM<Kernel, Grid, LinearIndexGhost3D> ibm(kernel, grid, LinearIndexGhost3D(n));
 	    auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
 	    ibm.gather(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
 	    auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
@@ -63,24 +81,6 @@ namespace uammd{
 	  return particleDataXYZ;
 	}
 
-      }
-      namespace regular{
-	template<class ParticleIterator, class PositionIterator, class Kernel>
-	auto spreadParticleForces(ParticleIterator &particleData, PositionIterator &positions,
-				  std::shared_ptr<Kernel> kernel,
-				  int numberParticles, Grid grid){
-	  DataXYZ gridData(grid.getNumberCells());
-	  gridData.fillWithZero();
-	  if(numberParticles > 0){
-	    DataXYZ particleDataXYZ(particleData, numberParticles);
-	    const real3 h = grid.cellSize;
-	    IBM<Kernel> ibm(kernel, grid);
-	    ibm.spread(positions, particleDataXYZ.x(), gridData.x(), numberParticles);
-	    ibm.spread(positions, particleDataXYZ.y(), gridData.y(), numberParticles);
-	    ibm.spread(positions, particleDataXYZ.z(), gridData.z(), numberParticles);
-	  }
-	  return gridData;
-	}
       }
     }
   }

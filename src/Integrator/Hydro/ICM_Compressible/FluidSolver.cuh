@@ -132,19 +132,23 @@ namespace uammd{
       __global__ void rungeKuttaSubStepD(FluidTimePack fluid, DataXYZPtr fluidForcingAtHalfStep,
 					 real2* fluidStochasticTensor,
 					 FluidParameters par, EquationOfState densityToPressure,
+					 int step,
 					 Grid grid,
 					 RungeKutta3 rk){
 	const int id = blockDim.x*blockIdx.x + threadIdx.x;
 	if(id>=grid.getNumberCells()) return;
+	//Cell inside the domain assigned to this thread
 	const auto cell_i = getCellFromThreadId(id, grid.cellDim);
+	//The linear index in the fluid arrays assigned to this cell, taking into account the ghost cells
+	const int ghostId = linearIndex3D(cell_i, grid.cellDim);
 	real densityAtTimeC;
 	{
 	  const real densityIncrement = computeDensityIncrement(cell_i, fluid.timeB, par.dt, grid);
-	  densityAtTimeC = rk.incrementScalar(fluid.timeA.density[id], fluid.timeB.density[id], densityIncrement);
+	  densityAtTimeC = rk.incrementScalar(fluid.timeA.density[ghostId], fluid.timeB.density[ghostId], densityIncrement);
 	}
 	real3 momentumIncrement;
 	{
-	  const real3 externalForcing = fluidForcingAtHalfStep.xyz()[id];
+	  const real3 externalForcing = real3(); //fluidForcingAtHalfStep.xyz()[id];
 	  const real3 deterministicMomentumIncrement = computeDeterministicMomentumIncrement(cell_i,
 											     fluid.timeB, par,
 											     densityToPressure, grid);
@@ -164,13 +168,13 @@ namespace uammd{
 	momentumAtTimeC.z = rk.incrementScalar(momentumAtTimeA.z, momentumAtTimeB.z,  momentumIncrement.z);
 	//Time C and time B or A might be aliased, so wait until the end to modify.
 	//Density is needed to compute momentum, so wait until here before updating.
-	fluid.timeC.density[id] = densityAtTimeC;
-	//Wait until the last moment to update velocity in memory.
-	//Store momentum in these arrays, just after this kernel they will be transformed to velocities
+	fluid.timeC.density[ghostId] = densityAtTimeC;
+	//Wait until the last moment to update momentum in memory.
+	//Store momentum in these arrays, just after this kernel the velocities are computed with it
 	//We cannot do it now because all the densities at time C need to be available.
-	fluid.timeC.velocityX[id] = momentumAtTimeC.x;
-	fluid.timeC.velocityY[id] = momentumAtTimeC.y;
-	fluid.timeC.velocityZ[id] = momentumAtTimeC.z;
+	fluid.timeC.momentumX[ghostId] = momentumAtTimeC.x;
+	fluid.timeC.momentumY[ghostId] = momentumAtTimeC.y;
+	fluid.timeC.momentumZ[ghostId] = momentumAtTimeC.z;
       }
 
       template<int subStep, class ...T>

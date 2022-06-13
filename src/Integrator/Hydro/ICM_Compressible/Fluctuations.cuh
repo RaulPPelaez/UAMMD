@@ -42,13 +42,20 @@ namespace uammd{
       }
       constexpr int randomNumbersPerCell = 6;
 
+      template<subgrid alpha, subgrid beta>
+      __device__ int getFluctTensIndex(int3 cell_i, int3 n){
+	const int id = linearIndex3D(cell_i, n);
+	const int3 numberCellsWithGhosts = n + make_int3(2,2,2);
+	const int ntot = numberCellsWithGhosts.x*numberCellsWithGhosts.y*numberCellsWithGhosts.z;
+	return ntot*getSymmetric3x3Index<alpha,beta>() + id;
+      }
+
       template<int subStep, subgrid alpha, subgrid beta>
       __device__ real getFluctuatingTensorElement(int3 cell_i, int3 n, const real2* noise){
-	cell_i = pbc_cell(cell_i, n);
-	const int id = linearIndex3D(cell_i, n);
+	//cell_i = pbc_cell(cell_i, n);
 	constexpr real timePrefactorA = getFluctuatingTimeAPrefactor<subStep>();
 	const real timePrefactorB = getFluctuatingTimeBPrefactor<subStep>();
-	real2 W_AB = noise[n.x*n.y*n.z*getSymmetric3x3Index<alpha,beta>() + id];
+	real2 W_AB = noise[getFluctTensIndex<alpha, beta>(cell_i, n)];
 	return timePrefactorA*W_AB.x + timePrefactorB*W_AB.y;
       }
 
@@ -97,8 +104,8 @@ namespace uammd{
 					    FluidParameters par,
 					    real temperature, Grid grid){
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
-	int n = grid.getNumberCells();
-	if(id >= n) return;
+	int ntot = grid.getNumberCells();
+	if(id >= ntot) return;
 	const real dV = grid.getCellVolume();
 	real prefactorCross = sqrt((par.dt*real(2.0)*par.shearViscosity*temperature)/(real(2.0)*dV));
 	real prefactorTrace = sqrt((par.dt*par.bulkViscosity*temperature)/(real(2.0)*real(3.0)*dV))-
@@ -112,12 +119,14 @@ namespace uammd{
 	real2 wxz = rng.gf(real(0.0), real(1.0));
 	real2 wyz = rng.gf(real(0.0), real(1.0));
 	real2 trace = wxx+wyy+wzz;
-	noise[n*getSymmetric3x3Index<subgrid::x, subgrid::x>()+id] = prefactorCross*wxx + prefactorTrace*trace;
-	noise[n*getSymmetric3x3Index<subgrid::y, subgrid::y>()+id] = prefactorCross*wyy + prefactorTrace*trace;
-	noise[n*getSymmetric3x3Index<subgrid::z, subgrid::z>()+id] = prefactorCross*wzz + prefactorTrace*trace;
-	noise[n*getSymmetric3x3Index<subgrid::x, subgrid::y>()+id] = prefactorCross*wxy;
-	noise[n*getSymmetric3x3Index<subgrid::x, subgrid::z>()+id] = prefactorCross*wxz;
-	noise[n*getSymmetric3x3Index<subgrid::y, subgrid::z>()+id] = prefactorCross*wyz;
+	const int3 n = grid.cellDim;
+	const int3 cell_i = getCellFromThreadId(id, n);
+	noise[getFluctTensIndex<subgrid::x, subgrid::x>(cell_i, n)] = prefactorCross*wxx + prefactorTrace*trace;
+	noise[getFluctTensIndex<subgrid::y, subgrid::y>(cell_i, n)] = prefactorCross*wyy + prefactorTrace*trace;
+	noise[getFluctTensIndex<subgrid::z, subgrid::z>(cell_i, n)] = prefactorCross*wzz + prefactorTrace*trace;
+	noise[getFluctTensIndex<subgrid::x, subgrid::y>(cell_i, n)] = prefactorCross*wxy;
+	noise[getFluctTensIndex<subgrid::x, subgrid::z>(cell_i, n)] = prefactorCross*wxz;
+	noise[getFluctTensIndex<subgrid::y, subgrid::z>(cell_i, n)] = prefactorCross*wyz;
       }
 
       template<class ...T>
@@ -126,6 +135,7 @@ namespace uammd{
 	int blocks = grid.getNumberCells()/threads+1;
         fillStochasticTensorD<<<blocks, threads>>>(args..., grid);
       }
+
 
     }
   }

@@ -51,7 +51,7 @@ For more information, check out Raul's manuscript.
 #ifndef ICM_COMPRESSIBLE_SPATIALDISCRETIZATION_CUH
 #define ICM_COMPRESSIBLE_SPATIALDISCRETIZATION_CUH
 #include"uammd.cuh"
-#include"utils.cuh"
+#include "utils.cuh"
 namespace uammd{
   namespace Hydro{
     namespace icm_compressible{
@@ -77,9 +77,13 @@ namespace uammd{
 	//Returns \vec{g}^\alpha = \rho^\alpha\vec{v}^\alpha in a staggered grid (cell faces)
 	template<subgrid direction>
 	__device__ real computeMomentumElement(int3 cell_i, int3 n, FluidPointers fluid){
-	  auto velocity_ptr = getVelocityPointer<direction>(fluid);
-	  const real v_alpha = fetchScalar(velocity_ptr, cell_i, n);
-	  const real momentum_alpha = interpolateScalar<direction>(fluid.density, cell_i, n)*v_alpha;
+	  //These lines compute the momentum as \rho*v
+	  // auto velocity_ptr = getVelocityPointer<direction>(fluid);
+	  // const real v_alpha = fetchScalar(velocity_ptr, cell_i, n);
+	  // const real momentum_alpha = interpolateScalar<direction>(fluid.density, cell_i, n)*v_alpha;
+	  //But if the momentum is being stored we can simply retrieve that
+	  auto momentum_ptr = getMomentumPointer<direction>(fluid);
+	  const real momentum_alpha = fetchScalar(momentum_ptr, cell_i, n);
 	  return momentum_alpha;
 	}
 
@@ -270,27 +274,27 @@ namespace uammd{
       }
 
       //Transforms the fluid momentum stored in fluid.velocity into velocities.
-      __global__ void momentumToVelocityD(FluidPointers fluid, Grid grid){
+      __global__ void momentumToVelocityD(FluidPointers fluid, int3 n){
 	const int id = blockDim.x*blockIdx.x + threadIdx.x;
-	if(id>=grid.getNumberCells()) return;
-	const auto cell_i = getCellFromThreadId(id, grid.cellDim);
-	const auto n = grid.cellDim;
+	if(id>=n.x*n.y*n.z) return;
+	const auto cell_i = getCellFromThreadId(id, n);
+	const int i = linearIndex3D(cell_i, n);
 	//We stored the momentum in the velocity variable before
-	const real3 momentum = {fluid.velocityX[id], fluid.velocityY[id], fluid.velocityZ[id]};
+	const real3 momentum = {fluid.momentumX[i], fluid.momentumY[i], fluid.momentumZ[i]};
 	using namespace staggered;
 	const real densityX = interpolateScalar<subgrid::x>(fluid.density, cell_i, n);
-	fluid.velocityX[id] = momentum.x/densityX;
+	fluid.velocityX[i] = momentum.x/densityX;
 	const real densityY = interpolateScalar<subgrid::y>(fluid.density, cell_i, n);
-	fluid.velocityY[id] = momentum.y/densityY;
+	fluid.velocityY[i] = momentum.y/densityY;
 	const real densityZ = interpolateScalar<subgrid::z>(fluid.density, cell_i, n);
-	fluid.velocityZ[id] = momentum.z/densityZ;
+	fluid.velocityZ[i] = momentum.z/densityZ;
       }
 
       template<class ...T>
-      void callMomentumToVelocityGPU(Grid grid, T...args){
+      void callMomentumToVelocityGPU(int3 n, T...args){
 	int threads = 128;
-	int blocks = grid.getNumberCells()/threads+1;
-	momentumToVelocityD<<<blocks, threads>>>(args..., grid);
+	int blocks = n.x*n.y*n.z/threads+1;
+	momentumToVelocityD<<<blocks, threads>>>(args..., n);
       }
 
       //Returns the velocity in a collocated grid, interpolating the staggered velocities to cell centers
@@ -322,6 +326,8 @@ namespace uammd{
 							n);
 	return collocatedVelocity;
       }
+
+
 
     }
   }
