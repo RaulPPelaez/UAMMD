@@ -3,9 +3,9 @@ Integrator
 
 Integrator is a :doc:`base module <../index>` of UAMMD. It is defined in :cpp:`Integrator/Integrator.cuh`.
 
-An Integrator has the ability to move the simulation one step forward in time.    
-For that, it can use any number of :ref:`Interactors <Interactor>`, which are added using the :cpp:`Integrator::addInteractor` method.  
-Additionally, Integrators can hold objects derived from the :doc:`../ParameterUpdatable` interface in order to inform them when a certain parameter changes (for instance the simulation time).  
+An Integrator has the ability to move the simulation one step forward in time.
+For that, it can use any number of :ref:`Interactors <Interactor>`, which are added using the :cpp:`Integrator::addInteractor` method.
+Additionally, Integrators can hold objects derived from the :doc:`../ParameterUpdatable` interface in order to inform them when a certain parameter changes (for instance the simulation time).
 C++ wise, Integrator is a pure virtual class.
 
 
@@ -14,43 +14,43 @@ The Integrator interface exposes the following functions:
 .. cpp:class:: Integrator
 
  .. cpp:function:: Integrator(std::shared_ptr<ParticleData> pd, std::string name = "noName")
-		    
+
     Constructor
 
-    
+
  .. cpp:function:: void addInteractor(std::shared_ptr<Interactor> some_interactor)
-		    
+
      Adds an :ref:`Interactor` to the integrator.
 
      :param some_interactor: Some :ref:`Interactor`
 
- 
+
  .. cpp:function:: void addUpdatable(std::shared_ptr<ParameterUpdatable> an_updatable)
-		     
+
      Adds a :cpp:any:`ParameterUpdatable` to the integrator.
-     
+
      :param an_updatable: Some :cpp:any:`ParameterUpdatable`
 
-			  
+
  .. cpp:function:: virtual void forwardTime() = 0;
 
      Takes the simulation to the next time step
 
 
-	      
+
  .. cpp:function:: virtual void sumEnergy();
-  
+
      Adds to each particle (via :cpp:any:`ParticleData`::getEnergy) the energy due to the Integrator (typically the kinetic energy). Defaults to doing nothing.
 
 
-	       
+
  .. cpp:function::  std::vector<std::shared_ptr<Interactor>> getInteractors();
-		     
+
      Returns a list of all the interactors in the Integrator
 
-	      
+
  .. cpp:function:: std::vector<std::shared_ptr<ParameterUpdatable>> getUpdatables();
-		    
+
      Returns a list of all the updatables in the Integrator (includes all Interactors)
 
 
@@ -58,15 +58,15 @@ Additionally, the following members are available as private members for any cla
   * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.
   * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :cpp:any:`ParticleData::getSystem`.
 
-After calling :code:`Integrator::forwardTime()` on a given Integrator the relevant particle properties (i.e. positions, velocities...) will be updated and can be accessed via :ref:`ParticleData`.  
+After calling :code:`Integrator::forwardTime()` on a given Integrator the relevant particle properties (i.e. positions, velocities...) will be updated and can be accessed via :ref:`ParticleData`.
 
-	      
+
 Usage
 =========
 
-This is just a base class that cannot be used by its own.  
-Childs of this class are instanced in a :doc:`code using UAMMD <../SimulationFile>` and :ref:`Interactors <Interactor>` are added to it to configure a simulation. 
-The simulation is then advanced by calling the method :cpp:`void forwardTime` any number of times.  
+This is just a base class that cannot be used by its own.
+Childs of this class are instanced in a :doc:`code using UAMMD <../SimulationFile>` and :ref:`Interactors <Interactor>` are added to it to configure a simulation.
+The simulation is then advanced by calling the method :cpp:`void forwardTime` any number of times.
 
 Creation
 ~~~~~~~~
@@ -79,7 +79,7 @@ Using an already available Integrator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: cpp
-   
+
   #include<uammd.cuh>
   ...
   //Modules often need parameters, which are set by passing an struct of the type ModuleName::Parameters
@@ -90,15 +90,15 @@ Using an already available Integrator
   //In general an integrator needs a (shared_ptr to) ParticleData or a ParticleGroup and some Parameters
   auto bd = make_shared<BD::EulerMaruyama>(pd, params);
   ...
-  //Now bd will take into account the interaction described by "an_interactor".  
+  //Now bd will take into account the interaction described by "an_interactor".
   bd->addInteractor(an_interactor);
   ...
   //Run 1000 steps
   fori(0,1000) bd->forwardTime();
-  
+
 Where make_shared creates a `shared_ptr <https://en.wikipedia.org/wiki/Smart_pointer#shared_ptr_and_weak_ptr>`_, a kind of smart pointer.
 
-You can see a list of currently implemented Integrators in the sidebar.  
+You can see a list of currently implemented Integrators in the sidebar.
 
 Example: Methods available in any Integrator
 ==============================================
@@ -126,12 +126,12 @@ We will create a :ref:`Brownian Dynamics` Integrator and list the available meth
      bd->addInteractor(some_interactor);
      //Take the simulation to the next time step
      bd->forwardTime();
-     //Add to each particle (via ParticleData::getEnergy) the energy due to the Integrator (typically the kinetic energy) 
-     bd->sumEnergy();  	    
+     //Add to each particle (via ParticleData::getEnergy) the energy due to the Integrator (typically the kinetic energy)
+     bd->sumEnergy();
      //Get a list of all the interactors in the Integrator
      // You will get a list of type: std::vector<std::shared_ptr<Interactor>>
-     auto interactors =  bd->getInteractors();  	    
-     //Adds a ParameterUpdatable to the Integrator.    
+     auto interactors =  bd->getInteractors();
+     //Adds a ParameterUpdatable to the Integrator.
      bd->addUpdatable(an_updatable);
      //Get a list of all the updatables in the Integrator
      auto updatables = bd->getUpdatables();
@@ -148,31 +148,31 @@ See :ref:`VerletNVE` for an example of an integrator.
 Whenever a module needs a particle property (i.e the position of the particles). It must ask for it to :ref:`ParticleData` in the following way:
 
 .. code:: c++
-   
+
   //The scope of pos must be the scope of the usage of pos_ptr, never store pos or any other particle property reference, always ask pd for them when you need them and release then when you are done using them.
   auto pos = pd->getPos(access::gpu, access::readwrite);
   real4* pos_ptr= pos.raw();
 
 
 You can go through every Interactor with this construction, for example to sum the forces:
-   
+
 .. code:: c++
-	  
+
   for(auto forceComp: interactors) forceComp->sum({.force=true, .energy=false, .virial=false},cudaStream);
 
-Where :cpp:`cudaStream` is a `CUDA stream <https://developer.nvidia.com/blog/gpu-pro-tip-cuda-7-streams-simplify-concurrency/>`_; 0, also known as the default stream, is a valid CUDA stream and will result in all GPU operations running one after the other. If a different stream is passed it is advisable for it to be the same for all Interactors.  
+Where :cpp:`cudaStream` is a `CUDA stream <https://developer.nvidia.com/blog/gpu-pro-tip-cuda-7-streams-simplify-concurrency/>`_; 0, also known as the default stream, is a valid CUDA stream and will result in all GPU operations running one after the other. If a different stream is passed it is advisable for it to be the same for all Interactors.
 In a similar manner you can inform the interactors of changes in parameters using the :ref:`ParameterUpdatable` interface.
 The :cpp:`updatables` member holds a list of :ref:`ParameterUpdatable`-derived objects in the Integrator, including the Interactors and any other :ref:`ParameterUpdatable` object added:
 
 .. code:: c++
-   
+
   for(auto updatable: updatables){
   updatable->updateSimulationTime(steps*dt);
   updatable->updateTemperature(temperature);
   ...
   }
 
-  
+
 A basic Integrator
 ~~~~~~~~~~~~~~~~~~~
 
@@ -180,7 +180,7 @@ A basic Integrator
 Here you have a bare bones template for an Integrator that you could follow:
 
 .. code:: c++
-   
+
   class MyIntegrator: public Integrator{
     real time, dt=0.1;
   public:
@@ -194,6 +194,11 @@ Here you have a bare bones template for an Integrator that you could follow:
       //Integrators have access to the member "updatables", holding a list of ParameterUpdatables.
       //Note that this includes the Interactors as well.
       for(auto updatable: updatables) updatable->updateSimulationTime(time);
+      //Before computing the new forces we probably want to fill the current ones with zero:
+      {
+        auto force = pd->getForce(access::gpu, access::write);
+	thrust::fill(force.begin(), force.end(), real4());
+      }
       //Integrators have access to the member "interactors", holding a list of Interactors
       for(auto forceComp: interactors){
         //forceComp->updateSimulationTime(time); //This call is redundant, since the interactor is already added in updatables
@@ -206,8 +211,5 @@ Here you have a bare bones template for an Integrator that you could follow:
     }
     //Sum any energy due to the integrator (i.e kinetic energy)
     virtual real sumEnergy()override { return 0;}
-  
-  };
 
-        
-      
+  };
