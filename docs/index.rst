@@ -4,11 +4,11 @@
    contain the root `toctree` directive.
 
 .. _index:
-   
+
 Welcome to the UAMMD v2.0 documentation!
 =========================================
 ----------------------------------------------------
-Universally Adaptable Multiscale Molecular Dynamics 
+Universally Adaptable Multiscale Molecular Dynamics
 ----------------------------------------------------
 
 .. figure:: img/shotlogo.png
@@ -18,10 +18,10 @@ Universally Adaptable Multiscale Molecular Dynamics
 	    10 Million LJ particles in a box with a low temperature thermostat. Ran on a GTX 980.
 
 
-Screenshot made with `superpunto <https://github.com/RaulPPelaez/superpunto/tree/SDL_OGL45>`_! 
+Screenshot made with `superpunto <https://github.com/RaulPPelaez/superpunto/tree/SDL_OGL45>`_!
 
 
-For information about a particular module, see its page. You will find the most up to date information about a module in its header file.  
+For information about a particular module, see its page. You will find the most up to date information about a module in its header file.
 
 -----
 
@@ -33,14 +33,14 @@ UAMMD is a software infrastructure for complex fluids simulations for the GPU, p
 Although "Molecular Dynamics" is part of the name,the UAMMD framework allows for much more than that. To this moment multiple integrators are implemented allowing it to perform:
 
 - :ref:`Molecular dynamics` (MD)
-- :ref:`Langevin Dynamics`  (LD)  
-- :ref:`Brownian Dynamics`  (BD)  
-- :ref:`Brownian Hydrodynamics` (BDHI)  
-- :ref:`Dissipative Particle Dynamics` (DPD)  
-- :ref:`Smoothed Particle Hydrodynamics` (SPH)  
-- :ref:`Metropolis Monte Carlo` (MC)   
-- :ref:`Lattice Boltzmann` (LBM)(WIP)  
-- :ref:`Fluctuating Hydrodynamics` (coupled with particles with :ref:`Immersed Boundary Method` (IBM))  
+- :ref:`Langevin Dynamics`  (LD)
+- :ref:`Brownian Dynamics`  (BD)
+- :ref:`Brownian Hydrodynamics` (BDHI)
+- :ref:`Dissipative Particle Dynamics` (DPD)
+- :ref:`Smoothed Particle Hydrodynamics` (SPH)
+- :ref:`Metropolis Monte Carlo` (MC)
+- :ref:`Lattice Boltzmann` (LBM)(WIP)
+- :ref:`Fluctuating Hydrodynamics` (coupled with particles with :ref:`Immersed Boundary Method` (IBM))
 
 Building blocks are provided for the user to construct a certain simulation. Most are highly templated to ease adaptability.
 
@@ -56,9 +56,9 @@ Hop on to the examples folder for an introduction or check the docs for more inf
    On the other hand **understanding and modifying UAMMD code will require at least basic knowledge of GPU programming with CUDA**. There are a lot of resources online to learn CUDA, but you can start here: https://developer.nvidia.com/blog/even-easier-introduction-cuda/
 
 
-If this is the first time you encounter UAMMD and want a quick start guide check the :doc:`QuickStart`. The :doc:`FAQ` is also a good source of knowledge.  
+If this is the first time you encounter UAMMD and want a quick start guide check the :doc:`QuickStart`. The :doc:`FAQ` is also a good source of knowledge.
 
-Look in :doc:`Compiling-UAMMD` if some Makefile gives you troubles. UAMMD is a header only framework and it is mostly self contained in terms of dependencies so compilation should not be too troubling.  
+Look in :doc:`Compiling-UAMMD` if some Makefile gives you troubles. UAMMD is a header only framework and it is mostly self contained in terms of dependencies so compilation should not be too troubling.
 
 
 .. _basic-assumptions:
@@ -68,7 +68,7 @@ The four basic assumptions
 
 
 .. figure:: img/sketchUAMMD.*
-		    
+
 	    The basic conceptual hierarchy in UAMMD.
 
 
@@ -77,23 +77,23 @@ The foundational concepts of UAMMD are supported on a handful of (deliberately) 
 .. rst-class:: centered
 
 .. topic:: **1.** The :doc:`System` assumption:
-	       
+
   The code will run primarily on a GPU (the most limiting assumption in the development process).
 
 .. rst-class:: centered
-		 
+
 .. topic:: **2.** The :doc:`ParticleData` assumption:
 
   Simulations are based on the state of "particles" (whatever a particle and its state mean).
-  
+
 .. rst-class:: centered
-	       
+
 .. topic:: **3.** The :doc:`Integrator </Integrator/index>` assumption:
 
   The state of these particles changes in time.
 
 .. rst-class:: centered
-	       
+
 .. topic:: **4.** The :doc:`Interactor </Interactor/index>` assumption:
 
   Particles can interact with each other and/or with an external influence.
@@ -111,7 +111,7 @@ Some special flags might be needed to compile codes including with certain UAMMD
 Here you have a short example of how a typical UAMMD code looks like:
 
 .. code:: cpp
-	  
+
   //Ideal Brownian particles
   #include"uammd.cuh"
   #include"Integrator/BrownianDynamics.cuh"
@@ -122,7 +122,7 @@ Here you have a short example of how a typical UAMMD code looks like:
     {
       auto pos = pd->getPos(access::cpu, access::write);
       std::generate(pos.begin(), pos.end(),
-                   [&](){ return make_real4(sys->rng.uniform3(-0.5, 0.5), 0);});	
+                   [&](){ return make_real4(sys->rng.uniform3(-0.5, 0.5), 0);});
     }
     BD::EulerMaruyama::Parameters par;
     par.temperature = 1.0;
@@ -133,11 +133,11 @@ Here you have a short example of how a typical UAMMD code looks like:
     int numberSteps=100;
     for(int i = 0; i<numberSteps; i++){
     	bd->forwardTime();
-    }  
+    }
     return 0;
   }
 
-A plethora of guided examples are available in the repository.  
+A plethora of guided examples are available in the repository.
 
 ----------------------
 
@@ -160,12 +160,12 @@ An in depth theoretical description of most of the algorithms and physics behind
    FAQ
    Examples
    Contact
-   
+
 .. toctree::
    :hidden:
    :maxdepth: 4
    :caption: Base modules
-	     
+
    System
    ParticleData
    Integrator/index
@@ -175,8 +175,8 @@ An in depth theoretical description of most of the algorithms and physics behind
    :hidden:
    :maxdepth: 4
    :caption: Concepts
-	     
-   SimulationDomain   
+
+   SimulationDomain
    NeighbourList
    ImmersedBoundary
    Transverser
@@ -192,7 +192,7 @@ An in depth theoretical description of most of the algorithms and physics behind
    Integrator/LangevinDynamics
    Integrator/BrownianDynamics
    Integrator/BrownianHydrodynamics
-   Integrator/FluctuatingHydrodynamics   
+   Integrator/FluctuatingHydrodynamics
    Integrator/MonteCarlo
 
 .. toctree::
@@ -203,18 +203,18 @@ An in depth theoretical description of most of the algorithms and physics behind
    Interactor/ExternalForces
    Interactor/BondedForces
    Interactor/PairForces
-   Interactor/Electrostatics   
+   Interactor/Electrostatics
 
 
-   
+
 .. toctree::
    :hidden:
    :maxdepth: 4
    :caption: Other concepts and utilities
-   
+
    ParameterUpdatable
    InputFile
-   TabulatedFunctions   
+   TabulatedFunctions
    Grid
    ParticleSorter
    ErrorHandling
@@ -224,13 +224,10 @@ An in depth theoretical description of most of the algorithms and physics behind
 
 
 
-	     
+
 Indices and tables
 ==================
-   
+
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-  
-

@@ -49,24 +49,23 @@ Scalar fields are defined in the cell centers, vector fields in cell faces and
 tensor fields are defined at the centers and edges.
 
 Let us denote a certain scalar field with :math:`\rho`, a vector field with :math:`\vec{v}`
-(with components :math:`v^\alpha`) and a tensor field with :math:`\tens{E}` (with components
-:math:`E^{\alpha\beta}` ).
+(with components :math:`v^\alpha`) and a tensor field with :math:`\bm{\Sigma}` (with components
+:math:`\Sigma^{\alpha\beta}` ).
 
-Say :math:`\vec{i}=(i_x, i_y, i_z)` represents a cell in the grid, which is centered at
+Say :math:`i` represents a cell in the grid, which is centered at
 the position :math:`\vec{r}_i`. Then, the different fields, corresponding to cell
-:math:`\vec{i}` would be defined at the following locations:
+:math:`i` would be defined at the following locations:
 
-  - :math:`\rho_{\vec{i}} \rightarrow \vec{r}_{\vec{i}}`
-  - :math:`\vec{v}^\alpha_{\vec{i}} \rightarrow \vec{r}_{\vec{i}} + h/2\vec{\alpha}`
-  - :math:`\tens{Z}^{\alpha\beta}_{\vec{i}} \rightarrow \vec{r}_{\vec{i}} + h/2\vec{\alpha} + h/2\vec{\beta}`
+  - :math:`\rho_{i} \rightarrow \vec{r}_{\vec{i}}`
+  - :math:`\vec{v}^\alpha_{i+\alpha/2} \rightarrow \vec{r}_{i} + h/2\vec{\alpha}`
+  - :math:`\bm{\Sigma}^{\alpha\beta}_{i+\alpha/2 + \beta/2} \rightarrow \vec{r}_{i} + h/2\vec{\alpha} + h/2\vec{\beta}`
 
-Where :math:`\vec{\alpha}` and :math:`\vec{\beta}` are the unit vectors in those directions and :math:`h` is the size of a cell.
+Where :math:`\vec{\alpha}` and :math:`\vec{\beta}` are the unit vectors in those directions and :math:`h` is the size of a cell. From now on a superindex denotes a coordinate and a subindex denotes a physical position in space. To be more explicit the component :math:`x` of the velocity, :math:`v^x_ {i+x/2}` of cell :math:`i` is defined at the position :math:`\vec{r}_i + \hat{\vec{x}}h/2`, which is to be understood as "the location of the center of cell :math:`i` plus :math:`h/2` in the :math:`x` direction".
 
-This rules result in the values assigned to a cell sometimes being defined in
+These rules result in the values assigned to a cell sometimes being defined in
 strange places. The sketch below represents all the values owning to a certain
-cell, :math:`\vec{i}` (with center defined at ○). Unintuitively, some quantities assigned
-to cell :math:`\vec{i}` lie in the neighbouring cells (represented below is also cell
-:math:`\vec{i} + (1,0,0)`).
+cell, :math:`i` (with center defined at ○). Unintuitively, some quantities assigned
+to cell :math:`i` lie in the neighbouring cells (represented below is also the cell to its right).
 
 .. code::
 
@@ -80,20 +79,30 @@ to cell :math:`\vec{i}` lie in the neighbouring cells (represented below is also
 	+-----------+-----------+
 
 Where each symbol represents:
-  * ○: :math:`\rho` (Cell center, at :math:`\vec{r}_{\vec{i}}`)
-  * ◨: :math:`v^x`
-  * ⬒: :math:`v^y`
-  * △: :math:`\tens{Z}^{xx}`
-  * ▽: :math:`\tens{Z}^{xy},\tens{Z}^{yx}`
+  * ○: :math:`\rho_i` (Cell center, at :math:`\vec{r}_{i}`)
+  * ◨: :math:`v^x_{i+x/2}`
+  * ⬒: :math:`v^y_{i+y/2}`
+  * △: :math:`\bm{\Sigma}^{xx}_{i + x}`
+  * ▽: :math:`\bm{\Sigma}^{xy}_{i + x/2 + y/2},\bm{\Sigma}^{yx}_{i + x/2 + y/2}`
 
 
 Naturally, this discretisation requires special handling of the discretized versions of the (differential) operators. See for instance :code:`ICM_Compressible/SpatialDiscretization.cuh` to see how UAMMD deals with them.
 
 For instance, multiplying a scalar and a vector requires interpolating the
 scalar at the position of the vector (Since the result, being a vector, must be
-defined at the vector subgrids).
+defined at the vector subgrids). One example of this is computing the momentum:
 
-:math:`\vec{g} := \rho\vec{v} \rightarrow g^\alpha_{\vec{i}} = 0.5(p_{\vec{i}+\vec{\alpha}} + p_{\vec{i}})v^\alpha_{\vec{i}}`
+:math:`g^\alpha_{i+alpha/2} = \rho_{i+alpha/2}v^\alpha_{i+alpha/2} = \frac{1}{2}(\rho_i + \rho_{i+1})v^\alpha_{i+alpha/2}`
+
+The differential operators are discretized via finite differences.
+For instance, the gradient of an scalar is a vector. Lets say we want to compute the :math:`\alpha` component of the density gradient at cell :math:`i`:
+
+.. math::
+
+  (\nabla\rho)_{i+\alpha/2}^\alpha := \partial_\alpha\rho_i = \frac{1}{h}(\rho_{i+\alpha} - \rho_i)
+
+The result is defined at the location :math:`i + x/2`. The rest of the operators follow a similar pattern, where in order to map from one space to another (like when going from scalars to vector in the above example) we have to make sure that the result is defined at the right location.
+
 
 For more information, check out [1]_, [3]_ or Raul's manuscript.
 
@@ -120,8 +129,8 @@ Where :math:`U` might be the density or the fluid velocity and :math:`(a,b,c)` a
 In order to go from the time step :math:`n` to :math:`n+1` the solver must be called three times for the density and then the velocity:
 
   1. :math:`a=0`, :math:`b=n` and :math:`c=n+1/3`
-  2. :math:`a=3/4`, :math:`b=1/4` and :math:`c=n+2/3`
-  3. :math:`a=1/3`, :math:`b=2/3` and :math:`c=n+1`
+  2. :math:`a=b+3/4`, :math:`b=n+1/4` and :math:`c=n+2/3`
+  3. :math:`a=b+1/3`, :math:`b=n+2/3` and :math:`c=n+1`
 
 The values of :math:`A` and :math:`B` allow to choose between different temporal discretizations.
 
@@ -138,8 +147,8 @@ Where :math:`\tens{F}(U,W,t)` means one thing or another depending on the equati
 
 .. math::
 
-   W^{n+1/3} &= W_A- \sqrt(3)W_B\\
-   W^{n+2/3} &= W_A+ \sqrt(3)W_B\\
+   W^{n+1/3} &= W_A- \sqrt{3}W_B\\
+   W^{n+2/3} &= W_A+ \sqrt{3}W_B\\
    W^{n+1} &= W_A
 
 Where :math:`W_A` and :math:`W_B` are uncorrelated Gaussian random 3x3 tensors defined as:
@@ -163,6 +172,59 @@ The overall algorithm, including the particles (which are included via the :ref:
    1. Take particles to mid step: :math:`\vec{q}^{n+1/2} = \vec{q}^n + \frac{dt}{2}\oper{J}^n\vec{v}^n`.
    2. Update the fluid densities and velocities using the Runge Kutta algorithm above to get :math:`\rho^{n+1}, \vec{v}^{n+1}`. Here we use :math:`\vec{f} = \oper{S}^{n+1/2}\vec{F}^{n+1/2}`.
    3. Update particle positions to next step: :math:`\vec{q}^{n+1} = \vec{q}^n + \frac{dt}{2}\oper{J}^{n+1/2}\left(\vec{v}^n+\vec{v}^{n+1}\right)`.
+
+Boundary conditions via ghost cells
+....................
+
+The boundary conditions are implemented using ghost cells. Since none of the operators require searching for a value beyond first neighbours we can use a single layer of ghost cells.
+
+.. figure:: ../img/ghostcells.*
+	    :width: 50%
+	    :align: center
+	    :alt: A representation of the ghost cell layer.
+
+	    A fluid discretized at the white cells is surrounded by a single layer of ghost cells (green). In order to apply periodic boundary conditions we must carefully fill the ghost cells. For instance, in order for the cell :math:`(0,1)` to access the information of the cell located to its left it is necessary for the ghost cell located there to store the information of the cell :math:`(2,1)`. Similarly the ghost cell at the top left corner must store the information in the cell :math:`(2,2)`.
+
+
+
+.. note:: In order to ensure a single layer is enough we store the density, :math:`\rho`, the fluid velocity :math:`\vec{v}` and the momentum, :math:`\vec{g}=\rho\vec{v}`, across the whole domain. While storing the momentum everywhere is redundant doing this simplifies the implementation and facilitates the customization of the boundary conditions via the ghost cells.
+
+
+It is useful to lay out a situation in which not storing the momentum explicitly can be problematic when using a single layer of ghost cells.
+In particular, there is an issue when trying to evaluate the divergence of the kinetic tensor,
+
+.. math::
+
+   \nabla\cdot\tens{K} := \nabla\cdot(\vec{g} \otimes \vec{v}),
+
+at the border of the domain. Tensor divergence is defined elementwise (such that the result is a vector) as
+
+.. math::
+
+  \left(\nabla\cdot \tens{K}\right)^\alpha_{i+\alpha/2} = \left(\sum_\beta \partial_\beta \tens{K}^{\alpha\beta}_{i+\alpha/2 + \beta/2}\right)_{i+\alpha/2}.
+
+For instance, the :math:`x` component will be defined at the same position as the velocity :math:`v^x_{i+x/2}` in the staggered grid sketch, that is :math:`\vec{r}_i + \hat{\vec{x}}h/2`.
+Lets focus on the :math:`\beta = \alpha` component:
+
+.. math::
+
+   \left(\partial_\beta \tens{K}^{\beta\beta}_{i+\beta}\right)_{i+\beta/2} = 1/h (\tens{K}^{\beta\beta}_{i+\beta} - \tens{K}^{\beta\beta}_{i})
+
+And now let us evaluate
+
+.. math::
+
+   \tens{K}^{\beta\beta}_{i+\beta} = \frac{1}{2}(g^\beta_{i+\beta/2} + g^\beta_{i+3/2\beta})\frac{1}{2}(v^\beta_{i+\beta/2} + v^\beta_{i+3/2\beta})
+
+In order to compute one element of a tensor (comping from two vectors) we interpolate the components at the same place. In this case the location :math:`i+\beta` (where :math:`\rho_{i+x}` is located in the staggered grid when :math:`\beta=x`).
+
+Finally, let us compute :math:`g^\beta_{i+3/2\beta}`:
+
+.. math::
+
+   g^\beta_{i+3/2\beta} = \rho_{i+3/2\beta}v^\beta_{i+3/2\beta}=\frac{1}{2}(\rho_{i+2\beta} + \rho_{i+\beta})v^\beta_{i+3/2\beta}
+
+Think about the rightmost cell of the domain, if we do not store the momentum the algorithm will try to fetch :math:`\rho_{i+2\beta}`, which lies one cell to the right of the ghost layer and is of course invalid. One solution is to store the momentum separately, so the element :math:`g^\beta_{i+3/2\beta}` is accessible in a ghost cell.
 
 Usage
 ............
@@ -233,10 +295,10 @@ FAQ
 ......
 
 1- I want to fiddle with the boundary conditions:
-    -Check the function pbc_cells and fetchScalar in file ICM_Compressible/utils.cuh, which handles what happens when trying to access the information of a cell
-    -You can also influence the solver itself (for instance to define special rules for the surfaces of the domain) in the functions of the file FluidSolver.cuh.
+    -Check the file :code:`ICM_Compressible/GhostCells.cuh`, which handles the filling of the ghost layer. You might also want to check the :code:`ICM_Compressible/Fluctuations.cuh`, which among other things handles the ghost layer for the fluctuations. Finally, if particles are involved, you will probably need to modify the spreading kernel (see below).
+    -You can also influence the solver itself (for instance to define special rules for the surfaces of the domain) in the functions of the file :code:`ICM_Compressible/FluidSolver.cuh`.
 
-2- I want to chenge the spreading kernel:
+2- I want to change the spreading kernel:
     -Change the line "using Kernel" below to the type of your kernel. You might also have to change the initialization in the spreading and interpolation functions in ICM_Compressible.cu. You will also have to change the relation between the hydrodynamic radius and the number of fluid cells, do this in the ICM_Compressible constructor.
 
 3- I want to add some special fluid forcing:
