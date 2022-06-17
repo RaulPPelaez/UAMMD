@@ -107,9 +107,9 @@ namespace uammd{
 	int ntot = grid.getNumberCells();
 	if(id >= ntot) return;
 	const real dV = grid.getCellVolume();
-	real prefactorCross = sqrt((par.dt*real(2.0)*par.shearViscosity*temperature)/(real(2.0)*dV));
-	real prefactorTrace = sqrt((par.dt*par.bulkViscosity*temperature)/(real(2.0)*real(3.0)*dV))-
-	  - real(1.0)/real(3.0)*sqrt((par.dt*real(2.0)*par.shearViscosity*temperature)/(real(2.0)*dV));
+	real prefactorCross = sqrt((par.dt*real(2.0)*par.shearViscosity*temperature)/dV);
+	real prefactorTrace = sqrt((par.dt*par.bulkViscosity*temperature)/(real(3.0)*dV))-
+	  real(1.0)/real(3.0)*sqrt((par.dt*real(2.0)*par.shearViscosity*temperature)/dV);
 	Saru rng(s1, s2, id);
 	constexpr real sq2 = 1.4142135623730950488016887;
 	real2 wxx = rng.gf(real(0.0), sq2);
