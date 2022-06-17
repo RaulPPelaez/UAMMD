@@ -326,9 +326,6 @@ namespace uammd{
 							n);
 	return collocatedVelocity;
       }
-
-
-
     }
   }
 }

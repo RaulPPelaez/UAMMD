@@ -12,7 +12,7 @@ namespace uammd{
     auto ICM_Compressible::storeCurrentPositions(){
       System::log<System::DEBUG2>("[ICM_Compressible] Store current particle positions");
       int numberParticles = pg->getNumberParticles();
-      ICM_Compressible::cached_vector<real4> v(numberParticles);
+      cached_vector<real4> v(numberParticles);
       auto pos = pd->getPos(access::gpu, access::read);
       thrust::copy(pos.begin(), pos.end(), v.begin());
       return v;
@@ -24,7 +24,8 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       auto pos = pd->getPos(access::gpu, access::read);
       auto kernel = std::make_shared<Kernel>(grid.cellSize.x);
-      auto vel = staggered::interpolateFluidVelocities(fluidVelocity, pos.begin(), kernel, numberParticles, grid);
+      auto vel = staggered::interpolateFluidVelocities(fluidVelocity, pos.begin(),
+						       kernel, numberParticles, grid);
       return vel;
     }
 
@@ -35,24 +36,9 @@ namespace uammd{
       auto pos = pd->getPos(access::gpu, access::read);
       auto kernel = std::make_shared<Kernel>(grid.cellSize.x);
       int numberParticles = pg->getNumberParticles();
-      auto fluidForcing = staggered::spreadParticleForces(forces.begin(), pos.begin(), kernel, numberParticles, grid);
+      auto fluidForcing = staggered::spreadParticleForces(forces.begin(), pos.begin(),
+							  kernel, numberParticles, grid);
       return fluidForcing;
-    }
-
-    template<class Container>
-    void checkDensity(Container &dens, int3 n){
-      std::vector<real> h_d(dens.size(), 0);
-      thrust::copy(dens.begin(), dens.end(), h_d.begin());
-      int jj= 0;
-      fori(0, h_d.size()){
-	int3 cell = icm_compressible::getCellFromThreadId(i, n+2);
-	//int ii = icm_compressible::linearIndexGhost3D(cell, n+2);
-	if(h_d[i]<=0.0){
-	  std::cerr<<"Density is bad at "<<i<<": "<<cell.x<<" "<<cell.y<<" "<<cell.z<<": "<<h_d[i]<<std::endl;
-	  jj++;
-	  if(jj==5) break;
-	}
-      }
     }
 
     template<int subStep>
@@ -69,11 +55,10 @@ namespace uammd{
 					DataXYZPtr(fluidForcingAtHalfStep),
 					thrust::raw_pointer_cast(fluidStochasticTensor.data()),
 					params, *densityToPressure, steps);
-      icm_compressible::callUpdateGhostCells(thrust::raw_pointer_cast(fluidAtNewTime.density.data()),
-					     ghostCells, grid.cellDim);
+      auto density_ptr = thrust::raw_pointer_cast(fluidAtNewTime.density.data());
+      icm_compressible::callUpdateGhostCells(density_ptr, ghostCells, grid.cellDim);
       callMomentumToVelocityGPU(getGridSize(), fluidAtNewTime.getPointers());
       fillGhostCells(fluidAtNewTime.getPointers());
-      //      checkDensity(fluidAtNewTime.density, grid.cellDim);
       return fluidAtNewTime;
     }
 

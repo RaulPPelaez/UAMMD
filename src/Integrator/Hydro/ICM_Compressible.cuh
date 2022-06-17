@@ -142,12 +142,13 @@ namespace uammd{
       ICM_Compressible(std::shared_ptr<ParticleData> pd, Parameters par):
 	Integrator(pd, "ICM::Compressible"){
 	densityToPressure = std::make_shared<DensityToPressure>();
+	densityToPressure->isothermalSpeedOfSound = par.speedOfSound;
 	checkInputValidity(par);
-	dt = par.dt;
-	shearViscosity = par.shearViscosity;
-	bulkViscosity = par.bulkViscosity;
-	temperature = par.temperature;
-	seed = (par.seed==0)?sys->rng().next32():par.seed;
+	this->dt = par.dt;
+	this->shearViscosity = par.shearViscosity;
+	this->bulkViscosity = par.bulkViscosity;
+	this->temperature = par.temperature;
+	this->seed = (par.seed==0)?sys->rng().next32():par.seed;
 	int3 ncells = par.cellDim;
 	if(par.hydrodynamicRadius>0){
 	  //0.91 only works for Peskin three point
@@ -156,8 +157,7 @@ namespace uammd{
 	else{
 	  par.hydrodynamicRadius = 0.91*par.boxSize.x/par.cellDim.x;
 	}
-	grid = Grid(Box(par.boxSize), ncells);
-	densityToPressure->isothermalSpeedOfSound = par.speedOfSound;
+	this->grid = Grid(Box(par.boxSize), ncells);
 	initializeFluid(par);
 	printInitialMessages(par);
 	setUpGhostCells();
@@ -189,17 +189,13 @@ namespace uammd{
     private:
       Grid grid;
       FluidData currentFluid;
-      // DataXYZ currentFluidVelocity;
-      // cached_vector<real> currentFluidDensity;
       cached_vector<int3> ghostCells; //A list with cells that lie in the halo of the domain grid
-
 
       //Returns the number of cells in the fluid grid in each direction including ghost cells
       //The simulation domain is located in the range i_x = 1:(getGhostGridSize().x-3) and similar for y and z.
       int3 getGhostGridSize() const{
 	return this->grid.cellDim + make_int3(2,2,2);
       }
-
 
       //Throws an exception if some of the provided parameters are invalid
       void checkInputValidity(Parameters par){
@@ -244,10 +240,9 @@ namespace uammd{
 	System::log<System::MESSAGE>("[ICM_Compressible] Fluid cell Re=α_c/β=%g", a_c/b);
 	real Sc = kinematicViscosity/selfDiffusion;
 	System::log<System::MESSAGE>("[ICM_Compressible] Schmidt number: %g", Sc);
-
       }
 
-      //Initializes the fluid variables (velocity and density)
+      //Initializes the fluid variables (velocity, density and momentum)
       void initializeFluid(Parameters par){
 	System::log<System::DEBUG>("[ICM_Compressible] Intializing fluid");
 	const real defaultDensity = 1.0;
@@ -274,8 +269,6 @@ namespace uammd{
 	thrust::copy(d_vx.begin(), d_vx.end(), currentFluid.velocity.x());
 	thrust::copy(d_vy.begin(), d_vy.end(), currentFluid.velocity.y());
 	thrust::copy(d_vz.begin(), d_vz.end(), currentFluid.velocity.z());
-
-
 	fillGhostCells(currentFluid.getPointers());
 	callMomentumToVelocityGPU(getGridSize(), currentFluid.getPointers());
 	fillGhostCells(currentFluid.getPointers());
