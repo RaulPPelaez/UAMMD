@@ -52,30 +52,6 @@ namespace uammd{
 
   };
 
-  //Computes real to complex 3D Fourier transforms.
-  class FourierTransform3D{
-    cufftHandle plan;
-    int3 ncells;
-  public:
-    using complex = uammd::cufftComplex_t<real>;
-    template<class T>
-    using cached_container = uninitialized_cached_vector<T>;
-    FourierTransform3D(int3 ncells):ncells(ncells){
-      cufftPlan3d(&plan, ncells.x, ncells.y, ncells.z, CUFFT_Real2Complex<real>::value);
-    }
-
-    template<class RealIterator>
-    auto transform(RealIterator a){
-      int nhat = (ncells.x/2+1)*ncells.y*ncells.z;
-      cached_container<complex> a_hat(nhat);
-      cufftExecReal2Complex<real>(plan, a, thrust::raw_pointer_cast(a_hat.data()));
-      auto it = thrust::make_constant_iterator(complex{0,0});
-      thrust::copy(it, it+1, a_hat.begin());
-      return a_hat;
-    }
-
-  };
-
 
   //This functor is used to permute a matrix
   struct ColMajorToRowMajor{
@@ -150,8 +126,89 @@ namespace uammd{
       return uqw;
 
     }
+  };
 
+  //Computes real to complex 3D Fourier transforms.
+  class FourierTransform3D{
+    cufftHandle plan;
+    int3 ncells;
+  public:
+    using complex = uammd::cufftComplex_t<real>;
+    template<class T>
+    using cached_container = uninitialized_cached_vector<T>;
+    FourierTransform3D(int3 ncells):ncells(ncells){
+      cufftPlan3d(&plan, ncells.x, ncells.y, ncells.z, CUFFT_Real2Complex<real>::value);
+    }
+
+    template<class RealIterator>
+    auto transform(RealIterator a){
+      int nhat = (ncells.x/2+1)*ncells.y*ncells.z;
+      cached_container<complex> a_hat(nhat);
+      cufftExecReal2Complex<real>(plan, a, thrust::raw_pointer_cast(a_hat.data()));
+      {
+	auto it = thrust::make_constant_iterator(complex{0,0});
+	thrust::copy(it, it+1, a_hat.begin());
+      }
+      {
+       	int ntot = ncells.x*ncells.y*ncells.z;
+       	auto it = thrust::make_constant_iterator<complex>({real(ntot), real(ntot)});
+       	thrust::transform(a_hat.begin(), a_hat.end(), it, a_hat.begin(), thrust::divides<complex>());
+      }
+      return a_hat;
+    }
 
   };
 
+  //Given a series of samples in Fourier space, computes their FFT.
+  class FourierTransformComplex1D{
+  public:
+    template<class T>
+    using cached_container = uninitialized_cached_vector<T>;
+    using complex = uammd::cufftComplex_t<real>;
+  private:
+    cufftHandle plan;
+    int nsamples, ntimes;
+    cached_container<complex> uqt;
+
+  public:
+
+    FourierTransformComplex1D(int nsamples, int ntimes):nsamples(nsamples), ntimes(ntimes){
+      uqt.resize(nsamples*ntimes);
+      int size = ntimes;
+      int n[] = {size};
+      int istride = 1;
+      int ostride = 1;
+      int idist = size;
+      int odist = size;
+      int inembed[] = {0};
+      int onembed[] = {0};
+      cufftPlanMany(&plan, 1,n,
+		    inembed, istride, idist,
+		    onembed, ostride, odist,
+		    CUFFT_Complex2Complex<real>::value,
+		    nsamples);
+    }
+
+    //Add samples in Fourier space. Simply stores the provided data.
+    //Expects two vectors of size nsamples
+    template<class ComplexIterator>
+    void addSamplesFourier(ComplexIterator samples_u, int time){
+      auto cit = thrust::make_counting_iterator(0);
+      auto indexit = thrust::make_transform_iterator(cit, ColMajorToRowMajor(ntimes, time));
+      auto perm = thrust::make_permutation_iterator(uqt.begin(), indexit);
+      thrust::copy(samples_u, samples_u+nsamples, perm);
+    }
+
+    //Compute the fft for the stored samples.
+    auto compute(){
+      cached_container<complex> uqw(ntimes*nsamples);
+      cufftExecComplex2Complex<real>(plan,
+				     thrust::raw_pointer_cast(uqt.data()),
+				     thrust::raw_pointer_cast(uqw.data()),
+				     CUFFT_FORWARD);
+      auto it = thrust::make_constant_iterator<complex>({real(ntimes), real(ntimes)});
+      thrust::transform(uqw.begin(), uqw.end(), it, uqw.begin(), thrust::divides<complex>());
+      return uqw;
+    }
+  };
 }

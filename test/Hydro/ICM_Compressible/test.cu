@@ -125,17 +125,18 @@ public:
 };
 
 template<class Container1, class Container2>
-void writeStructureFactor(Container1 &Sqw, Parameters par, int ntimes, Container2 &sampleWaveNumbers, std::string name){
-  const int ncells = par.cellDim.x*par.cellDim.y*par.cellDim.z;
+void writeComplexSignals(Container1 &Sqw, Parameters par, int ntimes, Container2 &sampleWaveNumbers, std::string name){
   const int nsamples = sampleWaveNumbers.size();
   std::vector<complex> Sqw_h(Sqw.size());
   thrust::copy(Sqw.begin(), Sqw.end(), Sqw_h.begin());
+  //  real T = ntimes*par.dt;
+  //  real V = par.boxSize.x*par.boxSize.y*par.boxSize.z;
   fori(0,nsamples){
     int isample = sampleWaveNumbers[i];
-    std::ofstream out("S"+name+"qw"+std::to_string(isample)+".dat");
+    std::ofstream out(name+"qw"+std::to_string(isample)+".dat");
     real q = indexToWaveVectorModulus(isample, par.cellDim, par.boxSize);
     forj(0, par.numberFreq){
-      out<<q<<" "<<2*M_PI*j/(par.simulationTime)<<" "<<Sqw_h[ntimes*i + j]<<"\n";
+      out<<2*M_PI*j/(par.simulationTime)<<" "<<Sqw_h[ntimes*i + j]<<"\n";
     }
   }
 }
@@ -145,7 +146,7 @@ int main(int argc, char *argv[]){
   auto pd = std::make_shared<ParticleData>(0, sys);
   auto par = readParameters(argv[1]);
   auto icm = createICMIntegrator(pd, par);
-  if(par.maxFreq<0) par.maxFreq = 2*4*par.speedOfSound*2*M_PI*2/par.boxSize.x;
+  if(par.maxFreq<0) par.maxFreq = 4*par.speedOfSound*2*M_PI*2/par.boxSize.x;
   if(par.simulationTime<0) par.simulationTime= 2*M_PI*par.numberFreq/par.maxFreq;
   {
     int relaxSteps =par.relaxTime/par.dt+1;
@@ -163,36 +164,54 @@ int main(int argc, char *argv[]){
     sampleWaveNumbers[0] = kn.x + (kn.y + kn.z*par.cellDim.y)*(par.cellDim.x/2+1);
   }
   FourierTransform3D fft(par.cellDim);
-  DynamicStructureFactor Sqw_vxvy(nsamples, ntimes), Sqw_vxvx(nsamples, ntimes);
-  DynamicStructureFactor Sqw_rhovx(nsamples, ntimes), Sqw_rhorho(nsamples, ntimes);
+  // DynamicStructureFactor Sqw_vxvy(nsamples, ntimes), Sqw_vxvx(nsamples, ntimes);
+  // DynamicStructureFactor Sqw_rhovx(nsamples, ntimes), Sqw_rhorho(nsamples, ntimes);
+  FourierTransformComplex1D vx_kw(nsamples, ntimes), vy_kw(nsamples, ntimes);
+  FourierTransformComplex1D rho_kw(nsamples, ntimes);
   VelocityAutocorrelation vacf;
+  int sampleSteps = 1;
   fori(0, ntimes){
     icm->forwardTime();
-    auto dens = icm->getCurrentDensity();
-    auto vel = icm->getCurrentVelocity();
-    if(par.measureVACF)
-      vacf.addSample(vel);
-    auto vxq = fft.transform(vel.x());
-    auto vyq = fft.transform(vel.y());
-    auto rhoq = fft.transform(thrust::raw_pointer_cast(dens.data()));
-    auto vxsamples = filterSamples(vxq, sampleWaveNumbers);
-    auto vysamples = filterSamples(vyq, sampleWaveNumbers);
-    auto rhosamples = filterSamples(rhoq, sampleWaveNumbers);
-    Sqw_vxvy.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), thrust::raw_pointer_cast(vysamples.data()), i);
-    Sqw_vxvx.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), thrust::raw_pointer_cast(vxsamples.data()), i);
-    Sqw_rhovx.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), thrust::raw_pointer_cast(vxsamples.data()), i);
-    Sqw_rhorho.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), thrust::raw_pointer_cast(rhosamples.data()), i);
+    if(i%sampleSteps == 0){
+      auto dens = icm->getCurrentDensity();
+      // std::vector<real> h_d(dens.size());
+      // thrust::copy(dens.begin(), dens.end(), h_d.begin());
+      // real averageDens = std::accumulate(dens.begin(), dens.end(), 0.0)/dens.size();
+      //System::log<System::MESSAGE>("Average density: %g", averageDens);
+      auto vel = icm->getCurrentVelocity();
+      if(par.measureVACF)
+	vacf.addSample(vel);
+      auto vxq = fft.transform(vel.x());
+      auto vyq = fft.transform(vel.y());
+      auto rhoq = fft.transform(thrust::raw_pointer_cast(dens.data()));
+      auto vxsamples = filterSamples(vxq, sampleWaveNumbers);
+      auto vysamples = filterSamples(vyq, sampleWaveNumbers);
+      auto rhosamples = filterSamples(rhoq, sampleWaveNumbers);
+      vx_kw.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), i );
+      vy_kw.addSamplesFourier(thrust::raw_pointer_cast(vysamples.data()), i );
+      rho_kw.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), i );
+      // Sqw_vxvy.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), thrust::raw_pointer_cast(vysamples.data()), i);
+      // Sqw_vxvx.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), thrust::raw_pointer_cast(vxsamples.data()), i);
+      // Sqw_rhovx.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), thrust::raw_pointer_cast(vxsamples.data()), i);
+      // Sqw_rhorho.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), thrust::raw_pointer_cast(rhosamples.data()), i);
+    }
   }
   System::log<System::MESSAGE>("Processing and writing results");
   if(par.measureVACF)
     vacf.write();
-  auto vxvy = Sqw_vxvy.compute();
-  writeStructureFactor(vxvy, par, ntimes, sampleWaveNumbers, "vxvy");
-  auto vxvx = Sqw_vxvx.compute();
-  writeStructureFactor(vxvx, par, ntimes, sampleWaveNumbers, "vxvx");
-  auto rhovx = Sqw_rhovx.compute();
-  writeStructureFactor(rhovx, par, ntimes, sampleWaveNumbers, "rhovx");
-  auto rhorho = Sqw_rhorho.compute();
-  writeStructureFactor(rhorho, par, ntimes, sampleWaveNumbers, "rhorho");
+  auto vx = vx_kw.compute();
+  writeComplexSignals(vx, par, ntimes, sampleWaveNumbers, "vx");
+  auto vy = vy_kw.compute();
+  writeComplexSignals(vy, par, ntimes, sampleWaveNumbers, "vy");
+  auto rho = rho_kw.compute();
+  writeComplexSignals(rho, par, ntimes, sampleWaveNumbers, "rho");
+  // auto vxvy = Sqw_vxvy.compute();
+  // writeComplexSignals(vxvy, par, ntimes, sampleWaveNumbers, "Svxvy");
+  // auto vxvx = Sqw_vxvx.compute();
+  // writeComplexSignals(vxvx, par, ntimes, sampleWaveNumbers, "Svxvx");
+  // auto rhovx = Sqw_rhovx.compute();
+  // writeComplexSignals(rhovx, par, ntimes, sampleWaveNumbers, "Srhovx");
+  // auto rhorho = Sqw_rhorho.compute();
+  // writeComplexSignals(rhorho, par, ntimes, sampleWaveNumbers, "Srhorho");
   return 0;
 }
