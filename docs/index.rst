@@ -159,6 +159,7 @@ An in depth theoretical description of most of the algorithms and physics behind
    SimulationFile
    FAQ
    Examples
+   Tests
    Contact
 
 .. toctree::
