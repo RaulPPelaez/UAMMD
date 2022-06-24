@@ -148,7 +148,7 @@ namespace uammd{
 	}
 	real3 momentumIncrement;
 	{
-	  const real3 externalForcing = real3(); //fluidForcingAtHalfStep.xyz()[id];
+	  const real3 externalForcing = fluidForcingAtHalfStep.xyz()[id];
 	  const real3 deterministicMomentumIncrement = computeDeterministicMomentumIncrement(cell_i,
 											     fluid.timeB, par,
 											     densityToPressure, grid);
