@@ -191,9 +191,6 @@ namespace uammd{
       __device__ real fetchScalar(ScalarIterator scalar, int3 cell, int3 n){
 	//cell = pbc_cell(cell, n); //With ghost cells the limits of the grid are never accessed.
 	int ic = linearIndex3D(cell, n);
-	if(ic>=32768){
-	  printf("Trying to access an invalid address: %d (cell %d %d %d)\n", ic, cell.x, cell.y, cell.z);
-	}
 	return scalar[ic];
       }
 
