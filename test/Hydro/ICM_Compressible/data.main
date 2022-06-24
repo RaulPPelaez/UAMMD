@@ -5,7 +5,7 @@ cellDim  30 30 30
 bulkViscosity 127.05
 speedOfSound  14.67
 shearViscosity 53.71
-temperature  249.4
+temperature 249.4
 initialDensity 0.632
 
 relaxTime 100

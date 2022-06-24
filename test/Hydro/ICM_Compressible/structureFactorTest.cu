@@ -1,17 +1,19 @@
 /* Raul P. Pelaez 2022. Compressible ICM test code.
    Can compute dynamic structure factors for the fluid as well as the VACF (Velocity autocorrelation function).
  */
+#include "Integrator/Integrator.cuh"
 #include "uammd.cuh"
 #include "computeStructureFactor.cuh"
 #include "Integrator/Hydro/ICM_Compressible.cuh"
 #include "utils/container.h"
 #include "utils/InputFile.h"
 #include <cstdint>
+#include <memory>
+#include <stdexcept>
 
 using namespace uammd;
 
 using ICM = Hydro::ICM_Compressible;
-
 
 struct Parameters{
   real dt = 0.1;
@@ -33,7 +35,7 @@ struct Parameters{
   bool measureVACF = false;
 };
 
-auto createICMIntegrator(std::shared_ptr<ParticleData> pd, Parameters ipar){
+auto createICMIntegratorCompressible(std::shared_ptr<ParticleData> pd, Parameters ipar){
   ICM::Parameters par;
   par.dt = ipar.dt;
   par.boxSize = ipar.boxSize;
@@ -145,7 +147,7 @@ int main(int argc, char *argv[]){
   auto sys = std::make_shared<System>(argc, argv);
   auto pd = std::make_shared<ParticleData>(0, sys);
   auto par = readParameters(argv[1]);
-  auto icm = createICMIntegrator(pd, par);
+  auto icm = createICMIntegratorCompressible(pd, par);
   if(par.maxFreq<0) par.maxFreq = 4*par.speedOfSound*2*M_PI*2/par.boxSize.x;
   if(par.simulationTime<0) par.simulationTime= 2*M_PI*par.numberFreq/par.maxFreq;
   {
@@ -174,10 +176,6 @@ int main(int argc, char *argv[]){
     icm->forwardTime();
     if(i%sampleSteps == 0){
       auto dens = icm->getCurrentDensity();
-      // std::vector<real> h_d(dens.size());
-      // thrust::copy(dens.begin(), dens.end(), h_d.begin());
-      // real averageDens = std::accumulate(dens.begin(), dens.end(), 0.0)/dens.size();
-      //System::log<System::MESSAGE>("Average density: %g", averageDens);
       auto vel = icm->getCurrentVelocity();
       if(par.measureVACF)
 	vacf.addSample(vel);
@@ -190,10 +188,6 @@ int main(int argc, char *argv[]){
       vx_kw.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), i );
       vy_kw.addSamplesFourier(thrust::raw_pointer_cast(vysamples.data()), i );
       rho_kw.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), i );
-      // Sqw_vxvy.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), thrust::raw_pointer_cast(vysamples.data()), i);
-      // Sqw_vxvx.addSamplesFourier(thrust::raw_pointer_cast(vxsamples.data()), thrust::raw_pointer_cast(vxsamples.data()), i);
-      // Sqw_rhovx.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), thrust::raw_pointer_cast(vxsamples.data()), i);
-      // Sqw_rhorho.addSamplesFourier(thrust::raw_pointer_cast(rhosamples.data()), thrust::raw_pointer_cast(rhosamples.data()), i);
     }
   }
   System::log<System::MESSAGE>("Processing and writing results");
