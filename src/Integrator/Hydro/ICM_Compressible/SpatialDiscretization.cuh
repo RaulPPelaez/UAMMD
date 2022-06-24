@@ -296,13 +296,12 @@ namespace uammd{
 	return pressureGradient;
       }
 
-      //Transforms the fluid momentum stored in fluid.velocity into velocities.
+      //Transforms the fluid momentum into velocities.
       __global__ void momentumToVelocityD(FluidPointers fluid, int3 n){
 	const int id = blockDim.x*blockIdx.x + threadIdx.x;
 	if(id>=n.x*n.y*n.z) return;
 	const auto cell_i = getCellFromThreadId(id, n);
 	const int i = linearIndex3D(cell_i, n);
-	//We stored the momentum in the velocity variable before
 	const real3 momentum = {fluid.momentumX[i], fluid.momentumY[i], fluid.momentumZ[i]};
 	using namespace staggered;
 	const real densityX = interpolateScalar<subgrid::x>(fluid.density, cell_i, n);
