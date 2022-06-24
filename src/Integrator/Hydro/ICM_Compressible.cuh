@@ -267,7 +267,7 @@ namespace uammd{
 	thrust::copy(d_vy.begin(), d_vy.end(), currentFluid.velocity.y());
 	thrust::copy(d_vz.begin(), d_vz.end(), currentFluid.velocity.z());
 	fillGhostCells(currentFluid.getPointers());
-	callMomentumToVelocityGPU(getGridSize(), currentFluid.getPointers());
+	callVelocityToMomentumGPU(getGridSize(), currentFluid.getPointers());
 	fillGhostCells(currentFluid.getPointers());
       }
 

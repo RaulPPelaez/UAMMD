@@ -297,6 +297,29 @@ namespace uammd{
 	momentumToVelocityD<<<blocks, threads>>>(args..., n);
       }
 
+      //Transforms the fluid velocity into momentum.
+      __global__ void velocityToMomentumD(FluidPointers fluid, int3 n){
+	const int id = blockDim.x*blockIdx.x + threadIdx.x;
+	if(id>=n.x*n.y*n.z) return;
+	const auto cell_i = getCellFromThreadId(id, n);
+	const int i = linearIndex3D(cell_i, n);
+	const real3 velocity = {fluid.velocityX[i], fluid.velocityY[i], fluid.velocityZ[i]};
+	using namespace staggered;
+	const real densityX = interpolateScalar<subgrid::x>(fluid.density, cell_i, n);
+	fluid.momentumX[i] = velocity.x*densityX;
+	const real densityY = interpolateScalar<subgrid::y>(fluid.density, cell_i, n);
+	fluid.momentumY[i] = velocity.y*densityY;
+	const real densityZ = interpolateScalar<subgrid::z>(fluid.density, cell_i, n);
+	fluid.momentumZ[i] = velocity.z*densityZ;
+      }
+
+      template<class ...T>
+      void callVelocityToMomentumGPU(int3 n, T...args){
+	int threads = 128;
+	int blocks = n.x*n.y*n.z/threads+1;
+	velocityToMomentumD<<<blocks, threads>>>(args..., n);
+      }
+
       //Returns the velocity in a collocated grid, interpolating the staggered velocities to cell centers
       __global__ void computeCollocatedVelocityD(DataXYZPtr staggeredVelocity, DataXYZPtr collocatedVelocity, int3 n){
 	int id = blockIdx.x*blockDim.x + threadIdx.x;
