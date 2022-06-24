@@ -173,15 +173,12 @@ namespace uammd{
       //Returns the fluid density in GPU memory.
       auto getCurrentDensity() const{
 	System::log<System::DEBUG1>("[ICM_Compressible] Returning a copy of the current density");
-	icm_compressible::callUpdateGhostCells(thrust::raw_pointer_cast(currentFluid.density.data()),
-					       ghostCells, grid.cellDim);
 	return icm_compressible::deghostifyDensity(currentFluid.density, grid.cellDim);
       }
 
       //Returns the fluid velocity, interpolated to the cell centers. In GPU memory
       auto getCurrentVelocity() const{
 	System::log<System::DEBUG1>("[ICM_Compressible] Computing collocated current velocity");
-	icm_compressible::callUpdateGhostCells(currentFluid.getPointers(), ghostCells, grid.cellDim);
 	auto collocatedVelocityGPU = icm_compressible::computeCollocatedVelocity(currentFluid.velocity, grid.cellDim);
 	return collocatedVelocityGPU;
       }
