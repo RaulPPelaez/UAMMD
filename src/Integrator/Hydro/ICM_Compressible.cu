@@ -56,7 +56,7 @@ namespace uammd{
 					thrust::raw_pointer_cast(fluidStochasticTensor.data()),
 					params, *densityToPressure, steps);
       auto density_ptr = thrust::raw_pointer_cast(fluidAtNewTime.density.data());
-      icm_compressible::callUpdateGhostCells(density_ptr, ghostCells, grid.cellDim);
+      fillGhostCells(fluidAtNewTime.getPointers());
       callMomentumToVelocityGPU(getGridSize(), fluidAtNewTime.getPointers());
       fillGhostCells(fluidAtNewTime.getPointers());
       return fluidAtNewTime;
@@ -64,14 +64,13 @@ namespace uammd{
 
     void ICM_Compressible::fillGhostCells(FluidPointers fluid){
       System::log<System::DEBUG2>("[ICM_Compressible] Updating ghost cells");
-      icm_compressible::callUpdateGhostCells(fluid, ghostCells, grid.cellDim);
+      icm_compressible::callUpdateGhostCells(fluid, walls, ghostCells, grid.cellDim);
     }
 
     //Uses the RK3 solver in FluidSolver.cuh
     void ICM_Compressible::updateFluidWithRungeKutta3(const DataXYZ &fluidForcingAtHalfStep,
 						      const cached_vector<real2> &fluidStochasticTensor){
       System::log<System::DEBUG2>("[ICM_Compressible] Update fluid with RK3");
-      fillGhostCells(currentFluid.getPointers());
       auto fluidPrediction = callRungeKuttaSubStep<1>(fluidForcingAtHalfStep, fluidStochasticTensor,
 						      currentFluid.getPointers());
       auto fluidAtHalfStep = callRungeKuttaSubStep<2>(fluidForcingAtHalfStep, fluidStochasticTensor,
@@ -97,7 +96,7 @@ namespace uammd{
 	callFillStochasticTensorGPU(grid,
 				    fluidStochasticTensor_ptr,
 				    seed, uint(steps), params, temperature);
-	icm_compressible::callUpdateGhostCellsFluctuations(fluidStochasticTensor, ghostCells, grid.cellDim);
+	icm_compressible::callUpdateGhostCellsFluctuations(fluidStochasticTensor, walls, ghostCells, grid.cellDim);
       }
       return fluidStochasticTensor;
     }

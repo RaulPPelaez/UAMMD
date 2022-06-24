@@ -11,7 +11,6 @@ namespace uammd{
 	return ((a %= b) < 0) ? a+b : a;
       }
 
-
       //Computes the cell coordinates that correspond to a given ghost cell with periodic boundary conditions.
       //The returned coordinates are in full grid (the fluid grid including ghost cells, size n+2)
       __host__ __device__ int3 computeMirrorGhostCell(int3 ghostCell, int3 n){
@@ -42,13 +41,21 @@ namespace uammd{
 	return d_ghostCells;
       }
 
-      __global__ void updateGhostCellsD(FluidPointers fluid, int3* ghostCells, int3 n, int numberGhostCells){
-        uint id = blockIdx.x*blockDim.x + threadIdx.x;
-	if(id>=numberGhostCells) return;
-	int3 ghostCell = ghostCells[id];
-	int3 periodicCell = computeMirrorGhostCell(ghostCell, n);
-	int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
-	int iperiodic = periodicCell.x + (periodicCell.y + periodicCell.z*(n.y+2))*(n.x+2);
+      enum class wall{ztop, zbottom};
+
+      //Returns whether a given ghost cell pertains to the given wall
+      template<wall awall>
+      __device__ bool isGhostCellAtWall(int3 cell, int3 n){
+	if(awall == wall::ztop and cell.z == n.z+1) return true;
+	if(awall == wall::zbottom and cell.z == 0) return true;
+	return false;
+      }
+
+      //Applies periodic boundary conditions to the given ghost cell
+      __device__ void periodifyGhostCell(FluidPointers fluid, int3 ghostCell, int3 n){
+	const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
+	const int3 periodicCell = computeMirrorGhostCell(ghostCell, n);
+	const int iperiodic = periodicCell.x + (periodicCell.y + periodicCell.z*(n.y+2))*(n.x+2);
 	fluid.density[ighost] = fluid.density[iperiodic];
 	fluid.velocityX[ighost] = fluid.velocityX[iperiodic];
 	fluid.velocityY[ighost] = fluid.velocityY[iperiodic];
@@ -58,34 +65,51 @@ namespace uammd{
 	fluid.momentumZ[ighost] = fluid.momentumZ[iperiodic];
       }
 
-      template<class Iterator>
-      __global__ void updateGhostCellsD(Iterator field, int3* ghostCells, int3 n, int numberGhostCells){
+      template<class Walls>
+      __global__ void updateGhostCellsD(FluidPointers fluid, Walls walls, int3* ghostCells,
+					int3 n, int numberGhostCells){
         uint id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>=numberGhostCells) return;
 	int3 ghostCell = ghostCells[id];
-	int3 periodicCell = computeMirrorGhostCell(ghostCell, n);
-	int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
-	int iperiodic = periodicCell.x + (periodicCell.y + periodicCell.z*(n.y+2))*(n.x+2);
-	field[ighost] = field[iperiodic];
+	periodifyGhostCell(fluid, ghostCell, n);
+	if(walls.isEnabled()){
+	  if(isGhostCellAtWall<wall::zbottom>(ghostCell, n)){
+	    walls.applyBoundaryConditionZBottom(fluid, ghostCell, n);
+	  }
+	  else if(isGhostCellAtWall<wall::ztop>(ghostCell, n)){
+	    walls.applyBoundaryConditionZTop(fluid, ghostCell, n);
+	  }
+	}
       }
 
-      template<class Container>
-      void callUpdateGhostCells(FluidPointers fluid, Container &ghostCells, int3 n){
+      // template<class Iterator>
+      // __global__ void updateGhostCellsD(Iterator field, int3* ghostCells, int3 n, int numberGhostCells){
+      //   uint id = blockIdx.x*blockDim.x + threadIdx.x;
+      // 	if(id>=numberGhostCells) return;
+      // 	int3 ghostCell = ghostCells[id];
+      // 	int3 periodicCell = computeMirrorGhostCell(ghostCell, n);
+      // 	int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
+      // 	int iperiodic = periodicCell.x + (periodicCell.y + periodicCell.z*(n.y+2))*(n.x+2);
+      // 	field[ighost] = field[iperiodic];
+      // }
+
+      template<class Container, class Walls>
+      void callUpdateGhostCells(FluidPointers fluid, std::shared_ptr<Walls> walls, Container &ghostCells, int3 n){
 	int threads = 128;
 	int numberGhostCells = ghostCells.size();
 	int blocks = numberGhostCells/threads+1;
 	auto ghostCells_ptr = thrust::raw_pointer_cast(ghostCells.data());
-	updateGhostCellsD<<<blocks, threads>>>(fluid, ghostCells_ptr, n, numberGhostCells);
+	updateGhostCellsD<<<blocks, threads>>>(fluid, *walls, ghostCells_ptr, n, numberGhostCells);
       }
 
-      template<class Container2, class Container>
-      void callUpdateGhostCells(Container2 field, Container &ghostCells, int3 n){
-	int threads = 128;
-	int numberGhostCells = ghostCells.size();
-	int blocks = numberGhostCells/threads+1;
-	auto ghostCells_ptr = thrust::raw_pointer_cast(ghostCells.data());
-	updateGhostCellsD<<<blocks, threads>>>(field, ghostCells_ptr, n, numberGhostCells);
-      }
+      // template<class Container2, class Container>
+      // void callUpdateGhostCells(Container2 field, Container &ghostCells, int3 n){
+      // 	int threads = 128;
+      // 	int numberGhostCells = ghostCells.size();
+      // 	int blocks = numberGhostCells/threads+1;
+      // 	auto ghostCells_ptr = thrust::raw_pointer_cast(ghostCells.data());
+      // 	updateGhostCellsD<<<blocks, threads>>>(field, ghostCells_ptr, n, numberGhostCells);
+      // }
 
       template<subgrid alpha, subgrid beta>
       __device__ int getFluctTensIndexGhost(int3 cell_i, int3 n){
@@ -104,10 +128,7 @@ namespace uammd{
 	fluidStochasticTensor[isource] = fluidStochasticTensor[idest];
       }
 
-      __global__ void updateGhostCellsFluctuationsD(real2* fluidStochasticTensor, int3* ghostCells, int3 n, int numberGhostCells){
-        uint id = blockIdx.x*blockDim.x + threadIdx.x;
-	if(id>=numberGhostCells) return;
-	int3 ghostCell = ghostCells[id];
+      __device__ void periodifyFluctuatingGhostCell(real2* fluidStochasticTensor, int3 ghostCell, int3 n){
 	int3 periodicCell = computeMirrorGhostCell(ghostCell, n);
 	mirrorFluctuations<subgrid::x, subgrid::x>(fluidStochasticTensor, ghostCell, periodicCell, n);
 	mirrorFluctuations<subgrid::y, subgrid::y>(fluidStochasticTensor, ghostCell, periodicCell, n);
@@ -117,15 +138,48 @@ namespace uammd{
 	mirrorFluctuations<subgrid::y, subgrid::z>(fluidStochasticTensor, ghostCell, periodicCell, n);
       }
 
+      template<subgrid alpha, subgrid beta>
+      __device__ void wallFluctuations(real2* fluidStochasticTensor, int3 ghostCell, int3 n){
+	int isource = getFluctTensIndexGhost<alpha, beta>(ghostCell, n);
+	//See eq. 2.126 in Floren's thesis. We double the noise for Dirichlet boundary conditions
+	fluidStochasticTensor[isource] *= real(2.0);
+      }
 
-      template<class Container2, class Container>
-      void callUpdateGhostCellsFluctuations(Container2 &fluidStochasticTensor, Container &ghostCells, int3 n){
+      __device__ void fillWallFluctuatingGhostCell(real2* fluidStochasticTensor, int3 ghostCell, int3 n){
+	wallFluctuations<subgrid::x, subgrid::x>(fluidStochasticTensor, ghostCell, n);
+	wallFluctuations<subgrid::y, subgrid::y>(fluidStochasticTensor, ghostCell, n);
+	wallFluctuations<subgrid::z, subgrid::z>(fluidStochasticTensor, ghostCell, n);
+	wallFluctuations<subgrid::x, subgrid::y>(fluidStochasticTensor, ghostCell, n);
+	wallFluctuations<subgrid::x, subgrid::z>(fluidStochasticTensor, ghostCell, n);
+	wallFluctuations<subgrid::y, subgrid::z>(fluidStochasticTensor, ghostCell, n);
+      }
+
+      template<class Walls>
+      __global__ void updateGhostCellsFluctuationsD(real2* fluidStochasticTensor, Walls walls, int3* ghostCells,
+						    int3 n, int numberGhostCells){
+        uint id = blockIdx.x*blockDim.x + threadIdx.x;
+	if(id>=numberGhostCells) return;
+	int3 ghostCell = ghostCells[id];
+	if(walls.isEnabled()){
+	  if(isGhostCellAtWall<wall::zbottom>(ghostCell, n) or
+	     isGhostCellAtWall<wall::ztop>(ghostCell, n)){
+	    fillWallFluctuatingGhostCell(fluidStochasticTensor, ghostCell, n);
+	  }
+	}
+	else{
+	  periodifyFluctuatingGhostCell(fluidStochasticTensor, ghostCell, n);
+	}
+      }
+
+      template<class Container2, class Container, class Walls>
+      void callUpdateGhostCellsFluctuations(Container2 &fluidStochasticTensor, std::shared_ptr<Walls> walls,
+					    Container &ghostCells, int3 n){
 	int threads = 128;
 	int numberGhostCells = ghostCells.size();
 	int blocks = numberGhostCells/threads+1;
 	auto ghostCells_ptr = thrust::raw_pointer_cast(ghostCells.data());
 	auto noise_ptr = thrust::raw_pointer_cast(fluidStochasticTensor.data());
-	updateGhostCellsFluctuationsD<<<blocks, threads>>>(noise_ptr, ghostCells_ptr, n, numberGhostCells);
+	updateGhostCellsFluctuationsD<<<blocks, threads>>>(noise_ptr, *walls, ghostCells_ptr, n, numberGhostCells);
       }
 
       //Copies the density from the input (which includes ghost cells) to an output without ghost cells.

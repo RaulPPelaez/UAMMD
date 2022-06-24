@@ -67,12 +67,14 @@ References:
 #ifndef UAMMD_ICM_COMPRESSIBLE_CUH
 #define UAMMD_ICM_COMPRESSIBLE_CUH
 #include "uammd.cuh"
+#include "misc/ParameterUpdatable.h"
 #include "Integrator/Integrator.cuh"
 #include "misc/IBM_kernels.cuh"
 #include "ICM_Compressible/utils.cuh"
 #include "ICM_Compressible/SpatialDiscretization.cuh"
 #include"ICM_Compressible/GhostCells.cuh"
 #include <functional>
+#include <memory>
 // #ifndef __CUDACC_EXTENDED_LAMBDA__
 // #error "This code requires the CUDA flag --extended-lambda to be enabled"
 //#endif
@@ -85,6 +87,54 @@ namespace uammd{
 	real isothermalSpeedOfSound = 1.0;
 	__device__ real operator()(real density){
 	  return isothermalSpeedOfSound*isothermalSpeedOfSound*density;
+	}
+      };
+
+      //This class hanldes the walls (if present) in the Z direction
+      //Default walled behavior is no walls, which translates into a periodic in the three directions.
+      //Note that the walls can be ParameterUpdatable
+      class DefaultWalls: public ParameterUpdatable{
+	real currentTime = 0;
+	real bottomWallvx = 0;
+      public:
+	//Returns wether there are walls in the Z direction. If false the Z domain ghost cells are periodic.
+	__host__ __device__ static constexpr bool isEnabled(){
+	  return false;
+	}
+
+	//Applies the boundary conditions at the top z wall for the fluid
+	__device__ void applyBoundaryConditionZBottom(FluidPointers fluid, int3 ghostCell, int3 n) const{
+	  // const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
+	  // //The index of the cell above the ghost cell
+	  // const int ighostZp1 = ghostCell.x + (ghostCell.y + (ghostCell.z+1)*(n.y+2))*(n.x+2);
+	  // real rho = fluid.density[ighostZp1];
+	  // fluid.density[ighost] = rho;
+	  // fluid.velocityX[ighost] = 2*bottomWallvx-fluid.velocityX[ighostZp1];
+	  // fluid.velocityY[ighost] = -fluid.velocityY[ighostZp1];
+	  // fluid.velocityZ[ighost] = -fluid.velocityZ[ighostZp1];
+	  // fluid.momentumX[ighost] = 2*bottomWallvx*rho-fluid.momentumX[ighostZp1];
+	  // fluid.momentumY[ighost] = -fluid.momentumY[ighostZp1];
+	  // fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZp1];
+	}
+
+	//Applies the boundary conditions at the bottom z wall for the fluid
+	__device__ static void applyBoundaryConditionZTop(FluidPointers fluid, int3 ghostCell, int3 n){
+	  // const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
+	  // //The index of the cell below the ghost cell
+	  // const int ighostZm1 = ghostCell.x + (ghostCell.y + (ghostCell.z-1)*(n.y+2))*(n.x+2);
+
+	  // fluid.density[ighost] = fluid.density[ighostZm1];
+	  // fluid.velocityX[ighost] = -fluid.velocityX[ighostZm1];
+	  // fluid.velocityY[ighost] = -fluid.velocityY[ighostZm1];
+	  // fluid.velocityZ[ighost] = -fluid.velocityZ[ighostZm1];
+	  // fluid.momentumX[ighost] = -fluid.momentumX[ighostZm1];
+	  // fluid.momentumY[ighost] = -fluid.momentumY[ighostZm1];
+	  // fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZm1];
+	}
+
+	void updateSimulationTime(real newTime) override{
+	  this->currentTime = newTime;
+	  this->bottomWallvx = sin(2*M_PI*currentTime);
 	}
       };
 
@@ -122,6 +172,7 @@ namespace uammd{
       using FluidData = icm_compressible::FluidData;
       using DensityToPressure = icm_compressible::DensityToPressure;
       using Kernel = IBM_kernels::Peskin::threePoint;
+      using Walls = icm_compressible::DefaultWalls;
     public:
       struct Parameters{
 	real shearViscosity = -1;
@@ -158,6 +209,9 @@ namespace uammd{
 	  par.hydrodynamicRadius = 0.91*par.boxSize.x/par.cellDim.x;
 	}
 	this->grid = Grid(Box(par.boxSize), ncells);
+	if(not this->walls)
+	  this->walls = std::make_shared<Walls>();
+        this->addUpdatable(walls);
 	initializeFluid(par);
 	printInitialMessages(par);
 	setUpGhostCells();
@@ -187,6 +241,7 @@ namespace uammd{
       Grid grid;
       FluidData currentFluid;
       cached_vector<int3> ghostCells; //A list with cells that lie in the halo of the domain grid
+      std::shared_ptr<Walls> walls;
 
       //Returns the number of cells in the fluid grid in each direction including ghost cells
       //The simulation domain is located in the range i_x = 1:(getGhostGridSize().x-3) and similar for y and z.
