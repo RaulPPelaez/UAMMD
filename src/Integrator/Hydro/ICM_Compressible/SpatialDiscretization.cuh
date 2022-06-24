@@ -251,6 +251,16 @@ namespace uammd{
 	return momentum_i;
       }
 
+
+      //Returns a-b preventing the usage of the FMA contraction in the surrounding code
+      __device__ real substract_no_fma(real a, real b){
+#ifdef DOUBLE_PRECISION
+	return __dsub_rn(a,b);
+#else
+	return __fsub_rn(a,b);
+#endif
+      }
+
       //Given an equation of state (transforming density to pressure). Computes the gradient of the pressure at cell i in a staggered grid (each component of the result is defined in a different cell face).
       template<class EquationOfState>
       __device__ real3 computePressureGradient(int3 cell_i, int3 n, real3 h,
@@ -258,17 +268,30 @@ namespace uammd{
 	using namespace staggered;
 	real3 pressureGradient;
 	const real pressureAt0 = densityToPressure(fetchScalar(density, cell_i, n));
+	//The usage of the special substraction is here to avoid the FMA contraction.
+	/*
+	  FMA can be detrimental and incur on spurious drifts, for instance when the eos is just \pi = c_T^2 \rho.
+	  In this case the code for the pressure gradient might end up being written by the compiler as:
+	  real result = a*b-a*c;
+	  Suppose b=c (for example if the density is constant). Then result should be zero, and it is indeed without FMA.
+	  However, with FMA the compiler writes:
+	  double ac = a*c;
+	  double result = fma(a,b -ac);
+	  Which is non-zero due to numerical roundoff.
+	  In order to avoid this issue here (which can result in, for instance, the velocity increasing uncontrolled) I prevent
+	  the compiler from using FMA.
+	*/
 	{
 	  real pressureAt_pX = densityToPressure(fetchScalar(density, cell_i + getSubgridOffset<subgrid::x>(), n));
-	  pressureGradient.x = real(1.0)/h.x*(pressureAt_pX - pressureAt0);
+	  pressureGradient.x = real(1.0)/h.x*substract_no_fma(pressureAt_pX, pressureAt0);
 	}
 	{
 	  real pressureAt_pY = densityToPressure(fetchScalar(density, cell_i + getSubgridOffset<subgrid::y>(), n));
-	  pressureGradient.y = real(1.0)/h.y*(pressureAt_pY - pressureAt0);
+	  pressureGradient.y = real(1.0)/h.y*substract_no_fma(pressureAt_pY,pressureAt0);
 	}
 	{
 	  real pressureAt_pZ = densityToPressure(fetchScalar(density, cell_i + getSubgridOffset<subgrid::z>(), n));
-	  pressureGradient.z = real(1.0)/h.z*(pressureAt_pZ - pressureAt0);
+	  pressureGradient.z = real(1.0)/h.z*substract_no_fma(pressureAt_pZ, pressureAt0);
 	}
 	return pressureGradient;
       }
