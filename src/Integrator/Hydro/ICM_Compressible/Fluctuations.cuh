@@ -112,12 +112,12 @@ namespace uammd{
 	  real(1.0)/real(3.0)*sqrt((par.dt*real(2.0)*par.shearViscosity*temperature)/dV);
 	Saru rng(s1, s2, id);
 	constexpr real sq2 = 1.4142135623730950488016887;
-	real2 wxx = rng.gf(real(0.0), sq2);
-	real2 wyy = rng.gf(real(0.0), sq2);
-	real2 wzz = rng.gf(real(0.0), sq2);
-	real2 wxy = rng.gf(real(0.0), real(1.0));
-	real2 wxz = rng.gf(real(0.0), real(1.0));
-	real2 wyz = rng.gf(real(0.0), real(1.0));
+	real2 wxx = make_real2(rng.gf(real(0.0), sq2));
+	real2 wyy = make_real2(rng.gf(real(0.0), sq2));
+	real2 wzz = make_real2(rng.gf(real(0.0), sq2));
+	real2 wxy = make_real2(rng.gf(real(0.0), real(1.0)));
+	real2 wxz = make_real2(rng.gf(real(0.0), real(1.0)));
+	real2 wyz = make_real2(rng.gf(real(0.0), real(1.0)));
 	real2 trace = wxx+wyy+wzz;
 	const int3 n = grid.cellDim;
 	const int3 cell_i = getCellFromThreadId(id, n);
