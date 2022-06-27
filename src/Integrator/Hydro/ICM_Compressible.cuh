@@ -102,7 +102,7 @@ namespace uammd{
 	  return false;
 	}
 
-	//Applies the boundary conditions at the top z wall for the fluid
+	//Applies the boundary conditions at the bottom z wall for the fluid
 	__device__ void applyBoundaryConditionZBottom(FluidPointers fluid, int3 ghostCell, int3 n) const{
 	  const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
 	  //The index of the cell above the ghost cell
@@ -117,7 +117,7 @@ namespace uammd{
 	  fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZp1];
 	}
 
-	//Applies the boundary conditions at the bottom z wall for the fluid
+	//Applies the boundary conditions at the top z wall for the fluid
 	__device__ static void applyBoundaryConditionZTop(FluidPointers fluid, int3 ghostCell, int3 n){
 	  const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
 	  //The index of the cell below the ghost cell
