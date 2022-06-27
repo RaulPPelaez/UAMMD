@@ -104,32 +104,31 @@ namespace uammd{
 
 	//Applies the boundary conditions at the top z wall for the fluid
 	__device__ void applyBoundaryConditionZBottom(FluidPointers fluid, int3 ghostCell, int3 n) const{
-	  // const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
-	  // //The index of the cell above the ghost cell
-	  // const int ighostZp1 = ghostCell.x + (ghostCell.y + (ghostCell.z+1)*(n.y+2))*(n.x+2);
-	  // real rho = fluid.density[ighostZp1];
-	  // fluid.density[ighost] = rho;
-	  // fluid.velocityX[ighost] = 2*bottomWallvx-fluid.velocityX[ighostZp1];
-	  // fluid.velocityY[ighost] = -fluid.velocityY[ighostZp1];
-	  // fluid.velocityZ[ighost] = -fluid.velocityZ[ighostZp1];
-	  // fluid.momentumX[ighost] = 2*bottomWallvx*rho-fluid.momentumX[ighostZp1];
-	  // fluid.momentumY[ighost] = -fluid.momentumY[ighostZp1];
-	  // fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZp1];
+	  const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
+	  //The index of the cell above the ghost cell
+	  const int ighostZp1 = ghostCell.x + (ghostCell.y + (ghostCell.z+1)*(n.y+2))*(n.x+2);
+	  real rho = fluid.density[ighostZp1];
+	  fluid.density[ighost] = rho;
+	  fluid.velocityX[ighost] = 2*bottomWallvx-fluid.velocityX[ighostZp1];
+	  fluid.velocityY[ighost] = -fluid.velocityY[ighostZp1];
+	  fluid.velocityZ[ighost] = -fluid.velocityZ[ighostZp1];
+	  fluid.momentumX[ighost] = 2*bottomWallvx*rho-fluid.momentumX[ighostZp1];
+	  fluid.momentumY[ighost] = -fluid.momentumY[ighostZp1];
+	  fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZp1];
 	}
 
 	//Applies the boundary conditions at the bottom z wall for the fluid
 	__device__ static void applyBoundaryConditionZTop(FluidPointers fluid, int3 ghostCell, int3 n){
-	  // const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
-	  // //The index of the cell below the ghost cell
-	  // const int ighostZm1 = ghostCell.x + (ghostCell.y + (ghostCell.z-1)*(n.y+2))*(n.x+2);
-
-	  // fluid.density[ighost] = fluid.density[ighostZm1];
-	  // fluid.velocityX[ighost] = -fluid.velocityX[ighostZm1];
-	  // fluid.velocityY[ighost] = -fluid.velocityY[ighostZm1];
-	  // fluid.velocityZ[ighost] = -fluid.velocityZ[ighostZm1];
-	  // fluid.momentumX[ighost] = -fluid.momentumX[ighostZm1];
-	  // fluid.momentumY[ighost] = -fluid.momentumY[ighostZm1];
-	  // fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZm1];
+	  const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
+	  //The index of the cell below the ghost cell
+	  const int ighostZm1 = ghostCell.x + (ghostCell.y + (ghostCell.z-1)*(n.y+2))*(n.x+2);
+	  fluid.density[ighost] = fluid.density[ighostZm1];
+	  fluid.velocityX[ighost] = -fluid.velocityX[ighostZm1];
+	  fluid.velocityY[ighost] = -fluid.velocityY[ighostZm1];
+	  fluid.velocityZ[ighost] = -fluid.velocityZ[ighostZm1];
+	  fluid.momentumX[ighost] = -fluid.momentumX[ighostZm1];
+	  fluid.momentumY[ighost] = -fluid.momentumY[ighostZm1];
+	  fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZm1];
 	}
 
 	void updateSimulationTime(real newTime) override{
