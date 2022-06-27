@@ -4,7 +4,6 @@
 # Also plots the results, comparing to theory.
 # The parameters for the run are in data.main. But theory is only available for the default parameters.
 set -e
-make structureFactorTest
 folder=structure_simulations
 
 mkdir -p $folder
@@ -84,6 +83,7 @@ function runSimulations(){
     averageAll $subfolder/run $subfolder
 }
 
+make structureFactorTest
 
 for i in $(seq $naverage)
 do

@@ -37,15 +37,6 @@ function average(){
     sort -g > $outputfolder/${name}
 }
 
-
-
-make particleDiffusionTest
-mkdir -p $folder
-
-
-downloadMSD
-
-
 function runSimulations(){
     local nruns=$1 #Number of identical runs to average
     local subfolder=$folder/$2
@@ -62,7 +53,7 @@ function runSimulations(){
 	    mkdir -p $subfolder/run$i
 	    cp $datamain $subfolder/run$i
 	    cd $subfolder/run$i
-	    ../../../particleDiffusionTest $datamain --device $dev 2> log > particles.pos
+	    ../../../particles $datamain --device $dev 2> log > particles.pos
 	    nsteps=$(grep -c "#" particles.pos)
 	    numberParticles=$(awk '/^numberParticles/{print $2}' $datamain)
 	    cat particles.pos | ../../../tools/msd -N $numberParticles -Nsteps $nsteps > particles.msd
@@ -75,8 +66,9 @@ function runSimulations(){
     average $subfolder/run $subfolder particles.msd
 }
 
-
-
+make particles
+mkdir -p $folder
+downloadMSD
 for i in $(seq $naverage)
 do
     subfolder=runAvg$i

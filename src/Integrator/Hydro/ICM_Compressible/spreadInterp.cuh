@@ -28,7 +28,7 @@ namespace uammd{
 	  ShiftTransform(real3 shift):shift(shift){}
 
 	  __device__ auto operator()(real4 p){
-	    return make_real3(p)-shift;
+	    return make_real3(p)+shift;
 	  }
 
 	};
@@ -43,23 +43,21 @@ namespace uammd{
 				  std::shared_ptr<Kernel> kernel,
 				  int numberParticles, Grid grid){
 	  const int3 n = grid.cellDim;
-	  const int3 numberCellsWithGhosts = n+2;
-	  const int ntot = numberCellsWithGhosts.x*numberCellsWithGhosts.y*numberCellsWithGhosts.z;
-	  DataXYZ gridData(ntot);
+	  DataXYZ gridData(n.x*n.y*n.z);
 	  gridData.fillWithZero();
 	  if(numberParticles > 0){
 	    DataXYZ particleDataXYZ(particleData, numberParticles);
 	    const real3 h = grid.cellSize;
-	    IBM<Kernel, Grid, LinearIndexGhost3D> ibm(kernel, grid, LinearIndexGhost3D(n));
-	    auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
+	    IBM<Kernel, Grid> ibm(kernel, grid);
+	    auto posX = make_shift_iterator(positions, {-real(0.5)*h.x, 0, 0});
 	    ibm.spread(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
-	    auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
+	    auto posY = make_shift_iterator(positions, {0, -real(0.5)*h.y, 0});
 	    ibm.spread(posY, particleDataXYZ.y(), gridData.y(), numberParticles);
-	    auto posZ = make_shift_iterator(positions, {0, 0, real(0.5)*h.z});
+	    auto posZ = make_shift_iterator(positions, {0, 0, -real(0.5)*h.z});
 	    ibm.spread(posZ, particleDataXYZ.z(), gridData.z(), numberParticles);
 	  }
 	  return gridData;
-}
+	}
 
 	template<class PositionIterator, class Kernel>
 	auto interpolateFluidVelocities(const DataXYZ &gridData, const PositionIterator &positions,
@@ -71,11 +69,11 @@ namespace uammd{
 	    const int3 n = grid.cellDim;
 	    const real3 h = grid.cellSize;
 	    IBM<Kernel, Grid, LinearIndexGhost3D> ibm(kernel, grid, LinearIndexGhost3D(n));
-	    auto posX = make_shift_iterator(positions, {real(0.5)*h.x, 0, 0});
+	    auto posX = make_shift_iterator(positions, {-real(0.5)*h.x, 0, 0});
 	    ibm.gather(posX, particleDataXYZ.x(), gridData.x(), numberParticles);
-	    auto posY = make_shift_iterator(positions, {0, real(0.5)*h.y, 0});
+	    auto posY = make_shift_iterator(positions, {0, -real(0.5)*h.y, 0});
 	    ibm.gather(posY, particleDataXYZ.y(), gridData.y(), numberParticles);
-	    auto posZ = make_shift_iterator(positions, {0, 0, real(0.5)*h.z});
+	    auto posZ = make_shift_iterator(positions, {0, 0, -real(0.5)*h.z});
 	    ibm.gather(posZ, particleDataXYZ.z(), gridData.z(), numberParticles);
 	  }
 	  return particleDataXYZ;

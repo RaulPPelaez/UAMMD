@@ -272,14 +272,19 @@ namespace uammd{
 	System::log<System::MESSAGE>("[ICM_Compressible] Box size: %g %g %g", par.boxSize.x, par.boxSize.y, par.boxSize.z);
 	System::log<System::MESSAGE>("[ICM_Compressible] Fluid cells: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
 	const real effective_a = 0.91*(grid.cellDim.x/par.boxSize.x);
-	const real d0 = par.temperature/(6*M_PI*par.shearViscosity*effective_a);
+	const real m0 = 1.0/(6*M_PI*par.shearViscosity*effective_a);
+        const real d0 = par.temperature*m0;
+	System::log<System::MESSAGE>("[ICM_Compressible] Expected long time particle self mobility coefficient : %g", m0);
 	System::log<System::MESSAGE>("[ICM_Compressible] Expected long time particle self diffusion coefficient : %g", d0);
 	System::log<System::MESSAGE>("[ICM_Compressible] seed: %u", seed);
-	const real h =grid.cellSize.x;
+	const real h = grid.cellSize.x;
 	real a_c = par.speedOfSound*par.dt/h;
-	real maxvx = *thrust::max_element(currentFluid.velocity.x(), currentFluid.velocity.x() + currentFluid.velocity.size());
-	real maxvy = *thrust::max_element(currentFluid.velocity.y(), currentFluid.velocity.y() + currentFluid.velocity.size());
-	real maxvz = *thrust::max_element(currentFluid.velocity.z(), currentFluid.velocity.z() + currentFluid.velocity.size());
+	real maxvx = *thrust::max_element(thrust::device_ptr<real>(currentFluid.velocity.x()),
+					  thrust::device_ptr<real>(currentFluid.velocity.x()) + currentFluid.velocity.size());
+	real maxvy = *thrust::max_element(thrust::device_ptr<real>(currentFluid.velocity.y()),
+					  thrust::device_ptr<real>(currentFluid.velocity.y()) + currentFluid.velocity.size());
+	real maxvz = *thrust::max_element(thrust::device_ptr<real>(currentFluid.velocity.z()),
+					  thrust::device_ptr<real>(currentFluid.velocity.z()) + currentFluid.velocity.size());
 	real maxv = std::max({maxvx, maxvy, maxvz});
 	real a_v = maxv*par.dt/h;
 	System::log<System::MESSAGE>("[ICM_Compressible] Advective CFL Numbers: α_c ~ %g; α_v ~ %g", a_c, a_v);
@@ -317,10 +322,10 @@ namespace uammd{
 	  if(par.initialVelocityY) d_vy[i] = par.initialVelocityY(pos);
 	  if(par.initialVelocityZ) d_vz[i] = par.initialVelocityZ(pos);
 	}
-	thrust::copy(d_h.begin(), d_h.end(), currentFluid.density.begin());
-	thrust::copy(d_vx.begin(), d_vx.end(), currentFluid.velocity.x());
-	thrust::copy(d_vy.begin(), d_vy.end(), currentFluid.velocity.y());
-	thrust::copy(d_vz.begin(), d_vz.end(), currentFluid.velocity.z());
+	thrust::copy(d_h.begin(), d_h.end(),   currentFluid.density.begin());
+	thrust::copy(d_vx.begin(), d_vx.end(), thrust::device_ptr<real>(currentFluid.velocity.x()));
+	thrust::copy(d_vy.begin(), d_vy.end(), thrust::device_ptr<real>(currentFluid.velocity.y()));
+	thrust::copy(d_vz.begin(), d_vz.end(), thrust::device_ptr<real>(currentFluid.velocity.z()));
 	fillGhostCells(currentFluid.getPointers());
 	callVelocityToMomentumGPU(getGridSize(), currentFluid.getPointers());
 	fillGhostCells(currentFluid.getPointers());

@@ -4,5 +4,6 @@ set -e
 
 ndev=5 #Number of available GPUs
 tar xvf tools.tar.xz #Unpack the theory data
-#bash structureFactorTest.bash $ndev
+bash structureFactorTest.bash $ndev
 bash particleDiffusionTest.bash $ndev
+bash radialDistributionFunction $ndev
