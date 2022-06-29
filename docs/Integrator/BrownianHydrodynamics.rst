@@ -374,9 +374,10 @@ Use as the rest of the :ref:`Integrator` modules.
 
 The following parameters are available:
 
-  * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
+  * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas. Can be 0.
   * :cpp:`real viscosity` Viscosity of the solvent.
   * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles)
+  * :cpp:`int3 cells`  Number of grid cells in each direction. This parameter can be set instead of the hydrodynamic radius and will force FCM to construct the grid of this size.
   * :cpp:`real dt`  Time step
   * :cpp:`real tolerance` Overall tolerance of the solver (affects the grid size and kernel support).
   * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.
@@ -397,6 +398,7 @@ The following parameters are available:
     par.temperature = 1.0;
     par.viscosity = 1.0;
     par.hydrodynamicRadius = 1.0;
+    //par.cells = {128, 128, 128}; //You can specify the grid size instead.
     par.dt = 0.01;
     par.tolerance = 1e-3;
     par.box = Box({128, 128, 128});
