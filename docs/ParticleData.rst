@@ -142,6 +142,13 @@ Basic properties include (type name):
   * And more defined in ParticleData.cuh
 
 
+You can add new properties in :code:`ALL_PROPERTIES_LIST`. Alternatively, you can populate the :code:`EXTRA_PARTICLE_PROPERTIES` macro without modifying :code:`ParticleData.cuh`. For instance by defining the macro before including :code:`uammd.cuh` or at the compilation line. The format of this macro is a list of properties like :code:`((PropertyName, propertyName, TYPE))`. For instance:
+
+.. code:: cpp
+
+   #define EXTRA_PARTICLE_PROPERTIES ((MyProp1, myprop1, real))((MyProp2, myprop2, real3))
+
+   
 .. _particle_id_assignation:
 
 Particle id assignation

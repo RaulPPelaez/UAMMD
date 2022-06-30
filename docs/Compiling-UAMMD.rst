@@ -54,7 +54,9 @@ You can define the following preprocessor macros to change compile options:
   * **-DMAXLOGLEVEL=X** Will set the maximum log level to X, 0 will print only critical errors, 6 will print some debug messages, 14 is the maximum verbosity and 5 will only print up to information messages (recommended).  
   * **-DUAMMD_DEBUG** Will enable CudaCheckError() calls. These calls imply a synchronization barrier and will halt the execution if an error is found with information about what went wrong. You can see these lines scattered all around the code base.  
   * **-DUSE_NVTX** Will enable nvtx ranges. If undefined (default) PUSH/POP_RANGE calls will be ignored. See utils/NVTXTools.h.  
-  
+  * **-DEXTRA_COMPUTABLES** Enables new :cpp:any:`Computables` in :ref:`Interactor`.
+  * **-DEXTRA_PARTICLE_PROPERTIES** Enables new particle properties in :ref:`ParticleData`.
+  * **-DEXTRA_UPDATABLE_PARAMETERS** Enables new parameters in :ref:`ParameterUpdatable`.
 
 COMMON ERRORS
 ---------------
