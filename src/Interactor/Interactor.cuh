@@ -46,9 +46,10 @@ namespace uammd{
 
     //This struct exposes the different targets of computation that can be requested from an Interactor.
     struct Computables{
-      bool force = false;
+      bool force  = false;
       bool energy = false;
       bool virial = false;
+      bool stress = false;
     };
 
     virtual void sum(Computables comp, cudaStream_t st = 0) = 0;
