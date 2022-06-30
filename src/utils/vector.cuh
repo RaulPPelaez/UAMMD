@@ -871,28 +871,30 @@ VECATTR int dot(const int2 &a, const int2 &b){return a.x * b.x + a.y * b.y;}
 
 
 VECATTR double length(double3 v){return sqrt(dot(v, v));}
-VECATTR double3 normalize(double3 v)
-{
-  double invLen = 1.0/sqrt(dot(v, v));
+
+VECATTR double3 normalize(double3 v){
+  double invLen = rsqrt(dot(v, v));
   return v * invLen;
 }
 
 VECATTR float length(float3 v){return sqrt(dot(v, v));}
-VECATTR float3 normalize(float3 v)
-{
-  float invLen = 1.0/sqrt(dot(v, v));
+
+VECATTR float3 normalize(float3 v){
+  float invLen = rsqrtf(dot(v, v));
   return v * invLen;
 }
 
 VECATTR double3 cross(double3 a, double3 b){
   return make_double3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
+
 VECATTR float3 cross(float3 a, float3 b){
   return make_float3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
 
 
 VECATTR float3 sqrt(const float3 &a){ return {sqrtf(a.x), sqrtf(a.y), sqrtf(a.z)};}
+
 VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
 
 
@@ -905,16 +907,6 @@ VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)}
 
 ///////////INT2/////////////////
 VECATTR int2 make_int2(int3 a){return make_int2(a.x, a.y);}
-
-VECATTR bool operator <(const int2 a, const int2 b){
-    if(a.x >= b.x){
-        if(a.y < b.y){
-            return true;
-        }
-        return false;
-    } 
-    return true;
-}
 
 ///////////INT3/////////////////
 
