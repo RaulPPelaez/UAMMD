@@ -15,7 +15,7 @@
   CREATION:
 
   auto pd = make_shared<ParticleData>(numberParticles, system);
-  //System can be ommited if a handle to it is not needed. 
+  //System can be ommited if a handle to it is not needed.
   //It will be auto created by ParticleData.
   auto pd = make_shared<ParticleData>(numberParticles);
 
@@ -97,13 +97,12 @@
 #include <thrust/system_error.h>
 
 #include"utils/vector.cuh"
-#include"utils/tensor.cuh"
 
 //List here all the properties with this syntax:
 /*       ((PropertyName, propertyName, TYPE))				\      */
 //The preprocessor ensures that they are included wherever is needed
-#ifndef EXTRA_PARTICLE_PROPERTIES 
-#define EXTRA_PARTICLE_PROPERTIES 
+#ifndef EXTRA_PARTICLE_PROPERTIES
+#define EXTRA_PARTICLE_PROPERTIES
 #endif
 #define IMPL_ALL_PROPERTIES_LIST ((Pos, pos, real4))	\
                             ((Id, id, int))	       \
@@ -410,4 +409,3 @@ namespace uammd{
 
 
 #endif
-
