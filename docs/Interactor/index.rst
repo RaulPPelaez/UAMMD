@@ -56,6 +56,7 @@ The Interactor interface exposes the following functions:
 In the compilation line, or before including uammd.cuh, you can define the :code:`EXTRA_COMPUTABLES` macro with a list of new computables that will be available to the rest of the code. For instance:
 
 .. code:: cpp
+	  
    //Before including uammd.cuh:
    #define EXTRA_COMPUTABLES (mycomputable1)(mycomputable2)
    //Alternatively, you can compile with something like: $ nvcc -DEXTRA_COMPUTABLES=(mycomputable1)(mycomputable2) ...
