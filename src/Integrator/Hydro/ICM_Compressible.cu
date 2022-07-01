@@ -9,7 +9,8 @@
 namespace uammd{
   namespace Hydro{
 
-    auto ICM_Compressible::storeCurrentPositions(){
+    template<class Walls>
+    auto ICM_Compressible_impl<Walls>::storeCurrentPositions(){
       System::log<System::DEBUG2>("[ICM_Compressible] Store current particle positions");
       int numberParticles = pg->getNumberParticles();
       cached_vector<real4> v(numberParticles);
@@ -18,7 +19,8 @@ namespace uammd{
       return v;
     }
 
-    auto ICM_Compressible::interpolateFluidVelocityToParticles(const DataXYZ &fluidVelocity){
+    template<class Walls>
+    auto ICM_Compressible_impl<Walls>::interpolateFluidVelocityToParticles(const DataXYZ &fluidVelocity){
       System::log<System::DEBUG2>("[ICM_Compressible] Interpolate fluid velocities");
       using namespace icm_compressible;
       int numberParticles = pg->getNumberParticles();
@@ -29,7 +31,8 @@ namespace uammd{
       return vel;
     }
 
-    auto ICM_Compressible::spreadCurrentParticleForcesToFluid(){
+    template<class Walls>
+    auto ICM_Compressible_impl<Walls>::spreadCurrentParticleForcesToFluid(){
       System::log<System::DEBUG2>("[ICM_Compressible] Spread particle forces");
       using namespace icm_compressible;
       auto forces = pd->getForce(access::gpu, access::read);
@@ -41,10 +44,11 @@ namespace uammd{
       return fluidForcing;
     }
 
+    template<class Walls>
     template<int subStep>
-    auto ICM_Compressible::callRungeKuttaSubStep(const DataXYZ &fluidForcingAtHalfStep,
-						 const cached_vector<real2> &fluidStochasticTensor,
-						 FluidPointers fluidAtSubTime){
+    auto ICM_Compressible_impl<Walls>::callRungeKuttaSubStep(const DataXYZ &fluidForcingAtHalfStep,
+							     const cached_vector<real2> &fluidStochasticTensor,
+							     FluidPointers fluidAtSubTime){
       System::log<System::DEBUG2>("[ICM_Compressible] Runge Kutta sub step %d", subStep);
       using namespace icm_compressible;
       FluidData fluidAtNewTime(getGhostGridSize());
@@ -62,13 +66,15 @@ namespace uammd{
       return fluidAtNewTime;
     }
 
-    void ICM_Compressible::fillGhostCells(FluidPointers fluid){
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::fillGhostCells(FluidPointers fluid){
       System::log<System::DEBUG2>("[ICM_Compressible] Updating ghost cells");
       icm_compressible::callUpdateGhostCells(fluid, walls, ghostCells, grid.cellDim);
     }
 
     //Uses the RK3 solver in FluidSolver.cuh
-    void ICM_Compressible::updateFluidWithRungeKutta3(const DataXYZ &fluidForcingAtHalfStep,
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::updateFluidWithRungeKutta3(const DataXYZ &fluidForcingAtHalfStep,
 						      const cached_vector<real2> &fluidStochasticTensor){
       System::log<System::DEBUG2>("[ICM_Compressible] Update fluid with RK3");
       auto fluidPrediction = callRungeKuttaSubStep<1>(fluidForcingAtHalfStep, fluidStochasticTensor,
@@ -82,8 +88,8 @@ namespace uammd{
       currentFluid.velocity.swap(fluidPrediction.velocity);
       currentFluid.momentum.swap(fluidPrediction.momentum);
     }
-
-    auto ICM_Compressible::computeStochasticTensor(){
+    template<class Walls>
+    auto ICM_Compressible_impl<Walls>::computeStochasticTensor(){
       System::log<System::DEBUG2>("[ICM_Compressible] Compute stochastic tensor");
       using namespace icm_compressible;
       cached_vector<real2> fluidStochasticTensor;
@@ -101,13 +107,15 @@ namespace uammd{
       return fluidStochasticTensor;
     }
 
-    void ICM_Compressible::forwardFluidDensityAndVelocityToNextStep(const DataXYZ &fluidForcingAtHalfStep){
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::forwardFluidDensityAndVelocityToNextStep(const DataXYZ &fluidForcingAtHalfStep){
       System::log<System::DEBUG2>("[ICM_Compressible] Forward fluid to next step");
       auto fluidStochasticTensor = computeStochasticTensor();
       updateFluidWithRungeKutta3(fluidForcingAtHalfStep, fluidStochasticTensor);
     }
 
-    void ICM_Compressible::updateParticleForces(){
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::updateParticleForces(){
       System::log<System::DEBUG2>("[ICM_Compressible] Compute particle forces");
       {
 	auto force = pd->getForce(access::gpu, access::write);
@@ -118,14 +126,16 @@ namespace uammd{
 
     //Any external fluid forcing (for instance a shear flow) can be added here.
     //The solver assumes the external forcing remains constant throughout the timestep and requires the forces at time n+1/2
-    void ICM_Compressible::addFluidExternalForcing(DataXYZ &fluidForcingAtHalfStep){
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::addFluidExternalForcing(DataXYZ &fluidForcingAtHalfStep){
       // thrust::transform(fluidForcingAtHalfStep.x(),
       // 			fluidForcingAtHalfStep.x() + fluidForcingAtHalfStep.size(),
       // 			fluidForcingAtHalfStep.x(),
       // 			[=]__device__(real fx){ return fx +=1; });
     }
 
-    auto ICM_Compressible::computeCurrentFluidForcing(){
+    template<class Walls>
+    auto ICM_Compressible_impl<Walls>::computeCurrentFluidForcing(){
       System::log<System::DEBUG2>("[ICM_Compressible] Compute fluid forcing");
       updateParticleForces();
       auto fluidForcing = spreadCurrentParticleForcesToFluid();
@@ -157,7 +167,8 @@ namespace uammd{
     }
 
     //Takes positions to n+1/2: \vec{q}^{n+1/2} = \vec{q}^n + dt/2\oper{J}^n\vec{v}^n
-    void ICM_Compressible::forwardPositionsToHalfStep(){
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::forwardPositionsToHalfStep(){
       if(pg->getNumberParticles() > 0){
 	System::log<System::DEBUG2>("[ICM_Compressible] Forward particles to n+1/2");
 	auto velocities = interpolateFluidVelocityToParticles(currentFluid.velocity);
@@ -170,7 +181,8 @@ namespace uammd{
     }
 
     //Takes positions to n+1: \vec{q}^{n+1} = \vec{q}^n + dt/2\oper{J}^{n+1/2}(\vec{v}^n + \vec{v}^{n+1})
-    void ICM_Compressible::forwardPositionsToNextStep(const cached_vector<real4> &positionsAtN,
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::forwardPositionsToNextStep(const cached_vector<real4> &positionsAtN,
 						      const DataXYZ &fluidVelocitiesAtN){
       System::log<System::DEBUG2>("[ICM_Compressible] Forward particles to n+1");
       auto fluidVelocitiesAtMidStep = icm_compressible::sumVelocities(fluidVelocitiesAtN, currentFluid.velocity);
@@ -183,19 +195,20 @@ namespace uammd{
 			icm_compressible::MidStepEulerFunctor(dt));
     }
 
-    void ICM_Compressible::forwardTime(){
+    template<class Walls>
+    void ICM_Compressible_impl<Walls>::forwardTime(){
       System::log<System::DEBUG>("[ICM_Compressible] Forward time");
       auto positionsAtN = storeCurrentPositions();
       auto fluidVelocitiesAtN = currentFluid.velocity;
       forwardPositionsToHalfStep();
-      for(auto i: interactors) i->updateSimulationTime((steps+0.5)*dt);
+      for(auto i: updatables) i->updateSimulationTime((steps+0.5)*dt);
       {
 	auto fluidForcing = computeCurrentFluidForcing();
 	forwardFluidDensityAndVelocityToNextStep(fluidForcing);
       }
       forwardPositionsToNextStep(positionsAtN, fluidVelocitiesAtN);
       steps++;
-      for(auto i: interactors) i->updateSimulationTime(steps*dt);
+      for(auto i: updatables) i->updateSimulationTime(steps*dt);
     }
 
   }

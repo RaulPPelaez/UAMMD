@@ -1,7 +1,7 @@
 # Test scripts for the compressible ICM
 
 
-There are three tests in this folder:
+There are several tests in this folder:
 
 
 ## 1. Fluid dynamic structure factors
@@ -41,6 +41,13 @@ This plot should show a curve that tends to 1 at long times.
 
 This test computes the RDF of a LJ liquid using the compressible solver and compares with an equivalent simulation using a BD (no hydrodynamics) solver.  
 Produces a plot comparing the two.  
+
+
+## 4. Moving wall test  
+
+This test places walls at the domain limits in the Z direction. The top wall is fixed while an oscillatory velocity in X is imposed on the bottom wall.
+
+A fluid only simulation is performed and a plot comparing $v_x(z)$ with the theoretical result at several times is generated.
 
 ## Usage
 

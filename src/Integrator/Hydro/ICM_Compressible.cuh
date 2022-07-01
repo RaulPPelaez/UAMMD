@@ -94,8 +94,8 @@ namespace uammd{
       //Default walled behavior is no walls, which translates into a periodic in the three directions.
       //Note that the walls can be ParameterUpdatable
       class DefaultWalls: public ParameterUpdatable{
-	real currentTime = 0;
-	real bottomWallvx = 0;
+	//real currentTime = 0;
+	//real bottomWallvx = 0;
       public:
 	//Returns wether there are walls in the Z direction. If false the Z domain ghost cells are periodic.
 	__host__ __device__ static constexpr bool isEnabled(){
@@ -103,11 +103,12 @@ namespace uammd{
 	}
 
 	//Applies the boundary conditions at the bottom z wall for the fluid
-	__device__ void applyBoundaryConditionZBottom(FluidPointers fluid, int3 ghostCell, int3 n) const{
+	__device__ static void applyBoundaryConditionZBottom(FluidPointers fluid, int3 ghostCell, int3 n){
 	  const int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
 	  //The index of the cell above the ghost cell
 	  const int ighostZp1 = ghostCell.x + (ghostCell.y + (ghostCell.z+1)*(n.y+2))*(n.x+2);
 	  real rho = fluid.density[ighostZp1];
+	  constexpr real bottomWallvx = 0;
 	  fluid.density[ighost] = rho;
 	  fluid.velocityX[ighost] = 2*bottomWallvx-fluid.velocityX[ighostZp1];
 	  fluid.velocityY[ighost] = -fluid.velocityY[ighostZp1];
@@ -131,10 +132,11 @@ namespace uammd{
 	  fluid.momentumZ[ighost] = -fluid.momentumZ[ighostZm1];
 	}
 
-	void updateSimulationTime(real newTime) override{
-	  this->currentTime = newTime;
-	  this->bottomWallvx = sin(2*M_PI*currentTime);
-	}
+        // void updateSimulationTime(real newTime) override{
+	//   this->currentTime = newTime;
+	//   real f = 1e-3;
+	//   this->bottomWallvx = sin(2*M_PI*f*currentTime);
+	// }
       };
 
       struct RandGen{
@@ -163,7 +165,9 @@ namespace uammd{
 
     }
 
-    class ICM_Compressible: public Integrator{
+    template<class Walls>
+    class ICM_Compressible_impl: public Integrator{
+    public:
       template<class T>
       using cached_vector = icm_compressible::cached_vector<T>;
       using DataXYZ = icm_compressible::DataXYZ;
@@ -171,8 +175,8 @@ namespace uammd{
       using FluidData = icm_compressible::FluidData;
       using DensityToPressure = icm_compressible::DensityToPressure;
       using Kernel = IBM_kernels::Peskin::threePoint;
-      using Walls = icm_compressible::DefaultWalls;
-    public:
+      //using Walls = icm_compressible::DefaultWalls;
+
       struct Parameters{
 	real shearViscosity = -1;
 	real bulkViscosity = -1;
@@ -187,9 +191,10 @@ namespace uammd{
 	std::function<real(real3)> initialVelocityX;
 	std::function<real(real3)> initialVelocityY;
 	std::function<real(real3)> initialVelocityZ;
+	std::shared_ptr<Walls> walls;
       };
 
-      ICM_Compressible(std::shared_ptr<ParticleData> pd, Parameters par):
+      ICM_Compressible_impl(std::shared_ptr<ParticleData> pd, Parameters par):
 	Integrator(pd, "ICM::Compressible"){
 	densityToPressure = std::make_shared<DensityToPressure>();
 	densityToPressure->isothermalSpeedOfSound = par.speedOfSound;
@@ -208,8 +213,12 @@ namespace uammd{
 	  par.hydrodynamicRadius = 0.91*par.boxSize.x/par.cellDim.x;
 	}
 	this->grid = Grid(Box(par.boxSize), ncells);
-	if(not this->walls)
-	  this->walls = std::make_shared<Walls>();
+	if(par.walls){
+	  System::log<System::MESSAGE>("[ICM_Compressible] Using walls provided in parameters");
+	  this->walls = par.walls;
+	}
+	else this->walls = std::make_shared<Walls>();
+
         this->addUpdatable(walls);
 	initializeFluid(par);
 	printInitialMessages(par);
@@ -364,6 +373,7 @@ namespace uammd{
       uint seed = 1234;
     };
 
+    using ICM_Compressible = ICM_Compressible_impl<icm_compressible::DefaultWalls>;
   }
 }
 #include"ICM_Compressible.cu"

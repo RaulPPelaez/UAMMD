@@ -2,8 +2,9 @@
 #Runs every other test
 set -e
 
-ndev=1 #Number of available GPUs
+ndev=5 #Number of available GPUs
 tar xvf tools.tar.xz #Unpack the theory data
 bash structureFactorTest.bash $ndev
 bash particleDiffusionTest.bash $ndev
 bash radialDistributionFunction $ndev
+bash walltest.bash
