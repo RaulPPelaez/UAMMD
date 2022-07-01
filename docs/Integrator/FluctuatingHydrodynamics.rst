@@ -174,7 +174,7 @@ The overall algorithm, including the particles (which are included via the :ref:
    3. Update particle positions to next step: :math:`\vec{q}^{n+1} = \vec{q}^n + \frac{dt}{2}\oper{J}^{n+1/2}\left(\vec{v}^n+\vec{v}^{n+1}\right)`.
 
 Boundary conditions via ghost cells
-....................
+.......................................
 
 The boundary conditions are implemented using ghost cells. Since none of the operators require searching for a value beyond first neighbours we can use a single layer of ghost cells.
 
@@ -226,6 +226,7 @@ Finally, let us compute :math:`g^\beta_{i+3/2\beta}`:
 
 Think about the rightmost cell of the domain, if we do not store the momentum the algorithm will try to fetch :math:`\rho_{i+2\beta}`, which lies one cell to the right of the ghost layer and is of course invalid. One solution is to store the momentum separately, so the element :math:`g^\beta_{i+3/2\beta}` is accessible in a ghost cell.
 
+
 Usage
 ............
 
@@ -250,7 +251,7 @@ The following parameters are available:
   * :cpp:`std::function<real(real3)> initialVelocityX`. A function to set the initial X velocity, will be called for each point in the domain
   * :cpp:`std::function<real(real3)> initialVelocityY`. A function to set the initial Y velocity, will be called for each point in the domain
   * :cpp:`std::function<real(real3)> initialVelocityZ`. A function to set the initial Z velocity, will be called for each point in the domain
-
+    
 .. code:: c++
 
 	#include"Integrator/Hydro/ICM_Compressible.cuh"
@@ -290,12 +291,54 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
 
+.. _ICMWalls:
+
+Walls
+......
+
+By default the compressible ICM Integrator is triply periodic. The class :code:`ICM_Compressible_impl` has a template parameter called Walls that can be customized to handle the ghost layers in the Z direction. In particular allowing to place walls at the domain limits.
+
+.. note:: The :ref:`Integrator` called :code:`ICM_Compressible` is an alias to :code:`ICM_Compressible_impl<Hydro::icm_compressible::DefaultWalls>`.
+
+The wall-handling class must abide to the following rules:
+
+.. cpp:class:: ICMZWalls
+
+   A class with arbitrary name that will be used by :code:`ICM_Compressible_impl` to handle the ghost cells in the Z direction.
+   Note that this class can be :ref:`ParameterUpdatable` (for instance to model a moving wall).
+
+   .. cpp:function:: ICMZWalls()
+
+      Must provide a default constructor due to a technical restriction.
+
+   .. cpp:function:: __host__ __device__ bool isEnabled();
+
+      If the domain is periodic in Z, this must return false. Otherwise return true.
+
+   .. cpp:function:: __device__ void applyBoundaryConditionZBottom(FluidPointers fluid, int3 ghostCell, int3 n);
+
+      This function applies the boundary conditions at the bottom z wall for the fluid for a given ghost cell.
+
+   .. cpp:function:: __device__ void applyBoundaryConditionZTop(FluidPointers fluid, int3 ghostCell, int3 n);
+
+      This function applies the boundary conditions at the top z wall for the fluid for a given ghost cell.
+
+
+For an usage example you can check the file :code:`test/Hydro/ICM_Compressible/walltest.cu`, which encodes a moving wall at the bottom.
+
+The default wall class in :code:`ICM_Compressible.cuh` is not enabled and can serve as an example as well.
+
+An additional parameter is present in :code:`ICM_Compressible_impl` to allow to provide an instance of the Wall handler:
+  * :cpp:`std::shared_ptr<Walls> walls`. If present, this object will be used to handle the ghost layers in the Z direction.
 
 FAQ
 ......
 
 1- I want to fiddle with the boundary conditions:
     -Check the file :code:`ICM_Compressible/GhostCells.cuh`, which handles the filling of the ghost layer. You might also want to check the :code:`ICM_Compressible/Fluctuations.cuh`, which among other things handles the ghost layer for the fluctuations. Finally, if particles are involved, you will probably need to modify the spreading kernel (see below).
+    
+    -Walls can be placed in the Z direction and customized via a template parameter (or by modifying the default wall class in :code:`ICM_Compressible.cuh`). See :ref:`Walls<ICMWalls>` above.
+    
     -You can also influence the solver itself (for instance to define special rules for the surfaces of the domain) in the functions of the file :code:`ICM_Compressible/FluidSolver.cuh`.
 
 2- I want to change the spreading kernel:
