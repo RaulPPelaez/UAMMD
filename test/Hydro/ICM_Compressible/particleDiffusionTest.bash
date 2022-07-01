@@ -92,9 +92,9 @@ a=$(echo 1 | awk '{print 0.91*'$lx'/'$nx'}')
 D0=$(echo 1 | awk '{print '$T'/(6*3.1415*'$viscosity'*'$a')}')
 cat $folder/particles.msd | awk '{printf("%g ", $1*'$dt'); for(i=2;i<=7; i++) printf("%g ",$i/(2*'$D0')); printf("\n")}' > $folder/particles.msd.norm
 
-awk '$1{print $1, $2/$1, $5/$1}' particles.msd.norm > X
-awk '$1{print $1, $3/$1, $6/$1}' particles.msd.norm > Y
-awk '$1{print $1, $4/$1, $7/$1}' particles.msd.norm > Z
+awk '$1{print $1, $2/$1, $5/$1}' $folder/particles.msd.norm > X
+awk '$1{print $1, $3/$1, $6/$1}' $folder/particles.msd.norm > Y
+awk '$1{print $1, $4/$1, $7/$1}' $folder/particles.msd.norm > Z
 mkdir -p figures
 gracebat -type xydy X Y Z -par tools/particleDiffusion.par -hdevice EPS -hardcopy -printfile figures/msd.eps
 rm -f X Y Z
