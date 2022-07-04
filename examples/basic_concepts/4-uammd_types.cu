@@ -1,17 +1,17 @@
 /* Raul P. Pelaez 2021
    Numeric types in UAMMD.
-   In this example we will work with uammd vector types used throughout the code.  
+   In this example we will work with uammd vector types used throughout the code.
    GPU's are really fast with single precision arithmetics and really take a hit when dealing with double precision.
-   However, sometimes double precision is needed. 
+   However, sometimes double precision is needed.
    UAMMD offers a generic type called "real" that can work as a double or a float via a compiler flag.
    By default UAMMD makes real = float. Try uncommenting the line with DOUBLE_PRECISION in the Makefile, which will make UAMMD define real as double.
    Additionally uammd offers a series of convenient vector types packing several numbers and overloading all arithmetic operations for them.
-    
-   By using these vector types we can increase chances of SIMD compiler vectorization in the CPU.
+
+   By using these vector types we also increase chances of SIMD compiler vectorization in the CPU.
    Alas, GPUs are SIMT machines and do not take advantage of vectorized operations per se, but they are still advantageous for memory loading/storing purposes.
    CUDA exposes a few ones, like float2, double2 or float4, which are just small structs defined like:
    struct float4{float x,y,z,w;};
-   The main thing to take into account is that CUDA can load/store a float4 or the price of a simple float.
+   The main thing to take into account is that CUDA can load/store a float4 for the price of a simple float.
    In particle simulations we can take advantage of this by defining highly used properties like particle positions or forces inside a float4 (even if that means discarding the .w element).
    UAMMD supercharges these native CUDA types and extends them by defining almost every arithmetic operator on them as you may need.
    Additionally, the types real2, real3 and real4 are exposed grouping float/double numbers.
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]){
   std::cout<<"Contents of fourValues:"<<fourValues<<std::endl;
   //Now that we are here, lets create a gpu vector of one of these types and fill it with something:
   int numberElements = 10000;
-  thrust::device_vector<real4> positions(numberElements);  
+  thrust::device_vector<real4> positions(numberElements);
   thrust::fill(positions.begin(), positions.end(), make_real4(1,2,3,4));
   //Now positions is a vector of 10000 elements with {1,2,3,4} in all its elements;
   //UAMMD makes extensive use of the CUDA library thrust and thus the std C++ library.
@@ -71,8 +71,7 @@ int main(int argc, char* argv[]){
   //https://docs.nvidia.com/cuda/thrust/index.html
   //If you are familiar with the standard C++ library you will find thrust to be clonical to it.
   //The equivalent CUDA/C code to what you see above is quite uglier and unsafe, in case you do not trust me:
-  // std::vector<real4> host_positions(numberElements);
-  // std::fill(host_positions.begin(), host_positions.end(), make_real4(1,2,3,4));
+  // std::vector<real4> host_positions(numberElements, make_real4(1,2,3,4));
   // real4* positions = nullptr;
   // cudaMalloc(&positions, numberElements*sizeof(real4));
   // cudaMemcpy(positions, host_positions.data(), numberElements*sizeof(real4), cudaMemcpyHostToDevice);

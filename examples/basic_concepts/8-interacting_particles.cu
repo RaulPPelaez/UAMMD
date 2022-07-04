@@ -8,8 +8,8 @@
    An Interactor is able to compute forces and energies resulting from a certain interaction.
 
    Look in the wiki pages or in other examples for a list of all available Interactors, we will cover one here, PairForces, which computes forces and energies between neighbouring particles ( such as a LJ potential interaction).
-   
-   We also need to initialize particles differently from previous tutorials, since we are going to be using a LJ interaction 
+
+   We also need to initialize particles differently from previous tutorials, since we are going to be using a LJ interaction
      it is a bad idea to start with a random distribution of particles. UAMMD offers a function called initLattice that we can leverage here.
  */
 
@@ -86,7 +86,7 @@ auto createVerletNVTIntegrator(UAMMD sim){
   using Verlet = VerletNVT::GronbechJensen;
   //Integrators always have a Parameters type inside of them that their constructor needs:
   Verlet::Parameters par;
-  //Lets simply copy the parameters we hardcoded at the beginning 
+  //Lets simply copy the parameters we hardcoded at the beginning
   par.dt = sim.par.dt;
   par.temperature = sim.par.temperature;
   par.friction = sim.par.friction;
@@ -138,7 +138,7 @@ auto createLJInteraction(UAMMD sim){
 std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
   auto pot = std::make_shared<Potential::LJ>();
   //We must instruct the potential with parameters for each interaction pair type
-  //LJ will interpret the fouth component of the position as type, in this example all particles have zero type.  
+  //LJ will interpret the fouth component of the position as type, in this example all particles have zero type.
   Potential::LJ::InputPairParameters par;
   par.epsilon = 1.0;
   par.shift = true; //If set to true the LJ potential is shifted, otherwise it is simply trucated
@@ -162,7 +162,7 @@ std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
 int main(int argc, char* argv[]){
   auto sim = initializeUAMMD(argc, argv);
   placeParticlesInFCCLattice(sim);
-  //Now lets create an Integrator just like before, to change things around, lets use a constant temperature verlet integrator: 
+  //Now lets create an Integrator just like before, to change things around, lets use a constant temperature verlet integrator:
   auto verlet = createVerletNVTIntegrator(sim);
   //Lets also create a PairForces Interactor set to a short range LJ potential
   auto lj_interaction = createLJInteraction(sim);
@@ -172,7 +172,7 @@ int main(int argc, char* argv[]){
   //Interactors are relatively small interface that only exposes one function called sum:
   //The sum function takes a structure defining whether force, energy and/or virial are desired. For instance:
   // lj_interaction->sum({.force=true, .energy=false, .virial=false});
-  //In this instance, the contents of pd->getForce will be updated with the ones comming from the LJ interaction.
+  //In this instance, the contents of pd->getForce will be updated with the ones coming from the LJ interaction.
   //When we call forwardTime now verlet will ask lj_interaction for the forces acting on each particle and use them when integrating the movement.
   //Note that this integrator does not need the particle energies, so they are not computed. If you want them, you may call lj_interaction->sum({.energy=true}); But remember to set the contents of pd->getEnergy() to zero first!
 
@@ -184,12 +184,10 @@ int main(int argc, char* argv[]){
   //If we want to print the positions we can do it at any point like in the previous example,
   //Lets for example write the positions of the first 10 particles:
   printFirst10Particles(sim);
-  
-  //See the wiki for a list of all the Interactors available and how to use them.
+
+  //See the docs for a list of all the Interactors available and how to use them.
   //In the examples/interaction_modules folder you can also see copy-pastable examples for each one.
 
-  
-  
   //Destroy the UAMMD environment and exit
   sim.pd->getSystem()->finish();
   return 0;
