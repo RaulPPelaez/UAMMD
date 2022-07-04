@@ -148,7 +148,7 @@ A minimal example of an Interactor:
         //Sum forces to each particle
         //For instance, adding a force to the x coordinate
         // of the first particle
-        auto forces = pd->getForces(access::cpu, access::write);
+        auto forces = pd->getForce(access::cpu, access::write);
         forces[0].x += 1;
       }
       if(comp.energy){
