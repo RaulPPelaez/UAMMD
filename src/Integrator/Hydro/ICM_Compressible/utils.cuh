@@ -5,6 +5,7 @@
 #define ICM_COMPRESSIBLE_UTILS_CUH
 #include "utils/utils.h"
 #include <thrust/iterator/transform_iterator.h>
+#include <thrust/tuple.h>
 #include "utils/container.h"
 #include "utils/Grid.cuh"
 namespace uammd{
@@ -37,7 +38,7 @@ namespace uammd{
 	template<class VectorTypeIterator>
 	DataXYZ(VectorTypeIterator &input, int size):DataXYZ(size){
 	  auto zip = thrust::make_zip_iterator(thrust::make_tuple(m_x.begin(), m_y.begin(), m_z.begin()));
-	  thrust::transform(input, input + size, zip, AoSToSoAReal3());
+	  thrust::transform(thrust::cuda::par, input, input + size, zip, AoSToSoAReal3());
 	}
 
 	DataXYZ(int size){
