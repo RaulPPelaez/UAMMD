@@ -200,6 +200,10 @@ Bonds with two particles per bond
 
 	       The same as :cpp:class:`BondedType::Harmonic`, but its constructor requires a :cpp:class`Box` object and applies periodic boundary conditions to the distances between computing the potential.
 
+   .. cpp:function:: HarmonicPBC(Box box)
+
+		     The constructor of this class requires a :cpp:any:`Box` object to deal with boundary conditions.
+
 .. cpp:class:: BondedType::FENE
 
 	       Implements the FENE potential, :math:`U(r) = \half K r_0^2\ln\left[1-\left(\frac{r}{r_0}\right)^2\right]`.
@@ -211,6 +215,11 @@ Bonds with two particles per bond
 
 	       The same as :cpp:class:`BondedType::FENE`, but its constructor requires a :cpp:class`Box` object and applies periodic boundary conditions to the distances between computing the potential.
 
+	       .. cpp:function:: FENEPBC(Box box)
+
+		  The constructor of this class requires a :cpp:any:`Box` object to deal with boundary conditions.
+
+
 Angular bonds
 ~~~~~~~~~~~~~~~
 
@@ -220,8 +229,13 @@ Bonds with three particles per bond.
 	       
 	       Implements the potential :math:`U(\theta) = 2K\left[\sin(\theta/2) - sin(\theta_0/2)\right]^2`.
 	       Requires the strength, :math:`K`, and the equilibrium angle :math:`\theta_0` in the bond file.
-	       The constructor requires a box to apply periodic boundary conditions.
+	       Applies the minimum image convention to the particle pair distances.
 
+   .. cpp:function:: Angular(real3 boxSize)
+
+		     The constructor of this class requires a domain size to apply periodic boundary conditions.
+
+		     
 Dihedral (torsional) bonds
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -231,9 +245,19 @@ Bonds with four particles per bond.
 	       
 	       Implements the `Fourier LAMMPS <https://docs.lammps.org/dihedral_fourier.html>`_ like potential :math:`U(\phi) = 2K\left[1+\cos(\phi -\phi_0)\right]` (where :math:`\phi\in [-\pi, \pi]`).
 	       Requires the strength, :math:`K`, and the equilibrium angle :math:`\phi_0` in the bond file.
-	       The constructor requires a box to apply periodic boundary conditions.
+	       Applies the minimum image convention to the particle pair distances.
 
+   .. cpp:function:: FourierLAMMPS(Box box)
 
+		     The constructor of this class requires a :cpp:any:`Box` object to deal with boundary conditions.
 
+.. cpp:class:: BondedType::Torsional
+
+	       An harmonic torsional bond defined in :code:`Interactor/TorsionalBondedForces.cuh`.
+	       Applies the minimum image convention to the particle pair distances.
+
+   .. cpp:function:: Torsional(real3 lbox)
+
+		     The constructor of this class requires a domain size to apply periodic boundary conditions.
 
 
