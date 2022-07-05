@@ -31,7 +31,7 @@ auto createIntegratorICM(UAMMD sim){
   ICM::Parameters par;
   par.dt = 0.1;
   real3 L = make_real3(32,32,32);
-  par.box = Box(L);
+  par.boxSize = L;
   par.hydrodynamicRadius = 1;
   par.bulkViscosity = 1.0;
   par.speedOfSound = 1.0;
