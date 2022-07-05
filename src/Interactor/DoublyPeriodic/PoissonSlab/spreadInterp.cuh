@@ -22,7 +22,7 @@ namespace uammd{
       Gaussian(real tolerance, real width, real h, real H, real He, real nz, int supportxy):
 	nz(nz){
 	this-> prefactor = cbrt(pow(2*M_PI*width*width, -1.5));
-	this-> tau = -1.0/(2.0*width*width);	
+	this-> tau = -1.0/(2.0*width*width);
 	rmax = supportxy*h*0.5;//5.0*h;//sqrt(log(tolerance/prefactor)/tau);
 	support.x = supportxy>0?(supportxy):std::max(3, int(2*rmax/h + 0.5)+1);
 	support.y = support.x;
@@ -37,7 +37,7 @@ namespace uammd{
       inline __host__  __device__ int3 getMaxSupport() const{
 	return make_int3(support.x, support.y, support.z);
       }
-      
+
       inline __host__  __device__ int3 getSupport(real3 pos, int3 cell) const{
 	real ch = real(0.5)*Htot*cospi((real(cell.z))/(nz-1));
 	int czt = int((nz)*(acos(real(2.0)*(ch+rmax)/Htot)/real(M_PI)));
@@ -51,7 +51,7 @@ namespace uammd{
       }
 
       inline __host__  __device__ real delta(real3 rvec, real3 h) const{
-	const real r2 = dot(rvec, rvec);	
+	const real r2 = dot(rvec, rvec);
 	return (abs(rvec.z)>=rmax)?0:(prefactor*prefactor*prefactor*exp(tau*r2));
       }
 
@@ -211,8 +211,8 @@ namespace uammd{
       }
 
       __device__ void operator += (real4 fande) const{
-	force[i] += charge[i]*make_real4(fande.x, fande.y, fande.z, 0);
-	energy[i] += charge[i]*fande.w;
+	force[i] += -charge[i]*make_real4(fande.x, fande.y, fande.z, 0);
+	energy[i] += -charge[i]*fande.w;
       }
     };
 
