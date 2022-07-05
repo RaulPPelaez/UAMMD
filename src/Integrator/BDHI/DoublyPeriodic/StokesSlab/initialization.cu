@@ -70,7 +70,7 @@ namespace uammd{
 
     void DPStokes::initializeKernel(Parameters par){
       System::log<System::DEBUG>("[DPStokes] Initialize kernel");
-      double h = grid.cellSize.x;
+      //double h = grid.cellSize.x;
       // if(supportxy >= grid.cellDim.x){
       // 	System::log<System::WARNING>("[DPStokes] Support is too big, cell dims: %d %d %d, requested support: %d",
       // 				     grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);

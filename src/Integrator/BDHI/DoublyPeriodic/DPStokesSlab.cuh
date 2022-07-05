@@ -30,7 +30,7 @@ namespace uammd{
 	int ct = int(nz*(acos(-2*(-H*0.5+rmax)/H)/M_PI));
 	support.z = 2*ct+1;
       }
-      
+
       inline __host__  __device__ int3 getMaxSupport() const{
 	return support;
       }
@@ -44,11 +44,11 @@ namespace uammd{
 	int sz = 2*thrust::max(czt-cell.z, cell.z-czb)+1;
 	return make_int3(support.x, support.y, thrust::min(sz, support.z));
       }
-      
+
       inline __host__  __device__ real phiX(real r) const{
 	return prefactor*exp(tau*r*r);
       }
-      
+
       inline __host__  __device__ real phiY(real r) const{
 	return prefactor*exp(tau*r*r);
       }
@@ -65,7 +65,7 @@ namespace uammd{
 	  real phi_img = rimg>=rmax?real(0.0):prefactor*exp(tau*rimg*rimg);
 	  real phi = prefactor*exp(tau*r*r);
 	  return phi - phi_img;
-	}	 
+	}
       }
 
     private:
@@ -84,7 +84,7 @@ namespace uammd{
 						    {5, {1.886,1.456086423397354}},
 						    {6, {1.3267,1.46442666831683}}});
     //{6, {1.714,1.452197522749675}}});
-    
+
     static const std::map<int, double2> BM_torque_params({{6, {2.216,1.157273283795062}}});
 
     //The BM kernel and its derivative
@@ -116,7 +116,7 @@ namespace uammd{
     }
     //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
     struct BarnettMagland{
-      int3 support;      
+      int3 support;
       real beta;
       real alpha;
       real norm;
@@ -141,7 +141,7 @@ namespace uammd{
 	if(beta<0) this->beta = detail::suggestBetaBM(w);
 	this->norm = this->computeNorm();
 	System::log<System::MESSAGE>("BM kernel: beta: %g, alpha: %g, w: %g, norm: %g", beta, alpha, w, norm);
-	//this->alpha = supportxy*0.5*h;	
+	//this->alpha = supportxy*0.5*h;
 	//If the support is not tabulated an exception will be thrown
 	// try{
 	//   if(torqueMode){
@@ -158,12 +158,12 @@ namespace uammd{
 	//   throw std::runtime_error("BM kernel: Untabulated support");
 	// }
       }
-      
+
       inline __host__  __device__ int3 getMaxSupport() const{
 	return support;
       }
 
-      inline __host__  __device__ int3 getSupport(int3 cell) const{
+      inline __host__  __device__ int3 getSupport(real3 pos, int3 cell) const{
 	real ch = real(-0.5)*H*cospi((real(cell.z))/(nz-1));
 	real zmax = thrust::min(ch+rmax, H*real(0.5));
 	int czt = int((nz)*(acos(real(-2.0)*(zmax)/H)/real(M_PI)));
@@ -172,13 +172,13 @@ namespace uammd{
 	int sz = 2*thrust::max(czt-cell.z, cell.z-czb)+1;
 	return make_int3(support.x, support.y, thrust::min(sz, support.z));
       }
-      
-      
-      inline __host__  __device__ real phiX(real r) const{
+
+
+      inline __host__  __device__ real phiX(real r, real3 pi) const{
 	return bm(r,alpha, beta, norm);
       }
-      
-      inline __host__  __device__ real phiY(real r) const{
+
+      inline __host__  __device__ real phiY(real r, real3 pi) const{
 	return bm(r,alpha, beta, norm);
       }
       //For this algorithm we spread a particle and its image to enforce the force density outside the slab is zero.
@@ -196,7 +196,7 @@ namespace uammd{
       real rmax;
       int nz;
     };
-    
+
     class DPStokes{
     public:
       //using Kernel = Gaussian;
@@ -205,7 +205,7 @@ namespace uammd{
       using KernelTorque = BarnettMagland;
       using Grid = chebyshev::doublyperiodic::Grid;
       using QuadratureWeights = chebyshev::doublyperiodic::QuadratureWeights;
-
+      using WallMode = WallMode;
       //Parameters, -1 means that it will be autocomputed if not present
       struct Parameters{
 	int nx, ny;
@@ -226,27 +226,27 @@ namespace uammd{
       };
 
       DPStokes(Parameters par);
-    
+
       ~DPStokes(){
 	System::log<System::MESSAGE>("[DPStokes] Destroyed");
-      }      
+      }
 
       //Computes the velocities and angular velocities given the forces and torques
       std::pair<cached_vector<real3>, cached_vector<real3>>
-      Mdot(real4* pos, real4* forces, real4* torque, int N, cudaStream_t st);
+      Mdot(real4* pos, real4* forces, real4* torque, int N, cudaStream_t st = 0);
 
       //Computes the velocities given the forces
-      cached_vector<real3> Mdot(real4* pos, real4* forces, int N, cudaStream_t st);
+      cached_vector<real3> Mdot(real4* pos, real4* forces, int N, cudaStream_t st = 0);
 
     private:
       shared_ptr<Kernel> kernel;
       shared_ptr<KernelTorque> kernelTorque;
       shared_ptr<FastChebyshevTransform> fct;
       shared_ptr<Correction> correction;
-      
+
       gpu_container<real> zeroModeVelocityChebyshevIntegrals;
       gpu_container<real> zeroModePressureChebyshevIntegrals;
-    
+
       void setUpGrid(Parameters par);
       void initializeKernel(Parameters par);
       void printStartingMessages(Parameters par);
@@ -269,7 +269,7 @@ namespace uammd{
 						      real4* pos, int N, cudaStream_t st);
       real Lx, Ly;
       real H;
-      Grid grid;   
+      Grid grid;
       real viscosity;
       real gw;
       real tolerance;
@@ -283,4 +283,3 @@ namespace uammd{
 #include"StokesSlab/initialization.cu"
 #include"StokesSlab/DPStokes.cu"
 #endif
-

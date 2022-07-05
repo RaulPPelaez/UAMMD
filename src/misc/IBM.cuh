@@ -85,7 +85,7 @@ namespace uammd{
 
     };
 
-  }  
+  }
 
   template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>
   class IBM{

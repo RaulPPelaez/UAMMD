@@ -28,7 +28,7 @@ namespace uammd{
       auto gridDataCheb = fct->forwardTransform(gridData, st);
       if(torques){//Torques are added in Cheb space
 	addSpreadTorquesFourier(pos, torques, numberParticles, gridDataCheb, st);
-      }      
+      }
       solveBVPVelocity(gridDataCheb, st);
       if(mode != WallMode::none){
       	correction->correctSolution(gridDataCheb, gridDataCheb, st);
@@ -91,15 +91,15 @@ namespace uammd{
 	const int2 ik = make_int2(id%(n.x/2+1), id/(n.x/2+1));
 	if(id >= n.y*(n.x/2+1)){
 	  return;
-	}    
-	const auto kn = computeWaveNumber(id, n.x, n.y);	
+	}
+	const auto kn = computeWaveNumber(id, n.x, n.y);
 	const auto k = computeWaveVector(kn, make_real2(L));
 	auto torque = make_third_index_iterator(gridTorqueCheb, ik.x, ik.y, Index3D(n.x/2+1, n.y, 2*n.z-2));
 	auto curl = make_third_index_iterator(gridTorqueCurlCheb, ik.x, ik.y, Index3D(n.x/2+1, n.y, 2*n.z-2));
 	//First sum the terms that do not depend on the derivative in Z
 	const real half = real(0.5);
 	const bool isUnpairedX = ik.x == (n.x - ik.x);
-	const bool isUnpairedY = ik.y == (n.y - ik.y);	
+	const bool isUnpairedY = ik.y == (n.y - ik.y);
 	real Dx = isUnpairedX?0:k.x;
 	real Dy = isUnpairedY?0:k.y;
 	fori(0, n.z){
@@ -116,7 +116,7 @@ namespace uammd{
 	  const auto DzT = torque[i];
 	  curl[i].x += -half*DzT.y;
 	  curl[i].y += half*DzT.x;
-	}	
+	}
       }
 
     }
@@ -125,7 +125,7 @@ namespace uammd{
     void DPStokes::addSpreadTorquesFourier(real4* pos, real4* torques, int numberParticles,
 					   cached_vector<cufftComplex4> &gridForceCheb, cudaStream_t st){
       if(torques == nullptr) return;
-      System::log<System::DEBUG2>("[DPStokes] Spreading torques");      
+      System::log<System::DEBUG2>("[DPStokes] Spreading torques");
       const int3 n = grid.cellDim;
       cached_vector<real4> gridTorque(2*(n.x/2+1)*n.y*(2*n.z-2));
       thrust::fill(thrust::cuda::par.on(st), gridTorque.begin(), gridTorque.end(), real4());
@@ -185,7 +185,10 @@ namespace uammd{
       auto dgrid3 = thrust::make_transform_iterator(d_gridVelocity, detail::ToReal3());
       const int3 n = grid.cellDim;
       IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-      ibm.gather(pos, thrust::raw_pointer_cast(particleVels.data()), dgrid3, *qw, numberParticles, st);
+      ibm.gather(pos, thrust::raw_pointer_cast(particleVels.data()),
+		 dgrid3,
+		 *qw, IBM_ns::DefaultWeightCompute(),
+		 numberParticles, st);
       CudaCheckError();
       return particleVels;
     }
@@ -202,7 +205,7 @@ namespace uammd{
 	const int2 ik = make_int2(id%(n.x/2+1), id/(n.x/2+1));
 	if(id >= n.y*(n.x/2+1)){
 	  return;
-	}      
+	}
 	auto kn = computeWaveNumber(id, n.x, n.y);
 	auto k = computeWaveVector(kn, make_real2(L));
 	auto vels = make_third_index_iterator(gridVelsCheb, ik.x, ik.y, Index3D(n.x/2+1, n.y, 2*n.z-2));
@@ -210,10 +213,10 @@ namespace uammd{
 	//First sum the terms that do not depend on the derivative in Z
 	const real half = real(0.5);
 	const bool isUnpairedX = ik.x == (n.x - ik.x);
-	const bool isUnpairedY = ik.y == (n.y - ik.y);	
+	const bool isUnpairedY = ik.y == (n.y - ik.y);
 	real Dx = isUnpairedX?0:k.x;
 	real Dy = isUnpairedY?0:k.y;
-	fori(0, n.z){	  
+	fori(0, n.z){
 	  const auto T = vels[i];
 	  curl[i].x = {-half*Dy*T.z.y, half*Dy*T.z.x};
 	  curl[i].y = {half*Dx*T.z.y, -half*Dx*T.z.x};
@@ -223,7 +226,7 @@ namespace uammd{
 	//Overwrite input torque with Z derivatives
 	chebyshevDerivate(vels, vels, n.z, real(0.5)*L.z);
 	//Sum the rest of the terms
-	fori(0, n.z){	  
+	fori(0, n.z){
 	  const auto DzT = vels[i];
 	  curl[i].x += -half*DzT.y;
 	  curl[i].y += half*DzT.x;
@@ -260,7 +263,10 @@ namespace uammd{
       real4* d_gridAngVelocity = thrust::raw_pointer_cast(gridAngVels.data());
       auto dgrid3 = thrust::make_transform_iterator(d_gridAngVelocity, detail::ToReal3());
       IBM<KernelTorque, Grid> ibm(kernelTorque, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-      ibm.gather(pos, thrust::raw_pointer_cast(particleAngVels.data()), dgrid3, *qw, numberParticles, st);
+      ibm.gather(pos, thrust::raw_pointer_cast(particleAngVels.data()),
+		 dgrid3,
+		 *qw, IBM_ns::DefaultWeightCompute(),
+		 numberParticles, st);
       CudaCheckError();
       return particleAngVels;
     }
