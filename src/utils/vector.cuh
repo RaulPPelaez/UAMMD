@@ -393,6 +393,7 @@ VECATTR real4 make_real4(real s){return make_real4(s, s, s, s);}
 VECATTR real4 make_real4(real3 a){ return make_real4(a.x, a.y, a.z, real(0.0));}
 VECATTR real4 make_real4(real3 a, real w){ return make_real4(a.x, a.y, a.z, w);}
 VECATTR real4 make_real4(real2 a){ return make_real4(a.x, a.y, real(0.0), real(0.0));}
+VECATTR real4 make_real4(real2 a, real z, real w){ return make_real4(a.x, a.y, z, w);}
 #ifdef SINGLE_PRECISION
 VECATTR real4 make_real4(double3 a, real w){return make_real4(a.x, a.y, a.z, w);}
 #else
