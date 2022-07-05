@@ -27,6 +27,7 @@ namespace uammd{
 	    return factor;
 	  }
 	  real a;
+	  real upsampling;
 	public:
 	  int support;
 	  real rmax;
@@ -86,7 +87,7 @@ namespace uammd{
 	  IBM_kernels::BarnettMagland initBM(real tolerance){
 	    real w = computeW(tolerance);
 	    real beta=1.8*w*2;
-	    return IBM_kernels::BarnettMagland(w, beta);
+	    return IBM_kernels::BarnettMagland(w, w*0.5, beta);
 	  }
 	  static real computeW(real tolerance){
 	    real w = std::max(1.5, int(-log10(tolerance) + 2)/2.0);
@@ -135,7 +136,7 @@ namespace uammd{
 
 	};
 
-	namespace Peskin{
+        namespace Peskin{
 
 	  class threePoint{
 	    IBM_kernels::Peskin::threePoint kern;

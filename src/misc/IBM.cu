@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2020. Immersed Boundary Method (IBM).
+/*Raul P. Pelaez 2019-2021. Immersed Boundary Method (IBM).
   See IBM.cuh
  */
 #include"IBM.cuh"
@@ -43,7 +43,7 @@ namespace uammd{
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
 	int3 P = support/2;
 	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);	
+	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
 	if(shift.x or shift.y or shift.z){
 	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
 	  const real3 pi_pbc = grid.box.apply_pbc(pos);
@@ -58,27 +58,33 @@ namespace uammd{
 	const int tid = threadIdx.x;
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
-	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
-	  weightsX[i] = detail::phiX(kernel, rij, pi);
+	  if(cellj.x>=0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).x;
+	    weightsX[i] = detail::phiX(kernel, rij, pi);
+	  }
 	}
 	real *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
-	  const real rij = grid.distanceToCellCenter(pi, cellj).y;
-	  weightsY[i] = detail::phiY(kernel,rij, pi);
+	  if(cellj.y>=0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).y;
+	    weightsY[i] = detail::phiY(kernel, rij, pi);
+	  }
 	}
 	real *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
-	  const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	  weightsZ[i] = detail::phiZ(kernel, rij, pi);
+	  if(cellj.z>=0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).z;
+	    weightsZ[i] = detail::phiZ(kernel, rij, pi);
+	  }
 	}
       }
 
       __device__ real3 computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
 	return make_real3(weights[ii], weights[support.x+jj], weights[support.x+support.y+kk]);
       }
-      
+
     }
 
     /*Spreads the quantity v (defined on the particle positions) to a grid
@@ -133,6 +139,8 @@ namespace uammd{
 	const int jj=(i/support.x)%support.y;
 	const int kk=is2D?0:(i/(support.x*support.y));
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
+	if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	  continue;
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	const auto weight = weightCompute(vi,kern);
@@ -157,7 +165,7 @@ namespace uammd{
       class InterpolationKernel,
       class ParticlePosIterator, class ParticleQuantityOutputIterator,
       class GridQuantityIterator,
-      class WeightCompute,	     
+      class WeightCompute,
       class Index3D,
       class QuadratureWeights>
     __global__ void grid2ParticlesDTPP(const ParticlePosIterator pos,
@@ -204,6 +212,8 @@ namespace uammd{
 	  const int jj=(i/support.x)%support.y;
 	  const int kk=is2D?0:(i/(support.x*support.y));
 	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
+	  if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	    continue;
 	  const real dV = qw(cellj, grid);
 	  const int jcell = cell2index(cellj);
 	  const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);

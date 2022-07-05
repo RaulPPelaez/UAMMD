@@ -5,11 +5,14 @@
 #ifndef FCM_UTILS_CUH
 #define FCM_UTILS_CUH
 #include"uammd.cuh"
+#include"utils/cufftPrecisionAgnostic.h"
+#include"utils/cufftComplex3.cuh"
+#include"utils/container.h"
 namespace uammd{
-  namespace BDHI{
-#ifdef UAMMD_DEBUG
+  namespace BDHI{    
+#ifndef UAMMD_DEBUG
     template<class T> using gpu_container = thrust::device_vector<T>;
-    template<class T>  using cached_vector = detail::UninitializedCachedContainer<T>;
+    template<class T>  using cached_vector = uninitialized_cached_vector<T>;
 #else
     template<class T> using gpu_container = thrust::device_vector<T, managed_allocator<T>>;
     template<class T> using cached_vector = thrust::device_vector<T, managed_allocator<T>>;

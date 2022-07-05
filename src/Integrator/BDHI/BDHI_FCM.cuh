@@ -35,7 +35,7 @@ namespace uammd{
 
       FCM(shared_ptr<ParticleData> pd, Parameters par):
 	FCM(std::make_shared<ParticleGroup>(pd, "All"), par){}
-      
+
       FCM(shared_ptr<ParticleGroup> pg, Parameters par):
         pg(pg),
 	temperature(par.temperature), dt(par.dt){
@@ -83,7 +83,7 @@ namespace uammd{
 
     class FCMIntegrator: public Integrator{
       using Kernel = FCM_ns::Kernels::Gaussian;
-      using KernelTorque = FCM_ns::Kernels::GaussianTorque;
+      using KernelTorque = FCM_ns::Kernels::Gaussian;
       using FCM_super = FCM_impl<Kernel, KernelTorque>;
       std::shared_ptr<FCM_super> fcm;
 
@@ -105,13 +105,13 @@ namespace uammd{
       ~FCMIntegrator(){
 	cudaStreamDestroy(st);
       }
-      
+
       void forwardTime() override;
 
       auto getFCM_impl(){
 	return fcm;
       }
-      
+
     private:
       uint steps = 0;
       cudaStream_t st;
@@ -120,7 +120,7 @@ namespace uammd{
       void resetForces();
       void resetTorques();
       auto computeHydrodynamicDisplacements();
-      void computeCurrentForces();      
+      void computeCurrentForces();
     };
   }
 }

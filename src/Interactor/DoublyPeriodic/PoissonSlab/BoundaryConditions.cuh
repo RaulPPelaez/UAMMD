@@ -9,31 +9,45 @@ In this case they are just trivial and equal to 1 all the time. Maybe this class
 #include "utils.cuh"
 namespace uammd{
   namespace DPPoissonSlab_ns{
-    class TrivialBoundaryConditions{
-      int instance;
+    class TopBoundaryConditions{
+      real k, H;
     public:
-      __host__ __device__ TrivialBoundaryConditions(int i):instance(i){
+      TopBoundaryConditions(real k, real H):k(k),H(H){
       }
 
-      static real getFirstIntegralFactor(){
-	return 1.0;
+      real getFirstIntegralFactor() const{
+	return (k!=0)*H;
       }
 
-      static real getSecondIntegralFactor(){
-	return 1.0;
+      real getSecondIntegralFactor() const{
+	return k!=0?(H*H*k):(1.0);
       }
-
-      // static __device__ cufftComplex_t<real> getRightHandSide(){
-      // 	return cufftComplex_t<real>();
-      // }
-
     };
 
-    template<class BoundaryConditions = TrivialBoundaryConditions>
-    class BoundaryConditionsDispatch{
+    class BottomBoundaryConditions{
+      real k, H;
     public:
-      __host__ __device__ BoundaryConditions operator()(int i){
-	return BoundaryConditions(i);
+      BottomBoundaryConditions(real k, real H):k(k),H(H){
+      }
+
+      real getFirstIntegralFactor() const{
+	return (k!=0)*H;
+      }
+
+      real getSecondIntegralFactor() const{
+	return k!=0?(-H*H*k):(1.0);
+      }
+    };
+
+    template<class BoundaryConditions, class Klist>
+    class BoundaryConditionsDispatch{
+      Klist klist;
+      real H;
+    public:
+      BoundaryConditionsDispatch(Klist klist, real H):klist(klist), H(H){}
+
+      BoundaryConditions operator()(int i) const{
+	return BoundaryConditions(klist[i], H);
       }
     };
 

@@ -51,8 +51,8 @@ namespace uammd{
     }
 
     //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
-    __host__ __device__ real BM(real zz, real w, real beta){
-      const real z = zz/w;
+    __host__ __device__ real BM(real zz, real w, real alpha, real beta){
+      const real z = zz/alpha;
       const real z2 = z*z;
       return (z2>=real(1.0))?0:(exp(beta*(sqrt(real(1.0)-z2)-real(1.0))));
     }
@@ -60,7 +60,7 @@ namespace uammd{
     struct BarnettMagland{
     private:
       real computeNorm() const{
-	auto foo=[=](real r){return BM(r, w, beta);};
+	auto foo=[=](real r){return BM(r, w, alpha, beta);};
 	real norm = detail::integrate(foo, -w, w, 100000);
 	return norm;
       }
@@ -69,15 +69,17 @@ namespace uammd{
     public:
       const real beta;
       const real w;
-
-      BarnettMagland(real i_w, real i_beta):
+      real alpha;
+      BarnettMagland(real i_w, real i_alpha, real i_beta):
 	w(i_w),
+	alpha(i_alpha),
 	beta(i_beta){
+	if(alpha<0) this->alpha = w*0.5;
 	this->invnorm = 1.0/computeNorm();
       }
 
-      inline __host__  __device__ real phi(real zz, real3 pos = real3()) const{
-	return BM(zz, w, beta)*invnorm;
+      inline __host__  __device__ real phi(real zz) const{
+	return BM(zz, w, alpha, beta)*invnorm;
       }
     };
 
