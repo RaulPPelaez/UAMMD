@@ -26,8 +26,8 @@ namespace uammd{
     bondCompute(bondCompute), TPP(64){
     //BondedForces does not care about any parameter update, but the BondType might.
     this->setDelegate(this->bondCompute);
-    sys->log<System::MESSAGE>("[BondedForces] Initialized");
-    sys->log<System::MESSAGE>("[BondedForces] Using: %s", type_name<BondType>().c_str());
+    System::log<System::MESSAGE>("[BondedForces] Initialized");
+    System::log<System::MESSAGE>("[BondedForces] Using: %s", type_name<BondType>().c_str());
     readBonds(par.file);
   }
 
@@ -104,7 +104,37 @@ namespace uammd{
       bond.bond_info = BondType::readBond(in);
       return bond;
     }
+
+    template<class Bond>
+    auto buildBondList(const BondProcessor<Bond> & processor, int particlesPerBond, int nbonds){
+      System::log<System::DEBUG>("[BondedForces] Generating list");
+      auto h_particlesWithBonds = processor.getParticlesWithBonds();
+      const int NparticleswithBonds = h_particlesWithBonds.size();
+      std::vector<int> h_bondStart, h_bondEnd;
+      h_bondStart.resize(NparticleswithBonds, 0xffFFffFF);
+      h_bondEnd.resize(NparticleswithBonds, 0);
+      std::vector<Bond> bondListCPU(particlesPerBond*nbonds);
+      std::vector<Bond> blst;
+      //Create a compact list of bonds for each particle that has at least one bond.
+      //The bond list of particle with id=particlesWithBonds[i] starts at bondStart[i] and ends at bondEnd[i].
+      //So the first bond is bondList[bondStart[i]]
+      fori(0, NparticleswithBonds){
+	const int index = h_particlesWithBonds[i];
+	blst = processor.getBondListOfParticle(index);
+	const int nbondsi = blst.size();
+	int offset = (i>0)?h_bondEnd[i-1]:0;
+	forj(0, nbondsi){
+	  bondListCPU[offset+j] = blst[j];
+	}
+	h_bondEnd[i] = offset + nbondsi;
+	h_bondStart[i] = offset;
+      }
+      return std::make_tuple(bondListCPU, h_bondStart, h_bondEnd);
+    }
+
   }
+
+
 
   template<class BondType, int particlesPerBond>
   void BondedForces<BondType, particlesPerBond>::readBonds(std::string fileName){
@@ -117,7 +147,7 @@ namespace uammd{
     in>>this->nbonds;
     BondProcessor<Bond> processor;
     if(nbonds > 0){
-      sys->log<System::MESSAGE>("[BondedForces] Detected: %d bonds", nbonds);
+      System::log<System::MESSAGE>("[BondedForces] Detected: %d bonds", nbonds);
       processor.hintNumberBonds(nbonds); //This makes the processor reserve the space for the bond list in advance
       for(int b = 0; b < nbonds; b++){
 	auto bond = readNextBond<Bond, BondType>(in, b, nbonds, particlesPerBond);
@@ -129,8 +159,9 @@ namespace uammd{
       int nbondsFP = 0;
       in>>nbondsFP;
       if(nbondsFP){
-	sys->log<System::MESSAGE>("[BondedForces] Detected: %d fixed point bonds", nbondsFP);
-	processor.hintNumberBonds(nbonds+nbondsFP); //This makes the processor reserve the space for the bond list in advance
+	nbonds += nbondsFP;
+	System::log<System::MESSAGE>("[BondedForces] Detected: %d fixed point bonds", nbondsFP);
+	processor.hintNumberBonds(nbonds); //This makes the processor reserve the space for the bond list in advance
 	this->fixedPointPositions.resize(nbondsFP+1);
 	for(int b = 0; b < nbondsFP; b++){
 	  real3 pos;
@@ -140,34 +171,10 @@ namespace uammd{
 	}
       }
     }
-    auto h_particlesWithBonds = processor.getParticlesWithBonds();
-    sys->log<System::DEBUG>("[BondedForces] Generating list");
-    sys->log<System::MESSAGE>("[BondedForces] %d particles are involved in at least one bond.", h_particlesWithBonds.size());
-    const int NparticleswithBonds = h_particlesWithBonds.size();
-    std::vector<int> h_bondStart, h_bondEnd;
-    h_bondStart.resize(NparticleswithBonds, 0xffFFffFF);
-    h_bondEnd.resize(NparticleswithBonds, 0);
-    thrust::host_vector<Bond> bondListCPU(particlesPerBond*nbonds);
-    std::vector<Bond> blst;
-    //Create a compact list of bonds for each particle that has at least one bond.
-    //The bond list of particle with id=particlesWithBonds[i] starts at bondStart[i] and ends at bondEnd[i].
-    //So the first bond is bondList[bondStart[i]]
-    fori(0, NparticleswithBonds){
-      const int index = h_particlesWithBonds[i];
-      blst = processor.getBondListOfParticle(index);
-      const int nbondsi = blst.size();
-      int offset = (i>0)?h_bondEnd[i-1]:0;
-      forj(0, nbondsi){
-	bondListCPU[offset+j] = blst[j];
-      }
-      h_bondEnd[i] = offset + nbondsi;
-      h_bondStart[i] = offset;
-    }
-    sys->log<System::DEBUG>("[BondedForces] Uploading list");
-    this->bondList = bondListCPU;
-    this->bondStart = h_bondStart;
-    this->bondEnd = h_bondEnd;
-    this->particlesWithBonds = h_particlesWithBonds;
+    std::tie(this->bondList, this->bondStart, this->bondEnd) = buildBondList(processor, particlesPerBond, nbonds);
+    this->particlesWithBonds = processor.getParticlesWithBonds();
+    System::log<System::MESSAGE>("[BondedForces] %d particles are involved in at least one bond.",
+				 particlesWithBonds.size());
   }
 
   namespace BondedForces_ns{
@@ -268,7 +275,7 @@ namespace uammd{
     auto energy = comp.energy?pd->getEnergy(access::gpu, access::readwrite).begin():nullptr;
     auto virial = comp.virial?pd->getVirial(access::gpu, access::readwrite).begin():nullptr;
     if(nbonds>0){
-      sys->log<System::DEBUG3>("[BondedForces] Computing Particle-Particle...");
+      System::log<System::DEBUG3>("[BondedForces] Computing Particle-Particle...");
       this->callComputeBonded(force, energy, virial, st);
     }
   }
