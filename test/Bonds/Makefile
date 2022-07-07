@@ -1,29 +1,25 @@
+
+
+NVCC=nvcc
+CXX=g++
+
+#Default log level is 5, which prints up to MESSAGE, 0 will only print critical errors and 14 will print everything up to the most low level debug information
+LOG_LEVEL=5
+
 #Uncomment to compile in double precision mode, single by default
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
 
-#C++ compiler, I tested up to clang++-5.0
-#CXX=clang++-5.0
-CXX=g++
+UAMMD_ROOT=../../
 
-LOG_LEVEL=5
+INCLUDEFLAGS=-I$(UAMMD_ROOT)/src -I$(UAMMD_ROOT)/src/third_party
+NVCCFLAGS=-ccbin=$(CXX) -std=c++14 -O3 $(INCLUDEFLAGS) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DOUBLE_PRECISION)
 
-CUDA_ROOT=/usr/local/cuda
+all: $(patsubst %.cu, %, $(wildcard *.cu))
 
-#Uncomment to add debug flags to nvcc
-#DEBUG=  -src-in-ptx -g -G -DUAMMD_DEBUG
+%: %.cu Makefile
+	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=)
 
-#Flags to $(CXX)
-CPU= -O3 -funroll-loops  -fno-math-errno -fno-signed-zeros  -march=native -fPIC -Wall -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-sign-compare
+clean: $(patsubst %.cu, %.clean, $(wildcard *.cu))
 
-INCLUDEFLAGS= -I$(CUDA_ROOT)/include -I ../../src -I ../../src/third_party
-OPTIONS=$(DOUBLE_PRECISION) -DMAXLOGLEVEL=$(LOG_LEVEL) $(DEBUG)
-BASIC_LINE= $(CUDA_ROOT)/bin/nvcc   -O3 -std=c++14 -x cu    $(INCLUDEFLAGS) $(OPTIONS)  -ccbin="$(CXX)" -Xcompiler="$(CPU)" -L$(CUDA_ROOT)/lib64 --expt-relaxed-constexpr 
-
-all: 
-	$(BASIC_LINE) AngularBond.cu -o angular
-clean:
-	rm -f angular
-
-
-
-
+%.clean:
+	rm -f $(@:.clean=)
