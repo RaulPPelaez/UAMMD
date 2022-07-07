@@ -194,30 +194,23 @@ Bonds with two particles per bond
 	       An harmonic bond encoding the potential :math:`U(r) = \half K\left(r-r_0\right)`
 	       Requires the strength, :math:`K`, and the equilibrium distance :math:`r_0` in the bond file.
 	       The constructor requires no arguments.
-	       This potential will not apply periodic boundary conditions to the distances between particles (to allow for bonds with equilibrium distances greater than L/2).
+	       If a :cpp:any:`Box` is not provided this potential will not apply periodic boundary conditions to the distances between particles (to allow for bonds with equilibrium distances greater than L/2).
 
-.. cpp:class:: BondedType::HarmonicPBC
+   .. cpp:function:: Harmonic(Box box = Box())
 
-	       The same as :cpp:class:`BondedType::Harmonic`, but its constructor requires a :cpp:class`Box` object and applies periodic boundary conditions to the distances between computing the potential.
+      The default constructor will make the box infinite (no periodic boundary conditions).
 
-   .. cpp:function:: HarmonicPBC(Box box)
-
-		     The constructor of this class requires a :cpp:any:`Box` object to deal with boundary conditions.
 
 .. cpp:class:: BondedType::FENE
 
 	       Implements the FENE potential, :math:`U(r) = \half K r_0^2\ln\left[1-\left(\frac{r}{r_0}\right)^2\right]`.
 	       Requires the strength, :math:`K`, and the equilibrium distance :math:`r_0` in the bond file.
 	       The constructor requires no arguments.
-	       This potential will not apply periodic boundary conditions to the distances between particles (to allow for bonds with equilibrium distances greater than L/2).
-	       
-.. cpp:class:: BondedType::FENEPBC
+	       If a :cpp:any:`Box` is not provided this potential will not apply periodic boundary conditions to the distances between particles (to allow for bonds with equilibrium distances greater than L/2).
 
-	       The same as :cpp:class:`BondedType::FENE`, but its constructor requires a :cpp:class`Box` object and applies periodic boundary conditions to the distances between computing the potential.
+   .. cpp:function:: FENE(Box box = Box())
 
-	       .. cpp:function:: FENEPBC(Box box)
-
-		  The constructor of this class requires a :cpp:any:`Box` object to deal with boundary conditions.
+      The default constructor will make the box infinite (no periodic boundary conditions).
 
 
 Angular bonds
