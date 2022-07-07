@@ -197,7 +197,7 @@ namespace uammd{
       const int id_i = particlesWithBonds[tid];
       const int index = id2index[id_i]; //Current index of the particle
       const real3 posi = make_real3(pos[index]);
-      ComputeType ct;
+      ComputeType ct = ComputeType{};
       const int first = bondStart[tid];
       const int last = bondEnd[tid];
       #pragma unroll 3
@@ -223,11 +223,14 @@ namespace uammd{
       if(comp.virial) virial[index] += ct.virial;
     }
 
-    template<int particlesPerBond, bool fpb, class ...T>
-    void dispatchComputeBonded(int Nparticles_with_bonds, int TPB,  cudaStream_t st, T...args){
+    template<int particlesPerBond, class ...T>
+    void dispatchComputeBonded(int Nparticles_with_bonds, bool fpb, int TPB,  cudaStream_t st, T...args){
       int Nthreads= 128;
       int Nblocks=Nparticles_with_bonds/Nthreads + ((Nparticles_with_bonds%Nthreads)?1:0);
-      computeBondedThreadPerParticle<particlesPerBond, fpb><<<Nblocks, Nthreads, 0, st>>>(args...);
+      if(fpb)
+	computeBondedThreadPerParticle<particlesPerBond, true><<<Nblocks, Nthreads, 0, st>>>(args...);
+      else
+	computeBondedThreadPerParticle<particlesPerBond, false><<<Nblocks, Nthreads, 0, st>>>(args...);
       //A block per particle might be benefitial, but lets leave it off for now
       // if(TPB<=32 or Nparticles_with_bonds < 5000){ //Empirical magic numbers, could probably be chosen better
       // }
@@ -253,20 +256,13 @@ namespace uammd{
     auto d_fixedPointPositions = thrust::raw_pointer_cast(fixedPointPositions.data());
     uint Nparticles_with_bonds = bondStart.size();
     Interactor::Computables comp{.force=f!=nullptr, .energy=e!=nullptr, .virial=v!=nullptr};
-    if(d_fixedPointPositions){
-      BondedForces_ns::dispatchComputeBonded<particlesPerBond, true>(Nparticles_with_bonds, TPP, st,
-								     f,e,v, comp, pos.raw(),
-								     d_bondList, d_bondStart, d_bondEnd, d_particlesWithBonds,
-								     d_fixedPointPositions,
-								     *bondCompute, id2index, Nparticles_with_bonds);
-    }
-    else{
-      BondedForces_ns::dispatchComputeBonded<particlesPerBond, false>(Nparticles_with_bonds, TPP, st,
-								      f,e,v, comp, pos.raw(),
-								      d_bondList, d_bondStart, d_bondEnd, d_particlesWithBonds,
-								      d_fixedPointPositions,
-								      *bondCompute, id2index, Nparticles_with_bonds);
-    }
+    bool fixedPointsPresent = d_fixedPointPositions;
+    BondedForces_ns::dispatchComputeBonded<particlesPerBond>(Nparticles_with_bonds, fixedPointsPresent,
+							     TPP, st,
+							     f,e,v, comp, pos.raw(),
+							     d_bondList, d_bondStart, d_bondEnd, d_particlesWithBonds,
+							     d_fixedPointPositions,
+							     *bondCompute, id2index, Nparticles_with_bonds);
   }
 
   template<class BondType, int particlesPerBond>
