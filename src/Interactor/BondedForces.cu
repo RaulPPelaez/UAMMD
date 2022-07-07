@@ -125,10 +125,6 @@ namespace uammd{
 	int offset = (i>0)?h_bondEnd[i-1]:0;
 	forj(0, nbondsi){
 	  bondListCPU[offset+j] = blst[j];
-	  System::log<System::WARNING>("Bond j=%d for particle %d, (of a total of %d) involves particles %d and %d",
-				       j, i, nbondsi,
-				       blst[j].ids[0], blst[j].ids[1]);
-
 	}
 	h_bondEnd[i] = offset + nbondsi;
 	h_bondStart[i] = offset;
