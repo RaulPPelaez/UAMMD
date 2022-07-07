@@ -38,11 +38,11 @@ namespace uammd{
       std::vector<Bond> bondList;
       std::set<int> particlesWithBonds;
 
-      void registerParticleInBond(int particleIndex, int b){
+      void registerParticleInBond(int particleIndex, int bondIndex){
 	if(particleIndex >= isInBonds.size()){
 	  isInBonds.resize(particleIndex + 1);
 	}
-	isInBonds[particleIndex].push_back(b);
+	isInBonds[particleIndex].push_back(bondIndex);
 	particlesWithBonds.insert(particleIndex);
       }
 
@@ -125,6 +125,10 @@ namespace uammd{
 	int offset = (i>0)?h_bondEnd[i-1]:0;
 	forj(0, nbondsi){
 	  bondListCPU[offset+j] = blst[j];
+	  System::log<System::WARNING>("Bond j=%d for particle %d, (of a total of %d) involves particles %d and %d",
+				       j, i, nbondsi,
+				       blst[j].ids[0], blst[j].ids[1]);
+
 	}
 	h_bondEnd[i] = offset + nbondsi;
 	h_bondStart[i] = offset;
@@ -159,14 +163,14 @@ namespace uammd{
       int nbondsFP = 0;
       in>>nbondsFP;
       if(nbondsFP){
-	nbonds += nbondsFP;
+	this->nbonds += nbondsFP;
 	System::log<System::MESSAGE>("[BondedForces] Detected: %d fixed point bonds", nbondsFP);
 	processor.hintNumberBonds(nbonds); //This makes the processor reserve the space for the bond list in advance
 	this->fixedPointPositions.resize(nbondsFP+1);
 	for(int b = 0; b < nbondsFP; b++){
 	  real3 pos;
 	  auto bond = readNextBondFixedPoint<Bond, BondType>(in, b, nbondsFP, pos);
-	  fixedPointPositions[b+1] = make_real4(pos);
+	  this->fixedPointPositions[b+1] = make_real4(pos);
 	  processor.registerBond(bond, particlesPerBond);
 	}
       }
