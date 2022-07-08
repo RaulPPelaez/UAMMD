@@ -17,14 +17,14 @@ namespace uammd{
 
       struct AoSToSoAReal3{
 	template<class VecType>
-	__device__ auto operator()(VecType v){
+	__device__ thrust::tuple<real,real,real> operator()(VecType v){
 	  return thrust::make_tuple(v.x, v.y, v.z);
 	}
       };
 
       struct SoAToAoSReal3{
-	__device__ auto operator()(thrust::tuple<real, real, real> v){
-	  return make_real3(thrust::get<0>(v), thrust::get<1>(v), thrust::get<2>(v));
+	__device__ real3 operator()(thrust::tuple<real, real, real> v){
+	  return {thrust::get<0>(v), thrust::get<1>(v), thrust::get<2>(v)};
 	}
       };
 
