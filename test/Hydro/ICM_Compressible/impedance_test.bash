@@ -6,6 +6,7 @@ lxy=16
 lz=64
 tools=extratools
 g++ $tools/impedance.cpp -o impedance
+g++ $tools/walltheory.cpp -o walltheory
 dev=0
 for h in 0.125 0.25 0.5 1 2
 do
