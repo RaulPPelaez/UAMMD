@@ -16,9 +16,6 @@ vamplitude=1
 printTime=$(awk '/^printTime/{print $2}' $datamain)
 simulationTime=$(awk '/^simulationTime/{print $2}' $datamain)
 
-for i in $(seq 0 $printTime $simulationTime); do
-    ./walltheory $viscosity $Lz $vamplitude $i; echo " ";
-done > $folder/vel.theory
 
 (
     cd $folder
@@ -26,6 +23,14 @@ done > $folder/vel.theory
     cat vel.dat | sed 's+#+ +g' > vel.uammd
 )
 
+for i in $(seq 0 $printTime $simulationTime); do
+    for z in $(cat vel.dat | awk '/#/{p++;next}p==2{exit}{print $1}')
+    do
+	theo=$(./walltheory $vis $L $v0 $time $freq $z)
+	echo $z $theo
+    done
+    echo " ";
+done > $folder/vel.theory
 
 mkdir -p figures
 gracebat $folder/vel.uammd $folder/vel.theory -par tools/walltest.par -hdevice EPS -hardcopy -printfile figures/walltest.eps

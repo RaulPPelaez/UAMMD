@@ -260,7 +260,7 @@ namespace uammd{
       //Throws an exception if some of the provided parameters are invalid
       void checkInputValidity(Parameters par){
 	if(par.shearViscosity <= 0) throw std::runtime_error("[ICM_Compressible] Invalid shear viscosity");
-	if(par.bulkViscosity <= 0) throw std::runtime_error("[ICM_Compressible] Invalid bulk viscosity");
+	if(par.bulkViscosity < 0) throw std::runtime_error("[ICM_Compressible] Invalid bulk viscosity");
 	if(par.temperature < 0) throw std::runtime_error("[ICM_Compressible] Invalid temperature");
 	if(par.dt < 0) throw std::runtime_error("[ICM_Compressible] Invalid dt");
 	if(par.speedOfSound <= 0) throw std::runtime_error("[ICM_Compressible] Invalid speed of sound");

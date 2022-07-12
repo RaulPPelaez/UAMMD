@@ -23,10 +23,12 @@ class ICMWalls: public ParameterUpdatable{
   real currentTime = 0;
   real bottomWallvx = 0;
   real freq;
+  real amplitude;
   using FluidPointers = Hydro::icm_compressible::FluidPointers;
 public:
 
-  ICMWalls(real freq = 0):freq(freq){}
+  ICMWalls(){}
+  ICMWalls(real amplitude, real freq = 0):amplitude(amplitude),freq(freq){}
 
   //Returns wether there are walls in the Z direction. If false the Z domain ghost cells are periodic.
   __host__ __device__ bool isEnabled(){
@@ -64,7 +66,7 @@ public:
 
   void updateSimulationTime(real newTime) override{
     this->currentTime = newTime;
-    this->bottomWallvx = cos(2*M_PI*freq*currentTime);
+    this->bottomWallvx = amplitude*cos(2*M_PI*freq*currentTime);
   }
 };
 
@@ -82,7 +84,7 @@ struct Parameters{
   real relaxTime = 500;
   real simulationTime = -1;
   real printTime = 0;
-  real wallFreq;
+  real wallFreq, wallAmplitude;
 };
 
 
@@ -96,7 +98,7 @@ auto createICMIntegratorCompressible(std::shared_ptr<ParticleData> pd, Parameter
   par.shearViscosity = ipar.shearViscosity;
   par.temperature = ipar.temperature;
   par.initialDensity = [=](real3 r){return ipar.initialDensity;};
-  par.walls = std::make_shared<ICMWalls>(ipar.wallFreq);
+  par.walls = std::make_shared<ICMWalls>(ipar.wallAmplitude, ipar.wallFreq);
   return std::make_shared<ICM>(pd, par);
 }
 
@@ -116,6 +118,7 @@ Parameters readParameters(std::string file){
   in.getOption("printTime", InputFile::Required)>>par.printTime;
 
   in.getOption("wallFreq", InputFile::Required)>>par.wallFreq;
+  in.getOption("wallAmplitude", InputFile::Required)>>par.wallAmplitude;
   return par;
 }
 
@@ -161,17 +164,17 @@ int main(int argc, char *argv[]){
     auto pd = initializeParticles(par, sys);
     auto icm = createICMIntegratorCompressible(pd, par);
     {
-      int relaxSteps =par.relaxTime/par.dt+1;
+      int relaxSteps = par.relaxTime/par.dt+0.5;
       fori(0, relaxSteps) icm->forwardTime();
     }
-    int ntimes = par.simulationTime/par.dt;
-    int sampleSteps = par.printTime/par.dt;
+    int ntimes = par.simulationTime/par.dt+0.5;
+    int sampleSteps = par.printTime/par.dt+0.5;
     fori(0, ntimes){
-      icm->forwardTime();
       if(i%sampleSteps == 0){
 	writeFluidVelocity(icm, par);
-	// writeFluidDensity(icm);
+	//writeFluidDensity(icm, par);
       }
+      icm->forwardTime();
     }
     System::log<System::MESSAGE>("Ending");
   }
