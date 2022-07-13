@@ -157,6 +157,35 @@ void writeFluidDensity(std::shared_ptr<ICM> icm, Parameters par){
   write3DField(out, dens.begin(), dens.size(), n, par);
 }
 
+void writeFluidFields(std::shared_ptr<ICM> integrator,
+		      Parameters simParams){
+  static std::ofstream out("fields.dat");
+  int3 cellDim = integrator->getGridSize();
+  auto velocity = integrator->getCurrentVelocity();
+  auto density = integrator->getCurrentDensity();
+  real3 L = simParams.boxSize;
+  real3 cellSize = L/make_real3(cellDim);
+  out<<"#"<<std::endl;
+  out<<std::setprecision(2*sizeof(real));
+  std::vector<real> vx(velocity.size()), vy(velocity.size()), vz(velocity.size()), rho(density.size());
+  thrust::copy(velocity.x(), velocity.x() + velocity.size(), vx.begin());
+  thrust::copy(velocity.y(), velocity.y() + velocity.size(), vy.begin());
+  thrust::copy(velocity.z(), velocity.z() + velocity.size(), vz.begin());
+  thrust::copy(density.begin(), density.end(), rho.begin());
+  for(int k = 0; k < cellDim.z; ++k) {
+    for(int j = 0; j < cellDim.y; ++j) {
+      for(int i = 0; i < cellDim.x; ++i) {
+	real x = -real(0.5)*L.x + i*(cellSize.x + real(0.5)) + cellSize.x;
+	real y = -real(0.5)*L.y + j*(cellSize.y + real(0.5)) + cellSize.y;
+	real z = -real(0.5)*L.z + k*(cellSize.z + real(0.5)) + cellSize.z;
+	int ii = i + (j+k*cellDim.y)*cellDim.y;
+	out<<x<<" "<<y<<" "<<z<<" "<<vx[ii]<<" "<<vy[ii]<<" "<<vz[ii]<<" 0 "<<rho[ii]<<"\n";
+      }
+    }
+  }
+  out<<std::endl;
+}
+
 int main(int argc, char *argv[]){
   {
     auto sys = std::make_shared<System>(argc, argv);
@@ -172,6 +201,7 @@ int main(int argc, char *argv[]){
     fori(0, ntimes){
       if(i%sampleSteps == 0){
 	writeFluidVelocity(icm, par);
+	writeFluidFields(icm, par);
 	//writeFluidDensity(icm, par);
       }
       icm->forwardTime();
