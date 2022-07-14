@@ -44,6 +44,26 @@ namespace uammd{
       return fluidForcing;
     }
 
+    namespace detail{
+      real  getRK3SubStepTime(int subStep){
+	real time = 0;
+	switch(subStep){
+	case 1:
+	  time = 1.0/3.0;
+	  break;
+	case 2:
+	  time = 2.0/3.0;
+	  break;
+	case 3:
+	  time = 1;
+	  break;
+	default:
+	  throw std::runtime_error("Invalid RK3 sub step");
+	};
+	return time;
+      }
+    }
+
     template<class Walls>
     template<int subStep>
     auto ICM_Compressible_impl<Walls>::callRungeKuttaSubStep(const DataXYZ &fluidForcingAtHalfStep,
@@ -60,6 +80,8 @@ namespace uammd{
 					thrust::raw_pointer_cast(fluidStochasticTensor.data()),
 					params, *densityToPressure, steps);
       auto density_ptr = thrust::raw_pointer_cast(fluidAtNewTime.density.data());
+      real subStepTime = detail::getRK3SubStepTime(subStep); // 1/3, 2/3, 1
+      for(auto i: updatables) i->updateSimulationTime((steps+subStepTime)*dt);
       fillGhostCells(fluidAtNewTime.getPointers());
       callMomentumToVelocityGPU(getGridSize(), fluidAtNewTime.getPointers());
       fillGhostCells(fluidAtNewTime.getPointers());
@@ -137,6 +159,8 @@ namespace uammd{
     template<class Walls>
     auto ICM_Compressible_impl<Walls>::computeCurrentFluidForcing(){
       System::log<System::DEBUG2>("[ICM_Compressible] Compute fluid forcing");
+      //Fluid forcing is required at half step.
+      for(auto i: updatables) i->updateSimulationTime((steps+0.5)*dt);
       updateParticleForces();
       auto fluidForcing = spreadCurrentParticleForcesToFluid();
       addFluidExternalForcing(fluidForcing);
@@ -201,14 +225,12 @@ namespace uammd{
       auto positionsAtN = storeCurrentPositions();
       auto fluidVelocitiesAtN = currentFluid.velocity;
       forwardPositionsToHalfStep();
-      for(auto i: updatables) i->updateSimulationTime((steps+0.5)*dt);
       {
 	auto fluidForcing = computeCurrentFluidForcing();
 	forwardFluidDensityAndVelocityToNextStep(fluidForcing);
       }
       forwardPositionsToNextStep(positionsAtN, fluidVelocitiesAtN);
       steps++;
-      for(auto i: updatables) i->updateSimulationTime(steps*dt);
     }
 
   }
