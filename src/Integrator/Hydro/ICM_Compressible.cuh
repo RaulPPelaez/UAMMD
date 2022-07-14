@@ -235,7 +235,8 @@ namespace uammd{
       //Returns the fluid density in GPU memory.
       auto getCurrentDensity() const{
 	System::log<System::DEBUG1>("[ICM_Compressible] Returning a copy of the current density");
-	return icm_compressible::deghostifyDensity(currentFluid.density, grid.cellDim);
+	auto densGPU = icm_compressible::deghostifyDensity(currentFluid.density, grid.cellDim);
+	return densGPU;
       }
 
       //Returns the fluid velocity, interpolated to the cell centers. In GPU memory
