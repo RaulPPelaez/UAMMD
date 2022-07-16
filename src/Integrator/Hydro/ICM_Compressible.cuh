@@ -246,6 +246,19 @@ namespace uammd{
 	return collocatedVelocityGPU;
       }
 
+      //Returns the fluid velocity in the bottom wall ghost cells, in GPU memory.
+      auto getCurrentBottomGhostCellVelocity() const{
+	System::log<System::DEBUG1>("[ICM_Compressible] Copying ghost cell velocity for returning");
+	auto n = getGhostGridSize();
+	int ncells = n.x*n.y;
+	DataXYZ ghostVels(ncells);
+	//Zbottom ghost cells are the first in the array.
+	thrust::copy(thrust::cuda::par,
+		     currentFluid.velocity.xyz(), currentFluid.velocity.xyz()+ncells,
+		     ghostVels.xyz());
+	return ghostVels;
+      }
+
     private:
       Grid grid;
       FluidData currentFluid;
