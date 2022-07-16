@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
+#include <vector>
 
 using namespace uammd;
 
@@ -167,7 +168,8 @@ void writeFluidFields(std::shared_ptr<ICM> integrator,
   real3 cellSize = L/make_real3(cellDim);
   out<<"#"<<std::endl;
   out<<std::setprecision(2*sizeof(real));
-  std::vector<real> vx(velocity.size()), vy(velocity.size()), vz(velocity.size()), rho(density.size());
+  std::vector<real> vx(velocity.size()), vy(velocity.size()), vz(velocity.size()),
+    rho(density.size());
   thrust::copy(velocity.x(), velocity.x() + velocity.size(), vx.begin());
   thrust::copy(velocity.y(), velocity.y() + velocity.size(), vy.begin());
   thrust::copy(velocity.z(), velocity.z() + velocity.size(), vz.begin());
@@ -178,9 +180,35 @@ void writeFluidFields(std::shared_ptr<ICM> integrator,
 	real x = -real(0.5)*L.x + i*(cellSize.x + real(0.5)) + cellSize.x;
 	real y = -real(0.5)*L.y + j*(cellSize.y + real(0.5)) + cellSize.y;
 	real z = -real(0.5)*L.z + k*(cellSize.z + real(0.5)) + cellSize.z;
-	int ii = i + (j+k*cellDim.y)*cellDim.y;
+	int ii = i + (j+k*cellDim.y)*cellDim.x;
 	out<<x<<" "<<y<<" "<<z<<" "<<vx[ii]<<" "<<vy[ii]<<" "<<vz[ii]<<" 0 "<<rho[ii]<<"\n";
       }
+    }
+  }
+  out<<std::endl;
+}
+
+
+void writeFluidBottomGhostCellVelocity(std::shared_ptr<ICM> integrator,
+				       Parameters simParams){
+  static std::ofstream out("ghost.dat");
+  int3 cellDim = integrator->getGridSize()+2;
+  auto velocity = integrator->getCurrentBottomGhostCellVelocity();
+  real3 L = simParams.boxSize;
+  real3 cellSize = L/make_real3(cellDim);
+  out<<"#"<<std::endl;
+  out<<std::setprecision(2*sizeof(real));
+  std::vector<real> vx(velocity.size()), vy(velocity.size()), vz(velocity.size());
+  thrust::copy(velocity.x(), velocity.x() + velocity.size(), vx.begin());
+  thrust::copy(velocity.y(), velocity.y() + velocity.size(), vy.begin());
+  thrust::copy(velocity.z(), velocity.z() + velocity.size(), vz.begin());
+  for(int j = 0; j < cellDim.y; ++j) {
+    for(int i = 0; i < cellDim.x; ++i) {
+      real x = -real(0.5)*L.x + i*(cellSize.x - real(0.5)) + cellSize.x;
+      real y = -real(0.5)*L.y + j*(cellSize.y - real(0.5)) + cellSize.y;
+      real z = -real(0.5)*L.z;
+      int ii = i + (j)*cellDim.x;
+      out<<x<<" "<<y<<" "<<z<<" "<<vx[ii]<<" "<<vy[ii]<<" "<<vz[ii]<<"\n";
     }
   }
   out<<std::endl;
@@ -198,10 +226,11 @@ int main(int argc, char *argv[]){
     }
     int ntimes = par.simulationTime/par.dt+0.5;
     int sampleSteps = par.printTime/par.dt+0.5;
-    fori(0, ntimes){
-      if(i%sampleSteps == 0){
+    fori(0, ntimes+1){
+      if(sampleSteps and i%sampleSteps == 0){
 	writeFluidVelocity(icm, par);
 	writeFluidFields(icm, par);
+	writeFluidBottomGhostCellVelocity(icm, par);
 	//writeFluidDensity(icm, par);
       }
       icm->forwardTime();
