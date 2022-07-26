@@ -187,6 +187,10 @@ namespace uammd{
 	return x + nx*y + z*nx*ny;
       }
 
+      inline __host__ __device__ int operator()(int3 i) const{
+	return this->operator()(i.x, i.y, i.z);
+      }
+
     };
 
     struct ThirdIndexIteratorTransform{
@@ -269,12 +273,12 @@ namespace uammd{
       int nz = dim.z;
       int ntot = nx*ny*nz;
       std::ofstream out(file);
-      std::vector<T> h_field(ntot);
-      thrust::copy(field.begin(), field.begin() + ntot, h_field.begin());
+      std::vector<T> h_field(field.size());
+      thrust::copy(field.begin(), field.end(), h_field.begin());
       for (int id = 0; id<ntot; id++){
         int3 ik = {id%nx, (id/nx)%ny, id/(nx*ny)};
-	Index3D indexer(nx, ny, nz);
-	auto f = h_field[id];
+	Index3D indexer(2*(nx/2+1), ny, nz);
+	auto f = h_field[indexer(ik)];
 	out<<ik.x<<" "<<ik.y<<" "<<ik.z<<" "<<f<<"\n";
       }
     }

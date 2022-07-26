@@ -23,7 +23,7 @@ namespace uammd{
 	cd.x = std::max(minimumNumberCells, cd.x);
 	cd.y = std::max(minimumNumberCells, cd.y);
 	//cd.z = int(M_PI/(asin(h/(L.z*0.5))) + 0.5) + 1;
-	cd.z = int(M_PI*0.5*L.z/h);
+	cd.z = ceil(M_PI*0.5*L.z/h);
 	cd.z = std::max(minimumNumberCells, cd.z);
 	//I want a number of cells in Z such that 2*Nz-2 is fft friendly
 	cd.z = 2*cd.z-2;
