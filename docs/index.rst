@@ -144,9 +144,11 @@ A plethora of guided examples are available in the repository.
 About this documentation
 ===========================
 
-This documentation constitutes an ongoing effort to port and update the old `UAMMD wiki <https://github.com/RaulPPelaez/UAMMD/wiki>`_ (which pertains to UAMMD v1.x) to ReadTheDocs, describing the new interfaces of the modules that have change since then. Thus, the pages for many modules are not yet available in this documentation. Although this documentation should be your primary source of knowledge for UAMMD, you should also consider, for the time being, the `old wiki <https://github.com/RaulPPelaez/UAMMD/wiki>`_.
-
 An in depth theoretical description of most of the algorithms and physics behind UAMMD can be found in Raul's PhD manuscript, available here: https://github.com/RaulPPelaez/tesis/raw/main/manuscript.pdf
+
+Although this documentation should be your primary source of knowledge for UAMMD, you should also consider the `old wiki <https://github.com/RaulPPelaez/UAMMD/wiki>`_. Although the wiki was written for older versions of UAMMD, it might shed some light if what you are trying to find is not here.
+
+
 
 
 .. toctree::

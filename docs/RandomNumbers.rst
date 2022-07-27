@@ -3,7 +3,7 @@ Random number generation with Saru
 
 :ref:`System` offers a handy serial CPU RNG that is good for things like seeding other generators, and in general as away for all UAMMD modules to share a common RNG. However, many times we find ourselves in needs of GPU random number generation.
      
-UAMMD exposes Saru [1]_, a really powerful massively parallel random number generator wrote by Steve Worley. It can be used in both GPU and CPU code and it is quite fast. Additionally, it passes every RNG battery test imaginable (DieHard and the like).
+UAMMD exposes Saru [1]_, a powerful massively parallel random number generator wrote by Steve Worley. Saru can be instanced in both GPU and CPU code and it is blazing fast. Additionally, it passes every RNG battery test imaginable (such as DieHard and the like).
 
 .. cpp:class:: Saru
 
@@ -43,7 +43,7 @@ UAMMD exposes Saru [1]_, a really powerful massively parallel random number gene
 
 Saru exposes a bunch of other functions allowing to advance/rewind the state of the generator. See :code:`third_party/saruprng.cuh` for more information.
 
-Take into account that the Saru state is quite small (consisting on only two 32 bit integers) and initializing it just involves a very small number of integer instructions. Additionally, contrary to many other generators, Saru is really good handling seeds even when the offer low "bit chaos" (for instance, 0, or 0b1111111...) and it does not require any "warm up" (the first numbers provided by some generators will sometimes be correlated). My advise is to simply create and seed a new Saru instance whenever you need.
+Take into account that the Saru state is small (consisting on only two 32 bit integers) and initializing it involves a small number of integer instructions. Contrary to most generators, Saru is really good handling seeds even when the offer low "bit chaos" (for instance, 0, or 0b1111111...) and it does not require any "warm up" (the first numbers provided by some generators will sometimes be highly correlated). My advise is to simply create and seed a new Saru instance whenever you need.
 
 
 Example
