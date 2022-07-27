@@ -97,7 +97,7 @@ namespace uammd{
 	this->He = detail::computeExtraHeight(par.numberStandardDeviations, par.gw, par.split);
 	const real minimumBoxSize = std::min({par.Lxy.x, par.Lxy.y, par.H});
 	detail::throwIfInvalidConfiguration(He, minimumBoxSize);
-	real3 totalBoxSize = make_real3(par.Lxy, par.H+6*He);
+	real3 totalBoxSize = make_real3(par.Lxy, par.H + 6*He);
 	this->cellDim = detail::proposeCellDim(farFieldGaussianWidth, par.upsampling, totalBoxSize);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] cells: %d %d %d", cellDim.x, cellDim.y, cellDim.z);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] box size: %g %g %g (enlarged to %g)",
