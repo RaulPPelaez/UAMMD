@@ -8,7 +8,8 @@
 #include "utils/cufftPrecisionAgnostic.h"
 #include "utils/cufftComplex4.cuh"
 #include "utils/cufftComplex2.cuh"
-#include<fstream>
+#include <fstream>
+#include<iomanip>
 namespace uammd{
   namespace DPPoissonSlab_ns{
     struct Permitivity{
@@ -222,7 +223,6 @@ namespace uammd{
     using cufftComplex = cufftComplex_t<real>;
     using cufftReal = cufftReal_t<real>;
 
-
     template<class Container>
     void writeComplexField(Container & field, int3 dim, real H, std::string file){
       int nkx = dim.x;
@@ -237,6 +237,7 @@ namespace uammd{
 	int2 ik = make_int2(id%(nkx/2+1), id/(nkx/2+1));
 	Index3D indexer(nkx/2+1, nky, nz);
 	auto fn = make_third_index_iterator(h_field.data(), ik.x, ik.y, indexer);
+	out<<std::setprecision(2*sizeof(real));
 	fori(0, nz){
 	  //real z = real(0.5)*H*cos(M_PI*i/(nz-1));
 	  real z = i;
@@ -253,8 +254,11 @@ namespace uammd{
       int nz = dim.z;
       int ntot = (nkx/2+1)*nky*nz;
       std::ofstream out(file);
-      std::vector<cufftComplex2> h_field(ntot);
-      thrust::copy(field.begin(), field.begin() + ntot, h_field.begin());
+      out<<std::setprecision(2*sizeof(real));
+      std::vector<cufftComplex2> h_field(field.size());
+      auto ptr = field.data();
+      thrust::copy(ptr, ptr + field.size(), h_field.begin());
+      out<<std::setprecision(2*sizeof(real));
       for (int id = 0; id<(nkx/2+1)*nky; id++){
 	int2 ik = make_int2(id%(nkx/2+1), id/(nkx/2+1));
 	Index3D indexer(nkx/2+1, nky, nz);
@@ -276,7 +280,9 @@ namespace uammd{
       int ntot = nx*ny*nz;
       std::ofstream out(file);
       std::vector<T> h_field(field.size());
-      thrust::copy(field.begin(), field.end(), h_field.begin());
+      auto ptr = field.data();
+      thrust::copy(ptr, ptr + field.size(), h_field.begin());
+      out<<std::setprecision(2*sizeof(real));
       for (int id = 0; id<ntot; id++){
         int3 ik = {id%nx, (id/nx)%ny, id/(nx*ny)};
 	Index3D indexer(2*(nx/2+1), ny, nz);
