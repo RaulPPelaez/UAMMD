@@ -11,13 +11,13 @@
 
 Let us use UAMMD's BVP solver to solve an equation with a known solution:
 
-\begin{align}
+$$ \begin{aligned}
     \left(\partial_z^2 -k^2\right)y(z) &= f(z) = exp(-\gamma z^2)\\
     \left(\partial_z \pm k\right)y(z=\pm1) & = \begin{bmatrix}
                                   \alpha\\
                                   \beta
                                   \end{bmatrix}
-\end{align}
+\end{aligned} $$
 
 The code bvp.cu runs three separated tests:
 
@@ -36,7 +36,7 @@ For comparing with the known result, let us set $k=2$, $\gamma = 1$ and $\alpha=
 
 The solution to this equation is:
 
-\begin{align}
+$$ \begin{aligned}
     y(x) &= -(\exp(-(-2 a - k)^2/(4 a) - (k - 2 a)^2/(4 a) - k x - 2 k)\nonumber \\
          &(-2 \sqrt{a} b k \exp((-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k x + k)\nonumber \\
          &+ 2 \sqrt{a} c k \exp((-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + k)\nonumber \\
@@ -48,7 +48,8 @@ The solution to this equation is:
          &+ (k - 2 a)^2/(4 a) + 2 k) - \sqrt{a} \exp(k^2/(4 a) + (-2 a - k)^2/(4 a) + 2 k x)\nonumber \\
          &+ \sqrt{a} \exp(k^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k x + 2 k) - \sqrt{a} \exp(k^2/(4 a) + (-2 a - k)^2/(4 a))\nonumber \\
          &+ \sqrt{a} \exp(k^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k)))/(4 \sqrt{a} k^2) 
-\end{align}
+\end{aligned} $$
+
 
 Being $a=\gamma, b=\alpha, c=\beta$.
 
@@ -58,9 +59,9 @@ Being $a=\gamma, b=\alpha, c=\beta$.
 Our BVP solvers work in Chebyshev space, requiring as input the Chebyshev modes of the right hand side.
 We can expand a given function, $g(z)$, into the first $N$ terms of its Chebyshev so that
 
-\begin{equation}
-  g(z) = \sum_{i=0}^{N-1}\hat{g}_nT_n(z).
-\end{equation}
+$$
+g(z) = \sum_{i=0}^{N-1}\hat{g}_nT_n(z).
+$$
 
 Obtaining the Chebyshev coefficients gets easier once we know that $T_n(cos(\theta)) = cos(n\theta)$.
 By evaluating the function at the extrema points $x_n = cos(n\pi/(N-1))$ we make the Chebyshev transform into a cosine series.
@@ -76,8 +77,9 @@ In a similar way, our BVP solvers return the Chebyshev coefficients of the solut
 real space for comparison using
 
 $$
-    g(x_n) =\sum_{i=0}^{N-1}\hat{g}_i\cos\left(in\pi/(N-1)\right).
+g(x_n) =\sum_{i=0}^{N-1}\hat{g}_i\cos\left(in\pi/(N-1)\right).
 $$
+
 In this case, however, we will be comparing the Chebyshev coefficients returned by the BVP solver with
 the Chebyshev coefficients of the solution directly.
 
@@ -112,7 +114,7 @@ We are comparing here between UAMMD's implementation and the BVP writen by Ondre
 
 Looking at [[table:1]] we can see that first, both UAMMD and Matlab are identical up to machine precision and second,
 both provide an accuracy of about 10 digits with the theory.
-The small discrepancies with the theory are reduced even more if we choose a finer grid ($N=32$ gives machine precision already).
+The small discrepancies with the theory are reduced even more if we choose a finer grid ( $N=32$ gives machine precision already).
 
 
 
