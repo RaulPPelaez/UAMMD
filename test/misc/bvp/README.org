@@ -12,7 +12,7 @@
 Let us use UAMMD's BVP solver to solve an equation with a known solution:
 
 $$ \begin{aligned}
-    \left(\partial_z^2 -k^2\right)y(z) &= f(z) = exp(-\gamma z^2)\\
+    \left(\partial_z^2 -k^2\right)y(z) &= f(z) = exp(-\gamma z^2) \\
     \left(\partial_z \pm k\right)y(z=\pm1) & = \begin{bmatrix}
                                   \alpha\\
                                   \beta
@@ -37,7 +37,7 @@ For comparing with the known result, let us set $k=2$, $\gamma = 1$ and $\alpha=
 The solution to this equation is:
 
 $$ \begin{aligned}
-    y(x) &= -(\exp(-(-2 a - k)^2/(4 a) - (k - 2 a)^2/(4 a) - k x - 2 k)\nonumber \\
+y(x) &= -(\exp(-(-2 a - k)^2/(4 a) - (k - 2 a)^2/(4 a) - k x - 2 k)\nonumber \\
          &(-2 \sqrt{a} b k \exp((-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k x + k)\nonumber \\
          &+ 2 \sqrt{a} c k \exp((-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + k)\nonumber \\
          &+ \sqrt{\pi} k \text{erf}((2 a + k)/(2 \sqrt{a})) \exp(k^2/(4 a)\nonumber \\
@@ -59,26 +59,20 @@ Being $a=\gamma, b=\alpha, c=\beta$.
 Our BVP solvers work in Chebyshev space, requiring as input the Chebyshev modes of the right hand side.
 We can expand a given function, $g(z)$, into the first $N$ terms of its Chebyshev so that
 
-$$
-g(z) = \sum_{i=0}^{N-1}\hat{g}_nT_n(z).
-$$
+$$g(z) = \sum_{i=0}^{N-1}\hat{g}_nT_n(z).$$
 
 Obtaining the Chebyshev coefficients gets easier once we know that $T_n(cos(\theta)) = cos(n\theta)$.
 By evaluating the function at the extrema points $x_n = cos(n\pi/(N-1))$ we make the Chebyshev transform into a cosine series.
 Finally, we can evaluate the Chebyshev coefficients of $g(z)$ using
 
-$$
-\hat{g}_n = p_m \left(\frac{1}{2} g(x_0)(-1)^n + g(x_{N-1}\right) + \sum_{i=1}^{N-2}\frac{p_m}{N-1}g(x_i)(-1)^n\cos(in\pi/(N-1)).
-$$
+$$\hat{g}_n = p_m \left(\frac{1}{2} g(x_0)(-1)^n + g(x_{N-1}\right) + \sum_{i=1}^{N-2}\frac{p_m}{N-1}g(x_i)(-1)^n\cos(in\pi/(N-1)).$$
 
 Where $p_m = 1$ if $n=0$ and $2$ otherwise.
 
 In a similar way, our BVP solvers return the Chebyshev coefficients of the solution, which we can take back to
 real space for comparison using
 
-$$
-g(x_n) =\sum_{i=0}^{N-1}\hat{g}_i\cos\left(in\pi/(N-1)\right).
-$$
+$$g(x_n) =\sum_{i=0}^{N-1}\hat{g}_i\cos\left(in\pi/(N-1)\right).$$
 
 In this case, however, we will be comparing the Chebyshev coefficients returned by the BVP solver with
 the Chebyshev coefficients of the solution directly.
