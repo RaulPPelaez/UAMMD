@@ -23,6 +23,7 @@ namespace uammd{
 	nz(nz){
 	this-> prefactor = cbrt(pow(2*M_PI*width*width, -1.5));
 	this-> tau = -1.0/(2.0*width*width);
+	supportxy+=1;
 	rmax = supportxy*h*0.5;//5.0*h;//sqrt(log(tolerance/prefactor)/tau);
 	support.x = supportxy>0?(supportxy):std::max(3, int(2*rmax/h + 0.5)+1);
 	support.y = support.x;
