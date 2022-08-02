@@ -27,12 +27,12 @@ namespace uammd{
       template<class ...T> static int getrf(T... args){return LAPACKE_dgetrf(args...);}
       template<class ...T> static int getri(T... args){return LAPACKE_dgetri(args...);}
     };
-    
+
     template<>
     struct LapackeUAMMD<lapack_complex_float>{
       template<class ...T> static int getrf(T... args){return LAPACKE_cgetrf(args...);}
       template<class ...T> static int getri(T... args){return LAPACKE_cgetri(args...);}
-    };    
+    };
     template<>
     struct LapackeUAMMD<lapack_complex_double>{
       template<class ...T> static int getrf(T... args){return LAPACKE_zgetrf(args...);}
@@ -50,7 +50,7 @@ namespace uammd{
 		       lapack_int* ipiv){
 	return LAPACKE_cgetri(matrix_layout, n, (lapack_complex_float*)(a), lda, ipiv);
       }
-    };    
+    };
     template<>
     struct LapackeUAMMD<cufftComplex_t<double>>{
       static int getrf(int matrix_layout, lapack_int n, lapack_int m,
@@ -63,9 +63,9 @@ namespace uammd{
 		       lapack_int* ipiv){
 	return LAPACKE_zgetri(matrix_layout, n, (lapack_complex_double*)(a), lda, ipiv);
       }
-    };    
+    };
 
-    
+
     template<class T>
     std::vector<T> invertSquareMatrix(const std::vector<T> &A, lapack_int N){
       lapack_int pivotArray[N];

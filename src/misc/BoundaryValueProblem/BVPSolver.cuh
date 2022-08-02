@@ -3,7 +3,7 @@
   Solves the equation:
   y''(z)-k y(z)^2 = f(z)
   With the boundary conditions:
-  tfi y(1)' + tsi y(1) = \alpha ;      bfi y(-1)' - bsi y(-1) = \beta ;
+  tfi y(1)' + tsi y(1) = \alpha ;      bfi y(-1)' + bsi y(-1) = \beta ;
   Where tfi, tsi, bfi and bsi are some arbitrary factors.
 
   In Chebyshev space.
@@ -112,7 +112,7 @@ namespace uammd{
 	}
 
       };
-      
+
       class PentadiagonalSystemSolver{
 	int nz;
 	real H;
@@ -273,29 +273,3 @@ namespace uammd{
 
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
