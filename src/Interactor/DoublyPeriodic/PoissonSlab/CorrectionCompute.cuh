@@ -240,7 +240,7 @@ namespace uammd{
 	DPPoissonSlab_ns::writeComplex2Field(analyticalCorrection, cellDim, H, "correctionFourier.dat");
 	takeAnalyticalCorrectionToChebyshevSpace(analyticalCorrection, st); //Step 4
 	auto fullCorrection = computeFullCorrectionXY(analyticalCorrection, boxSize, cellDim); //Step 4
-	DPPoissonSlab_ns::writeComplexField(fullCorrection, cellDim, H, "correctionCheb.dat");
+	DPPoissonSlab_ns::writeComplex4Field(fullCorrection, cellDim, H, "correctionCheb.dat");
 	sumCorrectionToInsideSolution(fullCorrection, insideSolution, st); //Step 5, 6
       }
 
