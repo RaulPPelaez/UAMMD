@@ -43,11 +43,12 @@ namespace uammd{
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
 	int3 P = support/2;
 	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);	
+	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
 	if(shift.x or shift.y or shift.z){
-	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
-	  const real3 pi_pbc = grid.box.apply_pbc(pos);
-	  P -= make_int3(((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5)))*shift;
+	  const auto cellSize = grid.getCellSize(celli);
+	  const auto distanceToCenter = grid.distanceToCellCenter(pos, celli);
+	  //The shift will be 0 if the particle lies to the left of the cell center and 1 otherwise
+	  P -= make_int3(distanceToCenter/cellSize+real(1.0))*shift;
 	}
 	return P;
       }
@@ -57,7 +58,8 @@ namespace uammd{
 	real *weightsX = &weights[0];
 	const int tid = threadIdx.x;
 	for(int i = tid; i<support.x; i+=blockDim.x){
-	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
+	  int cj = grid.pbc_cell_coord<0>(celli.x + i - P.x);
+	  const auto cellj = make_int3(cj, celli.y, celli.z);
 	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
 	  weightsX[i] = detail::phiX(kernel, rij, pi);
 	}
@@ -78,7 +80,7 @@ namespace uammd{
       __device__ real3 computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
 	return make_real3(weights[ii], weights[support.x+jj], weights[support.x+support.y+kk]);
       }
-      
+
     }
 
     /*Spreads the quantity v (defined on the particle positions) to a grid
@@ -157,7 +159,7 @@ namespace uammd{
       class InterpolationKernel,
       class ParticlePosIterator, class ParticleQuantityOutputIterator,
       class GridQuantityIterator,
-      class WeightCompute,	     
+      class WeightCompute,
       class Index3D,
       class QuadratureWeights>
     __global__ void grid2ParticlesDTPP(const ParticlePosIterator pos,

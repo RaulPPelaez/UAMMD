@@ -230,6 +230,31 @@ namespace uammd{
       int nz = dim.z;
       int ntot = (nkx/2+1)*nky*nz;
       std::ofstream out(file);
+      std::vector<cufftComplex> h_field(field.size());
+      auto ptr = field.data();
+      thrust::copy(ptr, ptr + field.size(), h_field.begin());
+      for (int id = 0; id<(nkx/2+1)*nky; id++){
+	int2 ik = make_int2(id%(nkx/2+1), id/(nkx/2+1));
+	Index3D indexer(nkx/2+1, nky, nz);
+	auto fn = make_third_index_iterator(h_field.data(), ik.x, ik.y, indexer);
+	out<<std::setprecision(2*sizeof(real));
+	fori(0, nz){
+	  //real z = real(0.5)*H*cos(M_PI*i/(nz-1));
+	  real z = i;
+	  auto f = fn[i];
+	  out<<ik.x<<" "<<ik.y<<" "<<z<<" "<<f<<"\n";
+	}
+      }
+    }
+
+
+    template<class Container>
+    void writeComplex4Field(Container & field, int3 dim, real H, std::string file){
+      int nkx = dim.x;
+      int nky = dim.y;
+      int nz = dim.z;
+      int ntot = (nkx/2+1)*nky*nz;
+      std::ofstream out(file);
       std::vector<cufftComplex4> h_field(field.size());
       auto ptr = field.data();
       thrust::copy(ptr, ptr + field.size(), h_field.begin());

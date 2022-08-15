@@ -24,7 +24,7 @@ namespace uammd{
 	this-> prefactor = cbrt(pow(2*M_PI*width*width, -1.5));
 	this-> tau = -1.0/(2.0*width*width);
 	supportxy+=2;
-	rmax = supportxy*h*0.5;//5.0*h;//sqrt(log(tolerance/prefactor)/tau);
+	rmax = supportxy*h*0.5;
 	support.x = supportxy>0?(supportxy):std::max(3, int(2*rmax/h + 0.5)+1);
 	support.y = support.x;
 	this->Htot = H + 6*He;
@@ -48,7 +48,8 @@ namespace uammd{
       }
 
       inline __host__  __device__ real phi(real r, real3 pos) const{
-	return (abs(r)>=rmax)?0:(prefactor*exp(tau*r*r));
+	return (abs(r)>rmax)?0:(prefactor*exp(tau*r*r));
+	//return prefactor*exp(tau*r*r);
       }
 
       inline __host__  __device__ real delta(real3 rvec, real3 h) const{
