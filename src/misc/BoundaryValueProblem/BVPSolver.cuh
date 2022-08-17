@@ -37,44 +37,43 @@
 #include "misc/BoundaryValueProblem/BVPMemory.cuh"
 #include<thrust/pair.h>
 #include<thrust/device_vector.h>
-#include<vector>
+#include <vector>
 namespace uammd{
   namespace BVP{
-
     namespace detail{
       class SubsystemSolver{
 	int nz;
 	real H;
-	StorageHandle<real> CinvA_storage;
-	StorageHandle<real4> CinvABmD_storage;
+	StorageHandle<complex> CinvA_storage;
+	StorageHandle<complex> CinvABmD_storage;
 
       public:
 
 	SubsystemSolver(int nz, real H):nz(nz), H(H){}
 
 	void registerRequiredStorage(StorageRegistration &memoryManager){
-	  CinvA_storage =    memoryManager.registerStorageRequirement<real>(2*nz+2);
-	  CinvABmD_storage = memoryManager.registerStorageRequirement<real4>(1);
+	  CinvA_storage =    memoryManager.registerStorageRequirement<complex>(2*nz+2);
+	  CinvABmD_storage = memoryManager.registerStorageRequirement<complex>(4);
 	}
 
 	template<class TopBC, class BottomBC>
-	void precompute(real k, const TopBC &top, const BottomBC &bottom, StorageRetriever &memoryManager){
+	void precompute(complex k, const TopBC &top, const BottomBC &bottom, StorageRetriever &memoryManager){
 	  auto CinvA_it = memoryManager.retrieveStorage(CinvA_storage);
 	  auto CinvABmD_it = memoryManager.retrieveStorage(CinvABmD_storage);
 	  auto invA = computeInverseSecondIntegralMatrix(k, H, nz);
 	  SchurBoundaryCondition bcs(nz, H);
 	  auto CandD = bcs.computeBoundaryConditionMatrix(top, bottom);
-	  real4 D = make_real4(CandD[2*nz], CandD[2*nz+1], CandD[2*nz+2], CandD[2*nz+3]);
+	  complex D[4] = {CandD[2*nz], CandD[2*nz+1], CandD[2*nz+2], CandD[2*nz+3]};
 	  auto CinvA = matmul(CandD, nz, 2, invA, nz, nz);
 	  std::copy(CinvA.begin(), CinvA.end(), CinvA_it);
-	  real4 CinvAB;
-	  real B00 = -k*k*H*H;
-	  real B11 = -k*k*H*H;
-	  CinvAB.x = CinvA[0]*B00;
-	  CinvAB.y = CinvA[1]*B11;
-	  CinvAB.z = CinvA[0+nz]*B00;
-	  CinvAB.w = CinvA[1+nz]*B11;
-	  CinvABmD_it[0] = CinvAB - D;
+	  complex CinvAB[4];
+	  auto B00 = -k*k*H*H;
+	  auto B11 = -k*k*H*H;
+	  CinvAB[0] = CinvA[0]*B00;
+	  CinvAB[1] = CinvA[1]*B11;
+	  CinvAB[2] = CinvA[0+nz]*B00;
+	  CinvAB[3] = CinvA[1+nz]*B11;
+	  fori(0, 4) CinvABmD_it[i] = CinvAB[i] - D[i];
 	}
 
 	template<class T, class FnIterator>
@@ -83,7 +82,9 @@ namespace uammd{
 					   StorageRetriever &memoryManager){
 	  const auto CinvA = memoryManager.retrieveStorage(CinvA_storage);
 	  const auto CinvAfmab = computeRightHandSide(alpha, beta, fn, CinvA);
-	  const real4 CinvABmD = *(memoryManager.retrieveStorage(CinvABmD_storage));
+	  const auto CinvABmD_it = memoryManager.retrieveStorage(CinvABmD_storage);
+	  complex CinvABmD[4] = {CinvABmD_it[0], CinvABmD_it[1],
+				       CinvABmD_it[2], CinvABmD_it[3]};
 	  const auto c0d0 = solveSubsystem(CinvABmD, CinvAfmab);
 	  return c0d0;
 	}
@@ -91,7 +92,7 @@ namespace uammd{
       private:
 
 	template<class T>
-	__device__ thrust::pair<T,T> solveSubsystem(real4 CinvABmD, thrust::pair<T,T> CinvAfmab) const{
+	__device__ thrust::pair<T,T> solveSubsystem(T CinvABmD[4], thrust::pair<T,T> CinvAfmab) const{
 	  auto c0d0 = solve2x2System(CinvABmD, CinvAfmab);
 	  return c0d0;
 	}
@@ -126,12 +127,12 @@ namespace uammd{
 	  pentasolve.registerRequiredStorage(memoryManager);
 	}
 
-	void precompute(real k, StorageRetriever &memoryManager){
-	  real diagonal[nz];
-	  real diagonal_p2[nz]; diagonal_p2[nz-2] = diagonal_p2[nz-1] = 0;
-	  real diagonal_m2[nz]; diagonal_m2[0] = diagonal_m2[1] = 0;
+	void precompute(complex k, StorageRetriever &memoryManager){
+	  complex diagonal[nz];
+	  complex diagonal_p2[nz]; diagonal_p2[nz-2] = diagonal_p2[nz-1] = 0;
+	  complex diagonal_m2[nz]; diagonal_m2[0] = diagonal_m2[1] = 0;
 	  SecondIntegralMatrix sim(nz);
-	  const real kH2 = k*k*H*H;
+	  const auto kH2 = k*k*H*H;
 	  for(int i = 0; i<nz; i++){
 	    diagonal[i] = 1.0 - kH2*sim.getElement(i,i);
 	    if(i<nz-2) diagonal_p2[i] = -kH2*sim.getElement(i+2, i);
@@ -151,20 +152,20 @@ namespace uammd{
     class BoundaryValueProblemSolver{
       detail::PentadiagonalSystemSolver pent;
       detail::SubsystemSolver sub;
-      StorageHandle<real> waveVector;
+      StorageHandle<complex> waveVector;
       int nz;
       real H;
     public:
       BoundaryValueProblemSolver(int nz, real H): nz(nz), H(H), sub(nz, H), pent(nz, H){}
 
       void registerRequiredStorage(StorageRegistration &mem){
-	waveVector = mem.registerStorageRequirement<real>(1);
+	waveVector = mem.registerStorageRequirement<complex>(1);
 	sub.registerRequiredStorage(mem);
 	pent.registerRequiredStorage(mem);
       }
 
       template<class TopBC, class BottomBC>
-      void precompute(StorageRetriever &mem, real k, const TopBC &top, const BottomBC &bot){
+      void precompute(StorageRetriever &mem, complex k, const TopBC &top, const BottomBC &bot){
 	auto k_access = mem.retrieveStorage(waveVector);
 	k_access[0] = k;
 	pent.precompute(k, mem);
@@ -177,10 +178,10 @@ namespace uammd{
 			    AnIterator& an,
 			    CnIterator& cn,
 			    StorageRetriever &mem){
-        const real k = *(mem.retrieveStorage(waveVector));
+        const auto k = *(mem.retrieveStorage(waveVector));
 	T c0, d0;
 	thrust::tie(c0, d0) = sub.solve(fn, alpha, beta, mem);
-	const real kH2 = k*k*H*H;
+	const auto kH2 = k*k*H*H;
 	fn[0] += kH2*c0;
 	fn[1] += kH2*d0;
 	pent.solve(fn, an, mem);

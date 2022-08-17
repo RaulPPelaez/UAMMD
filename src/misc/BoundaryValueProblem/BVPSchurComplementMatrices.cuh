@@ -125,8 +125,8 @@ namespace uammd{
       SchurBoundaryCondition(int nz, real H):nz(nz), H(H), bcs(nz){}
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeBoundaryConditionMatrix(const TopBC &top, const BottomBC &bottom){
-	std::vector<real> CandD(2*nz+4, 0);
+      auto computeBoundaryConditionMatrix(const TopBC &top, const BottomBC &bottom){
+	std::vector<complex> CandD(2*nz+4, 0);
 	auto topRow = computeTopRow(top, bottom);
 	auto bottomRow = computeBottomRow(top, bottom);
 	std::copy(topRow.begin(), topRow.end()-2, CandD.begin());
@@ -141,8 +141,8 @@ namespace uammd{
     private:
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeTopRow(const TopBC &top, const BottomBC &bottom){
-	std::vector<real> topRow(nz+2, 0);
+      auto computeTopRow(const TopBC &top, const BottomBC &bottom){
+	std::vector<complex> topRow(nz+2, 0);
 	auto tfi = bcs.topFirstIntegral();
 	auto tsi = bcs.topSecondIntegral();
 	auto tfiFactor = top.getFirstIntegralFactor();
@@ -156,8 +156,8 @@ namespace uammd{
       }
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeBottomRow(const TopBC &top, const BottomBC &bottom){
-	std::vector<real> bottomRow(nz+2, 0);
+      auto computeBottomRow(const TopBC &top, const BottomBC &bottom){
+	std::vector<complex> bottomRow(nz+2, 0);
 	auto bfi = bcs.bottomFirstIntegral();
 	auto bsi = bcs.bottomSecondIntegral();
 	auto bfiFactor = bottom.getFirstIntegralFactor();
@@ -172,21 +172,21 @@ namespace uammd{
 
     };
 
-    std::vector<real> computeSecondIntegralMatrix(real k, real H, int nz){
-      std::vector<real> A(nz*nz, 0);
+    auto computeSecondIntegralMatrix(complex k, real H, int nz){
+      std::vector<complex> A(nz*nz, complex());
       SecondIntegralMatrix sim(nz);
-      real kH2 = k*k*H*H;
+      auto kH2 = k*k*H*H;
       fori(0, nz){
 	forj(0,nz){
-	  A[i+nz*j] = (i==j) - kH2*sim.getElement(i, j);
+	  A[i+nz*j] = (i==j)?real(1.0):real(0.0) - kH2*sim.getElement(i, j);
 	}
       }
       return std::move(A);
     }
 
-    std::vector<real> computeInverseSecondIntegralMatrix(real k, real H, int nz){
-      if(k==0){
-	std::vector<real> invA(nz*nz, 0);
+    auto computeInverseSecondIntegralMatrix(complex k, real H, int nz){
+      if(k.real()==0 and k.imag() == 0){
+	std::vector<complex> invA(nz*nz, 0);
 	fori(0, nz){
 	  invA[i+nz*i] = 1;
 	}
