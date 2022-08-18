@@ -178,7 +178,7 @@ namespace uammd{
       auto kH2 = k*k*H*H;
       fori(0, nz){
 	forj(0,nz){
-	  A[i+nz*j] = (i==j)?real(1.0):real(0.0) - kH2*sim.getElement(i, j);
+	  A[i+nz*j] = (i==j)*real(1.0) - kH2*sim.getElement(i, j);
 	}
       }
       return std::move(A);
