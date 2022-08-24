@@ -72,6 +72,7 @@ namespace uammd{
     };
 
     struct DefaultQuadratureWeights{
+      template<class Grid>
       inline __host__ __device__ real operator()(int3 cellj, const Grid &grid) const{
 	return grid.getCellVolume(cellj);
       }
