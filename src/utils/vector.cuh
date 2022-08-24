@@ -899,6 +899,8 @@ VECATTR float3 sqrt(const float3 &a){ return {sqrtf(a.x), sqrtf(a.y), sqrtf(a.z)
 VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
 
 
+VECATTR double3 abs(const double3 &a) { return {abs(a.x), abs(a.y), abs(a.z)}; }
+VECATTR float3 abs(const float3 &a){ return {fabs(a.x), fabs(a.y), fabs(a.z)};}
 //////////////////////////////////////////////////////////
 
 

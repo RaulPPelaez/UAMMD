@@ -39,15 +39,21 @@ namespace uammd{
       ENABLE_PHI_IF_NOT_HAS(Y) phiY(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
       ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
 
+
       template<class Grid>
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
 	int3 P = support/2;
-	//Kernels with even support might need an offset of one cell depending on the position of the particle inside the cell
-	const int3 shift = make_int3(support.x%2==0, support.y%2==0, support.z%2==0);
-	if(shift.x or shift.y or shift.z){
-	  const auto invCellSize = real(1.0)/grid.getCellSize(celli);
-	  const real3 pi_pbc = grid.box.apply_pbc(pos);
-	  P -= make_int3(((pi_pbc+grid.box.boxSize*real(0.5))*invCellSize - make_real3(celli) + real(0.5)))*shift;
+	//Sometimes we need to displace the support cells to the left
+	const auto distanceToLeftMostCell = abs(grid.distanceToCellCenter(pos, celli-P));
+	const auto cellSize = grid.getCellSize(celli);
+	if(cellSize.x>0 and distanceToLeftMostCell.x > support.x*cellSize.x/real(2.0)){
+	  P.x -=1;
+	}
+	if(cellSize.y>0 and distanceToLeftMostCell.y > support.y*cellSize.y/real(2.0)){
+	  P.y -=1;
+	}
+	if(cellSize.z>0 and distanceToLeftMostCell.z > support.z*cellSize.z/real(2.0)){
+	  P.z -=1;
 	}
 	return P;
       }
