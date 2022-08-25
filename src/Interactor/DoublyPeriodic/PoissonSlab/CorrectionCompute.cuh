@@ -97,7 +97,7 @@ namespace uammd{
 	  }
 	  else{
 	    correction[i].x = -linearModeCorrection.x;
-	    correction[i].y = linearModeCorrection.x*z + linearModeCorrection.y;
+	    correction[i].y = -linearModeCorrection.x*z + linearModeCorrection.y;
 	  }
 	}
 	else{
@@ -179,8 +179,8 @@ namespace uammd{
       fori(0, nz){
 	const auto potential = corr[i].y;
 	const auto Ez = corr[i].x;
-	fullCorr[i].x = cufftComplex({k.x*potential.y, -k.x*potential.x})*isPairedX;
-	fullCorr[i].y = cufftComplex({k.y*potential.y, -k.y*potential.x})*isPairedY;
+	fullCorr[i].x = -cufftComplex({k.x*potential.y, -k.x*potential.x})*isPairedX;
+	fullCorr[i].y = -cufftComplex({k.y*potential.y, -k.y*potential.x})*isPairedY;
 	fullCorr[i].z = Ez;
 	fullCorr[i].w = potential;
       }

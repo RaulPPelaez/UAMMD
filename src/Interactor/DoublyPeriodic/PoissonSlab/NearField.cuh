@@ -100,7 +100,7 @@ namespace uammd{
     public:
 
       NearField(shared_ptr<ParticleGroup> pg, Parameters par):
-	pg(pg), par(par), split(par.split), gw(par.gw){	
+	pg(pg), par(par), split(par.split), gw(par.gw){
 	this->rcut = nearField_ns::computeCutOffDistance(par);
 	nearField_ns::throwIfInvalidConfiguration(rcut, par.H);
 	System::log<System::MESSAGE>("[DPPoissonSlab] Near field cut off: %g", rcut);
@@ -213,7 +213,7 @@ namespace uammd{
 	auto pd = pg->getParticleData();
 	auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
 	auto charge = pd->getCharge(access::location::gpu, access::mode::read);
-	auto force = pd->getForce(access::location::gpu, access::mode::readwrite);	
+	auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
         auto tr = NearFieldTransverser(energy.begin(), force.begin(), charge.begin(),
 				       *greenTables, box, par.H, rcut, par.permitivity, split, gw,
 				       fieldAtParticles);

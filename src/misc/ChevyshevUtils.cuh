@@ -88,7 +88,7 @@ namespace uammd{
 	template<class VecType>
 	inline __host__ __device__ int3 getCell(const VecType &r) const{
 	  real3 pos_inBox = box.apply_pbc(make_real3(r));
-	  int cz = int((cellDim.z-1)*(acos(real(-2.0)*pos_inBox.z/box.boxSize.z)/real(M_PI)));
+	  int cz = int((cellDim.z-1)*(acos(real(2.0)*pos_inBox.z/box.boxSize.z)/real(M_PI)));
 	  int3 cell = make_int3((pos_inBox.x+real(0.5)*box.boxSize.x)*invCellSize.x,
 				(pos_inBox.y+real(0.5)*box.boxSize.y)*invCellSize.y,
 				cz);
@@ -154,8 +154,8 @@ namespace uammd{
 	  return cellCenterPos;
 	}
 
-	inline __host__ __device__ real cellHeight(int cellz){
-	  return -real(0.5)*box.boxSize.z*cospi((real(cellz))/(cellDim.z-1));
+	inline __host__ __device__ real cellHeight(int cellz) const{
+	  return real(0.5)*box.boxSize.z*cospi((real(cellz))/(cellDim.z-1));
 	}
 
       };

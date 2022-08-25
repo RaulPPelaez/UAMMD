@@ -25,7 +25,7 @@ namespace uammd{
       Permitivity permitivity;
       real tolerance = 1e-4;
       real gw = -1;
-      int support = 10;
+      int support = 12;
       real numberStandardDeviations = 4;
       real split = -1;
       //Either Charge of potential depending on whether the walls are metallic or not

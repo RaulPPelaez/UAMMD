@@ -46,15 +46,22 @@ namespace uammd{
 	//Sometimes we need to displace the support cells to the left
 	const auto distanceToLeftMostCell = abs(grid.distanceToCellCenter(pos, celli-P));
 	const auto cellSize = grid.getCellSize(celli);
-	if(cellSize.x>0 and distanceToLeftMostCell.x > support.x*cellSize.x/real(2.0)){
+	if(cellSize.x>0 and distanceToLeftMostCell.x >= support.x*cellSize.x/real(2.0)){
 	  P.x -=1;
 	}
-	if(cellSize.y>0 and distanceToLeftMostCell.y > support.y*cellSize.y/real(2.0)){
+	if(cellSize.y>0 and distanceToLeftMostCell.y >= support.y*cellSize.y/real(2.0)){
 	  P.y -=1;
 	}
-	if(cellSize.z>0 and distanceToLeftMostCell.z > support.z*cellSize.z/real(2.0)){
+	if(cellSize.z>0 and distanceToLeftMostCell.z >= support.z*cellSize.z/real(2.0)){
 	  P.z -=1;
 	}
+	// printf("Particle at %g %g %g (cell %d %d %d) has shift %d %d %d. Distance to cell is %g %g %g\n",
+	//        pos.x, pos.y, pos.z,
+	//        celli.x, celli.y, celli.z,
+	//        P.x, P.y, P.z,
+	//        distanceToLeftMostCell.x, distanceToLeftMostCell.y, distanceToLeftMostCell.z
+
+	//        );
 	return P;
       }
 
@@ -67,18 +74,32 @@ namespace uammd{
 	  const auto cellj = make_int3(cj, celli.y, celli.z);
 	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
 	  weightsX[i] = detail::phiX(kernel, rij, pi);
+	  	 //  printf("Particle with position %g %g %g, at cell %d %d %d, spreads with weight %.15g in X to cell %d (distance %.15g)\n",
+		 // pi.x, pi.y, pi.z, celli.x, celli.y, celli.z,
+		 // weightsX[i],
+		 // 	 cellj.x, rij);
 	}
 	real *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
 	  const real rij = grid.distanceToCellCenter(pi, cellj).y;
 	  weightsY[i] = detail::phiY(kernel,rij, pi);
+	  // printf("Particle with position %g %g %g, at cell %d %d %d, spreads with weight %.15g in Y to cell %d (distance %.15g)\n",
+	  // 	 pi.x, pi.y, pi.z, celli.x, celli.y, celli.z,
+	  // 	 weightsY[i],
+	  // 	 cellj.y, rij);
 	}
 	real *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
 	  const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	  weightsZ[i] = detail::phiZ(kernel, rij, pi);
+	  if(cellj.z>0){
+	    weightsZ[i] = detail::phiZ(kernel, rij, pi);
+	  }
+	  // printf("Particle with position %g %g %g, at cell %d %d %d, spreads with weight %.15g in Z to cell %d (distance %.15g)\n",
+	  // 	 pi.x, pi.y, pi.z, celli.x, celli.y, celli.z,
+	  // 	 weightsZ[i],
+	  // 	 cellj.z, rij);
 	}
       }
 

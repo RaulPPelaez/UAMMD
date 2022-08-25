@@ -108,7 +108,7 @@ namespace uammd{
 	  B0 = -mismatchPotentialBottom;
 	}
 	else if(not metallicTop and not metallicBottom){
-	  A0 = (E*eb - mismatchFieldZBottom.x/perm.inside + C*et - mismatchFieldZTop/perm.inside)*real(0.5);
+	  A0 = (E*eb - mismatchFieldZBottom/perm.inside + C*et - mismatchFieldZTop/perm.inside)*real(0.5);
 	  B0 = cufftComplex();
 	}
 	return {A0, B0};
