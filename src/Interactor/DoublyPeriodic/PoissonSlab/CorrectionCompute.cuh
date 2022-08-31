@@ -51,26 +51,22 @@ namespace uammd{
       }
     }
 
-    __device__ cufftComplex2 analyticalCorrectionTwoMetallicWalls(float k, float z, float H, Permitivity perm, MismatchVals mis){
-      // const auto Ai = (mis.mPH - exp(-k*H)*mis.mP0)/(exp(-k*H) - exp(k*H));
-      // const auto Bi = (-mis.mP0 + mis.mPH*exp(-k*H))/(1.0-exp(-2.0*k*H));
-      // cufftComplex2 EzAndPhi;
-      // //field Z
-      // EzAndPhi.x = k*Ai*exp(k*z) - k*Bi*exp(-k*z);
-      // //phi
-      // EzAndPhi.y = Ai*exp(k*z) + Bi*exp(-k*z);
-      // return EzAndPhi;
+    __device__ cufftComplex2 analyticalCorrectionTwoMetallicWalls(double k, double z, double H, Permitivity perm, MismatchVals mis){
       const real ekzmH = exp(k*(z-H));
       const real em2kH= exp(-2*k*H);
+      const real emkH= exp(-k*H);
+      const real ekH= exp(k*H);
       const real emkz = exp(-k*z);
-      const real denominator = em2kH -1;
-      const auto firstTerm = (mis.mPH*ekzmH+mis.mP0*emkz)/denominator;
-      const auto secondTerm = (mis.mP0*emkz - mis.mPH*exp(-k*(z+H)))/denominator;
-      cufftComplex2 EzAndPhi;
+      const real ekz = exp(k*z);
+      const auto Ai = (mis.mPH-emkH*mis.mP0)/(emkH-ekH);
+      const auto Bi = (-mis.mP0+emkH*mis.mPH)/(real(1.0)-em2kH);
+      const auto firstTerm = Ai*ekz;
+      const auto secondTerm = Bi*emkz;
+      cufftComplex2 EzAndPhi{};
       //field Z
       EzAndPhi.x = k*firstTerm - k*secondTerm;
       //phi
-      EzAndPhi.y =  firstTerm + secondTerm;
+      EzAndPhi.y = firstTerm + secondTerm;
       return EzAndPhi;
     }
 
