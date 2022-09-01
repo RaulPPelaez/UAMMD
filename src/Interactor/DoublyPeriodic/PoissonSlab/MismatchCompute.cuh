@@ -104,7 +104,7 @@ namespace uammd{
 	  B0 = -mismatchPotentialBottom - A0*H;
 	}
 	else if(metallicTop and metallicBottom){
-	  A0 = (mismatchPotentialTop - mismatchPotentialBottom)/H;
+	  A0 = -(mismatchPotentialTop - mismatchPotentialBottom)/H;
 	  B0 = -mismatchPotentialBottom;
 	}
 	else if(not metallicTop and not metallicBottom){

@@ -92,8 +92,8 @@ namespace uammd{
 	    correction[i] = res;
 	  }
 	  else{
-	    correction[i].x = -linearModeCorrection.x;
-	    correction[i].y = -linearModeCorrection.x*z + linearModeCorrection.y;
+	    correction[i].x = linearModeCorrection.x;
+	    correction[i].y = linearModeCorrection.x*z + linearModeCorrection.y;
 	  }
 	}
 	else{
