@@ -15,10 +15,10 @@ namespace uammd{
       const double et = perm.top/perm.inside;
       const double denominator = (exp(double(-2.0)*H*k)*(double(-1.0) + eb + et - eb*et) + (double(1.0) + eb)*(double(1.0) + et));
       //This expression is written so the highest exponential evaluated is exp(kmax*HE)
-      auto ezm2H = exp(k*(z-double(2.0)*H))*(double(-1.0) + et)*(-mis.mE0/perm.inside - eb*k*mis.mP0);
-      auto emz = exp(-z*k)*(double(1.0) + et)*(-mis.mE0/perm.inside - eb*k*mis.mP0);
-      auto emHmz = exp((-H-z)*k)*(double(-1.0) + eb)* (-mis.mEH/perm.inside + et*k*mis.mPH);
-      auto emHpz = exp(k*(-H + z))*(double(1.0) + eb)*(-mis.mEH/perm.inside + et*k*mis.mPH);
+      auto ezm2H = exp(k*(z-double(2.0)*H))*(double(-1.0) + et)*(mis.mE0/perm.inside - eb*k*mis.mP0);
+      auto emz = exp(-z*k)*(double(1.0) + et)*(mis.mE0/perm.inside - eb*k*mis.mP0);
+      auto emHmz = exp((-H-z)*k)*(double(-1.0) + eb)* (mis.mEH/perm.inside + et*k*mis.mPH);
+      auto emHpz = exp(k*(-H + z))*(double(1.0) + eb)*(mis.mEH/perm.inside + et*k*mis.mPH);
       cufftComplex2 EzAndPhi;
       //field Z
       EzAndPhi.x = -(ezm2H + emz + emHmz + emHpz) / denominator;
