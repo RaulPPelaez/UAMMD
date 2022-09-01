@@ -34,7 +34,7 @@ namespace uammd{
 	  this->hxhy = cellSizex*cellSizey;
 	  std::vector<real> weights(nz+1, 0);
 	  for(int i = 0; i<nz; i++){
-	    weights[i] = -0.5*H*clencurt(i, nz-1);
+	    weights[i] = 0.5*H*clencurt(i, nz-1);
 	  }
 	  CudaSafeCall(cudaMemcpy(clencurtWeights, weights.data(), (nz+1)*sizeof(real), cudaMemcpyHostToDevice));
 	}

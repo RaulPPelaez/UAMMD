@@ -281,7 +281,8 @@ namespace uammd{
 	auto forces = pd->getForce(access::location::gpu, access::mode::readwrite);
 	auto energies = pd->getEnergy(access::location::gpu, access::mode::readwrite);
 	real4* d_gridForcesEnergies = (real4*)thrust::raw_pointer_cast(gridFieldPotential.data());
-	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(), charge.begin(), fieldAtParticles);
+	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(),
+								  charge.begin(), fieldAtParticles);
 	auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), Ep2fe);
 	int3 n = grid.cellDim;
 	IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));

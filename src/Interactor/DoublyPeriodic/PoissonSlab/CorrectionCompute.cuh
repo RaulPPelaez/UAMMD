@@ -174,9 +174,9 @@ namespace uammd{
       const bool isPairedY = ik.y != (nky/2);
       fori(0, nz){
 	const auto potential = corr[i].y;
-	const auto Ez = corr[i].x;
-	fullCorr[i].x = -cufftComplex({k.x*potential.y, -k.x*potential.x})*isPairedX;
-	fullCorr[i].y = -cufftComplex({k.y*potential.y, -k.y*potential.x})*isPairedY;
+	const auto Ez = -corr[i].x;
+	fullCorr[i].x = cufftComplex({k.x*potential.y, -k.x*potential.x})*isPairedX;
+	fullCorr[i].y = cufftComplex({k.y*potential.y, -k.y*potential.x})*isPairedY;
 	fullCorr[i].z = Ez;
 	fullCorr[i].w = potential;
       }
