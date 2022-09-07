@@ -172,6 +172,14 @@ namespace uammd{
 	sub.precompute(k, top, bot, mem);
       }
 
+      //Solves the BVP as configured
+      //Input:
+      //fn are the Chebyshev coefficients of the RHS of the equation
+      //alpha/beta are the RHS of the top/bottom boundary conditions
+      //mem is the StorageRetriever of this BVP instance
+      //Output:
+      //an are the Chebyshev coefficients of the second derivative of the solution
+      //cn are the Chebyshev coefficients of the solution
       template<class T, class FnIterator, class AnIterator, class CnIterator>
       __device__ void solve(FnIterator& fn,
 			    T alpha, T beta,
@@ -214,6 +222,13 @@ namespace uammd{
 	numberSystems(numberSystems), bvpSolver(bvpSolver), gpuMemory(raw){}
     public:
 
+      //Solves the BVP as configured
+      //Input:
+      //fn are the Chebyshev coefficients of the RHS of the equation
+      //alpha/beta are the RHS of the top/bottom boundary conditions
+      //Output:
+      //an are the Chebyshev coefficients of the second derivative of the solution
+      //cn are the Chebyshev coefficients of the solution
       template<class T, class FnIterator, class AnIterator, class CnIterator>
       __device__ void solve(int instance,
 			    const FnIterator& fn,
