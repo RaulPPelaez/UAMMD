@@ -109,7 +109,6 @@ namespace uammd{
 	  sys->log<System::MESSAGE>("[DPPoissonSlab] Far field width: %g, (%g times original width)",
 				    farFieldGaussianWidth, farFieldGaussianWidth/par.gw);
 	}
-
 	this->ibm = createImmersedBoundary();
 	this->fct = std::make_shared<FastChebyshevTransform>(sys, cellDim);
 	this->bvp = createBVP(par);
@@ -121,20 +120,20 @@ namespace uammd{
 	System::log<System::DEBUG>("Far field");
 	auto separatedCharges = separateCharges(st); //Step 1
 	auto gridCharges = ibm->spreadChargesNearWalls(separatedCharges, st); //Step 2
-	DPPoissonSlab_ns::writeRealField<real>(gridCharges, cellDim, "gf_C1.dat");
+	//DPPoissonSlab_ns::writeRealField<real>(gridCharges, cellDim, "gf_C1.dat");
 	auto gridChargesFourier = fct->forwardTransform(gridCharges, st);//Step 2
 	auto outsideSolution = bvp->solveFieldPotential(gridChargesFourier, st); //Step 2
-	DPPoissonSlab_ns::writeComplex4Field(outsideSolution, cellDim, par.H,"solOut.dat");
+	//DPPoissonSlab_ns::writeComplex4Field(outsideSolution, cellDim, par.H,"solOut.dat");
 	ibm->spreadChargesFarFromWallAdd(separatedCharges, gridCharges, st); //Step 3
 	ibm->spreadImageChargesAdd(separatedCharges, gridCharges, par.permitivity, st); //Step 3
-	DPPoissonSlab_ns::writeRealField<real>(gridCharges, cellDim, "gf_C1pC2pC1star.dat");
+	//DPPoissonSlab_ns::writeRealField<real>(gridCharges, cellDim, "gf_C1pC2pC1star.dat");
 	gridChargesFourier = fct->forwardTransform(gridCharges, st); //Step 3
-	DPPoissonSlab_ns::writeComplexField(gridChargesFourier, cellDim, par.H, "gf_C1pC2pC1starFourier.dat");
+	//DPPoissonSlab_ns::writeComplexField(gridChargesFourier, cellDim, par.H, "gf_C1pC2pC1starFourier.dat");
 	auto insideSolution = bvp->solveFieldPotential(gridChargesFourier, st); //Step 3
-	DPPoissonSlab_ns::writeComplex4Field(insideSolution, cellDim, par.H,"solIn.dat");
+	//DPPoissonSlab_ns::writeComplex4Field(insideSolution, cellDim, par.H,"solIn.dat");
 	auto surfaceValues_ptr = thrust::raw_pointer_cast(surfaceValuesFourier.data());
 	correction->correctSolution(insideSolution, outsideSolution, surfaceValues_ptr, st); //Steps 4,5,6
-	DPPoissonSlab_ns::writeComplex4Field(insideSolution, cellDim, par.H,"solCorrected.dat");
+	//DPPoissonSlab_ns::writeComplex4Field(insideSolution, cellDim, par.H,"solCorrected.dat");
 	if(par.printK0Mode){
 	  solutionZeroMode.resize(cellDim.z);
 	  Index3D indexer(cellDim.x/2+1, cellDim.y, cellDim.z);
@@ -144,7 +143,7 @@ namespace uammd{
 		       solutionZeroMode.begin());
 	}
 	auto gridFields = fct->inverseTransform(insideSolution, st);
-	DPPoissonSlab_ns::writeRealField<real4>(gridFields, cellDim, "solGrid.dat");
+	//DPPoissonSlab_ns::writeRealField<real4>(gridFields, cellDim, "solGrid.dat");
 	ibm->interpolateFieldsToParticles(gridFields, st, fieldAtParticles);
 	CudaCheckError();
       }
