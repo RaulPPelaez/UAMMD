@@ -113,7 +113,6 @@ namespace uammd{
 	}
 	return {A0, B0};
       }
-
     private:
       template<class SolutionIterator>
       __device__ cufftComplex4 evaluateThetas(SolutionIterator sol, real thetaTop, real thetaBot, int Nz){

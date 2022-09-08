@@ -51,15 +51,16 @@ namespace uammd{
       }
     }
 
-    __device__ cufftComplex2 analyticalCorrectionTwoMetallicWalls(double k, double z, double H, Permitivity perm, MismatchVals mis){
-      const real ekzmH = exp(k*(z-H));
-      const real em2kH= exp(-2*k*H);
-      const real emkH= exp(-k*H);
-      const real ekH= exp(k*H);
-      const real emkz = exp(-k*z);
-      const real ekz = exp(k*z);
+    __device__ cufftComplex2 analyticalCorrectionTwoMetallicWalls(double k, double z, double H,
+								  Permitivity perm, MismatchVals mis){
+      const double ekzmH = exp(k*(z-H));
+      const double em2kH= exp(-2.0*k*H);
+      const double emkH= exp(-k*H);
+      const double ekH= exp(k*H);
+      const double emkz = exp(-k*z);
+      const double ekz = exp(k*z);
       const auto Ai = (mis.mPH-emkH*mis.mP0)/(emkH-ekH);
-      const auto Bi = (-mis.mP0+emkH*mis.mPH)/(real(1.0)-em2kH);
+      const auto Bi = (-mis.mP0+emkH*mis.mPH)/(1.0-em2kH);
       const auto firstTerm = Ai*ekz;
       const auto secondTerm = Bi*emkz;
       cufftComplex2 EzAndPhi{};
