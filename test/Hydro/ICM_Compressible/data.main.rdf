@@ -1,0 +1,18 @@
+scheme icm_compressible
+
+dt  3
+boxSize  3000 3000 3000
+cellDim  30 30 30
+bulkViscosity 127.05
+speedOfSound  14.67
+shearViscosity 53.71
+temperature 1800
+initialDensity 0.632
+
+relaxTime 500000
+simulationTime 10000000
+printTime      10000
+
+numberParticles 10000
+enableSterics
+epsilon 600

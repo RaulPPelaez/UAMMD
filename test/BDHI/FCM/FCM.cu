@@ -54,7 +54,6 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   sys->rng().setSeed(0xabefa129f9173^time(NULL));
   for(int i = 0; i<10000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
-
   Box box(L);
   BDHI::FCM::Parameters par;
   par.temperature = 0.0;
@@ -63,15 +62,11 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   par.dt = 1;
   par.box = box;
   par.tolerance = tolerance;
-
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, par);
-
   auto inter= make_shared<miniInteractor>(pd, "puller");
   bdhi->addInteractor(inter);
-
   M0 = bdhi->getSelfMobility();
   real_rh = bdhi->getHydrodynamicRadius();
-
   for(int i = 0; i<9;i++){M[i] = 0;}
   int Ntest = 100;
   for(int i = 0; i<Ntest;i++){
@@ -82,7 +77,6 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
 	pos.raw()[0] = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5))*box.boxSize,0);
 	posprev = make_double3(make_real3(pos.raw()[0]));
       }
-
       inter->F = F*make_real3(alpha==0, alpha==1, alpha==2);
       bdhi->forwardTime();
       double3 vel;
@@ -97,7 +91,6 @@ void computeSelfMobilityMatrix(real3 L, double F, long double *M, long double &M
   }
   sys->finish();
 }
-
 
 
 void computeSelfMobilityMatrixRH(real3 L, double F, long double *M, long double &M0, long double &real_rh, real3 r0, shared_ptr<BDHI::EulerMaruyama<BDHI::FCM>> &bdhi, int3 cells = {-1, -1, -1}){
@@ -155,15 +148,9 @@ void computeSelfMobilityMatrixRH(real3 L, double F, long double *M, long double 
 
 
 bool hydrodynamicRadiusVariance_test(){
-
   real L = int(64*rh+0.5);
-  //real L = int(64*(-log10(0.5*tolerance)));
-  //real L = int(tolerance);
-
   double F = 1;
-
   long double M[9];
-
   std::ofstream Mout("hydrodynamicRadiusVariance.test");
   real3 r0 = make_real3(0);
   int Nt = 5000;
@@ -172,35 +159,24 @@ bool hydrodynamicRadiusVariance_test(){
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
   long double M0;// = computeM0PBC(L);
   long double real_rh = 0;
-
   fori(0, Nt){
     std::uniform_real_distribution<> dis(-L*0.5, -L*0.5+1);
-
     r0.x = dis(gen);
     r0.y = dis(gen);
     computeSelfMobilityMatrixRH(make_real3(L), F, M, M0, real_rh, r0, bdhi, make_int3(L));
-
     CudaCheckError();
-
     Mout<<std::setprecision(15)<<r0.x+0.5*L<<" "<<r0.y+0.5*L<<" ";
-    //Substract 1 to the diagonal terms, which should be one so a matrix of zeroes should be printed
-    //abs to be able to plot log
-    //for(int j=0; j<3; j++) Mout<<std::setprecision(15)<<((1.0L*(j%3==j/3)-M[j]/M0))<<" ";
     for(int j=0; j<3; j++) Mout<<std::setprecision(15)<<(M[j]/M0)<<" ";
     Mout<<endl;
   }
-
   return true;
 }
 
 bool selfMobilityCubicBox_test(){
-
   int NL = 20;
   std::vector<real2> velocities(NL);
-
   real L_min = 8*rh;
   real L_max = 128*rh;
-
   double F = 1;
   long double M[9];
   std::ofstream Mout("selfMobilityCubicBox.test");
@@ -209,16 +185,13 @@ bool selfMobilityCubicBox_test(){
     long double M0;// = computeM0PBC(L);
     long double real_rh;
     computeSelfMobilityMatrix(make_real3(L, L, L), F, M, M0, real_rh);
-
     CudaCheckError();
-
     Mout<<std::setprecision(15)<<L/real_rh<<" ";
     //Substract 1 to the diagonal terms, which should be one so a matrix of zeroes should be printed
     //abs to be able to plot log
     for(int j=0; j<9; j++) Mout<<std::setprecision(15)<<abs((1.0L*(j%3==j/3)-M[j]/M0))<<" ";
     Mout<<endl;
   }
-
   return true;
 }
 
@@ -228,8 +201,6 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
   sys->rng().setSeed(0xabefa129f9173);
   for(int i = 0; i<100000; i++) sys->rng().next();
   auto pd = make_shared<ParticleData>(N, sys);
-  
-
   Box box(L);
   BDHI::FCM::Parameters par;
   par.temperature = 0.0;
@@ -238,13 +209,9 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
   par.dt = 0.01;
   par.box = box;
   par.tolerance = tolerance;
-
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd,  par);
-
   auto inter= make_shared<miniInteractor>(pd,  "puller");
   bdhi->addInteractor(inter);
-
-
   for(int i = 0; i<9;i++){M[i] = 0;}
   int Ntest = 10;
   for(int i = 0; i<Ntest;i++){
@@ -274,24 +241,18 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
 }
 
 bool pairMobilityCubicBox_test(double dist){
-
   int NL = 20;
-
   real L_min = 2.1*dist;
   real L_max = 100*rh;
-
   Xorshift128plus rng;
   rng.setSeed(0x12ffdbae328f01);
   for(int i = 0; i<10000; i++) rng.next();
   real3 dir = make_real3(0);
-
   while(dir.x == 0 or dir.y == 0 or dir.z == 0) dir = make_real3(rng.gaussian3(0,1));
   real3 rij = dist*dir/sqrt(dot(dir,dir));
-
   std::ofstream out("pairMobilityCubicBox.dist"+std::to_string(dist/rh)+".test");
   double F = 1;
   long double M[9];
-
   double M_theo_Linf[9];
   out<<"#rij "<<rij.x<<" "<<rij.y<<" "<<rij.z<<endl;
   //When applying a force \vec{force_i} = (-1)^i·\hat{\beta} to particle i, the velocity of the other particle will be v_\alpha = M_{alpha\beta}(r)-M_{\alpha\beta}(0) = (f(r)-f(0))·\delta_{\alpha\beta}+ g(r)·r_\alpha*r_\beta/r^2
@@ -306,11 +267,8 @@ bool pairMobilityCubicBox_test(double dist){
       long double fr = 1.0L/(6.0L*M_PIl*viscosity*rh);
       if(r>1e-7*rh) fr = f(r)-fr;
       if(i==j) M_theo_Linf[3*i+j] += fr;
-
-
     }
   }
-
   fori(0, NL){
     real L = L_min + i*((L_max-L_min)/(real)(NL-1));
     out<<std::setprecision(15)<<L/rh<<" ";
@@ -319,31 +277,24 @@ bool pairMobilityCubicBox_test(double dist){
     long double pbc_corr = computeM0PBC(L)*(6.0L*M_PIl*viscosity*rh);
     for(int j = 0; j<9; j++)    out<<abs(1.0l-M[j]*pbc_corr/(M_theo_Linf[j]))<<" ";
     out<<endl;
-
     CudaCheckError();
   }
   return true;
 }
 
 bool pairMobility_q2D_test(double dist){
-
   int NL = 400;
-
   real L_min = 2.1*dist;
   real L_max = 200*rh;
-
   Xorshift128plus rng;
   rng.setSeed(0x12ffdbae328f01);
   for(int i = 0; i<10000; i++) rng.next();
   real3 dir = make_real3(0);
-
   while(dir.x == 0 or dir.y == 0 or dir.z == 0) dir = make_real3(rng.gaussian3(0,1));
   real3 rij = dist*dir/sqrt(dot(dir,dir));
-
   std::ofstream out("pairMobility_q2D.dist"+std::to_string(dist/rh)+".test");
   double F = 1;
   long double M[9];
-
   out<<"#rij "<<rij.x<<" "<<rij.y<<" "<<rij.z<<endl;
   real Lx = 32*rh;
   fori(0, NL){
@@ -353,19 +304,15 @@ bool pairMobility_q2D_test(double dist){
     double M0 = 1.0/(6*M_PI*viscosity*rh);
     for(int j = 0; j<9; j++)  out<<M[j]/M0<<" ";
     out<<endl;
-
     CudaCheckError();
   }
   return true;
 }
 
 bool selfMobility_q2D_test(){
-
   int NL = 20;
-
   real L_min = 8*rh;
   real L_max = 200*rh;
-
   double F = 1;
   long double M[9];
   std::ofstream Mout("selfMobility_q2D.test");
@@ -376,27 +323,19 @@ bool selfMobility_q2D_test(){
     long double M0;// = 1.0L/(6.0L*M_PIl*viscosity*rh);
     long double real_rh;
     computeSelfMobilityMatrix(make_real3(L,L, Lz), F, M, M0, real_rh);
-
     CudaCheckError();
-
-
     //From eq 21 and 23 in Vögele, M., & Hummer, G. (2016). Divergent Diffusion Coefficients in Simulations of Fluids and Lipid Membranes. The Journal of Physical Chemistry B, 120(33), 8722–8732. doi:10.1021/acs.jpcb.6b05102
-
     M0 = 1.0L/(6.0L*M_PIl*viscosity*real_rh);
     double Mplane_near = M0 + M0*real_rh/L*(M_PI*0.5*Lz/L - 4.3878);
     double Mplane_far = M0 + M0*real_rh/Lz*(1.5*log(L/Lz) - 2.8897);
-
     double Mperp_near = M0 + M0*real_rh/Lz*(3*log(L/Lz) - 2.77939);
     double Mperp_far = M0 - M0*2.9252*real_rh/L;
-
     Mout<<std::setprecision(15)<<Lz/real_rh<<" ";
     Mtheoout<<std::setprecision(15)<<Lz/real_rh<<" ";
     for(int j=0; j<9; j++) Mout<<std::setprecision(15)<<M[j]/M0<<" ";
-
     Mtheoout<<std::setprecision(15)<<Mplane_near/M0<<" "<<Mplane_far/M0<<" "<<Mperp_near/M0<<" "<<Mperp_far/M0<<endl;
     Mout<<endl;
   }
-
   return true;
 }
 
@@ -404,10 +343,7 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
   auto sys = make_shared<System>();
   sys->rng().setSeed(0x33dbff9f235ab);
   for(int i=0; i<10000; i++) sys->rng().next();
-
   auto pd = make_shared<ParticleData>(N, sys);
-  
-
   Box box(L);
   BDHI::FCM::Parameters par;
   par.temperature = temperature;
@@ -416,11 +352,9 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
   par.dt = 0.001;
   par.box = box;
   par.tolerance = tolerance;
-
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd,  par);
   M0 = bdhi->getSelfMobility();
   real_rh = bdhi->getHydrodynamicRadius();
-
   std::ofstream out("pos.noise.boxSize"+std::to_string(L.z/bdhi->getHydrodynamicRadius())+".dt"+std::to_string(par.dt)+".Ds"+std::to_string(temperature*M0)+".rh"+std::to_string(real_rh)+"."+suffix);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
@@ -428,7 +362,6 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
       pos.raw()[i] = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5))*L, 0);
     }
   }
-
   fori(0,3000){
     bdhi->forwardTime();
     auto pos = pd->getPos(access::location::cpu, access::mode::read);
@@ -438,7 +371,6 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
       out<<std::setprecision(8)<<make_real3(p[j])<<"\n";
     }
   }
-
   sys->finish();
   return true;
 }
@@ -450,13 +382,10 @@ void selfDiffusionCubicBox_test(){
   int N=4096;
   long double M0, real_rh;
   forj(0, NL){
-
     real L = L_min + j*((L_max-L_min)/(real)(NL-1));
     idealParticlesDiffusion(N, make_real3(L), M0, real_rh);
     CudaCheckError();
   }
-
-
 }
 
 void selfDiffusion_q2D_test(){
@@ -470,25 +399,17 @@ void selfDiffusion_q2D_test(){
   forj(0, NL){
     double Lz = L_min + j*((L_max-L_min)/(real)(NL-1));
     idealParticlesDiffusion(N, make_real3(Lx, Lx, Lz), M0, real_rh, "q2D.Lx"+std::to_string(Lx)+".test");
-
     double L = Lx;
-
     //From eq 21 and 23 in Vögele, M., & Hummer, G. (2016). Divergent Diffusion Coefficients in Simulations of Fluids and Lipid Membranes. The Journal of Physical Chemistry B, 120(33), 8722–8732. doi:10.1021/acs.jpcb.6b05102
-
     M0 = 1.0L/(6.0L*M_PIl*viscosity*real_rh);
     double Mplane_near = M0 + M0/L*(M_PI*0.5*Lz/L - 4.3878);
     double Mplane_far = M0 + M0/Lz*(1.5*log(L/Lz) - 2.8897);
-
     double Mperp_near = M0 + M0/Lz*(3*log(L/Lz) - 2.77939);
     double Mperp_far = M0 - 2.9252/(6*M_PI*viscosity*L);
-
     out<<std::setprecision(15)<<Lz/real_rh<<" "<<Mplane_near/M0<<" "<<Mplane_far/M0<<" ";
     out<<std::setprecision(15)<<Mperp_near/M0<<" "<<Mperp_far/M0<<endl;
-
     CudaCheckError();
   }
-
-
 }
 
 //Returns Var(noise)
@@ -496,8 +417,7 @@ double3 singleParticleNoise(real T, real3 L, long double &M0, long double &real_
   int N = 1;
   auto sys = make_shared<System>();
   sys->rng().setSeed(1234791);
-  auto pd = make_shared<ParticleData>(N, sys);  
-
+  auto pd = make_shared<ParticleData>(N, sys);
   Box box(L);
   BDHI::FCM::Parameters par;
   par.temperature = T;
@@ -506,13 +426,9 @@ double3 singleParticleNoise(real T, real3 L, long double &M0, long double &real_
   par.dt = 1.0;
   par.box = box;
   par.tolerance = tolerance;
-
-
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd, par);
-
   M0 = bdhi->getSelfMobility();
   real_rh = bdhi->getHydrodynamicRadius();
-
   double3 prevp;
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
@@ -534,9 +450,7 @@ double3 singleParticleNoise(real T, real3 L, long double &M0, long double &real_
     prevp = make_double3(p[0]);
   }
   variance /= real(nsteps);
-
   sys->finish();
-
   return variance;
 }
 

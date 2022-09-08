@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2020. Immersed Boundary Method (IBM).
+/*Raul P. Pelaez 2019-2021. Immersed Boundary Method (IBM).
   See IBM.cuh
  */
 #include"IBM.cuh"
@@ -70,36 +70,27 @@ namespace uammd{
 	real *weightsX = &weights[0];
 	const int tid = threadIdx.x;
 	for(int i = tid; i<support.x; i+=blockDim.x){
-	  int cj = grid.pbc_cell_coord<0>(celli.x + i - P.x);
-	  const auto cellj = make_int3(cj, celli.y, celli.z);
-	  const real rij = grid.distanceToCellCenter(pi, cellj).x;
-	  weightsX[i] = detail::phiX(kernel, rij, pi);
-	  	 //  printf("Particle with position %g %g %g, at cell %d %d %d, spreads with weight %.15g in X to cell %d (distance %.15g)\n",
-		 // pi.x, pi.y, pi.z, celli.x, celli.y, celli.z,
-		 // weightsX[i],
-		 // 	 cellj.x, rij);
+	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
+	  if(cellj.x>=0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).x;
+	    weightsX[i] = detail::phiX(kernel, rij, pi);
+	  }
 	}
 	real *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
-	  const real rij = grid.distanceToCellCenter(pi, cellj).y;
-	  weightsY[i] = detail::phiY(kernel,rij, pi);
-	  // printf("Particle with position %g %g %g, at cell %d %d %d, spreads with weight %.15g in Y to cell %d (distance %.15g)\n",
-	  // 	 pi.x, pi.y, pi.z, celli.x, celli.y, celli.z,
-	  // 	 weightsY[i],
-	  // 	 cellj.y, rij);
+	  if(cellj.y>=0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).y;
+	    weightsY[i] = detail::phiY(kernel, rij, pi);
+	  }
 	}
 	real *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
-	  const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	  if(cellj.z>0){
+	  if(cellj.z>=0){
+	    const real rij = grid.distanceToCellCenter(pi, cellj).z;
 	    weightsZ[i] = detail::phiZ(kernel, rij, pi);
 	  }
-	  // printf("Particle with position %g %g %g, at cell %d %d %d, spreads with weight %.15g in Z to cell %d (distance %.15g)\n",
-	  // 	 pi.x, pi.y, pi.z, celli.x, celli.y, celli.z,
-	  // 	 weightsZ[i],
-	  // 	 cellj.z, rij);
 	}
       }
 
@@ -161,6 +152,8 @@ namespace uammd{
 	const int jj=(i/support.x)%support.y;
 	const int kk=is2D?0:(i/(support.x*support.y));
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
+	if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	  continue;
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	const auto weight = weightCompute(vi,kern);
@@ -232,6 +225,8 @@ namespace uammd{
 	  const int jj=(i/support.x)%support.y;
 	  const int kk=is2D?0:(i/(support.x*support.y));
 	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
+	  if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	    continue;
 	  const real dV = qw(cellj, grid);
 	  const int jcell = cell2index(cellj);
 	  const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);

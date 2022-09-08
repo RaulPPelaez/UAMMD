@@ -15,13 +15,14 @@
 
 #ifndef PARAMETERUPDATABLE_H
 #define PARAMETERUPDATABLE_H
-
 #include"global/defines.h"
 #include"utils/Box.cuh"
-
-
+#include<third_party/boost/preprocessor.hpp>
+#include<third_party/boost/preprocessor/stringize.hpp>
+#include<third_party/boost/preprocessor/seq/for_each.hpp>
+#include<third_party/boost/preprocessor/tuple/elem.hpp>
 #ifndef EXTRA_UPDATABLE_PARAMETERS
-#define EXTRA_UPDATABLE_PARAMETERS 
+#define EXTRA_UPDATABLE_PARAMETERS
 #endif
 //Add here any parameter you want along its type, after adding it here the function updateWHATEVER(type) will
 //be available for all ParameterUpdatable modules

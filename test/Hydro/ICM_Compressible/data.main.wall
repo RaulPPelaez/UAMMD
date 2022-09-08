@@ -1,0 +1,14 @@
+dt  0.005
+boxSize  64 64 64
+cellDim  64 64 64
+bulkViscosity 10
+speedOfSound  0.015625
+shearViscosity 12.868
+temperature 0
+initialDensity 1.0
+
+wallFreq 1e-3
+
+relaxTime 1000 #A full oscillation with freq 1e-3
+simulationTime 2000
+printTime      50

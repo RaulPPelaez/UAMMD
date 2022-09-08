@@ -70,7 +70,7 @@ namespace uammd{
 	initializeKernelTorque(par);
 	printMessages(par);
 	initCuFFT();
-	CudaSafeCall(cudaDeviceSynchronize());      
+	CudaSafeCall(cudaDeviceSynchronize());
 	CudaCheckError();
       }
 
@@ -79,7 +79,7 @@ namespace uammd{
 	cufftDestroy(cufft_plan_inverse);
 	cufftDestroy(cufft_plan_forward);
       }
-      
+
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
       }
@@ -110,16 +110,16 @@ namespace uammd{
 				       int numberParticles, real temperature, real prefactor, cudaStream_t st);
 
     private:
-      
+
       cudaStream_t st;
       uint seed;
 
       real viscosity;
       real hydrodynamicRadius;
-      
+
       std::shared_ptr<Kernel> kernel;
       std::shared_ptr<KernelTorque> kernelTorque;
-      
+
       Box box;
       Grid grid;
 
@@ -127,7 +127,7 @@ namespace uammd{
       thrust::device_vector<char> cufftWorkArea;
 
       Parameters par;
-      
+
       void initializeGrid(Parameters par){
 	int3 cellDim;
 	real h;
@@ -140,7 +140,6 @@ namespace uammd{
 	else{
 	  cellDim = par.cells;
 	}
-	h = box.boxSize.x/cellDim.x;
 	this->grid = Grid(box, cellDim);
       }
 
@@ -244,12 +243,12 @@ namespace uammd{
     };
 
     namespace fcm_detail{
-      
+
       struct ToReal3{
 	template<class vtype>
 	inline __device__ real3 operator()(vtype q){return make_real3(q);}
       };
-      
+
       template<class IterPos, class IterForce, class Kernel>
       cached_vector<real3> spreadForces(IterPos& pos, IterForce& force,
 					int numberParticles,
@@ -291,8 +290,8 @@ namespace uammd{
 	const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
 	const real half = real(0.5);
 	const bool isUnpairedX = ik.x == (nk.x - ik.x);
-	const bool isUnpairedY = ik.y == (nk.y - ik.y);	
-	const bool isUnpairedZ = ik.z == (nk.z - ik.z);	
+	const bool isUnpairedY = ik.y == (nk.y - ik.y);
+	const bool isUnpairedZ = ik.z == (nk.z - ik.z);
 	real Dx = isUnpairedX?0:k.x;
 	real Dy = isUnpairedY?0:k.y;
 	real Dz = isUnpairedZ?0:k.z;
@@ -301,13 +300,13 @@ namespace uammd{
 	gridVeli.x = {half*(-Dy*gridi.z.y + Dz*gridi.y.y),
 	  half*(Dy*gridi.z.x - Dz*gridi.y.x)};
 	gridVeli.y = {half*(-Dz*gridi.x.y + Dx*gridi.z.y),
-	  half*(Dz*gridi.x.x-Dx*gridi.z.x)};	
+	  half*(Dz*gridi.x.x-Dx*gridi.z.x)};
 	gridVeli.z = {half*(-Dx*gridi.y.y + Dy*gridi.x.y),
 	  half*(Dx*gridi.y.x - Dy*gridi.x.x)};
 	gridVelsFourier[id] += gridVeli;
       }
 
-      
+
       template<class IterPos, class IterTorque, class Kernel>
       void addSpreadTorquesFourier(IterPos& pos, IterTorque& torque, int numberParticles,
 				   Grid grid,
@@ -316,7 +315,7 @@ namespace uammd{
 				   cached_vector<cufftComplex3>& gridVelsFourier, cudaStream_t st){
 	/*Spread force on particles to grid positions -> S·F*/
 	System::log<System::DEBUG2>("[BDHI::FCM] Spreading torques");
-	int3 n = grid.cellDim;     
+	int3 n = grid.cellDim;
 	auto torque_r3 = thrust::make_transform_iterator(torque, ToReal3());
 	cached_vector<real3> gridTorques(n.x*n.y*n.z);
 	auto d_gridTorques3 = thrust::raw_pointer_cast(gridTorques.data());
@@ -361,7 +360,7 @@ namespace uammd{
 	factor.x *= B;
 	factor.y *= B;
 	factor.z *= B;
-	gridVels[id] = projectFourier(k, factor);	
+	gridVels[id] = projectFourier(k, factor);
       }
 
       void convolveFourier(cached_vector<cufftComplex3>& gridVelsFourier, real viscosity, Grid grid, cudaStream_t st){
@@ -458,7 +457,7 @@ namespace uammd{
 	  gridVelsFourier[id_conj] += projectFourier(k, factor);
 	}
 }
-            
+
       void addBrownianNoise(cached_vector<cufftComplex3>& gridVelsFourier,
 			    real temperature, real viscosity, real prefactor,
 			    uint seed,
@@ -497,7 +496,7 @@ namespace uammd{
 	CufftSafeCall(cufftExecComplex2Real<real>(plan, d_gridFourier, d_gridReal));
 	return gridReal;
       }
-    
+
       template<class IterPos, class Kernel>
       cached_vector<real3> interpolateVelocity(IterPos& pos, cached_vector<real3>& gridVels,
 					       Grid grid, std::shared_ptr<Kernel> kernel,
@@ -514,7 +513,7 @@ namespace uammd{
 	CudaCheckError();
 	return linearVelocities;
       }
-      
+
       //Compute the curl of the velocity, V, in Fourier space. This is equal to the angular velocity
       // 0.5\nabla \times V = 0.5 (i*k_x i*k_y i*k_z)\times (V_x V_y V_z) =
       // = 0.5( i*k_y*V_z - i*k_z(V_y), i*k_z(V_x) - i*k_x*V_z, i*k_x*V_y - i*k_y*V_x)
@@ -532,8 +531,8 @@ namespace uammd{
 	const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
 	const real half = real(0.5);
 	const bool isUnpairedX = ik.x == (nk.x - ik.x);
-	const bool isUnpairedY = ik.y == (nk.y - ik.y);	
-	const bool isUnpairedZ = ik.z == (nk.z - ik.z);	
+	const bool isUnpairedY = ik.y == (nk.y - ik.y);
+	const bool isUnpairedZ = ik.z == (nk.z - ik.z);
 	const real Dx = isUnpairedX?0:k.x;
 	const real Dy = isUnpairedY?0:k.y;
 	const real Dz = isUnpairedZ?0:k.z;
@@ -547,7 +546,7 @@ namespace uammd{
 	  half*(Dx*gridLinear.y.x - Dy*gridLinear.x.x)};
 	gridAngVelsFourier[id] = gridAng;
       }
-      
+
       cached_vector<cufftComplex3> computeGridAngularVelocityFourier(cached_vector<cufftComplex3>& gridVelsFourier,
 								     Grid grid,  cudaStream_t st){
 	const int3 n = grid.cellDim;
@@ -614,7 +613,7 @@ namespace uammd{
       CudaCheckError();
       return {linearVelocities, angularVelocities};
     }
-  }  
+  }
 }
 
 #endif

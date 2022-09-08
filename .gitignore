@@ -10,6 +10,9 @@
 !extensions
 src/Interactor/Experimental
 *.o
+*.so
+*log
+*.test
 a.out
 *~
 *.particles

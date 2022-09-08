@@ -1,3 +1,6 @@
+/*Raul P. Pelaez 2019-2021. Some utilities for working with Chebyshev grids.
+
+ */
 #ifndef CHEVYSHEVUTILS_CUH
 #define CHEVYSHEVUTILS_CUH
 #include"global/defines.h"
@@ -119,7 +122,7 @@ namespace uammd{
 	    ncells = cellDim.y;
 	  }
 	  if(coordinate == 2){
-	    return cell;
+	    return (cell<0 or cell>=cellDim.z)?-1:cell;
 	  }
 	  if(cell <= -1) cell += ncells;
 	  else if(cell >= ncells) cell -= ncells;

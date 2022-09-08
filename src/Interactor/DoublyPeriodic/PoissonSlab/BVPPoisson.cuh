@@ -145,8 +145,10 @@ namespace uammd{
 	const int2 nk = {cellDim.x, cellDim.y};
 	auto klist = DPPoissonSlab_ns::make_wave_vector_modulus_iterator(nk, Lxy);
 	auto topBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0),
-						     DPPoissonSlab_ns::BoundaryConditionsDispatch<>());
-	auto bottomBC = topBC;
+						     BoundaryConditionsDispatch<TopBoundaryConditions, decltype(klist)>(klist, H));
+	auto bottomBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0),
+						   BoundaryConditionsDispatch<BottomBoundaryConditions, decltype(klist)>(klist, H));
+
 	int numberSystems = (nk.x/2+1)*nk.y;
 	this->bvpSolver = std::make_shared<BVP::BatchedBVPHandler>(klist, topBC, bottomBC, numberSystems, H, cellDim.z);
 	CudaCheckError();

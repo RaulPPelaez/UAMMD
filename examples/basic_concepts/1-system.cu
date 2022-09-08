@@ -15,11 +15,11 @@ using namespace uammd;
 int main(int argc, char* argv[]){
   //Many UAMMD modules (if not all) are stored in C++ shared pointers.
   //On creation, System will initialize the CUDA and UAMMD environments
-  //System can read a few options from command line if provided with argc,argv. But lets ignore that for now. 
+  //System can read a few options from command line if provided with argc,argv. But lets ignore that for now.
   auto sys = std::make_shared<System>(argc, argv);
   //If succesfull some messages will be printed to the terminal with environment and UAMMD information.
   //Otherwise an error will be thrown and the execution will be halted.
-  
+
   //Whenever UAMMD is not needed anymore it is a good idea to destroy any object related to it and then call sys->finish()
   // this will gracefully complete any pending cleanup operations.
   // Freeing all memory allocated and leaving the environment free to be used by any other code outside UAMMD.

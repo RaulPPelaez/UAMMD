@@ -40,7 +40,7 @@ namespace uammd{
 
       UninitializedCachedContainer(const std::vector<T> &other):
 	UninitializedCachedContainer(other.size()){
-	thrust::copy(other.begin(), other.end(), thrust::device_ptr<T>(begin()));
+	thrust::copy(other.begin(), other.end(), begin());
       }
 
       iterator begin() const{ return iterator(data()); }
@@ -74,6 +74,10 @@ namespace uammd{
 	resize(0);
 	m_data = create(0);
 	capacity = 0;
+      }
+
+      void swap(UninitializedCachedContainer<T> & another){
+        m_data.swap(another.m_data);
       }
     };
   }

@@ -35,7 +35,7 @@ namespace uammd{
 
       FCM(shared_ptr<ParticleData> pd, Parameters par):
 	FCM(std::make_shared<ParticleGroup>(pd, "All"), par){}
-      
+
       FCM(shared_ptr<ParticleGroup> pg, Parameters par):
         pg(pg),
 	temperature(par.temperature), dt(par.dt){
@@ -105,13 +105,13 @@ namespace uammd{
       ~FCMIntegrator(){
 	cudaStreamDestroy(st);
       }
-      
+
       void forwardTime() override;
 
       auto getFCM_impl(){
 	return fcm;
       }
-      
+
     private:
       uint steps = 0;
       cudaStream_t st;
@@ -120,7 +120,7 @@ namespace uammd{
       void resetForces();
       void resetTorques();
       auto computeHydrodynamicDisplacements();
-      void computeCurrentForces();      
+      void computeCurrentForces();
     };
   }
 }

@@ -55,7 +55,7 @@ namespace uammd{
 	    real w = computeW(tolerance);
 	    //real beta=sqrt(2*M_PI)*w*2;
 	    real beta=1.8*w*2;
-	    return IBM_kernels::BarnettMagland(w, beta);
+	    return IBM_kernels::BarnettMagland(w, w*0.5, beta);
 	  }
 	  static real computeW(real tolerance){
 	    real w = std::max(1.5, int(-log10(tolerance) + 2)/2.0);

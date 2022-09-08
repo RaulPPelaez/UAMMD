@@ -370,6 +370,12 @@ VECATTR  float4 floorf(const float4 &a){
 
 VECATTR float dot(float4 a, float4 b){return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;}
 
+VECATTR float4 normalize(float4 v)
+{
+  float invLen = 1.0/sqrt(dot(v, v));
+  return v * invLen;
+}
+
 
 
 namespace uammd{
@@ -387,6 +393,7 @@ VECATTR real4 make_real4(real s){return make_real4(s, s, s, s);}
 VECATTR real4 make_real4(real3 a){ return make_real4(a.x, a.y, a.z, real(0.0));}
 VECATTR real4 make_real4(real3 a, real w){ return make_real4(a.x, a.y, a.z, w);}
 VECATTR real4 make_real4(real2 a){ return make_real4(a.x, a.y, real(0.0), real(0.0));}
+VECATTR real4 make_real4(real2 a, real z, real w){ return make_real4(a.x, a.y, z, w);}
 #ifdef SINGLE_PRECISION
 VECATTR real4 make_real4(double3 a, real w){return make_real4(a.x, a.y, a.z, w);}
 #else
@@ -865,21 +872,30 @@ VECATTR int dot(const int2 &a, const int2 &b){return a.x * b.x + a.y * b.y;}
 
 
 VECATTR double length(double3 v){return sqrt(dot(v, v));}
-VECATTR double3 normalize(double3 v)
-{
-  double invLen = 1.0/sqrt(dot(v, v));
+
+VECATTR double3 normalize(double3 v){
+  double invLen = rsqrt(dot(v, v));
+  return v * invLen;
+}
+
+VECATTR float length(float3 v){return sqrt(dot(v, v));}
+
+VECATTR float3 normalize(float3 v){
+  float invLen = rsqrtf(dot(v, v));
   return v * invLen;
 }
 
 VECATTR double3 cross(double3 a, double3 b){
   return make_double3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
+
 VECATTR float3 cross(float3 a, float3 b){
   return make_float3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
 
 
 VECATTR float3 sqrt(const float3 &a){ return {sqrtf(a.x), sqrtf(a.y), sqrtf(a.z)};}
+
 VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
 
 

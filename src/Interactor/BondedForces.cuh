@@ -43,12 +43,12 @@ namespace uammd{
   struct ComputeType{
     real3 force;
     real virial;
-    real energy;      
+    real energy;
   };
-    
+
   //Functors with different bond potentials
   namespace BondedType{
-    
+
     namespace detail{
       inline __device__ real harmonicForceModulusDivR(real invr, real k, real r0){
 	const real f = -k*(real(1.0)-r0*invr); //F = -k·(r-r0)·rvec/r
@@ -75,6 +75,8 @@ namespace uammd{
     }
     //Harmonic bond for pairs of particles
     struct Harmonic{
+      Box box;
+      Harmonic(Box box = Box()): box(box){}
       //Place in this struct whatever static information is needed for a given bond
       //In this case spring constant and equilibrium distance
       //the function readBond below takes care of reading each BondInfo from the file
@@ -90,12 +92,16 @@ namespace uammd{
       inline __device__ ComputeType compute(int bond_index,
 					    int ids[2], real3 pos[2],
 					    Interactor::Computables comp, BondInfo bi){
-	real3 r12 = pos[1]-pos[0];
-	return detail::harmonicBond(r12, comp, bi.k, bi.r0);
+	auto ri = pos[0];
+	auto rj = pos[1];
+	if(bond_index == ids[0])
+	  thrust::swap(ri, rj);
+	real3 rij = box.apply_pbc(rj-ri);
+	return detail::harmonicBond(rij, comp, bi.k, bi.r0);
       }
 
       //This function will be called for each bond in the bond file and read the information of a bond
-      //It must use the stream that is handed to it to construct a BondInfo.  
+      //It must use the stream that is handed to it to construct a BondInfo.
       static __host__ BondInfo readBond(std::istream &in){
 	/*BondedForces will read i j, readBond has to read the rest of the line*/
 	BondInfo bi;
@@ -103,18 +109,6 @@ namespace uammd{
 	return bi;
       }
 
-    };
-
-    //Same as Harmonic, but applies Periodic boundary conditions to the distance of a pair
-    struct HarmonicPBC: public Harmonic{
-      Box box;
-      HarmonicPBC(Box box): box(box){}
-      inline __device__ ComputeType compute(int bond_index,
-					    int ids[2], real3 pos[2],
-					    Interactor::Computables comp, BondInfo bi){
-	real3 r12 = box.apply_pbc(pos[1]-pos[0]);
-	return detail::harmonicBond(r12, comp, bi.k, bi.r0);
-      }
     };
 
     namespace detail{
@@ -140,7 +134,12 @@ namespace uammd{
       }
     }
 
-    struct FENE{
+    class FENE{
+      Box box;
+      public:
+
+      FENE(Box box = Box()): box(box){}
+
       struct BondInfo{
 	real r0, k;
       };
@@ -148,27 +147,19 @@ namespace uammd{
       inline __device__ ComputeType compute(int bond_index,
 					    int ids[2], real3 pos[2],
 					    Interactor::Computables comp, BondInfo bi){
-	real3 r12 = pos[1]-pos[0];
-	return detail::feneBond(r12, comp, bi.k, bi.r0);
-      }      
+	auto ri = pos[0];
+	auto rj = pos[1];
+	if(bond_index == ids[0])
+	  thrust::swap(ri, rj);
+	real3 rij = box.apply_pbc(rj-ri);
+	return detail::feneBond(rij, comp, bi.k, bi.r0);
+      }
 
       static BondInfo readBond(std::istream &in){
 	BondInfo bi;
 	in>>bi.k>>bi.r0;
 	return bi;
       }
-
-    };
-    
-    struct FENEPBC: public FENE{
-      Box box;
-      FENEPBC(Box box): box(box){}
-      inline __device__ ComputeType compute(int bond_index,
-					    int ids[2], real3 pos[2],
-					    Interactor::Computables comp, BondInfo bi){
-	real3 r12 = box.apply_pbc(pos[1]-pos[0]);
-	return detail::feneBond(r12, comp, bi.k, bi.r0);
-      }      
 
     };
 
@@ -216,9 +207,3 @@ namespace uammd{
 #include"BondedForces.cu"
 
 #endif
-
-
-
-
-
-
