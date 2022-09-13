@@ -55,13 +55,6 @@ namespace uammd{
 	if(cellSize.z>0 and distanceToLeftMostCell.z >= support.z*cellSize.z/real(2.0)){
 	  P.z -=1;
 	}
-	// printf("Particle at %g %g %g (cell %d %d %d) has shift %d %d %d. Distance to cell is %g %g %g\n",
-	//        pos.x, pos.y, pos.z,
-	//        celli.x, celli.y, celli.z,
-	//        P.x, P.y, P.z,
-	//        distanceToLeftMostCell.x, distanceToLeftMostCell.y, distanceToLeftMostCell.z
-
-	//        );
 	return P;
       }
 
