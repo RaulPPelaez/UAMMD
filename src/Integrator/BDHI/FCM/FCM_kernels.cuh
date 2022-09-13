@@ -10,6 +10,7 @@ TODO:
  */
 #ifndef FCM_KERNELS_CUH
 #define FCM_KERNELS_CUH
+#include "uammd.cuh"
 #include "Integrator/BDHI/BDHI.cuh"
 #include "misc/IBM_kernels.cuh"
 namespace uammd{
@@ -85,19 +86,21 @@ namespace uammd{
 	  IBM_kernels::BarnettMagland bm;
 
 	  IBM_kernels::BarnettMagland initBM(real tolerance){
-	    real w = computeW(tolerance);
+	    int w = computeSupport(tolerance);
 	    real beta=1.8*w*2;
-	    return IBM_kernels::BarnettMagland(w, w*0.5, beta);
+	    return IBM_kernels::BarnettMagland(w*0.5, beta);
 	  }
-	  static real computeW(real tolerance){
-	    real w = std::max(1.5, int(-log10(tolerance) + 2)/2.0);
-	    w = std::min(real(9.0), w);
-	    return w;
+
+	  static int computeSupport(real tolerance){
+	    real i_w = std::max(1.5, int(-log10(tolerance) + 2)/2.0);
+	    i_w = std::min(real(9.0), i_w);
+	    return ceil(i_w);
 	  }
-	  static real computeUpsampling(real w){
+
+	  static real computeUpsampling(real i_w){
 	    //Empirical fit from the taylor expansion of the BM kernel, the first term goes with x^2
 	    //Which allows to make a simil with a gaussian such that \sigma = w/sqrt(beta)
-	    return 1.36409985665115*pow(w,-0.53028415751646);
+	    return 1.36409985665115*pow(i_w,-0.53028415751646);
 	    //This is the fitted data:
 	    //fac = 4.863392908150500e-01; //w=7
 	    //fac = 7.617116421559339e-01; //w=3
@@ -109,29 +112,47 @@ namespace uammd{
 	    //fac = 6.525743222080990e-01; //w=4
 	    //fac = 5.269758326738209e-01; //w=6
 	  }
+
+	  auto initBM(real alpha, real beta){
+	    return IBM_kernels::BarnettMagland(alpha, beta);
+	  }
+
 	  real a;
 	public:
 	  int support;
 
+	  BarnettMagland(real width, real h, real tolerance):
+	    BarnettMagland(h, tolerance){
+	    System::log<System::EXCEPTION>("BarnettMagland: This constructor cannot be called");
+	    throw std::runtime_error("Invalid constructor");
+	  }
+
 	  BarnettMagland(real h, real tolerance):
 	    bm(initBM(tolerance)){
-	    support = int(2*bm.w + 0.5);
+	    support = ceil(2*bm.alpha);
+	    this->a = h;
+	  }
+
+	  BarnettMagland(real w, real alpha, real beta, real h):
+	    bm(alpha, beta){
+	    support = ceil(2*bm.alpha);
 	    this->a = h;
 	  }
 
 	  static real adviseGridSize(real hydrodynamicRadius, real tolerance){
-	    real w = computeW(tolerance);
+	    real w = computeSupport(tolerance);
 	    real upsampling = computeUpsampling(w);
 	    return hydrodynamicRadius*upsampling;
 	  }
 
 	  real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
-	    real upsampling = computeUpsampling(bm.w);
+	    real upsampling = computeUpsampling(support);
 	    return h/upsampling;
 	  }
 
 	  __host__ __device__ real phi(real r, real3 pos) const{
-	    return bm.phi(r/a)/a;
+	    auto kern = bm.phi(r/a)/a;
+	    return kern;
 	  }
 
 	};
