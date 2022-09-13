@@ -13,7 +13,6 @@ namespace uammd{
     class UninitializedCachedContainer{
       using Container = std::shared_ptr<T>;
       using Ptr = T*;
-      using iterator = typename thrust::device_vector<T>::iterator;
       Container m_data;
       size_t m_size, capacity;
 
@@ -33,12 +32,19 @@ namespace uammd{
       }
 
     public:
+      using iterator = typename thrust::device_vector<T>::iterator;
+
       UninitializedCachedContainer(size_t i_size = 0)
 	: m_size(0), capacity(0), m_data() {
 	this->resize(i_size);
       }
 
       UninitializedCachedContainer(const std::vector<T> &other):
+	UninitializedCachedContainer(other.size()){
+	thrust::copy(other.begin(), other.end(), begin());
+      }
+
+      UninitializedCachedContainer(const UninitializedCachedContainer<T> &other):
 	UninitializedCachedContainer(other.size()){
 	thrust::copy(other.begin(), other.end(), begin());
       }
@@ -79,6 +85,10 @@ namespace uammd{
       void swap(UninitializedCachedContainer<T> & another){
         m_data.swap(another.m_data);
       }
+
+      // auto operator=(UninitializedCachedContainer<T> &other){
+      // 	return UninitializedCachedContainer<T>(other);
+      // }
     };
   }
 
