@@ -151,7 +151,7 @@ namespace uammd{
 	  cellDim = make_int3(box.boxSize/h);
 	  cellDim = nextFFTWiseSize3D(cellDim);
 	  if(par.adaptBoxSize){
-	    box.boxSize = make_real3(cellDim*h);
+	    box = Box(make_real3(cellDim)*h);
 	  }
 	}
 	else{
