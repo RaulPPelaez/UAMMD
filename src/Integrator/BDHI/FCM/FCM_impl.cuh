@@ -148,10 +148,10 @@ namespace uammd{
 	  if(par.hydrodynamicRadius<=0)
 	    System::log<System::CRITICAL>("[BDHI::FCM] I need an hydrodynamic radius if cell dimensions are not provided!");
 	  h = Kernel::adviseGridSize(par.hydrodynamicRadius, par.tolerance);
-	  cellDim = make_int3(par.box.boxSize/h);
+	  cellDim = make_int3(box.boxSize/h);
 	  cellDim = nextFFTWiseSize3D(cellDim);
 	  if(par.adaptBoxSize){
-	    par.box.boxSize = make_real3(cellDim*h);
+	    box.boxSize = make_real3(cellDim*h);
 	  }
 	}
 	else{
