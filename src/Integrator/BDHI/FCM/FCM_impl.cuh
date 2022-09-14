@@ -47,6 +47,8 @@ namespace uammd{
       struct Parameters: BDHI::Parameters{
 	int3 cells = make_int3(-1, -1, -1); //Number of Fourier nodes in each direction
 	uint seed = 0;
+	//If true the box size will be adapted to enforce the hydrodynamic radius
+	bool adaptBoxSize = false;
 	std::shared_ptr<Kernel> kernel = nullptr;
 	std::shared_ptr<KernelTorque> kernelTorque = nullptr;
       };
@@ -146,7 +148,11 @@ namespace uammd{
 	  if(par.hydrodynamicRadius<=0)
 	    System::log<System::CRITICAL>("[BDHI::FCM] I need an hydrodynamic radius if cell dimensions are not provided!");
 	  h = Kernel::adviseGridSize(par.hydrodynamicRadius, par.tolerance);
-	  cellDim = nextFFTWiseSize3D(make_int3(par.box.boxSize/h));
+	  cellDim = make_int3(par.box.boxSize/h);
+	  cellDim = nextFFTWiseSize3D(cellDim);
+	  if(par.adaptBoxSize){
+	    par.box.boxSize = make_real3(cellDim*h);
+	  }
 	}
 	else{
 	  cellDim = par.cells;
