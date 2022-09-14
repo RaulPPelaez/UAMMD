@@ -30,8 +30,8 @@ temperature=1
 viscosity=1
 hydrodynamicRadius=1
 
-tolerance=1e-4
-make fcm
+tolerance=1e-14
+#make fcm
 
 resultsFolder=results
 figuresFolder=figures
@@ -81,7 +81,6 @@ function hydrodynamicRadiusVariance {
 
 }
 
-
 function extrapolate {
     #Extrapolates the results of the mobility matrix to L=inf by fitting to a polynomy with gnuplot.
     file=$1
@@ -119,8 +118,6 @@ function pairMobilityCubicBox {
     mv pairMobilityCubicBox.*test uammd.pairMobility.log results/
 }
 
-
-
 function selfMobility_q2D {
     echo "Self Mobility q2D test"
     ./fcm selfMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.selfMobility_q2D.log 2>&1
@@ -133,63 +130,74 @@ function selfMobility_q2D {
 
 function selfDiffusionCubicBox {
     echo "Self diffusion cubic box test"
-    ./fcm selfDiffusionCubicBox $temperature $viscosity $hydrodynamicRadius $tolerance  > uammd.selfDiffusion.log 2>&1
-    g++ -std=c++11 -O3 tools/msd.cpp tools/Timer.cpp -o msd
+    ./fcm selfDiffusionCubicBox $temperature $viscosity $hydrodynamicRadius $tolerance \
+	  > uammd.selfDiffusion.log 2>&1
+    #g++ -std=c++11 -O3 tools/msd.cpp tools/Timer.cpp -o msd
     for i in $(ls pos.noise*.test)
     do
 	echo "Doing $i" >/dev/stderr
-	L=$(echo $i | cut -d. -f3,4 | sed 's+boxSize++')
-	D0=$(echo $i | awk -F Ds '{print $2}' | awk -F .rh '{print $1}')
-	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .Ds '{print $1}')
-	#PBC corrections up to sixth order in L
-	#D0=$(echo 1 | awk '{l=1/'$L';print '$temperature'/(6*3.14159265358979*'$viscosity'*'$hydrodynamicRadius')*(1-2.837297*l+(4/3.0)*3.14159265358979*l**3-27.4*l**6);}')
-
-	./msd -N $(grep -n "#" -m 2 $i | cut -d: -f1 | paste -sd" " | awk '{print $2-$1-1}') -Nsteps $(grep -c "#" $i)  $i 2>/dev/null | awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd
-
+	L=$(head -1 $i | awk '{print $2}')
+	D0=$(head -1 $i | awk '{print $4}')
+	dt=$(head -1 $i | awk '{print $5}')
+	N=$(grep -n "#" -m 2 $i |
+	    cut -d: -f1 |
+	    paste -sd" " |
+	    awk '{print $2-$1-1}')
+	msd -N $N -Nsteps $(grep -c "#" $i)  $i 2>/dev/null |
+	    awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd
 	#Fit msd to 2*t*a*D0 in each direction, so "a" should be 1. Weight points with 1/t^4 when fitting.
-	slope=$(gnuplot -e 'set fit quiet; f(x) = 2*x*a*'$D0'; do for [i=2:4]{ fit f(x) "'$i'.msd" u 1:(column(i)):($1*$1):(1e-30) errors x,z via a; print a;}' 2>&1)
+	slope=$(gnuplot -e 'set print "-";
+			    set fit quiet;
+			    f(x) = 2*x*a*'$D0';
+			     do for [i=2:4]{
+			        fit f(x) "'$i'.msd" u 1:(column(i)):($1*$1):(1e-30) errors x,z via a;
+			        print a;}' 2>/dev/null)
 
 	echo $L $slope
     done | sort -g -k1  > results/selfDiffusionCubicBox.test
-	gracebat  -nxy results/selfDiffusionCubicBox.test -par tools/selfDiffusionCubicBox.par -hdevice EPS -printfile figures/selfDiffusionCubicBox.eps
-
+    gracebat  -nxy results/selfDiffusionCubicBox.test \
+	      -par tools/selfDiffusionCubicBox.par \
+	      -hdevice EPS -printfile figures/selfDiffusionCubicBox.eps
 	maxDeviation=$(cat results/selfDiffusionCubicBox.test |
 			   awk '{print $2, $3, $4}' |
 			   tr ' ' '\n' |
 			   awk '{print sqrt((1-$1)**2)}' |
 			   datamash -W max 1 )
-
 	echo "Maximum deviation from expected diffusion: $maxDeviation"
 	mv pos.noise* uammd.selfDiffusion.log results/
 	rm msd
-
 }
 
 
 function selfDiffusion_q2D {
     echo "Self diffusion q2D test"
-    ./fcm selfDiffusion_q2D $temperature $viscosity $hydrodynamicRadius $tolerance  > uammd.selfDiffusion_q2D.log 2>&1
-    g++ -std=c++11 -O3 tools/msd.cpp tools/Timer.cpp -o msd
+    ./fcm selfDiffusion_q2D $temperature $viscosity $hydrodynamicRadius $tolerance \
+	  > uammd.selfDiffusion_q2D.log 2>&1
+    #g++ -std=c++11 -O3 tools/msd.cpp tools/Timer.cpp -o msd
     for i in $(ls pos.noise*.*q2D*test)
     do
 	echo "Doing $i" >/dev/stderr
-	dt=$(echo $i | awk -F dt '{print $2}' | awk -F .Ds '{print $1}')
-	real_rh=$(echo $i | awk -F rh '{print $2}' | awk -F .q2D '{print $1}')
-	D0=$(echo 1 | awk '{print '$temperature'/(6*3.1415*'$viscosity'*'$real_rh');}')
+	L=$(head -1 $i | awk '{print $3}')
+	D0=$(head -1 $i | awk '{print $4}')
+	dt=$(head -1 $i | awk '{print $5}')
+	real_rh=$(head -1 $i | awk '{print $6}')
 	N=$(grep -n "#" -m 2 $i | cut -d: -f1 | paste -sd" " | awk '{print $2-$1-1}')
 	Nsteps=$(grep -c "#" $i)
-	./msd -N $N -Nsteps $Nsteps $i 2> /dev/null | awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd
-
+	msd -N $N -Nsteps $Nsteps $i 2> /dev/null |
+	    awk '{print $1*'$dt', $2, $3, $4}'  > $i.msd
 	#Fit msd to 2*t*a*D0 in each direction, so "a" should be 1. Weight points with 1/t^4 when fitting.
-	slope=$(gnuplot -e 'set fit quiet; f(x) = 2*x*a*'$D0'; do for [i=2:4]{ fit f(x) "'$i'.msd" u 1:(column(i)):($1*$1):(1e-30) errors x,z via a; print a;}' 2>&1)
-
-	L=$(echo $i | cut -d. -f3,4 | sed 's+boxSize++')
-
+	slope=$(gnuplot -e 'set print "-";
+			    set fit quiet;
+			    f(x) = 2*x*a*'$D0';
+			    do for [i=2:4]{
+			      fit f(x) "'$i'.msd" u 1:(column(i)):($1*$1):(1e-30) errors x,z via a;
+			      print a;}' 2>/dev/null)
 	echo $L $slope
     done | sort -g -k1 > results/selfDiffusion_q2D.test
-
-    gracebat  -nxy results/selfDiffusion_q2D.test -nxy selfDiffusion_q2D.theo -par tools/selfDiffusion_q2D.par -hdevice EPS -printfile figures/selfDiffusion_q2D.eps
-
+    gracebat  -nxy results/selfDiffusion_q2D.test \
+	      -nxy selfDiffusion_q2D.theo \
+	      -par tools/selfDiffusion_q2D.par \
+	      -hdevice EPS -printfile figures/selfDiffusion_q2D.eps
     mv pos.noise* uammd.selfDiffusion_q2D.log selfDiffusion_q2D.theo  results/
     rm msd
 }
@@ -204,12 +212,12 @@ function noiseVariance {
 
 
 #./fcm pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1
-selfMobilityCubicBox
-hydrodynamicRadiusVariance
-pairMobilityCubicBox
-selfMobility_q2D
+#selfMobilityCubicBox
+#hydrodynamicRadiusVariance
+#pairMobilityCubicBox
+#selfMobility_q2D
 selfDiffusionCubicBox
 selfDiffusion_q2D
-noiseVariance
+#noiseVariance
 
 rm -f fit.log

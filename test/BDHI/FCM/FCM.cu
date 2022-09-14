@@ -355,7 +355,9 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd,  par);
   M0 = bdhi->getSelfMobility();
   real_rh = bdhi->getHydrodynamicRadius();
-  std::ofstream out("pos.noise.boxSize"+std::to_string(L.z/bdhi->getHydrodynamicRadius())+".dt"+std::to_string(par.dt)+".Ds"+std::to_string(temperature*M0)+".rh"+std::to_string(real_rh)+"."+suffix);
+  std::ofstream out("pos.noise."+suffix);
+  out<<std::setprecision(2*sizeof(real));
+  out<<"# "<<L.x/real_rh<<" "<<L.z/real_rh<<" "<<temperature*M0<<" "<<par.dt<<" "<<real_rh<<endl;
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     fori(0, pd->getNumParticles()){
@@ -366,9 +368,9 @@ bool idealParticlesDiffusion(int N, real3 L, long double &M0, long double &real_
     bdhi->forwardTime();
     auto pos = pd->getPos(access::location::cpu, access::mode::read);
     real4 *p = pos.raw();
-    out<<"#"<<endl;
+    if(i>0)out<<"#"<<endl;
     forj(0,pd->getNumParticles()){
-      out<<std::setprecision(8)<<make_real3(p[j])<<"\n";
+      out<<make_real3(p[j])<<"\n";
     }
   }
   sys->finish();
@@ -383,7 +385,7 @@ void selfDiffusionCubicBox_test(){
   long double M0, real_rh;
   forj(0, NL){
     real L = L_min + j*((L_max-L_min)/(real)(NL-1));
-    idealParticlesDiffusion(N, make_real3(L), M0, real_rh);
+    idealParticlesDiffusion(N, make_real3(L), M0, real_rh, "L"+std::to_string(L)+".test");
     CudaCheckError();
   }
 }
@@ -399,14 +401,15 @@ void selfDiffusion_q2D_test(){
   forj(0, NL){
     double Lz = L_min + j*((L_max-L_min)/(real)(NL-1));
     idealParticlesDiffusion(N, make_real3(Lx, Lx, Lz), M0, real_rh, "q2D.Lx"+std::to_string(Lx)+".test");
-    double L = Lx;
+    double L = Lx/rh*real_rh;
+    real lz = Lz/rh*real_rh;
     //From eq 21 and 23 in Vögele, M., & Hummer, G. (2016). Divergent Diffusion Coefficients in Simulations of Fluids and Lipid Membranes. The Journal of Physical Chemistry B, 120(33), 8722–8732. doi:10.1021/acs.jpcb.6b05102
     M0 = 1.0L/(6.0L*M_PIl*viscosity*real_rh);
-    double Mplane_near = M0 + M0/L*(M_PI*0.5*Lz/L - 4.3878);
-    double Mplane_far = M0 + M0/Lz*(1.5*log(L/Lz) - 2.8897);
-    double Mperp_near = M0 + M0/Lz*(3*log(L/Lz) - 2.77939);
+    double Mplane_near = M0 + M0/L*(M_PI*0.5*lz/L - 4.3878);
+    double Mplane_far = M0 + M0/lz*(1.5*log(L/lz) - 2.8897);
+    double Mperp_near = M0 + M0/lz*(3*log(L/lz) - 2.77939);
     double Mperp_far = M0 - 2.9252/(6*M_PI*viscosity*L);
-    out<<std::setprecision(15)<<Lz/real_rh<<" "<<Mplane_near/M0<<" "<<Mplane_far/M0<<" ";
+    out<<std::setprecision(15)<<lz/real_rh<<" "<<Mplane_near/M0<<" "<<Mplane_far/M0<<" ";
     out<<std::setprecision(15)<<Mperp_near/M0<<" "<<Mperp_far/M0<<endl;
     CudaCheckError();
   }
@@ -461,7 +464,6 @@ void noiseVariance_test(){
 
   real T = temperature;
   std::ofstream out("noiseVariance.test");
-
   forj(0, NL){
     real L = L_min + j*((L_max-L_min)/(real)(NL-1));
     //real selfDiffusion = T*computeM0PBC(L);
