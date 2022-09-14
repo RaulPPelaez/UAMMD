@@ -463,14 +463,17 @@ namespace uammd{
 	  int yc = (cell.y > 0)*(nk.y - cell.y);
 	  int zc = (cell.z > 0)*(nk.z - cell.z);
 	  int id_conj =  xc + (nk.x/2 + 1)*(yc + zc*nk.y);
-	  const int3 ik = indexToWaveNumber(id, nk);
+	  const int3 ik = indexToWaveNumber(id_conj, nk);
 	  const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
 	  const real k2 = dot(k,k);
 	  /*Get my scaling factor B,  Fourier representation of FCM*/
 	  const real B = real(1.0)/(k2*viscosity);
 	  const real Bsq = sqrt(B);
 	  /*v_{N-k} = v*_k, so the complex noise must be conjugated*/
-	  complex3 factor = real(-1.0)*noise*Bsq;
+	  complex3 factor = noise*Bsq;
+	  factor.x.y *= real(-1.0);
+	  factor.y.y *= real(-1.0);
+	  factor.z.y *= real(-1.0);
 	  const real3 dk = getGradientFourier(ik, nk, grid.box.boxSize);
 	  gridVelsFourier[id_conj] += projectFourier(k2, dk, factor);
 	}
@@ -490,6 +493,15 @@ namespace uammd{
 	  const int3 n = grid.cellDim;
 	  const real dV = grid.getCellVolume();
 	  const real fourierNormalization = 1.0/(double(n.x)*n.y*n.z);
+
+
+
+
+
+
+
+
+
 	  real noisePrefactor = prefactor*sqrt(fourierNormalization*2*temperature/(dV));
 	  int Nthreads = 128;
 	  int Nblocks = (n.z*n.y*(n.x/2+1))/Nthreads +1;
