@@ -109,6 +109,17 @@ namespace uammd{
       computeHydrodynamicDisplacements(real4* pos, real4* force, real4* torque,
 				       int numberParticles, real temperature, real prefactor, cudaStream_t st);
 
+      //Computes the velocities and angular velocities given the forces and torques
+      // If torques is a nullptr, the torque computation is skipped and the second output is empty
+      //This version of the function spreads the first set of particles i_ to the grid, but interpolates
+      // to the second set of positions, o_
+      template<class PosIter, class ForceIter, class TorqueIter>
+      std::pair<cached_vector<real3>, cached_vector<real3>>
+      computeHydrodynamicDisplacements(PosIter i_pos, ForceIter i_force, TorqueIter i_torque,
+				       int i_numberParticles,
+				       PosIter o_pos, int o_numberParticles,
+				       real temperature, real prefactor, cudaStream_t st);
+
     private:
 
       cudaStream_t st;
@@ -579,37 +590,46 @@ namespace uammd{
 
     template<class Kernel, class KernelTorque>
     std::pair<cached_vector<real3>, cached_vector<real3>>
-    FCM_impl<Kernel, KernelTorque>::computeHydrodynamicDisplacements(real4* pos, real4* force, real4* torque,
-								     int numberParticles, real temperature, real prefactor, cudaStream_t st){
+    FCM_impl<Kernel, KernelTorque>::computeHydrodynamicDisplacements(real4* pos,
+								     real4* force, real4* torque,
+								     int numberParticles,
+								     real temperature,
+								     real prefactor,
+								     cudaStream_t st){
+      return this->computeHydrodynamicDisplacements(pos, force, torque, numberParticles,
+						    pos, numberParticles,
+						    temperature, prefactor, st);
+    }
+
+    template<class Kernel, class KernelTorque>
+    template<class PosIter, class ForceIter, class TorqueIter>
+    std::pair<cached_vector<real3>, cached_vector<real3>>
+    FCM_impl<Kernel, KernelTorque>::computeHydrodynamicDisplacements(PosIter i_pos,
+								     ForceIter force, TorqueIter torque,
+								     int i_numberParticles,
+								     PosIter o_pos,
+								     int o_numberParticles,
+								     real temperature,
+								     real prefactor,
+								     cudaStream_t st){
       using namespace fcm_detail;
       cached_vector<cufftComplex3> gridVelsFourier;
-      if(force){
-	auto gridVels = spreadForces(pos, force, numberParticles, kernel, grid, st);
-	gridVelsFourier = forwardTransform(gridVels, grid.cellDim, cufft_plan_forward, st);
-      }
-      else{
-	const auto n = grid.cellDim;
-	gridVelsFourier.resize((n.x/2+1)*n.y*n.z);
-	thrust::fill(thrust::cuda::par.on(st), gridVelsFourier.begin(), gridVelsFourier.end(), cufftComplex3());
-      }
-      if(torque){
-	addSpreadTorquesFourier(pos, torque, numberParticles, grid, kernelTorque,
-				cufft_plan_forward, gridVelsFourier, st);
-      }
-      if(force or torque){
-	convolveFourier(gridVelsFourier, viscosity, grid, st);
-      }
+      auto gridVels = spreadForces(i_pos, force, i_numberParticles, kernel, grid, st);
+      gridVelsFourier = forwardTransform(gridVels, grid.cellDim, cufft_plan_forward, st);
+      addSpreadTorquesFourier(i_pos, torque, i_numberParticles, grid, kernelTorque,
+			      cufft_plan_forward, gridVelsFourier, st);
+      convolveFourier(gridVelsFourier, viscosity, grid, st);
       addBrownianNoise(gridVelsFourier, temperature, viscosity, prefactor, seed, grid, st);
       cached_vector<real3> angularVelocities;
-      if (torque){
+      {
 	auto gridVelsFourier2 = gridVelsFourier;
 	auto gridAngVelFourier = computeGridAngularVelocityFourier(gridVelsFourier2, grid, st);
 	auto gridAngVel = inverseTransform(gridAngVelFourier, grid.cellDim, cufft_plan_inverse, st);
-	angularVelocities = interpolateAngularVelocity(pos, gridAngVel, grid,
-						       kernelTorque, numberParticles, st);
+	angularVelocities = interpolateAngularVelocity(o_pos, gridAngVel, grid,
+						       kernelTorque, o_numberParticles, st);
       }
-      auto gridVels = inverseTransform(gridVelsFourier, grid.cellDim, cufft_plan_inverse, st);
-      auto linearVelocities = interpolateVelocity(pos, gridVels, grid, kernel, numberParticles, st);
+      gridVels = inverseTransform(gridVelsFourier, grid.cellDim, cufft_plan_inverse, st);
+      auto linearVelocities = interpolateVelocity(o_pos, gridVels, grid, kernel, o_numberParticles, st);
       CudaCheckError();
       return {linearVelocities, angularVelocities};
     }
