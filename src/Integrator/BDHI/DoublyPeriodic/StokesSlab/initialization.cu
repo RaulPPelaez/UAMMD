@@ -21,10 +21,10 @@ namespace uammd{
 	  System::log<System::EXCEPTION>("[DPStokes] Domain width (Lx, Ly) was not set");
 	  throw std::runtime_error("[DPStokes] Invalid argument");
 	}
-	if(par.dt <= 0){
-	  System::log<System::EXCEPTION>("[DPStokes] dt was not set");
-	  throw std::runtime_error("[DPStokes] Invalid argument");
-	}
+	// if(par.dt <= 0){
+	//   System::log<System::EXCEPTION>("[DPStokes] dt was not set");
+	//   throw std::runtime_error("[DPStokes] Invalid argument");
+	// }
       }
     };
     DPStokes::DPStokes(DPStokes::Parameters par):
