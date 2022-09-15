@@ -144,7 +144,7 @@ namespace uammd{
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	const auto weight = weightCompute(vi,kern);
-        atomicAdd(&gridQuantity[jcell], weight);
+        atomicAdd(gridQuantity[jcell], weight);
       }
     }
 
