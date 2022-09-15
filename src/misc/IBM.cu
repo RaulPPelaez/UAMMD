@@ -4,42 +4,11 @@
 #include"IBM.cuh"
 #include<type_traits>
 #include<third_party/uammd_cub.cuh>
-#include"utils/atomics.cuh"
+#include "utils/atomics.cuh"
+#include "IBM_utils.cuh"
 namespace uammd{
   namespace IBM_ns{
-
     namespace detail{
-      SFINAE_DEFINE_HAS_MEMBER(getSupport)
-      template<class Kernel, bool def = has_getSupport<Kernel>::value> struct GetSupport;
-      template<class Kernel> struct GetSupport<Kernel, true>{
-	static __host__  __device__ int3 get(Kernel &kernel, real3 pos, int3 cell){return kernel.getSupport(pos, cell);}
-      };
-      template<class Kernel> struct GetSupport<Kernel, false>{
-	static __host__  __device__ int3 get(Kernel &kernel, real3 pos, int3 cell){return make_int3(kernel.support);}
-      };
-
-      SFINAE_DEFINE_HAS_MEMBER(getMaxSupport)
-      template<class Kernel, bool def = has_getMaxSupport<Kernel>::value> struct GetMaxSupport;
-      template<class Kernel> struct GetMaxSupport<Kernel, true>{
-	static __host__  __device__ int3 get(Kernel &kernel){return kernel.getMaxSupport();}
-      };
-      template<class Kernel> struct GetMaxSupport<Kernel, false>{
-	static __host__  __device__ int3 get(Kernel &kernel){return make_int3(kernel.support);}
-      };
-
-      SFINAE_DEFINE_HAS_MEMBER(phiX)
-      SFINAE_DEFINE_HAS_MEMBER(phiY)
-      SFINAE_DEFINE_HAS_MEMBER(phiZ)
-#define ENABLE_PHI_IF_HAS(foo) template<class Kernel> __device__ inline SFINAE::enable_if_t<has_phi##foo<Kernel>::value, real>
-#define ENABLE_PHI_IF_NOT_HAS(foo) template<class Kernel> __device__ inline SFINAE::enable_if_t<not has_phi##foo<Kernel>::value, real>
-      ENABLE_PHI_IF_HAS(X) phiX(Kernel &kern, real r, real3 pos){return kern.phiX(r, pos);}
-      ENABLE_PHI_IF_HAS(Y) phiY(Kernel &kern, real r, real3 pos){return kern.phiY(r, pos);}
-      ENABLE_PHI_IF_HAS(Z) phiZ(Kernel &kern, real r, real3 pos){return kern.phiZ(r, pos);}
-      ENABLE_PHI_IF_NOT_HAS(X) phiX(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
-      ENABLE_PHI_IF_NOT_HAS(Y) phiY(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
-      ENABLE_PHI_IF_NOT_HAS(Z) phiZ(Kernel &kern, real r, real3 pos){return kern.phi(r, pos);}
-
-
       template<class Grid>
       __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid, int3 support){
 	int3 P = support/2;
@@ -58,9 +27,9 @@ namespace uammd{
 	return P;
       }
 
-      template<class Grid, class Kernel>
-      __device__ void fillSharedWeights(real* weights, real3 pi, int3 support, int3 celli, int3 P,  Grid &grid, Kernel &kernel){
-	real *weightsX = &weights[0];
+      template<class Grid, class Kernel, class KernelValueType>
+      __device__ void fillSharedWeights(KernelValueType* weights, real3 pi, int3 support, int3 celli, int3 P,  Grid &grid, Kernel &kernel){
+	auto *weightsX = &weights[0];
 	const int tid = threadIdx.x;
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
@@ -69,7 +38,7 @@ namespace uammd{
 	    weightsX[i] = detail::phiX(kernel, rij, pi);
 	  }
 	}
-	real *weightsY = &weights[support.x];
+	auto *weightsY = &weights[support.x];
 	for(int i = tid; i<support.y; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, grid.pbc_cell_coord<1>(celli.y + i -P.y), celli.z);
 	  if(cellj.y>=0){
@@ -77,7 +46,7 @@ namespace uammd{
 	    weightsY[i] = detail::phiY(kernel, rij, pi);
 	  }
 	}
-	real *weightsZ = &weights[support.x+support.y];
+	auto *weightsZ = &weights[support.x+support.y];
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
 	  if(cellj.z>=0){
@@ -90,9 +59,7 @@ namespace uammd{
       __device__ real3 computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
 	return make_real3(weights[ii], weights[support.x+jj], weights[support.x+support.y+kk]);
       }
-
     }
-
     /*Spreads the quantity v (defined on the particle positions) to a grid
       S v(z) = v(x) = \sum_{z}{ v(z)*\delta(z-x) }
       Where:
@@ -123,7 +90,8 @@ namespace uammd{
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
       __shared__ int3 support;
-      extern __shared__ real weights[];
+      using KernelValueType = decltype(detail::phiX(kernel,real(), real3()));
+      extern __shared__ KernelValueType weights[];
       if(tid==0){
 	pi = make_real3(pos[id]);
 	vi = particleQuantity[id];
@@ -194,7 +162,8 @@ namespace uammd{
       __shared__ int3 P; //Neighbour cell offset
       __shared__ typename BlockReduce::TempStorage temp_storage;
       __shared__ int3 support;
-      extern __shared__ real weights[];
+      using KernelValueType = decltype(detail::phiX(kernel,real(), real3()));
+      extern __shared__ KernelValueType weights[];
       if(id<numberParticles){
 	if(tid==0){
 	  pi = make_real3(pos[id]);
