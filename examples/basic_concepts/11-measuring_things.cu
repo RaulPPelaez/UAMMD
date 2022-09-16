@@ -12,7 +12,7 @@
 #include "Interactor/Potential/Potential.cuh" //We will also need this header, which has the LJ potential
 #include"utils/InitialConditions.cuh" //For the initLattice function
 #include<random>
-
+#include<fstream>
 using namespace uammd;
 
 //Lets take some utilities from the previous tutorials. This block is just a near copy paste from before
@@ -65,7 +65,7 @@ std::shared_ptr<Integrator> createVerletNVTIntegrator(UAMMD sim){
   using Verlet = VerletNVT::GronbechJensen;
   //Integrators always have a Parameters type inside of them that their constructor needs:
   Verlet::Parameters par;
-  //Lets simply copy the parameters we hardcoded at the beginning 
+  //Lets simply copy the parameters we hardcoded at the beginning
   par.dt = sim.par.dt;
   par.temperature = sim.par.temperature;
   par.friction = sim.par.friction;
@@ -117,7 +117,7 @@ std::shared_ptr<Interactor> createLJInteraction(UAMMD sim){
 std::shared_ptr<Potential::LJ> createLJPotential(UAMMD sim){
   auto pot = std::make_shared<Potential::LJ>();
   //We must instruct the potential with parameters for each interaction pair type
-  //LJ will interpret the fouth component of the position as type, in this example all particles have zero type.  
+  //LJ will interpret the fouth component of the position as type, in this example all particles have zero type.
   Potential::LJ::InputPairParameters par;
   par.epsilon = 1.0;
   par.shift = true; //If set to true the LJ potential is shifted, otherwise it is simply trucated
@@ -206,7 +206,7 @@ int main(int argc, char* argv[]){
 
   //In order to thermalize the system we let it run for a while
   int Nrelax = 40000;
-  for(int i = 0; i< Nrelax; i++){    
+  for(int i = 0; i< Nrelax; i++){
     verlet->forwardTime();
   }
 
@@ -215,7 +215,7 @@ int main(int argc, char* argv[]){
   int Nsteps = 10000;
   real averageEnergy = 0;
   int averageCounter = 0;
-  for(int i = 0; i< Nsteps; i++){    
+  for(int i = 0; i< Nsteps; i++){
     verlet->forwardTime();
     if(i%Nmeasure==0){
       real energyPerParticle = measureEnergyPerParticle(sim, verlet);
