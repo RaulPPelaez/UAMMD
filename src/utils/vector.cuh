@@ -9,7 +9,7 @@
 #include <math.h>
 #include"global/defines.h"
 #include"utils/cxx_utils.h"
-
+#include<thrust/tuple.h>
 typedef unsigned short ushort;
 typedef unsigned int uint;
 typedef unsigned long long int ullint;
@@ -964,6 +964,15 @@ VECATTR  int3 operator -(const int &b, const int3 &a){
 VECATTR  int3 operator *(const int3 &a, const int3 &b){return make_int3(a.x*b.x, a.y*b.y, a.z*b.z);}
 VECATTR  void operator *=(int3 &a, const int3 &b) {a = a*b;}
 VECATTR  int3 operator *(const int3 &a, const int &b){return make_int3(a.x*b, a.y*b, a.z*b);}
-VECATTR  int3 operator *(const int &b, const int3 &a){return a*b;}
+VECATTR int3 operator*(const int &b, const int3 &a) { return a * b; }
+
+namespace uammd{
+  VECATTR thrust::tuple<real, real, real> operator +(real3 a, thrust::tuple<real, real, real> b){
+    return thrust::make_tuple(a.x + thrust::get<0>(b), a.y + thrust::get<1>(b),a.z + thrust::get<2>(b));
+  }
+  VECATTR real3 operator +(thrust::tuple<real, real, real> b, real3 a){
+    return make_real3(a.x + thrust::get<0>(b), a.y + thrust::get<1>(b),a.z + thrust::get<2>(b));
+  }
+}
 
 #endif
