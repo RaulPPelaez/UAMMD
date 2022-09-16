@@ -1,4 +1,15 @@
 
+v2.3:
+ -Many vector overloads has been added
+ -The DPStokes module has been added
+ -The DPPoisson module now accepts an infinite permitivitty, which is understood as a metallic wall.
+ -The ICM_Compressible has been added.
+ 
+API Breaking changes:
+    -The WeightCompute advancer parameter to IBM now takes a thrust::tuple<T,T,T> as the second argument. This allows to generalize IBM to any return type for the phi functions. With this things like (rx^2 + ry^2)*phi(rx)*phi(ry) can be spreaded/interpolated
+
+
+
 v2.0:
 Version shipped with Raul's Ph.D manuscript
 API Breaking Changes:
