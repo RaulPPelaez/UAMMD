@@ -1,8 +1,7 @@
 #ifndef MISC_IBM_UTILS_CUH
 #define MISC_IBM_UTILS_CUH
 
-
-
+#include"utils/utils.h"
 namespace uammd{
   namespace IBM_ns{
     namespace detail{
