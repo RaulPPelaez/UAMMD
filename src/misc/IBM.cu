@@ -46,13 +46,13 @@ namespace uammd{
 	//Sometimes we need to displace the support cells to the left
 	const auto distanceToLeftMostCell = abs(grid.distanceToCellCenter(pos, celli-P));
 	const auto cellSize = grid.getCellSize(celli);
-	if(cellSize.x>0 and distanceToLeftMostCell.x >= support.x*cellSize.x/real(2.0)){
+	if(cellSize.x>0 and distanceToLeftMostCell.x > support.x*cellSize.x/real(2.0)){
 	  P.x -=1;
 	}
-	if(cellSize.y>0 and distanceToLeftMostCell.y >= support.y*cellSize.y/real(2.0)){
+	if(cellSize.y>0 and distanceToLeftMostCell.y > support.y*cellSize.y/real(2.0)){
 	  P.y -=1;
 	}
-	if(cellSize.z>0 and distanceToLeftMostCell.z >= support.z*cellSize.z/real(2.0)){
+	if(cellSize.z>0 and distanceToLeftMostCell.z > support.z*cellSize.z/real(2.0)){
 	  P.z -=1;
 	}
 	return P;
