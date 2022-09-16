@@ -18,18 +18,17 @@ All output is adimensional.
 #include<random>
 using namespace uammd;
 
-real temperature, viscosity, rh, tolerance;
-
 //FCM kernel M(\vec{r}) = f(r)·I + g(r)·\vec{r}\otimes\vec{r}/r^2
 //M0 = f(0)
-long double f(long double r){return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1+2*rh*rh/(M_PIl*r*r))*erfl(r*sqrt(M_PIl)/(2*rh)) - 2*rh/(M_PIl*r)*expl(-M_PIl*r*r/(4*rh*rh)) );}
-long double g(long double r){ return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1-6*rh*rh/(M_PIl*r*r))*erfl(r*sqrt(M_PIl)/(2*rh)) + 6*rh/(M_PIl*r)*expl(-M_PIl*r*r/(4*rh*rh)) );}
-
-
+long double f(long double r, double rh, double viscosity){return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1+2*rh*rh/(M_PIl*r*r))*erfl(r*sqrt(M_PIl)/(2*rh)) - 2*rh/(M_PIl*r)*expl(-M_PIl*r*r/(4*rh*rh)) );}
+long double g(long double r, double rh, double viscosity){ return (1.0/(8.0*M_PIl*viscosity*r)) * (  (1-6*rh*rh/(M_PIl*r*r))*erfl(r*sqrt(M_PIl)/(2*rh)) + 6*rh/(M_PIl*r)*expl(-M_PIl*r*r/(4*rh*rh)) );}
 //Self mobility with PBC corrections up to sixth order
-long double computeM0PBC(double L){
-  return  1.0l/(6.0l*M_PIl*viscosity*rh)*(1.0l-2.837297l*rh/L+(4.0l/3.0l)*M_PIl*pow(rh/L,3)-27.4l*pow(rh/L,6.0l));
+long double computePBCCorrection(double L, double rh){
+  return  (1.0l-2.837297l*rh/L+(4.0l/3.0l)*M_PIl*pow(rh/L,3)-27.4l*pow(rh/L,6.0l));
 }
+
+
+real temperature, viscosity, rh, tolerance;
 
 //Pulls two particles agains each other, or just the first one if there is only one particle
 class miniInteractor: public Interactor{
@@ -157,7 +156,7 @@ bool hydrodynamicRadiusVariance_test(){
   shared_ptr<BDHI::EulerMaruyama<BDHI::FCM>> bdhi;
   std::random_device rd;  //Will be used to obtain a seed for the random number engine
   std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
-  long double M0;// = computeM0PBC(L);
+  long double M0;
   long double real_rh = 0;
   fori(0, Nt){
     std::uniform_real_distribution<> dis(-L*0.5, -L*0.5+1);
@@ -195,7 +194,8 @@ bool selfMobilityCubicBox_test(){
   return true;
 }
 
-void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
+void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M,
+			       long double &M0, long double &real_rh){
   int N = 2;
   auto sys = make_shared<System>();
   sys->rng().setSeed(0xabefa129f9173);
@@ -212,6 +212,8 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
   auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::FCM>>(pd,  par);
   auto inter= make_shared<miniInteractor>(pd,  "puller");
   bdhi->addInteractor(inter);
+  M0 = bdhi->getSelfMobility();
+  real_rh = bdhi->getHydrodynamicRadius();
   for(int i = 0; i<9;i++){M[i] = 0;}
   int Ntest = 10;
   for(int i = 0; i<Ntest;i++){
@@ -240,6 +242,25 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M){
   sys->finish();
 }
 
+void computePairMobilityOpenBoundary(double *M, real3 rij, double rh, double viscosity){
+  //When applying a force \vec{force_i} = (-1)^i·\hat{\beta} to particle i, the velocity of the other particle will be v_\alpha = M_{alpha\beta}(r)-M_{\alpha\beta}(0) = (f(r)-f(0))·\delta_{\alpha\beta}+ g(r)·r_\alpha*r_\beta/r^2
+  for(int i=0; i<9; i++){ M[i] = 0;}
+  for(int i=0; i<3; i++){
+    for(int j=0; j<3; j++){
+      long double r = sqrt(dot(rij, rij));
+      real *r01 = &rij.x;
+      long double diadic = 0;
+      if(r>0) diadic = r01[i]*r01[j]/(r*r);
+      M[3*i+j] = g(r, rh, viscosity)*diadic;
+      long double fr = 1.0L/(6.0L*M_PIl*viscosity*rh);
+      if(r>1e-7*rh) fr = f(r, rh, viscosity)-fr;
+      if(i==j) M[3*i+j] += fr;
+    }
+  }
+
+
+}
+
 bool pairMobilityCubicBox_test(double dist){
   int NL = 20;
   real L_min = 2.1*dist;
@@ -250,32 +271,20 @@ bool pairMobilityCubicBox_test(double dist){
   real3 dir = make_real3(0);
   while(dir.x == 0 or dir.y == 0 or dir.z == 0) dir = make_real3(rng.gaussian3(0,1));
   real3 rij = dist*dir/sqrt(dot(dir,dir));
-  std::ofstream out("pairMobilityCubicBox.dist"+std::to_string(dist/rh)+".test");
+  std::ofstream out("pairMobilityCubicBox.dist"+std::to_string(dist)+".test");
   double F = 1;
   long double M[9];
-  double M_theo_Linf[9];
   out<<"#rij "<<rij.x<<" "<<rij.y<<" "<<rij.z<<endl;
-  //When applying a force \vec{force_i} = (-1)^i·\hat{\beta} to particle i, the velocity of the other particle will be v_\alpha = M_{alpha\beta}(r)-M_{\alpha\beta}(0) = (f(r)-f(0))·\delta_{\alpha\beta}+ g(r)·r_\alpha*r_\beta/r^2
-  for(int i=0; i<9; i++){ M_theo_Linf[i] = 0;}
-  for(int i=0; i<3; i++){
-    for(int j=0; j<3; j++){
-      long double r = sqrt(dot(rij, rij));
-      real *r01 = &rij.x;
-      long double diadic = 0;
-      if(r>0) diadic = r01[i]*r01[j]/(r*r);
-      M_theo_Linf[3*i+j] = g(r)*diadic;
-      long double fr = 1.0L/(6.0L*M_PIl*viscosity*rh);
-      if(r>1e-7*rh) fr = f(r)-fr;
-      if(i==j) M_theo_Linf[3*i+j] += fr;
-    }
-  }
+  double M_theo_Linf[9];
+  long double M0;
+  long double real_rh;
   fori(0, NL){
     real L = L_min + i*((L_max-L_min)/(real)(NL-1));
     out<<std::setprecision(15)<<L/rh<<" ";
-    computePairMobilityMatrix(make_real3(L), F, rij, M);
-    //With the correction this should print something converging to zero very fast for all terms
-    long double pbc_corr = computeM0PBC(L)*(6.0L*M_PIl*viscosity*rh);
-    for(int j = 0; j<9; j++)    out<<abs(1.0l-M[j]*pbc_corr/(M_theo_Linf[j]))<<" ";
+    computePairMobilityMatrix(make_real3(L), F, rij, M, M0, real_rh);
+    computePairMobilityOpenBoundary(M_theo_Linf, rij, real_rh, viscosity);
+    //auto pbc_corr = computePBCCorrection(L, real_rh);
+    for(int j = 0; j<9; j++)    out<<abs(1.0l-M[j]/(M_theo_Linf[j]))<<" ";
     out<<endl;
     CudaCheckError();
   }
@@ -297,11 +306,11 @@ bool pairMobility_q2D_test(double dist){
   long double M[9];
   out<<"#rij "<<rij.x<<" "<<rij.y<<" "<<rij.z<<endl;
   real Lx = 32*rh;
+  long double M0, real_rh;
   fori(0, NL){
     real Lz = L_min + i*((L_max-L_min)/(real)(NL-1));
-    out<<std::setprecision(15)<<Lz/rh<<" ";
-    computePairMobilityMatrix(make_real3(Lx,Lx,Lz), F, rij, M);
-    double M0 = 1.0/(6*M_PI*viscosity*rh);
+    computePairMobilityMatrix(make_real3(Lx,Lx,Lz), F, rij, M, M0, real_rh);
+    out<<std::setprecision(15)<<Lz/real_rh<<" ";
     for(int j = 0; j<9; j++)  out<<M[j]/M0<<" ";
     out<<endl;
     CudaCheckError();
