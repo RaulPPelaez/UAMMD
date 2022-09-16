@@ -80,11 +80,13 @@ namespace uammd{
     };
 
     struct DefaultWeightCompute{
-      template<class T1>
-      inline __device__ auto operator()(T1 value, real3 kernel) const{
-	return value*kernel.x*kernel.y*kernel.z;
+      template<class T1, class T2>
+      inline __device__ auto operator()(T1 value, thrust::tuple<T2,T2,T2> kernel) const{
+	auto phiX = thrust::get<0>(kernel);
+	auto phiY = thrust::get<1>(kernel);
+	auto phiZ = thrust::get<2>(kernel);
+	return value*phiX*phiY*phiZ;
       }
-
     };
   }
   template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>

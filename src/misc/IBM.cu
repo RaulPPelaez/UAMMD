@@ -55,8 +55,9 @@ namespace uammd{
 	}
       }
 
-      __device__ real3 computeWeightFromShared(real* weights, int ii, int jj, int kk, int3 support){
-	return make_real3(weights[ii], weights[support.x+jj], weights[support.x+support.y+kk]);
+      template<class KernelValueType>
+      __device__ auto computeWeightFromShared(KernelValueType* weights, int ii, int jj, int kk, int3 support){
+	return thrust::make_tuple(weights[ii], weights[support.x+jj], weights[support.x+support.y+kk]);
       }
     }
     /*Spreads the quantity v (defined on the particle positions) to a grid
@@ -116,7 +117,7 @@ namespace uammd{
 	  continue;
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
-	const auto weight = weightCompute(vi,kern);
+	const auto weight = weightCompute(vi, kern);
         atomicAdd(gridQuantity[jcell], weight);
       }
     }
@@ -192,12 +193,12 @@ namespace uammd{
 	  const int jcell = cell2index(cellj);
 	  const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	  const auto weight = weightCompute(gridQuantity[jcell], kern);
-	  result += dV*weight;
+	  result = result + dV*weight;
 	}
       }
       GridQuantityType total = BlockReduce(temp_storage).Sum(result);
       if(tid==0 and id<numberParticles){
-	particleQuantity[id] += total;
+	particleQuantity[id] = particleQuantity[id] + total;
       }
     }
 
