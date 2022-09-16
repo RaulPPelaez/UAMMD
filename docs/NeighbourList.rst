@@ -153,7 +153,280 @@ Two other arrays are provided providing, for each cell, the index of the first a
       A value in cellStart less than VALID_CELL means the cell is empty. Subject to change between updates.
 
 
+.. cpp:class:: CellListBase
 
+   This class exposes the same functions as :cpp:any:`CellList`, but it does not depend on :ref:`ParticleData` (to facilitate its usage outside the ecosystem). In particular, this class offers an alternative constructor and update function.
+
+   
+   .. cpp:function:: CellListBase();
+
+      Default constructor.
+      
+      
+   .. cpp:member:: template<class PositionIterator>  void update(PositionIterator pos, int numberParticles, Grid grid, cudaStream_t st = 0);
+
+      This function works similar to :cpp:any:`NeighbourList::update`, but constructs the list based on the contents of the provided :cpp:`pos` iterator and grid.
+
+      
+Example
+...........
+
+The different ways of using a :ref:`CellList` in UAMMD.
+
+.. code:: cpp
+
+  #include<uammd.cuh>
+  #include<Interactor/NeighbourList/CellList.cuh>
+  using namespace uammd;
+  
+  //Construct a list using the UAMMD ecosystem
+  void constructListWithUAMMD(UAMMD sim){
+    //Create the list object
+    //It is wise to create once and store it
+    CellList cl(sim.pd);
+    //Update the list using the current positions in sim.pd
+    cl.update(sim.par.box, sim.par.rcut);
+    //Now the list can be used via the
+    //  various common interfaces
+    //-Providing a Transverser:
+    //cl.transverseList(some_transverser);
+    //-Requesting a NeighbourContainer
+    auto nc = cl.getNeighbourContainer();
+    //Or by getting the internal structure of the Cell List
+    auto cldata = cl.getCellList();
+  }
+  //Construct a CellList without UAMMD
+  template<class Iterator>
+  void constructListWithPositions(Iterator positions, 
+                                  int numberParticles,
+                                  real3 boxSize, 
+                                  int3 numberCells){
+    //Create the list object
+    //It is wise to create once and store it
+    CellListBase cl;
+    //CellListBase requires specific cell 
+    // dimensions for its construction
+    Grid grid(Box(boxSize), numberCells);
+    //Update the list using the positions
+    cl.update(positions, numberParticles, grid);
+    //Now the internal structure of the Cell List
+    // can be requested
+    auto cldata = cl.getCellList();
+    //And a NeighbourContainer can be constructed from it
+    auto nc = CellList_ns::NeighbourContainer(cldata);
+  }	  
+
+.. note:: Here the :cpp:`UAMMD` struct contains an instance of :ref:`ParticleData` and a series of parameters related to this particular example.
+  
+.. hint:: This example makes use of the :ref:`Transverser` and :ref:`NeighbourContainer<NeighbourContainer>` interfaces.
+  
+VerletList
+~~~~~~~~~~~~
+
+This list uses :ref:`CellList` to construct a neighbour list up to a distance :math:`r_{s} > r_{cut}`, in this case the list only has to be reconstructed when any given particle has travelled more than a threshold distance,
+
+.. math::
+   
+   r_t = \frac{r_{s}-r_{c}}{2}.
+
+See the representation at the start of :ref:`NeighbourList`.
+
+.. hint:: A good default is usually around :math:`r_s\approx 1.15r_c`. 
+
+The list is constructed by storing a private list of neighbours for each particle in a column-major fashion. In order to achieve a cache-friendly memory pattern this "private" lists are stored in the same contiguous array. Since we do not know in advance how many neighbours each particle has we set up a maximum number of neighbours per particle, :math:`N_{\text{max}}`, and allocate an array of size :math:`N_{\text{max}}N` elements. Later on we traverse the list by assigning a thread per particle, which prompts for a column-major layout of the list. That is, threads will tend to read contiguous memory locations if we place the first neighbours of all particles contiguously, then the second, and so forth and so on.
+
+.. note::
+   
+   A row-major layout (in which we place all neighbours of a certain particle contiguously) will be beneficial if we assign a block of threads per particle when traversing.
+   Measuring is required to know which strategy is best in each case (thread-per-particle vs block-per-particle). UAMMD chooses a column-major format, as testing suggests this is the better choice in our habitual use-cases.\footnote{
+   Nonetheless this fact is abstracted away in the interface and changing between column- and row-major formats can be done easily and without affecting the users code.
+
+Finally, the maximum number of neighbours per particles, which affects both performance and memory consumption, is autotuned at each update to be the nearest multiple of 32 (the CUDA warp size) of the particle with the greatest number of neighbours.
+	  
+As with the :cpp:any:`CellList`, UAMMD exposes the Verlet list algorithm as part of the ecosystem and as an external accelerator. If the internal option is used the safety factor is automatically autotuned. Regardless, the safety radius can be modified via the :cpp:any:`VerletList::setCutOffMultiplier` member function.
+
+In both cases, accessing the :cpp:any:`VerletList` via the common UAMMD interfaces (:ref:`Transverser` and :ref:`NeighbourContainer<NeighbourContainer>`) makes it interchangeable with a :cpp:any:`CellList`, as evidenced in the example code below.
+
+.. cpp:class:: VerletList
+
+   This class adheres to the :cpp:any:`NeighbourList` UAMMD interface. Besides the functions defined in :cpp:any:`NeighbourList`, the cell list also exposes some functions proper to this particular algorithm.
+
+   .. cpp:member:: VerletListBase::VerletListData getVerletListData();
+
+		   Returns the internal structures of the Verlet list
+
+   .. cpp:member:: void setCutOffMultiplier(real newMultiplier);
+		   
+		   Sets the cutoff multiplier, i.e :math:`r_s/r_c=`  :cpp:`newMultiplier`.
+
+   .. cpp:member:: int getNumberOfStepsSinceLastUpdate();
+
+		   Returns the number of times the update has been called since the last time a list rebuild was required.
+
+.. cpp:struct:: VerletListBase::VerletListData;
+
+   .. cpp:member:: real4* sortPos;
+
+      Positions sorted to be contiguous if they fall into the same cell. Same as with :ref:`CellList`.
+		
+   .. cpp:member:: int* groupIndex;
+
+      Given the index of a particle in :cpp:`sortPos`, this array returns the index of that particle in :ref:`ParticleData` (or the original positions array if the list is used outside the ecosystem). This indirection is necessary when something other than the positions is needed (like the forces). Same as with :ref:`CellList`.
+      
+   .. cpp:member:: int* numberNeighbours;
+
+      The number of neighbours for each particle in sortPos.
+      
+   .. cpp:member:: StrideIterator particleStride;
+
+      For a given particle index, :cpp:`i`, :cpp:`particleStride[i]` holds the index of its first neighbour in :cpp:`neighbourList`. :cpp:`StrideIterator` is a random access iterator. 
+
+      .. note:: Note that, as evidenced by its type name, the particle stride (or offset) is not necessarily a raw array but rather a generic C++ random access iterator (that behaves as a raw array for most purposes). For instance the offset might just be the same for all particles. In UAMMD's current implementation, the particle stride is simply the maximum number of neighbours per particle. However, this interface allows for the possibility of compacting the list in the future, with a similar behavior as the :cpp:`cellStart` array in :ref:`CellList`.
+		
+      .. hint:: In particular, in the current implementation this iterator simply returns, for a given index :cpp:`i`, :cpp:`maxNeighboursPerParticle*i`.
+
+	     
+   .. cpp:member:: int* neighbourList;
+		   
+      The actual neighbour list. The neighbour :cpp:`j` for particle with index :cpp:`i` (of a maximum of :cpp:`j=numberNeighbours[i]`) is located at :cpp:`neighbourList[particleStride[i] + j];`.
+
+
+
+.. cpp:class:: VerletListBase
+
+   This class exposes the same functions as :cpp:any:`VerletList`, but it does not depend on :ref:`ParticleData` (to facilitate its usage outside the ecosystem). In particular, this class offers an alternative constructor and update function.
+
+   
+   .. cpp:function:: VerletListBase();
+
+      Default constructor.
+      
+      
+   .. cpp:member:: template<class PositionIterator>  void update(PositionIterator pos, int numberParticles, Box box, real cutOff, cudaStream_t st = 0);
+
+      This function works similar to :cpp:any:`NeighbourList::update`, but constructs the list based on the contents of the provided :cpp:`pos` iterator.
+      
+Example
+.........
+      
+The different ways of using a :ref:`VerletList`.
+
+.. code:: cpp
+	  
+  #include<uammd.cuh>
+  #include<Interactor/NeighbourList/VerletList.cuh>
+  using namespace uammd;
+  
+  //Construct a list using the UAMMD ecosystem
+  void constructListWithUAMMD(UAMMD sim){
+    //Create the list object
+    //It is wise to create once and store it
+    VerletList vl(sim.pd);
+    //Update the list using the current positions in sim.pd
+    vl.update(sim.par.box, sim.par.rcut);
+    //Now the list can be used via the
+    //  various common interfaces
+    //-With a Transverser:
+    //vl.transverseList(some_transverser);
+    //-Requesting a NeighbourContainer
+    auto nc = vl.getNeighbourContainer();
+    //Or by getting the internal structure of the Verlet List
+    auto vldata = vl.getVerletList();
+    //The safety radius can be specified
+    vl.setCutOffMultiplier(sim.par.rsafe/sim.par.rcut);
+    //The number of update calls since the last time
+    // it was necessary to rebuild the list can be 
+    // obtained
+    int nbuild = vl.getNumberOfStepsSinceLastUpdate();
+  }
+  //Construct a VerletList without UAMMD
+  template<class Iterator>
+  void constructListWithPositions(Iterator positions, 
+                                  int numberPartivles,
+                                  real3 boxSize, 
+                                  int3 numberParticles){
+    //Create the list object
+    //It is wise to create once and store it
+    VerletListBase vl;
+    //The safety radius can be specified
+    vl.setCutOffMultiplier(sim.par.rsafe/sim.par.rcut);
+    //Update the list using the positions
+    vl.update(positions, numberParticles, 
+              sim.par.box, sim.par.rcut);
+    //Now the internal structure of the Verlet List
+    // can be requested
+    auto vldata = vl.getVerletList();
+    //And a NeighbourContainer can be constructed from it
+    auto nc = VerletList_ns::NeighbourContainer(vldata);
+    //The number of update calls since the last time
+    // it was necessary to rebuild the list can be 
+    // obtained
+    int nbuild = vl.getNumberOfStepsSinceLastUpdate();
+  }
+
+
+.. note:: Here the :cpp:`UAMMD` struct contains an instance of :ref:`ParticleData` and a series of parameters related to this particular example.
+
+.. hint:: The :ref:`Transverser` and :ref:`NeighbourContainer<NeighbourContainer>` options are identical to the case of a :ref:`CellList`.
+
+  
+Linear Bounding Volume Hierarchy list (LBVH)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+The Linear Bounding Volume Hierarchy (LBVH) neighbour list works by partitioning space into boxes according to a tree hierarchy in such a way that interacting pairs of particles can be located quickly. The innermost level of partitioning encases single particles, and boxes sharing faces are hierarchically bubbled together to form a tree structure. In contrast, the cell list partitions space in identical cubes independently of the particles positions or their distribution inside the domain. The "object awareness" of the LBVH results in a better handling of systems with large density fluctuations or objects of highly different size.
+
+.. note:: In contrast, the cell list is not aware of the size of the particles, only accepting a cut off distance. If a system contains particles of different sizes (and therefore interaction cut offs), the cell list must be constructed using the largest one. In the presence of large size disparities (say a set of large particles interacting with tiny ones), a lot of unnecessary particle pairs will be visited (in particular when checking the neighbours of a tiny particle).
+
+	  
+A full detailed description of the algorithm is beautifully laid out in detail in references [Howard2016]_, [Howard2019]_ and [Torres2009]_, with only minor modifications to them present in UAMMD's implementation.
+
+A brief summary of the algorithm:
+  * We start by assigning a different type to each particle based on its size (understanding that if particles have not been assigned a size, they will all have the same type).
+  * Then, we sort the particles by assigning a hash to each one in a way such that two given particles of the same type that are close in physical space tend to be close in memory. We achieve this by sorting particles first by type and then by Z-order hash (actually, UAMMD uses the Morton hash presented at \ref{alg:mortonhash]_, encoding the type in the last two bits, which are typically unused).
+  * The sorted particle hashes are included in a binary tree structure following Karra's algorithm [Karras2012]_. By including the type in the particle hashing, we can generate a single tree, ensuring that a different subtree is constructed for each type. The root of the subtree for each type can be then identified by descending the tree. This appears to scale well with the number of types when compared to generating an entirely new tree for every type as in [Howard2016]_, [Howard2019]_.
+  * After, we Assign an Axis Aligned Bounding Box (AABB) to each node of the tree that joins the AABBs of the nodes below it (with the particles, aka leaf nodes, being at the innermost level). This is done using Karra's algorithm [Karras2012]_. The AABBs are stored in a ``quantized'' manner that allows to store a node in a single int4, improving traversal time [Howard2019]_. The bubbling of boxes stops at the root of every type subtree.
+  * Finally, the neighbours of a given particle are found by traversing the AABB subtrees of every type [Torres2009]_.
+
+
+Tree traversal is carried out in a top-down approach, where each particle starts by checking its distance to the root of a given subtree and subsequently descending as needed. If a particle's AABB overlaps a node within a given cut off, the algorithm goes to the next child node, otherwise it skips to the next node/tree.
+For a given particle, overlap with the 27 (in 3D) periodic images of the current subtree is computed before traversal of a tree and encoded in a single integer to reduce divergence (except the main box, which is traversed first by default) (see [Howard2019]_).
+After a type subtree is entirely processed, the process is repeated with next one until none remain.
+
+In my personal experience, the sheer raw power of the cell list in the GPU makes this algorithm not worth the effort in general. Note, however, that this algorithm is bound to outperform the cell list in certain situations, mainly when the size disparities between the different particles in the simulation is pronounced (as in the largest particle having at least twice the size of the smallest) or when the configuration presents a very low density (in terms of the cut-off distance of the interaction).
+
+
+
+Example
+..........
+
+The interface for this neighbour list in UAMMD is more restricted than those of the previously introduced ones. The reason for this being its, yet to be found, applicability in our simulations. Nonetheless, it can be used in any place where :ref:`CellList` or :ref:`VerletList` can be used.
+
+The internal data structure of the LBVH list can be queried, but we have not discussed in detail the algorithm in this manuscript. A reader who is particularly interested in making use of the LBVH list or a more in-depth understanding of its inner workings is referred to the code itself, located at the source file :code:`Interactor/NeighboutList/LBVH.cuh`.
+
+.. code:: cpp
+  
+  #include<uammd.cuh>
+  #include<Interactor/NeighbourList/LBVHList.cuh>
+  using namespace uammd;
+  
+  //Construct a list using the UAMMD ecosystem
+  void constructListWithUAMMD(UAMMD sim){
+    //Create the list object
+    //It is wise to create once and store it
+    LBVHList vl(sim.pd);
+    //Update the list using the current positions in sim.pd
+    vl.update(sim.par.box, sim.par.rcut);
+    //Now the list can be used via the
+    //  various common interfaces
+    //-With a Transverser:
+    //vl.transverseList(some_transverser);
+    //-Requesting a NeighbourContainer
+    auto nc = vl.getNeighbourContainer();
+    //Or by getting the internal structure of the LBVH List
+    auto vldata = vl.getLBVHList();
+  }
+  	  
 .. _NeighbourContainer:
 
 The Neighbour Container interface
@@ -250,3 +523,15 @@ Counting the number of neighbours of each particle using a :cpp:any:`NeighbourCo
 
 
 .. hint:: The group index of a particle in the above example can be used to get its global index (see :ref:`ParticleGroup`) and then any of its properties via :ref:`ParticleData`. When no group is used (as in the example above), the default group (containing all particles) is assumed and the group index is equal to the global index.
+
+
+
+.. rubric:: References:
+
+.. [Karras2012] Maximizing Parallelism in the Construction of BVHs, Octrees, and k-d Trees. Karras 2012.
+
+.. [Torres2009] Ray Casting Using a Roped BVH with CUDA. Torres et.al. 2009. https://doi.org/10.1145/1980462.1980483
+
+.. [Howard2019] Quantized bounding volume hierarchies for neighbor search in molecular simulations on graphics processing units. Howard et. al. 2019. https://doi.org/10.1016/j.commatsci.2019.04.004
+
+.. [Howard2016] Efficient neighbor list calculation for molecular simulation of colloidal systems using graphics processing units. Howard et. al. 2016. https://doi.org/10.1016/j.cpc.2016.02.003
