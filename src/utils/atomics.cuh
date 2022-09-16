@@ -1,7 +1,8 @@
 #ifndef UAMMD_ATOMICS
 #define UAMMD_ATOMICS
 #include "global/defines.h"
-#include<thrust/tuple.h>
+#include <thrust/tuple.h>
+#include<thrust/iterator/zip_iterator.h>
 namespace uammd{
   template<class T>
   inline __device__ T atomicAdd(T* address, T val){ return ::atomicAdd(address, val);}
@@ -48,36 +49,37 @@ namespace uammd{
     return newval;
   }
 
-  template<class T>
-  inline __device__ T atomicAdd(T& address, T val){ return atomicAdd(&address, val);}
-
-  template<class T>
-  inline __device__ T atomicAdd(T&& address, T val){ return atomicAdd(&address, val);}
 
   template<class T, class T2>
-  inline __device__ auto atomicAdd(thrust::tuple<T,T> &&refs, T2 val){
+  inline __device__ T2 atomicAdd(T &ref, T2 val){
+    return atomicAdd(&ref, val);
+  }
+
+
+  template<class T, class T2>
+  inline __device__ T2 atomicAdd(thrust::tuple<T&,T&> &&refs, T2 val){
     T2 newval;
-    if(val.x) newval.x = atomicAdd(&(thrust::get<0>(refs)), val.x);
-    if(val.y) newval.y = atomicAdd(&(thrust::get<1>(refs)), val.y);
+    if(val.x) newval.x = atomicAdd(&thrust::get<0>(refs), val.x);
+    if(val.y) newval.y = atomicAdd(&thrust::get<1>(refs), val.y);
     return newval;
   }
 
   template<class T, class T2>
-  inline __device__ auto atomicAdd(thrust::tuple<T,T,T> &&refs, T2 val){
+  inline __device__ T2 atomicAdd(thrust::tuple<T&,T&,T&> &&refs, T2 val){
     T2 newval;
-    if(val.x) newval.x = atomicAdd(&(thrust::get<0>(refs)), val.x);
-    if(val.y) newval.y = atomicAdd(&(thrust::get<1>(refs)), val.y);
-    if(val.z) newval.z = atomicAdd(&(thrust::get<2>(refs)), val.z);
+    if(val.x) newval.x = atomicAdd(&thrust::get<0>(refs), val.x);
+    if(val.y) newval.y = atomicAdd(&thrust::get<1>(refs), val.y);
+    if(val.z) newval.z = atomicAdd(&thrust::get<2>(refs), val.z);
     return newval;
   }
 
   template<class T, class T2>
-  inline __device__ auto atomicAdd(thrust::tuple<T,T,T,T> &&refs, T2 val){
+  inline __device__ T2 atomicAdd(thrust::tuple<T&,T&,T&,T&> &&refs, T2 val){
     T2 newval;
-    if(val.x) newval.x = atomicAdd(&(thrust::get<0>(refs)), val.x);
-    if(val.y) newval.y = atomicAdd(&(thrust::get<1>(refs)), val.y);
-    if(val.z) newval.z = atomicAdd(&(thrust::get<2>(refs)), val.z);
-    if(val.w) newval.w = atomicAdd(&(thrust::get<3>(refs)), val.w);
+    if(val.x) newval.x = atomicAdd(&thrust::get<0>(refs), val.x);
+    if(val.y) newval.y = atomicAdd(&thrust::get<1>(refs), val.y);
+    if(val.z) newval.z = atomicAdd(&thrust::get<2>(refs), val.z);
+    if(val.w) newval.w = atomicAdd(&thrust::get<3>(refs), val.w);
     return newval;
   }
 
