@@ -237,6 +237,9 @@ Any kernel must adhere to the following interface
 .. cpp:class:: IBMKernel
 
 	       A conceptual interface class for IBM spread/interpolation kernels.
+	       The return type of the phi functions: :cpp:`KernelReturnType` will be auto deduced and can be anything, as long as the :code:`WeightCompute` argument passed to :code:`spread` and :code:`gather` can handle it.
+	       Note that the return type will be, more often than not, a simple :code:`real` number.
+	       But there are situations where a more complex return type might be needed, for instance, to spread the value: :math:`(r_x^2 + r_y^2 + r_z^2)\phi(r_x)\phi(r_y)\phi(r_z)` we will need the return type to be a :code:`real2` storing :cpp:`r` and :cpp:`phi` in each direction.
 
    .. cpp:function:: __device__ int3 getSupport(real3 pos, int3 cell);
 
@@ -245,20 +248,20 @@ Any kernel must adhere to the following interface
    .. cpp:function:: int3 getMaxSupport();
 
       Return the maximum support required by the kernel.
-
-   .. cpp:function:: __device__ real phiX(real r, real3 pos);
+      
+   .. cpp:function:: __device__ KernelReturnType phiX(real r, real3 pos);
 
       Computes the kernel at a distance :cpp:`r` in the X direction. The value of the kernel can depend on the position of the marker, given at :cpp:`pos`.
 		     
-   .. cpp:function:: __device__ real phiY(real r, real3 pos);
+   .. cpp:function:: __device__ KernelReturnType phiY(real r, real3 pos);
 
       Computes the kernel at a distance :cpp:`r` in the Y direction. The value of the kernel can depend on the position of the marker, given at :cpp:`pos`.
 		     
-   .. cpp:function:: __device__ real phiZ(real r, real3 pos);
+   .. cpp:function:: __device__ KernelReturnType phiZ(real r, real3 pos);
 
       Computes the kernel at a distance :cpp:`r` in the Z direction. The value of the kernel can depend on the position of the marker, given at :cpp:`pos`.
 
-   .. cpp:function:: __device__ real phi(real r, real3 pos);
+   .. cpp:function:: __device__ KernelReturnType phi(real r, real3 pos);
 
       Instead of having a different function per direction (:cpp:any:`phiX`, :cpp:any:`phiY` and :cpp:any:`phiZ`) this single function can be defined instead (so that :cpp:`phiX = phiY = phiZ`).
 
@@ -319,7 +322,7 @@ The :cpp:any:`IBM` class is used to communicate between marker (particle) and gr
       The basic overload of the spread function takes the position of the markers, the values defined at each marker's positions and the grid data (stored according to :cpp:any:`Index3D`).
       This function will add to each cell, :math:`c_j`, in :cpp:`gridData` the result of :math:`c_j += \sum_i\text{WeightCompute}(\delta_a(\vec{\ppos}_i-\vec{\fpos}_{c_j}), \vec{f}_i)`.
       Here :math:`\text{WeightCompute}` defaults to multiplication, see :ref:`Advanced functionality`. 
-      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the marker data and return a type for which the :cpp:`GridDataIterator::value_type::operator +=()` exists.
+      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the marker data and return a type for which the :cpp:`GridDataIterator::value_type::operator+()` and :cpp:`GridDataIterator::value_type::operator=()` exists.
 
    .. cpp:function::     template<class PosIterator,\
 			 class QuantityIterator,\
@@ -331,7 +334,7 @@ The :cpp:any:`IBM` class is used to communicate between marker (particle) and gr
       The basic overload of the interpolation function takes the position of the markers, the values defined at each marker's positions and the grid data (stored according to :cpp:any:`Index3D`).
       This function will add to each particles value, :math:`v_i`, the result of :math:`v_i += \sum_j\text{WeightCompute}(\delta_a(\vec{\ppos}_i-\vec{\fpos}_{c_j}), \vec{v}_{c_j})*\text{QuadratureWeight}_j`, where :math:`\vec{c}_j` is the value stored for cell :math:`j`.
       Here :math:`\text{WeightCompute}` defaults to multiplication. The :math:`\text{QuadratureWeight}` of each cell defaults to :math:`h^3`, the volume of a grid cell provided by the :cpp:any:`Grid` object. See :ref:`Advanced functionality` for more information.
-      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the grid data and return a type for which the :cpp:`QuantityIterator::value_type::operator +=()` exists.
+      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the grid data and return a type for which the :cpp:`GridDataIterator::value_type::operator+()` and :cpp:`GridDataIterator::value_type::operator=()` exists.
 
 
 Example
@@ -498,9 +501,10 @@ Modify how the multiplication of the kernel and a marker value is performed when
 .. cpp:class:: WeightComputation
 
 
-   .. cpp:function::  template<class T> __device__ auto operator()(T value, real3 kernel);
+   .. cpp:function::  template<class T, class T2> __device__ auto operator()(T value, thrust::tuple<T2, T2, T2> kernel);
 
-		      Takes a value (defined at a markers position in the case of spreading or at a grid point in the case of interpolation) and a kernel evaluation. Returns the value that will be added to the other description (a value at a grid point in the case of spreading and at a markers position in the case of interpolation). The default weight computation will return :cpp:`value*kernel.x*kernel.y*kernel.z`.
+		      Takes a value (defined at a markers position in the case of spreading or at a grid point in the case of interpolation) and a kernel evaluation. Returns the value that will be added to the other description (a value at a grid point in the case of spreading and at a markers position in the case of interpolation). The default weight computation will return :cpp:`value*thrust::get<0>(kernel)*thrust::get<1>(kernel)*thrust::get<2>(kernel);`.
+		      The type :cpp:`T2` will be determined by the return type of the kernel.
 
 
 Example
@@ -516,8 +520,8 @@ Example
 
   struct MyWeightCompute{
   
-    inline __device__ real operator()(real value, real3 kernel) const{
-  	return value*kernel.x*kernel.y*kernel.z;
+    inline __device__ real operator()(real value, thrust::tuple<real, real, real> kernel) const{
+  	return value*thrust::get<0>(kernel)*thrust::get<1>(kernel)*thrust::get<2>(kernel);
     }
 
   };
