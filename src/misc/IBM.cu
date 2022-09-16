@@ -193,12 +193,12 @@ namespace uammd{
 	  const int jcell = cell2index(cellj);
 	  const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	  const auto weight = weightCompute(gridQuantity[jcell], kern);
-	  result = result + dV*weight;
+	  result += dV*weight;
 	}
       }
       GridQuantityType total = BlockReduce(temp_storage).Sum(result);
       if(tid==0 and id<numberParticles){
-	particleQuantity[id] = particleQuantity[id] + total;
+	particleQuantity[id] += total;
       }
     }
 
