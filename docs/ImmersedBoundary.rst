@@ -322,7 +322,7 @@ The :cpp:any:`IBM` class is used to communicate between marker (particle) and gr
       The basic overload of the spread function takes the position of the markers, the values defined at each marker's positions and the grid data (stored according to :cpp:any:`Index3D`).
       This function will add to each cell, :math:`c_j`, in :cpp:`gridData` the result of :math:`c_j += \sum_i\text{WeightCompute}(\delta_a(\vec{\ppos}_i-\vec{\fpos}_{c_j}), \vec{f}_i)`.
       Here :math:`\text{WeightCompute}` defaults to multiplication, see :ref:`Advanced functionality`. 
-      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the marker data and return a type for which the :cpp:`GridDataIterator::value_type::operator+()` and :cpp:`GridDataIterator::value_type::operator=()` exists.
+      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the marker data and return a type for which the :cpp:`GridDataIterator::value_type::operator+=()` exists.
 
    .. cpp:function::     template<class PosIterator,\
 			 class QuantityIterator,\
@@ -334,7 +334,7 @@ The :cpp:any:`IBM` class is used to communicate between marker (particle) and gr
       The basic overload of the interpolation function takes the position of the markers, the values defined at each marker's positions and the grid data (stored according to :cpp:any:`Index3D`).
       This function will add to each particles value, :math:`v_i`, the result of :math:`v_i += \sum_j\text{WeightCompute}(\delta_a(\vec{\ppos}_i-\vec{\fpos}_{c_j}), \vec{v}_{c_j})*\text{QuadratureWeight}_j`, where :math:`\vec{c}_j` is the value stored for cell :math:`j`.
       Here :math:`\text{WeightCompute}` defaults to multiplication. The :math:`\text{QuadratureWeight}` of each cell defaults to :math:`h^3`, the volume of a grid cell provided by the :cpp:any:`Grid` object. See :ref:`Advanced functionality` for more information.
-      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the grid data and return a type for which the :cpp:`GridDataIterator::value_type::operator+()` and :cpp:`GridDataIterator::value_type::operator=()` exists.
+      The types of the different quantities are irrelevant as long as the required arithmetics are defined for them (for instance, the weight compute must be able to process the type of the grid data and return a type for which the :cpp:`GridDataIterator::value_type::operator+=()` exists.
 
 
 Example
