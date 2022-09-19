@@ -56,7 +56,8 @@ namespace uammd{
 	par(par),
 	viscosity(par.viscosity),
 	hydrodynamicRadius(par.hydrodynamicRadius),
-	box(par.box){
+	box(par.box),
+	grid(par.box, par.cells){
 	System::log<System::MESSAGE>("[BDHI::FCM] Initialized");
 	if(box.boxSize.x == real(0.0) && box.boxSize.y == real(0.0) && box.boxSize.z == real(0.0)){
 	  System::log<System::CRITICAL>("[BDHI::FCM] Box of size zero detected, cannot work without a box! (make sure a box parameter was passed)");
@@ -65,6 +66,14 @@ namespace uammd{
 	if(par.seed == 0){
 	  auto now = std::chrono::steady_clock::now().time_since_epoch();
 	  this->seed = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+	}
+	if(par.box.boxSize.x<=0){
+	  System::log<System::EXCEPTION>("FCM_impl requires a valid box");
+	  throw std::runtime_error("Invalid arguments");
+	}
+	if(par.cells.x<=0){
+	  System::log<System::EXCEPTION>("FCM_impl requires a valid grid dimension");
+	  throw std::runtime_error("Invalid arguments");
 	}
 	if(not par.kernel or not par.kernelTorque){
 	  System::log<System::EXCEPTION>("FCM_impl requires instances of the spreading kernels");
@@ -138,7 +147,7 @@ namespace uammd{
 	auto rh = this->getHydrodynamicRadius();
 	auto M0 = this->getSelfMobility();
 	System::log<System::MESSAGE>("[BDHI::FCM] Using kernel: %s", type_name<Kernel>().c_str());
-	System::log<System::MESSAGE>("[BDHI::FCM] Closest possible hydrodynamic radius: %g (%g requested)", rh, par.hydrodynamicRadius);
+	System::log<System::MESSAGE>("[BDHI::FCM] Closest possible hydrodynamic radius: %g", rh);
 	System::log<System::MESSAGE>("[BDHI::FCM] Self mobility: %g", (double)M0);
 	if(box.boxSize.x != box.boxSize.y || box.boxSize.y != box.boxSize.z || box.boxSize.x != box.boxSize.z){
 	  System::log<System::WARNING>("[BDHI::FCM] Self mobility will be different for non cubic boxes!");
