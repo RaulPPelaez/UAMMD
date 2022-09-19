@@ -478,7 +478,7 @@ The following parameters are available:
 
 
 In this example we compute the hydrodynamic displacements of a particle that is being pulled in the X direction.
-For simplicity we will make use of a :code:class:`Gaussian` kernel, but any :ref:`IBM`-compatible kernel can be used instead.
+For simplicity we will make use of a :cpp:class:`Gaussian` kernel, but any :ref:`IBM`-compatible kernel can be used instead.
 
 .. code:: c++
 
