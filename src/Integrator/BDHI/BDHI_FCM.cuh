@@ -59,6 +59,7 @@ namespace uammd{
 	   kernel->support >= grid.cellDim.z){
 	  System::log<System::ERROR>("[BDHI::FCM] Kernel support is too big, try lowering the tolerance or increasing the box size!.");
 	}
+	System::log<System::MESSAGE>("[BDHI::FCM] Kernel support is %d points.", kernel->support);
 	return kernel;
       }
 
@@ -102,7 +103,7 @@ namespace uammd{
 	par.box = grid.box;
 	par.cells = grid.cellDim;
 	par.kernel = detail::initializeKernel<Kernel>(par, grid);
-	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(grid.cellSize.x, grid.cellSize.x);
+	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(par.hydrodynamicRadius, grid.cellSize.x);
 	par.kernelTorque = detail::initializeKernelTorque<KernelTorque>(par, grid);
 	this->fcm = std::make_shared<FCM_super>(par);
       }
@@ -165,7 +166,7 @@ namespace uammd{
 	par.cells = grid.cellDim;
 	par.box = grid.box;
 	par.kernel = detail::initializeKernel<Kernel>(par, grid);
-	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(grid.cellSize.x, grid.cellSize.x);
+	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(par.hydrodynamicRadius, grid.cellSize.x);
 	par.kernelTorque = detail::initializeKernelTorque<KernelTorque>(par, grid);
 	this->fcm = std::make_shared<FCM_super>(par);
 	cudaStreamCreate(&st);
