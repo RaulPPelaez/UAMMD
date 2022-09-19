@@ -377,10 +377,11 @@ The following parameters are available:
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas. Can be 0.
   * :cpp:`real viscosity` Viscosity of the solvent.
   * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles)
+  * :cpp:`bool adaptBoxSize = false` If set to true and the hydrodynamic radius is provided, the box size will be adapted to enforce the provided hydrodynamic radius;
   * :cpp:`int3 cells`  Number of grid cells in each direction. This parameter can be set instead of the hydrodynamic radius and will force FCM to construct the grid of this size.
   * :cpp:`real dt`  Time step
   * :cpp:`real tolerance` Overall tolerance of the solver (affects the grid size and kernel support).
-  * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.
+  * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.  
 
 
 .. code:: c++
@@ -425,6 +426,7 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 
 .. note:: Although this is undocumented at the moment, the FCM module can also deal with torques/angular displacements.
 
+.. hint:: Since FCM requires to bin the domain and the hydrodynamic radius is tied to the bin size, in general we cannot enforce both the domain size and the hydrodynamic radius at the same time. This is why the :cpp:`adaptBoxSize` parameter exists. If the default heuristics for handling the cell dimensions are not satisfactory for you use case, you can always specify every parameter yourself (cell dimensions, kernel support and width, etc).
 
 .. hint:: Note that the tolerance parameter is ignored depending on the kernel. For instance, the :cpp:class:`Peskin::threePoint` kernel cannot be tweaked for some accuracy or another, the grid size will always be such that :code:`h = hydrodynamicRadius` and the support is always 3 points.
 
@@ -473,7 +475,7 @@ The following parameters are available:
   * :cpp:`int3 cells` The grid dimensions.
   * :cpp:`uint seed` The seed used for fluctuations. If unset a number will be drawn from :cpp:class:`System` generator.
   * :cpp:`std::shared_ptr<Kernel> kernel` This instance will be used by the module for spreading forces.
-  * :cpp:`std::shared_ptr<KernelTorque> kernelTorque` Same as above but for the dipole kernel.
+  * :cpp:`std::shared_ptr<KernelTorque> kernelTorque` Same as above but for the dipole kernel.  
   * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles). The module will simply return this parameter when the :cpp:`getHydrodynamicRadius` function is called.
 
 
