@@ -49,6 +49,7 @@ namespace uammd{
 	uint seed = 0;
 	std::shared_ptr<Kernel> kernel = nullptr;
 	std::shared_ptr<KernelTorque> kernelTorque = nullptr;
+	bool adaptBoxSize;
       };
 
       FCM_impl(Parameters par):
@@ -65,9 +66,14 @@ namespace uammd{
 	  auto now = std::chrono::steady_clock::now().time_since_epoch();
 	  this->seed = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
 	}
-	initializeGrid(par);
-	initializeKernel(par);
-	initializeKernelTorque(par);
+	if(not par.kernel or not par.kernelTorque){
+	  System::log<System::EXCEPTION>("FCM_impl requires instances of the spreading kernels");
+	  throw std::runtime_error("Invalid arguments");
+	}
+	if(par.cells.x <= 0){
+	  System::log<System::EXCEPTION>("FCM_impl requires valid grid dimensions");
+	  throw std::runtime_error("Invalid arguments");
+	}
 	printMessages(par);
 	initCuFFT();
 	CudaSafeCall(cudaDeviceSynchronize());
@@ -128,42 +134,6 @@ namespace uammd{
 
       Parameters par;
 
-      void initializeGrid(Parameters par){
-	int3 cellDim;
-	real h;
-	if(par.cells.x<=0){
-	  if(par.hydrodynamicRadius<=0)
-	    System::log<System::CRITICAL>("[BDHI::FCM] I need an hydrodynamic radius if cell dimensions are not provided!");
-	  h = Kernel::adviseGridSize(par.hydrodynamicRadius, par.tolerance);
-	  cellDim = nextFFTWiseSize3D(make_int3(par.box.boxSize/h));
-	}
-	else{
-	  cellDim = par.cells;
-	}
-	this->grid = Grid(box, cellDim);
-      }
-
-      void initializeKernel(Parameters par){
-	real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
-	if(not par.kernel)
-	  this->kernel = std::make_shared<Kernel>(h, par.tolerance);
-	else
-	  this->kernel = par.kernel;
-	this->hydrodynamicRadius = kernel->fixHydrodynamicRadius(h, grid.cellSize.x);
-      }
-
-      void initializeKernelTorque(Parameters par){
-	if(not par.kernelTorque){
-	  real a = this->getHydrodynamicRadius();
-	  real width = a/(pow(6*sqrt(M_PI), 1/3.));
-	  real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
-	  this->kernelTorque = std::make_shared<KernelTorque>(width, h, par.tolerance);
-	}
-	else{
-	  this->kernelTorque = par.kernelTorque;
-	}
-      }
-
       void printMessages(Parameters par){
 	auto rh = this->getHydrodynamicRadius();
 	auto M0 = this->getSelfMobility();
@@ -175,15 +145,10 @@ namespace uammd{
 	}
 	System::log<System::MESSAGE>("[BDHI::FCM] Box Size: %g %g %g", grid.box.boxSize.x, grid.box.boxSize.y, grid.box.boxSize.z);
 	System::log<System::MESSAGE>("[BDHI::FCM] Grid dimensions: %d %d %d", grid.cellDim.x, grid.cellDim.y, grid.cellDim.z);
-	System::log<System::MESSAGE>("[BDHI::FCM] Interpolation kernel support: %g rh max distance, %d cells total",
-				     kernel->support*0.5*grid.cellSize.x/rh, kernel->support);
+	// System::log<System::MESSAGE>("[BDHI::FCM] Interpolation kernel support: %g rh max distance, %d cells total",
+	// 			     kernel->support*0.5*grid.cellSize.x/rh, kernel->support);
 	System::log<System::MESSAGE>("[BDHI::FCM] h: %g %g %g", grid.cellSize.x, grid.cellSize.y, grid.cellSize.z);
-	System::log<System::MESSAGE>("[BDHI::FCM] Requested kernel tolerance: %g", par.tolerance);
-	if(kernel->support >= grid.cellDim.x or
-	   kernel->support >= grid.cellDim.y or
-	   kernel->support >= grid.cellDim.z){
-	  System::log<System::ERROR>("[BDHI::FCM] Kernel support is too big, try lowering the tolerance or increasing the box size!.");
-	}
+	//System::log<System::MESSAGE>("[BDHI::FCM] Requested kernel tolerance: %g", par.tolerance);
       }
 
       void initCuFFT(){
