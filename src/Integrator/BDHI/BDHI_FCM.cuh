@@ -100,6 +100,7 @@ namespace uammd{
 	  par.seed = pg->getParticleData()->getSystem()->rng().next32();
 	auto grid = detail::initializeGrid<Kernel>(par);
 	par.box = grid.box;
+	par.cells = grid.cellDim;
 	par.kernel = detail::initializeKernel<Kernel>(par, grid);
 	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(grid.cellSize.x, grid.cellSize.x);
 	par.kernelTorque = detail::initializeKernelTorque<KernelTorque>(par, grid);
@@ -161,6 +162,7 @@ namespace uammd{
 	if(par.seed == 0)
 	  par.seed = sys->rng().next32();
 	auto grid = detail::initializeGrid<Kernel>(par);
+	par.cells = grid.cellDim;
 	par.box = grid.box;
 	par.kernel = detail::initializeKernel<Kernel>(par, grid);
 	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(grid.cellSize.x, grid.cellSize.x);
