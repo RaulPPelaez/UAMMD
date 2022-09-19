@@ -57,7 +57,9 @@ namespace uammd{
 	viscosity(par.viscosity),
 	hydrodynamicRadius(par.hydrodynamicRadius),
 	box(par.box),
-	grid(par.box, par.cells){
+	grid(par.box, par.cells),
+	kernel(par.kernel),
+	kernelTorque(par.kernelTorque){
 	System::log<System::MESSAGE>("[BDHI::FCM] Initialized");
 	if(box.boxSize.x == real(0.0) && box.boxSize.y == real(0.0) && box.boxSize.z == real(0.0)){
 	  System::log<System::CRITICAL>("[BDHI::FCM] Box of size zero detected, cannot work without a box! (make sure a box parameter was passed)");
