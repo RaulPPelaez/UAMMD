@@ -426,12 +426,139 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 .. note:: Although this is undocumented at the moment, the FCM module can also deal with torques/angular displacements.
 
 
+.. hint:: Note that the tolerance parameter is ignored depending on the kernel. For instance, the :cpp:class:`Peskin::threePoint` kernel cannot be tweaked for some accuracy or another, the grid size will always be such that :code:`h = hydrodynamicRadius` and the support is always 3 points.
+
+
+Advanced functionality
+************************
+
+The FCM :ref:`Integrator` relies on an underlying module called :ref:`uammd::BDHI::FCM_impl`. This class does not rely on any :ref:`UAMMD` base module (i.e. :ref:`Integrator`, :ref:`ParticleData`, etc), so it can be easily adapted to usage outside the UAMMD ecosystem.
+
+.. cpp:class:: template<class Kernel, class KernelTorque> BDHI::FCM_impl
+
+   This class computes the hydrodynamic displacements of a suspension of equally-sized particles in a triply periodic domain, following the algorithm described in :ref:`FCM`. It can be specialized for any :ref:`IBM`-compatible kernel for both the linear (:cpp:`Kernel`) and dipolar (:cpp:`KernelTorque` displacements).
+   
+ .. cpp:function:: FCM_impl(Parameters par);
+
+   The constructor takes an instance of the :code:`Parameters` struct defined inside :code:`FCM_impl`.   
+   See the usage example below for a list of parameters.
+
+ .. cpp:function:: real getHydrodynamicRadius();
+
+    Returns the hydrodynamic radius used by the module.
+
+ .. cpp:function:: real getSelfMobility();
+
+    Returns the self mobility that should be expected given the current parameters. This includes periodic corrections and the actual hydrodynamic radius in use.
+
+ .. cpp:function:: Box getBox();
+
+    Returns the current :ref:`Box` used by the module.
+
+ .. cpp:function:: std::pair<cached_vector<real3>, cached_vector<real3>> computeHydrodynamicDisplacements(real4* q, real4* F, real4* T, int numberParticles, real kT, real b, cudaStream_t st = 0);
+
+    Computes the hydrodynamic displacements, defined as :math:`\begin{bmatrix}d\vec{q}\\d\vec{\tau}\end{bmatrix} = \tens{M}(\vec{q})\begin{bmatrix}\vec{F}\\\vec{T}\end{bmatrix} + b\sqrt{2\kT\tens{M}(\vec{q})}d\tilde{\vec{W}}`.
+    The positions, :code:`q`, the forces, :code:`F` and the torques, :code:`T`, must be passed as pointers to :cpp:class:`real4` with interleaved x,y,z components for each marker. The fourth element is unused.
+    The return type is a pair containing two gpu containers. The first element holds the linear displacements, while the second holds the dipolar displacements.
+    
+      
+
+
+Usage
+//////
+
+The following parameters are available:
+  * :cpp:`real viscosity` Viscosity of the solvent.
+  * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.
+  * :cpp:`int3 cells` The grid dimensions.
+  * :cpp:`uint seed` The seed used for fluctuations. If unset a number will be drawn from :cpp:class:`System` generator.
+  * :cpp:`std::shared_ptr<Kernel> kernel` This instance will be used by the module for spreading forces.
+  * :cpp:`std::shared_ptr<KernelTorque> kernelTorque` Same as above but for the dipole kernel.
+  * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles). The module will simply return this parameter when the :cpp:`getHydrodynamicRadius` function is called.
+
+
+In this example we compute the hydrodynamic displacements of a particle that is being pulled in the X direction.
+For simplicity we will make use of a :code:class:`Gaussian` kernel, but any :ref:`IBM`-compatible kernel can be used instead.
+
+.. code:: c++
+
+   #include "uammd.cuh"
+   #include "Integrator/BDHI/FCM/FCM_impl.cuh"
+
+   using namespace uammd;
+   //A simple Gaussian kernel compatible with the IBM module.
+   class Gaussian{
+     const real prefactor;
+     const real tau;
+     const int support;
+   public:
+     Gaussian(real width, int support):
+       prefactor(pow(2.0*M_PI*width*width, -0.5)),
+       tau(-0.5/(width*width)),
+       support(support){}
+ 
+    int3 getMaxSupport(){
+      return {support, support, support};
+    }
+    
+     __device__ int3 getSupport(real3 pos, int3 cell){
+       return getMaxSupport();
+     }
+   
+     __device__ real phi(real r, real3 pos) const{
+       return prefactor*exp(tau*r*r);
+     }
+   };
+ 
+   using Kernel = Gaussian;
+   using KernelTorque = Gaussian;
+   using FCM = BDHI::FCM_impl<Kernel, KernelTorque>;
+	  
+   int main(){
+     FCM::Parameters par;
+     par.viscosity = 1.0/(6*M_PI);
+     real L = 128;
+     par.box = uammd::Box({L,L,L});
+     //Some arbitrary parameters
+     par.cells = {64,64,64};
+     real width = 1;
+     int support = 8;
+     par.kernel = std::make_shared<Kernel>(width, support);
+     par.kernelTorque = std::make_shared<KernelTorque>(width, support);
+     auto fcm = std::make_shared<FCM>(par);
+
+     //Some arbitrary positions and forces.
+     int numberParticles = 1;
+     thrust::device_vector<real4> pos(numberParticles);
+     pos[0] = make_real4(0,0,0,0);
+     thrust::device_vector<real4> forces(numberParticles);
+     forces[0] = make_real4(1,0,0,0);
+     thrust::device_vector<real4> torques(numberParticles);
+     torques[0] = make_real4(0,0,0,0);
+
+     auto disp = fcm->computeHydrodynamicDisplacements(pos.data().get(),
+	                                               forces.data().get(), torques.data().get(),
+						       numberParticles, 0, 0);
+     auto MF = disp.first;
+     auto MT = disp.second;
+
+     thrust::host_vector<real3> h_MF(MF.begin(), MF.end());
+     real3 MF0 = h_MF[0];
+     std::cout<<"Linear displacement for the first particle: "<<MF0<<std::endl;
+     auto selfMob = fcm->getSelfMobility();
+     std::cout<<"Self mobility is: "<<selfMob<<std::endl;
+     
+     return 0;
+   }
+
+
+
 .. _PSE:
 
 Positively Split Ewald
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-An Ewald split version of the Force Coupling Method [12]_. Splits the computation between a far and near field contributions. The far field reuses the FCM machinery described above and the near field makes use of the Lanczos algorithm.
+An Ewald split version of the Force Coupling Method [12]_ that uses the Rotne-Prager-Yamakawa mobility. Splits the computation between a far and near field contributions. The far field reuses the FCM machinery described above and the near field makes use of the Lanczos algorithm.
 
 
 .. todo:: Fill
