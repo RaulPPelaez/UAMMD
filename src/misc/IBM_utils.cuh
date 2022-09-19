@@ -17,10 +17,10 @@ namespace uammd{
       SFINAE_DEFINE_HAS_MEMBER(getMaxSupport)
       template<class Kernel, bool def = has_getMaxSupport<Kernel>::value> struct GetMaxSupport;
       template<class Kernel> struct GetMaxSupport<Kernel, true>{
-	static __host__  __device__ int3 get(Kernel &kernel){return kernel.getMaxSupport();}
+	static int3 get(Kernel &kernel){return kernel.getMaxSupport();}
       };
       template<class Kernel> struct GetMaxSupport<Kernel, false>{
-	static __host__  __device__ int3 get(Kernel &kernel){return make_int3(kernel.support);}
+	static int3 get(Kernel &kernel){return GetSupport<Kernel>().get(kernel, {0,0,0}, {0,0,0});}
       };
 
       SFINAE_DEFINE_HAS_MEMBER(phiX)
