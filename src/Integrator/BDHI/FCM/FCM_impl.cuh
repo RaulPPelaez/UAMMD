@@ -49,7 +49,7 @@ namespace uammd{
 	uint seed = 0;
 	std::shared_ptr<Kernel> kernel = nullptr;
 	std::shared_ptr<KernelTorque> kernelTorque = nullptr;
-	bool adaptBoxSize;
+	bool adaptBoxSize = false;
       };
 
       FCM_impl(Parameters par):
