@@ -476,7 +476,7 @@ namespace uammd{
 	  System::log<System::EXCEPTION>("FCM_impl requires an instance of the WeightCompute");
 	  throw std::runtime_error("Invalid arguments");
 	}
-	else{
+	else if(not this->wc){
 	  this->wc = fcm_detail::createIfDefaultConstructible<WeightCompute>();
 	}
 	if(par.cells.x <= 0){
