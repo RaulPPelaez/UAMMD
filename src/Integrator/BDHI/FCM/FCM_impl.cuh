@@ -450,7 +450,7 @@ namespace uammd{
 	grid(par.box, par.cells),
 	kernel(par.kernel),
 	kernelTorque(par.kernelTorque),
-	wc(wc){
+	wc(par.wc){
 	System::log<System::MESSAGE>("[BDHI::FCM] Initialized");
 	if(box.boxSize.x == real(0.0) && box.boxSize.y == real(0.0) && box.boxSize.z == real(0.0)){
 	  System::log<System::CRITICAL>("[BDHI::FCM] Box of size zero detected, cannot work without a box! (make sure a box parameter was passed)");
