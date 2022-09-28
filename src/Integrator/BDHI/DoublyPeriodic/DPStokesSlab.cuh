@@ -5,167 +5,26 @@
 #ifndef DOUBLYPERIODIC_STOKES_CUH
 #define DOUBLYPERIODIC_STOKES_CUH
 
-#include"Integrator/BDHI/DoublyPeriodic/StokesSlab/utils.cuh"
 #include"Integrator/Integrator.cuh"
-
-
-#include "misc/IBM_kernels.cuh"
+#include "System/System.h"
 #include "utils/utils.h"
 #include "global/defines.h"
-#include"misc/BoundaryValueProblem/BVPSolver.cuh"
 #include"misc/ChevyshevUtils.cuh"
 #include"StokesSlab/FastChebyshevTransform.cuh"
 #include"StokesSlab/utils.cuh"
 #include"StokesSlab/Correction.cuh"
+#include <memory>
+#include <stdexcept>
+#include "misc/LanczosAlgorithm.cuh"
+#include"StokesSlab/spreadInterp.cuh"
 
 namespace uammd{
   namespace DPStokesSlab_ns{
-    struct Gaussian{
-      int3 support;
-      Gaussian(real tolerance, real width, real h, real H, int supportxy, int nz, bool torqueMode = false):H(H), nz(nz){
-	this-> prefactor = cbrt(pow(2*M_PI*width*width, -1.5));
-	this-> tau = -1.0/(2.0*width*width);
-	rmax = supportxy*h*0.5;
-	support = {supportxy, supportxy, supportxy};
-	int ct = int(nz*(acos(-2*(-H*0.5+rmax)/H)/M_PI));
-	support.z = 2*ct+1;
-      }
 
-      inline __host__  __device__ int3 getMaxSupport() const{
-	return support;
-      }
-
-      inline __host__  __device__ int3 getSupport(int3 cell) const{
-	real ch = real(-0.5)*H*cospi((real(cell.z))/(nz-1));
-	real zmax = thrust::min(ch+rmax, H*real(0.5));
-	int czt = int((nz)*(acos(real(-2.0)*(zmax)/H)/real(M_PI)));
-	real zmin = thrust::max(ch-rmax, -H*real(0.5));
-	int czb = int((nz)*(acos(real(-2.0)*(zmin)/H)/real(M_PI)));
-	int sz = 2*thrust::max(czt-cell.z, cell.z-czb)+1;
-	return make_int3(support.x, support.y, thrust::min(sz, support.z));
-      }
-
-      inline __host__  __device__ real phiX(real r) const{
-	return prefactor*exp(tau*r*r);
-      }
-
-      inline __host__  __device__ real phiY(real r) const{
-	return prefactor*exp(tau*r*r);
-      }
-      //For this algorithm we spread a particle and its image to enforce the force density outside the slab is zero.
-      //A particle on the wall position will spread zero force. phi(r) = phi(r) - phi(r_img);
-      inline __host__  __device__ real phiZ(real r, real3 pi) const{
-	if(fabs(r) >=rmax){
-	  return 0;
-	}
-	else{
-	  real top_rimg =  H-2*pi.z+r;
-	  real bot_rimg = -H-2*pi.z+r;
-	  real rimg = thrust::min(fabs(top_rimg), fabs(bot_rimg));
-	  real phi_img = rimg>=rmax?real(0.0):prefactor*exp(tau*rimg*rimg);
-	  real phi = prefactor*exp(tau*r*r);
-	  return phi - phi_img;
-	}
-      }
-
-    private:
-      real prefactor;
-      real tau;
-      real H;
-      real rmax;
-      int nz;
-    };
-
-    //Tabulated parameters for the BM kernel and its derivative, this map returns, for a given support, beta and the normalization
-    //BM_params[w] -> {beta, norm}
-    //TODO: the norm should be autocomputed
-    //TODO: Use BM from IBM_kernels directly
-    // static const std::map<int, double2> BM_params({ {4, {1.785,1.471487792829305}},
-    // 						    {5, {1.886,1.456086423397354}},
-    // 						    {6, {1.3267,1.46442666831683}}});
-    // //{6, {1.714,1.452197522749675}}});
-
-    // static const std::map<int, double2> BM_torque_params({{6, {2.216,1.157273283795062}}});
-
-    // //The BM kernel and its derivative
-    // inline __host__  __device__ real bm(real r, real alpha, real beta, real norm){
-    //   real za  = fabs(r/alpha);
-    //   return za>=real(1.0)?real(0.0):exp(beta*(sqrt(real(1.0)-za*za)-real(1.0)))/norm;
-    // }
-
-    // inline __host__  __device__ real bm_deriv(real r, real alpha, real beta, real norm){
-    //   real a2 = alpha*alpha;
-    //   return -beta*r*bm(r,alpha, beta, norm)/(a2*sqrt(real(1.0)-r*r/a2));
-    // }
-
-    // namespace detail{
-    //   real suggestBetaBM(real w){
-    // 	throw std::runtime_error("Beta<0 Not implemented yet, please give me a value");
-    // 	return 0;
-    //   }
-    // }
-    //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
-    struct BarnettMagland{
-      IBM_kernels::BarnettMagland bm;
-      real a;
-      int3 support;
-
-      BarnettMagland(real w, real beta, real i_alpha, real h, real H, int nz):
-	H(H), nz(nz), bm(i_alpha, beta){
-	int supportxy = w+0.5;
-	this->rmax = w*h*0.5;
-	support.x = support.y = supportxy;
-	int ct = ceil((nz-1)*(acos((H*0.5-rmax)/(0.5*H))/M_PI));
-	support.z = 2*ct+1;
-	this->a = h;
-	System::log<System::MESSAGE>("BM kernel: beta: %g, alpha: %g, w: %g", beta, i_alpha, w);
-      }
-
-      inline __host__  __device__ int3 getMaxSupport() const{
-	return support;
-      }
-
-      inline __host__  __device__ int3 getSupport(real3 pos, int3 cell) const{
-	real bound = H*real(0.5);
-	real ztop = thrust::min(pos.z+rmax, bound);
-	real zbot = thrust::max(pos.z-rmax, -bound);
-	int czb = int((nz-1)*(acos(ztop/bound)/real(M_PI)));
-	int czt = int((nz-1)*(acos(zbot/bound)/real(M_PI)));
-	int sz = 2*thrust::max(cell.z - czb, czt - cell.z)+1;
-	return make_int3(support.x, support.y, sz);
-      }
-
-      inline __host__  __device__ real phiX(real r, real3 pi) const{
-	return bm.phi(r/a)/a;
-      }
-
-      inline __host__  __device__ real phiY(real r, real3 pi) const{
-	return bm.phi(r/a)/a;
-      }
-      //For this algorithm we spread a particle and its image to enforce the force density outside the slab is zero.
-      //A particle on the wall position will spread zero force. phi(r) = phi(r) - phi(r_img);
-      inline __host__  __device__ real phiZ(real r, real3 pi) const{
-	real top_rimg =  H-real(2.0)*pi.z+r;
-	real bot_rimg = -H-real(2.0)*pi.z+r;
-	real rimg = thrust::min(fabs(top_rimg), fabs(bot_rimg));
-	real phi_img = bm.phi(rimg/a)/a;
-	real phi = bm.phi(r/a)/a;
-	return phi - phi_img;
-      }
-    private:
-      real H;
-      real rmax;
-      int nz;
-    };
 
     class DPStokes{
     public:
-      //using Kernel = Gaussian;
-      using Kernel = BarnettMagland;
-      //A different kernel can be used for spreading forces and torques
-      using KernelTorque = BarnettMagland;
       using Grid = chebyshev::doublyperiodic::Grid;
-      using QuadratureWeights = chebyshev::doublyperiodic::QuadratureWeights;
       using WallMode = WallMode;
       //Parameters, -1 means that it will be autocomputed if not present
       struct Parameters{
@@ -192,19 +51,54 @@ namespace uammd{
 	System::log<System::MESSAGE>("[DPStokes] Destroyed");
       }
 
-      //Computes the velocities and angular velocities given the forces and torques
-      std::pair<cached_vector<real3>, cached_vector<real3>>
-      Mdot(real4* pos, real4* forces, real4* torque, int N, cudaStream_t st = 0);
 
-      //Computes the velocities given the forces
-      cached_vector<real3> Mdot(real4* pos, real4* forces, int N, cudaStream_t st = 0);
+      //Computes the hydrodynamic displacements (velocities) coming from the forces
+      // acting on a group of positions.
+      template<class PosIterator, class ForceIterator>
+      cached_vector<real3> Mdot(PosIterator pos, ForceIterator forces,
+				int numberParticles, cudaStream_t st){
+	auto M = Mdot(pos, forces, (real4*) nullptr, numberParticles, st);
+	return M.first;
+      }
+
+      //Computes the linear and angular hydrodynamic displacements (velocities) coming from
+      // the forces and torques acting on a group of positions
+      //If the torques pointer is null, the function will only compute and return the translational part
+      // of the mobility
+      template<class PosIterator, class ForceIterator, class TorqueIterator>
+      std::pair<cached_vector<real3>, cached_vector<real3>>
+      Mdot(PosIterator pos, ForceIterator forces, TorqueIterator torques,
+	   int numberParticles, cudaStream_t st){
+	cudaDeviceSynchronize();
+	System::log<System::DEBUG2>("[DPStokes] Computing displacements");
+	auto gridData = ibm->spreadForces(pos, forces, numberParticles, st);
+	auto gridForceCheb = fct->forwardTransform(gridData, st);
+	if(torques){//Torques are added in Cheb space
+	  ibm->addSpreadTorquesFourier(pos, torques, numberParticles, gridForceCheb,
+				       fct, st);
+	}
+	FluidData<complex> fluid = solveBVPVelocity(gridForceCheb, st);
+	if(mode != WallMode::none){
+	  correction->correctSolution(fluid, gridForceCheb, st);
+	}
+	cached_vector<real3> particleAngularVelocities;
+	if(torques){
+	  //Ang. velocities are interpolated from the curl of the velocity, which is
+	  // computed in Cheb space.
+	  auto gridAngVelsCheb = ibm->computeGridAngularVelocityCheb(fluid, st);
+	  auto gridAngVels = fct->inverseTransform(gridAngVelsCheb, st);
+	  particleAngularVelocities = ibm->interpolateAngularVelocity(gridAngVels, pos, numberParticles, st);
+	}
+	gridData = fct->inverseTransform(fluid.velocity, st);
+	auto particleVelocities = ibm->interpolateVelocity(gridData, pos, numberParticles, st);
+	CudaCheckError();
+	return {particleVelocities, particleAngularVelocities};
+      }
 
     private:
-      shared_ptr<Kernel> kernel;
-      shared_ptr<KernelTorque> kernelTorque;
       shared_ptr<FastChebyshevTransform> fct;
       shared_ptr<Correction> correction;
-
+      shared_ptr<SpreadInterp> ibm;
       gpu_container<real> zeroModeVelocityChebyshevIntegrals;
       gpu_container<real> zeroModePressureChebyshevIntegrals;
 
@@ -213,21 +107,12 @@ namespace uammd{
       void printStartingMessages(Parameters par);
       void resizeVectors();
       void initializeBoundaryValueProblemSolver();
-      void initializeQuadratureWeights();
+
       void precomputeIntegrals();
       void resetGridForce();
       void tryToResetGridForce();
-      cached_vector<real4> spreadForces(real4* pos, real4* forces, int N, cudaStream_t st);
-      void addSpreadTorquesFourier(real4* pos, real4* torques, int N,
-				   cached_vector<cufftComplex4> &gridData, cudaStream_t st);
-      void solveBVPVelocity(cached_vector<cufftComplex4> &gridDataFourier, cudaStream_t st);
+      FluidData<complex> solveBVPVelocity(DataXYZ<complex> &gridForcesFourier, cudaStream_t st);
       void resizeTmpStorage(size_t size);
-      cached_vector<real3> interpolateVelocity(cached_vector<real4> &gridData, real4* pos,
-					       int N, cudaStream_t st);
-      cached_vector<cufftComplex4> computeGridAngularVelocityCheb(cached_vector<cufftComplex4> &gridVelsCheb,
-						      cudaStream_t st);
-      cached_vector<real3> interpolateAngularVelocity(cached_vector<real4> &gridData,
-						      real4* pos, int N, cudaStream_t st);
       real Lx, Ly;
       real H;
       Grid grid;
@@ -235,9 +120,157 @@ namespace uammd{
       real gw;
       real tolerance;
       WallMode mode;
-      shared_ptr<QuadratureWeights> qw;
       shared_ptr<BVP::BatchedBVPHandler> bvpSolver;
 
+    };
+
+
+    namespace detail{
+      struct LanczosAdaptor{
+	std::shared_ptr<DPStokes> dpstokes;
+	real4* pos;
+	int numberParticles;
+
+	LanczosAdaptor(std::shared_ptr<DPStokes> dpstokes, real4* pos, int numberParticles):
+	  dpstokes(dpstokes),pos(pos),numberParticles(numberParticles){}
+
+	void operator()(real3 *mv, real3* m){
+	  auto res = dpstokes->Mdot(pos, m, numberParticles, 0);
+	}
+
+      };
+
+       struct SaruTransform{
+	uint s1, s2;
+	SaruTransform(uint s1, uint s2):s1(s1), s2(s2){}
+
+	__device__ real3 operator()(uint id){
+	  Saru rng(s1, s2, id);
+	  return make_real3(rng.gf(0.0f,1.0f), rng.gf(0.0f,1.0f).x);
+
+	}
+      };
+
+      auto fillRandomVectorReal3(int numberParticles, uint s1, uint s2){
+	cached_vector<real3> noise(numberParticles);
+	auto cit = thrust::make_counting_iterator<uint>(0);
+	auto tr = thrust::make_transform_iterator(cit, SaruTransform(s1, s2));
+	thrust::copy(tr, tr + numberParticles,
+		     noise.begin());
+	return noise;
+      }
+
+      struct SumPosAndNoise{
+	real3* b;
+	real4* pos;
+	real sign;
+	SumPosAndNoise(real4* pos, real3* b, real sign): pos(pos), b(b), sign(sign){}
+
+	__device__ auto operator()(int id){
+	  return make_real3(pos[id]) + sign*b[id];
+	}
+      };
+
+      struct BDIntegrate{
+	real4* pos;
+	real3* mf;
+	real3* sqrtmdw;
+	real3* mpw;
+	real3* mmw;
+	real deltaRFD;
+	real dt;
+	real noisePrefactor;
+	BDIntegrate(real4* pos,
+		    real3* mf, real3* sqrtmdw,
+		    real3* mpw, real3* mmw, real deltaRFD,
+		    real dt, real temperature):
+	  pos(pos), mf(mf), sqrtmdw(sqrtmdw),
+	  mpw(mpw), mmw(mmw), deltaRFD(deltaRFD), dt(dt){
+	  this->noisePrefactor = sqrt(2*temperature*dt);
+	}
+	__device__ void operator()(int id){
+	  real3 displacement = mf[id]*dt +
+	    noisePrefactor*sqrtmdw[id] +
+	    real(1.0)/deltaRFD * (mpw[id] - mmw[id]);
+	  pos[id] += make_real4(displacement);
+	}
+      };
+
+    }
+
+    class DPStokesIntegrator: public Integrator{
+      int steps = 0;
+      uint seed;
+      std::shared_ptr<DPStokes> dpstokes;
+      std::shared_ptr<LanczosAlgorithm> lanczos;
+      real deltaRFD;
+      public:
+      template<class T> using cached_vector = cached_vector<T>;
+      struct Parameters: DPStokes::Parameters{
+	real temperature;
+      };
+
+      DPStokesIntegrator(std::shared_ptr<ParticleData> pd, Parameters par):
+	Integrator(pd, "DPStokes"), par(par){
+	dpstokes = std::make_shared<DPStokes>(par);
+	lanczos = std::make_shared<LanczosAlgorithm>(par.tolerance);
+	this->seed = pd->getSystem()->rng().next32();
+	this->deltaRFD = 1e-4;
+      }
+
+      void forwardTime(){
+	if(steps==0) setUpInteractors();
+	for(auto i: interactors){
+	  i->updateSimulationTime(par.dt*steps);
+	  i->sum({.force=true});
+	}
+	auto pos = pd->getPos(access::gpu, access::readwrite);
+	auto force = pd->getForceIfAllocated(access::gpu, access::read);
+	auto torque = pd->getTorqueIfAllocated(access::gpu, access::read);
+	const int numberParticles = pd->getNumParticles();
+	auto mf = dpstokes->Mdot(pos.raw(), force.raw(), numberParticles, 0);
+	if(torque.raw()){
+	  System::log<System::EXCEPTION>("[DPStokes] Torques are not yet implemented");
+	  throw std::runtime_error("Operation not implemented");
+	}
+	cached_vector<real3> bdw(numberParticles);
+	thrust::fill(bdw.begin(), bdw.end(), real3());
+	detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
+	auto noise = detail::fillRandomVectorReal3(numberParticles, seed, 2*steps);
+	lanczos->solve(dot,
+		       (real*)bdw.data().get(), (real*)noise.data().get(),
+		       numberParticles, 0);
+	auto noise2 = detail::fillRandomVectorReal3(numberParticles, seed, 2*steps+1);
+	auto posp = thrust::make_transform_iterator(thrust::make_counting_iterator(0),
+						    detail::SumPosAndNoise(pos.raw(),
+									   noise2.data().get(),
+									   deltaRFD*0.5));
+	auto mpw = dpstokes->Mdot(posp, noise2.data().get(), numberParticles, 0);
+	auto posm = thrust::make_transform_iterator(thrust::make_counting_iterator(0),
+						    detail::SumPosAndNoise(pos.raw(),
+									   noise2.data().get(),
+									   -deltaRFD*0.5));
+	auto mmw = dpstokes->Mdot(posm, noise2.data().get(), numberParticles, 0);
+	detail::BDIntegrate(pos.raw(), mf.data().get(), bdw.data().get(),
+			    mpw.data().get(), mmw.data().get(),
+			    deltaRFD, par.dt, par.temperature);
+	steps++;
+      }
+
+    private:
+      Parameters par;
+
+      void setUpInteractors(){
+	Box box({par.Lx, par.Ly,par.H});
+	box.setPeriodicity(1, 1, 0);
+	for(auto i: interactors){
+	  i->updateBox(box);
+	  i->updateTimeStep(par.dt);
+	  i->updateTemperature(par.temperature);
+	  i->updateViscosity(par.viscosity);
+	}
+
+      }
     };
   }
 }

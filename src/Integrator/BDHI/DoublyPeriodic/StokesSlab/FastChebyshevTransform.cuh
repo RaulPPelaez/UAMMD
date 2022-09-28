@@ -17,61 +17,54 @@ namespace uammd{
     namespace fct_ns{
 
       template<class T>
-      __global__ void periodicExtension(T* signal, int3 n){
+      __global__ void periodicExtension(DataXYZPtr<T> signal, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>= n.x*n.y*n.z) return;
 	const int ikx = id%n.x;
 	const int iky = (id/n.x)%n.y;
-	const int iz  = id/(n.x*n.y);
-	if(iz>=n.z-1 or iz == 0) return;
-	const int zf = 2*n.z-2-iz;
-	const int zi = iz;
-	signal[ikx+n.x*iky+n.x*n.y*zf]  = signal[ikx+n.x*iky+n.x*n.y*zi];
+	const int iz  = id/(n.x*n.y) + n.z;
+	//	if(iz>=n.z-1 or iz == 0) return;
+	if(iz>=2*n.z-2) return;
+	int src = ikx+(iky+(2*n.z-2-iz)*n.y)*n.x;
+	int dest = ikx+(iky+iz*n.y)*n.x;
+		// signal[ikx+n.x*iky+n.x*n.y*zf]  = signal[ikx+n.x*iky+n.x*n.y*zi];
+	signal.x()[dest] = signal.x()[src];
+	signal.y()[dest] = signal.y()[src];
+	signal.z()[dest] = signal.z()[src];
       }
 
       template<class T>
-      __global__ void scaleFFTToForwardChebyshevTransform(const T* signalin, T*signalout, int3 n){
+      __global__ void scaleFFTToForwardChebyshevTransform(const DataXYZPtr<T> signalin,
+							  DataXYZPtr<T> signalout, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>= n.x*n.y*n.z) return;
 	const int iz  = id/(n.x*n.y);
 	const int ikx = id%n.x;
 	const int iky = (id/n.x)%n.y;
-	if(iz>0 and iz < (n.z-1))
-	  signalout[id] = signalin[id] + signalin[ikx+n.x*(iky+n.y*(2*n.z-2-iz))];
-	signalout[id] *= real(0.5)/real(n.z-1);
-      }
+	int dest = ikx+(iky+iz*n.y)*n.x;
+	auto pm = (iz==0 or iz==(n.z-1))?real(1.0):real(2.0);
+	signalout.x()[dest] = pm/(2*n.z-2)*signalin.x()[dest];
+	signalout.y()[dest] = pm/(2*n.z-2)*signalin.y()[dest];
+	signalout.z()[dest] = pm/(2*n.z-2)*signalin.z()[dest];
+
+
+	// if(iz>0 and iz < (n.z-1))
+	//   signalout[id] = signalin[id] + signalin[ikx+n.x*(iky+n.y*(2*n.z-2-iz))];
+	// signalout[id] *= real(0.5)/real(n.z-1);
+	      }
 
       template<class T>
-      __global__ void scaleFFTToInverseChebyshevTransform(T* signal, int3 n){
+      __global__ void scaleFFTToInverseChebyshevTransform(DataXYZPtr<T> signal, int3 n){
 	const int id = blockIdx.x*blockDim.x + threadIdx.x;
 	if(id>= (n.x/2+1)*n.y*n.z) return;
 	const int iz  = id/((n.x/2+1)*n.y);
-	signal[id] *= ((iz==0 or iz == n.z-1)?real(1.0):real(0.5))/real(n.x*n.y*(2*n.z-2));
-	signal[id] *= real(2.0)*n.z-real(2.0);
-      }
+	// signal[id] *= ((iz==0 or iz == n.z-1)?real(1.0):real(0.5))/real(n.x*n.y*(2*n.z-2));
+	// signal[id] *= real(2.0)*n.z-real(2.0);
+	auto pm = (iz==0 or iz==(n.z-1))?real(1.0):real(2.0);
+	signal.x()[id] *= real(1.0)/(pm*n.x*n.y);
+	signal.y()[id] *= real(1.0)/(pm*n.x*n.y);
+	signal.z()[id] *= real(1.0)/(pm*n.x*n.y);
 
-      template<class Tin, class Tout>
-      __global__ void unpack(const Tin* in, Tout* out, int3 n){
-	const int id = blockIdx.x*blockDim.x + threadIdx.x;
-	int nel = n.x*n.y*n.z;
-	if(id>= nel) return;
-        auto Ei = in[id];
-	out[id] = Ei.x;
-	out[nel+id] = Ei.y;
-	out[2*nel+id] = Ei.z;
-	//out[3*nel+id] = Ei.w;
-      }
-      
-      template<class Tin, class Tout>
-      __global__ void pack(const Tin* in, Tout* out, int3 n){
-	const int id = blockIdx.x*blockDim.x + threadIdx.x;
-	int nel = n.x*n.y*n.z;
-	if(id>= nel) return;
-	auto Ex = in[id];
-	auto Ey = in[nel + id];
-	auto Ez = in[2*nel + id];
-	//auto P = in[3*nel + id];
-	out[id] = {Ex, Ey, Ez, Tin()};
       }
 
     }
@@ -87,69 +80,45 @@ namespace uammd{
 	System::log<System::DEBUG>("[FastChebyshevTransform] Initialized");
 	initCuFFT();
       }
-      //In order to use cufft correctly I have to go back and forth between a AoS and SoA layout, there has to be a better way. 
-      template<class Real4Container>
-      cached_vector<cufftComplex4> forwardTransform(Real4Container &gridData, cudaStream_t st){
+      //In order to use cufft correctly I have to go back and forth between a AoS and SoA layout, there has to be a better way.
+      auto forwardTransform(DataXYZ<real> &gridData, cudaStream_t st){
 	System::log<System::DEBUG2>("[DPStokesSlab] Transforming to wave/Chebyshev space");
 	CufftSafeCall(cufftSetStream(cufft_plan_forward, st));
 	const int3 n = gridSize;
-	real4* d_gridData = (real4*)thrust::raw_pointer_cast(gridData.data());
 	const int blockSize = 128;
 	int nblocks = ((2*(n.x/2+1))*n.y*n.z)/blockSize+1;
 	CudaCheckError();
-        fct_ns::periodicExtension<<<nblocks, blockSize, 0, st>>>(d_gridData, make_int3(2*(n.x/2+1), n.y, n.z));	
+        fct_ns::periodicExtension<<<nblocks, blockSize, 0, st>>>(DataXYZPtr<real>(gridData),
+								 make_int3(2*(n.x/2+1), n.y, n.z));
 	CudaCheckError();
-	cached_vector<cufftComplex> gridDataFouR(4*(2*n.z-2)*n.y*(n.x/2+1));
-	cufftComplex* d_gridDataFouR = thrust::raw_pointer_cast(gridDataFouR.data());
-
-	{
-	  cached_vector<real> gridDataR(4*(2*n.z-2)*n.y*2*(n.x/2+1));
-	  real* d_gridDataR = thrust::raw_pointer_cast(gridDataR.data());
-	  fct_ns::unpack<<<(2*(n.x/2+1)*n.y*(2*n.z-2))/blockSize+1, blockSize, 0, st>>>(d_gridData, d_gridDataR,
-											make_int3(2*(n.x/2+1), n.y, 2*n.z-2));
-	  CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, d_gridDataR, d_gridDataFouR));
-	  CudaCheckError();
-	}
-	cached_vector<cufftComplex4> gridDataFourier(2*(2*n.z-2)*n.y*(n.x/2+1));
-	System::log<System::DEBUG2>("[DPStokesSlab] Taking forces to wave/Chebyshev space");
-        cufftComplex4* d_gridDataFourier = thrust::raw_pointer_cast(gridDataFourier.data());
-	fct_ns::pack<<<((n.x/2+1)*n.y*(2*n.z-2))/blockSize+1, blockSize, 0, st>>>(d_gridDataFouR, d_gridDataFourier,
-										  make_int3(n.x/2+1, n.y, 2*n.z-2));
-	auto gridDataFourier2 = gridDataFourier;
-	cufftComplex4* d_gridDataFourier2 = thrust::raw_pointer_cast(gridDataFourier2.data());
-	CudaCheckError();
+	DataXYZ<complex> gridDataFou((2*n.z-2)*n.y*(n.x/2+1));
+	CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, gridData.x(), gridDataFou.x()));
+	CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, gridData.y(), gridDataFou.y()));
+	CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, gridData.z(), gridDataFou.z()));
 	nblocks = ((n.x/2+1)*n.y*n.z)/blockSize+1;
-	fct_ns::scaleFFTToForwardChebyshevTransform<<<nblocks, blockSize, 0, st>>>(d_gridDataFourier2, d_gridDataFourier, make_int3((n.x/2+1), n.y, n.z));
+	auto d_gridDataFou = DataXYZPtr<complex>(gridDataFou);
+	fct_ns::scaleFFTToForwardChebyshevTransform<<<nblocks, blockSize, 0, st>>>
+	  (d_gridDataFou, d_gridDataFou, make_int3((n.x/2+1), n.y, n.z));
 	cudaDeviceSynchronize();
 	CudaCheckError();
 	System::log<System::DEBUG2>("[DPStokesSlab] Taking forces to wave/Chebyshev space");
-	return gridDataFourier;
+	return gridDataFou;
       }
 
-      template<class Cufft4Container>
-      cached_vector<real4> inverseTransform(Cufft4Container & gridDataFourier, cudaStream_t st){
+      auto inverseTransform(DataXYZ<complex> & gridDataFourier, cudaStream_t st){
 	System::log<System::DEBUG2>("[DPStokesSlab] Transforming to real space");
 	CufftSafeCall(cufftSetStream(cufft_plan_inverse, st));
 	const int3 n = gridSize;
-	auto d_gridDataFourier = thrust::raw_pointer_cast(gridDataFourier.data());
 	const int blockSize = 128;
 	const int nblocks = ((n.x/2+1)*n.y*n.z)/blockSize+1;
-	fct_ns::scaleFFTToInverseChebyshevTransform<<<nblocks, blockSize, 0, st>>>(d_gridDataFourier, make_int3(n.x, n.y, n.z));
-	fct_ns::periodicExtension<<<nblocks, blockSize, 0, st>>>(d_gridDataFourier, make_int3((n.x/2+1), n.y, n.z));
-	cached_vector<real> gridDataR(4*(2*n.z-2)*n.y*2*(n.x/2+1));
-	real* d_gridDataR = thrust::raw_pointer_cast(gridDataR.data());
-	{
-	  cached_vector<cufftComplex> gridDataFouR(4*(2*n.z-2)*n.y*(n.x/2+1));
-	  cufftComplex* d_gridDataFouR = thrust::raw_pointer_cast(gridDataFouR.data());
-	  fct_ns::unpack<<<((n.x/2+1)*n.y*(2*n.z-2))/blockSize+1, blockSize, 0, st>>>(d_gridDataFourier, d_gridDataFouR,
-										      make_int3(n.x/2+1, n.y, 2*n.z-2));
- 
-	  CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, d_gridDataFouR, d_gridDataR));
-	}
-	cached_vector<real4> gridData((2*n.z-2)*n.y*2*(n.x/2+1));
-	real4* d_gridData = thrust::raw_pointer_cast(gridData.data());
-	fct_ns::pack<<<(2*(n.x/2+1)*n.y*(2*n.z-2))/blockSize+1, blockSize, 0, st>>>(d_gridDataR, d_gridData,
-										    make_int3(2*(n.x/2+1), n.y, 2*n.z-2));
+	auto d_gridDataFou = DataXYZPtr<complex>(gridDataFourier);
+	fct_ns::scaleFFTToInverseChebyshevTransform<<<nblocks, blockSize, 0, st>>>(d_gridDataFou,
+										   make_int3(n.x, n.y, n.z));
+	fct_ns::periodicExtension<<<nblocks, blockSize, 0, st>>>(d_gridDataFou, make_int3((n.x/2+1), n.y, n.z));
+	DataXYZ<real> gridData(2*(n.x/2+1)*n.y*n.z);
+	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridDataFourier.x(), gridData.x()));
+	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridDataFourier.y(), gridData.y()));
+	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridDataFourier.z(), gridData.z()));
 	CudaCheckError();
 	return gridData;
       }
@@ -173,8 +142,8 @@ namespace uammd{
 					1, inembed.x*inembed.y*inembed.z,
 					&oembed.x,
 					1, oembed.x*oembed.y*oembed.z,
-					CUFFT_Real2Complex<real>::value, 3,
-					&cufftWorkSizei));
+					CUFFT_Real2Complex<real>::value, 1,
+					&cufftWorkSizef));
 	CufftSafeCall(cufftCreate(&cufft_plan_inverse));
 	CufftSafeCall(cufftSetAutoAllocation(cufft_plan_inverse, 0));
 	CufftSafeCall(cufftMakePlanMany(cufft_plan_inverse,
@@ -183,7 +152,7 @@ namespace uammd{
 					1, oembed.x*oembed.y*oembed.z,
 					&inembed.x,
 					1, inembed.x*inembed.y*inembed.z,
-					CUFFT_Complex2Real<real>::value, 3,
+					CUFFT_Complex2Real<real>::value, 1,
 					&cufftWorkSizei));
 	System::log<System::DEBUG>("[DPStokesSlab] cuFFT grid size: %d %d %d", cdtmp.x, cdtmp.y, cdtmp.z);
 	size_t cufftWorkSize = std::max(cufftWorkSizef, cufftWorkSizei);
