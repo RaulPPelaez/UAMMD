@@ -2,7 +2,7 @@
 #ifndef CUDA_LIB_DEFINES_H
 #define CUDA_LIB_DEFINES_H
 #include"global/defines.h"
-
+#include<cublas_v2.h>
 
 #if defined SINGLE_PRECISION
 #define cusolverDnpotrf cusolverDnSpotrf

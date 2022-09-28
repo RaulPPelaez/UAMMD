@@ -4,7 +4,7 @@
 #ifdef CUDA_ERROR_CHECK
 #define CUBLAS_ERROR_CHECK
 #endif
-
+#include<cublas_v2.h>
 #define CublasSafeCall(err) __cublasSafeCall(err, __FILE__, __LINE__)
 
 
