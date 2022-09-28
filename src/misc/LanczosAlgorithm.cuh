@@ -1,8 +1,8 @@
-/*Raul P. Pelaez 2017. Lanczos Algotihm,
+/*Raul P. Pelaez 2017-2022. Lanczos Algotihm,
   Computes the matrix-vector product sqrt(M)·v recursively. In the case of solveNoise, v is a random gaussian vector.
 
   For that, it requires a functor in which the () operator takes an output real3* array and an input real3* (both device memory) as:
-  inline __device__ operator()(real3* out, real3 * a_v);
+  void operator()(real3* out, real3 * a_v);
 
   This function must fill out with the result of performing the M·v dot product- > out = M·a_v.
 
@@ -29,15 +29,11 @@ Some notes:
 
 #ifndef LANCZOSALGORITHM_CUH
 #define LANCZOSALGORITHM_CUH
-#include<cuda.h>
-#include<curand.h>
 #include"utils/utils.h"
-#include"global/defines.h"
-#include<cublas_v2.h>
 #include"utils/cuda_lib_defines.h"
 #include<thrust/device_vector.h>
+#include<thrust/host_vector.h>
 #include"System/System.h"
-//#include"utils/debugTools.h"
 #include"utils/cublasDebug.h"
 #include<memory>
 namespace uammd{
@@ -52,7 +48,7 @@ namespace uammd{
 
   struct LanczosAlgorithm{
     LanczosAlgorithm(real tolerance = 1e-3);
-    void init();
+
     ~LanczosAlgorithm(){
       CublasSafeCall(cublasDestroy_v2(cublas_handle));
       System::log<System::DEBUG>("[LanczosAlgorithm] Destroyed");
@@ -72,6 +68,11 @@ namespace uammd{
 
     LanczosStatus getLastError(){ return errorStatus; }
   private:
+    //Init cuBLAS for Lanczos process
+    void init(){
+      CublasSafeCall(cublasCreate_v2(&cublas_handle));
+      System::log<System::DEBUG1>("[LanczosAlgorithm] Success!");
+    }
     void compResult(real z2, int N, int iter, real *BdW, cudaStream_t st = 0);
     //Increases storage space
     void increment_max_iter(int inc = 2);
@@ -91,13 +92,8 @@ namespace uammd{
     thrust::host_vector<real> hdiag, hsup, htemp;
     thrust::device_vector<real> htempGPU;
     thrust::device_vector<real3> oldBz;
-
     int check_convergence_steps;
-
     LanczosStatus errorStatus = LanczosStatus::SUCCESS;
-
-    shared_ptr<System> sys;
-
     real tolerance;
   };
 

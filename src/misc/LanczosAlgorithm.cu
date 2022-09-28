@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. Lanczos algorithm
+/*Raul P. Pelaez 2017-2022. Lanczos algorithm
 
 References:
   [1] Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations.
@@ -7,29 +7,15 @@ References:
 */
 #include"LanczosAlgorithm.cuh"
 
-
-
 #ifdef USE_MKL
 #include<mkl.h>
 #else
 #include<lapacke.h>
 #include<cblas.h>
 #endif
-
-#include"lapack_and_blas_defines.h"
 #include"utils/debugTools.h"
-#include"utils/cublasDebug.h"
-
-#include<thrust/device_vector.h>
-#include<fstream>
-
+#include"misc/lapack_and_blas_defines.h"
 namespace uammd{
-  void LanczosAlgorithm::init(){
-    //Init cuBLAS for Lanczos process
-    CublasSafeCall(cublasCreate_v2(&cublas_handle));
-    System::log<System::DEBUG1>("[LanczosAlgorithm] Success!");
-  }
-
   LanczosAlgorithm::LanczosAlgorithm(real tolerance):
     N(0),
     max_iter(3), check_convergence_steps(3), tolerance(tolerance)
@@ -61,16 +47,12 @@ namespace uammd{
   //Increase maximum dimension of Krylov subspace, reserve necessary memory
   void LanczosAlgorithm::increment_max_iter(int inc){
     System::log<System::DEBUG3>("[LanczosAlgorithm] Increasing subspace dimension.");
-
     V.resize(3*N*(max_iter+inc),0);
     P.resize((max_iter+inc)*(max_iter+inc),0);
-
     hdiag.resize((max_iter+inc)+1,0);
     hsup.resize((max_iter+inc)+1,0);
     htemp.resize(2*(max_iter+inc),0);
     htempGPU.resize(2*(max_iter+inc),0);
-
-
     this->max_iter += inc;
   }
 
@@ -82,9 +64,7 @@ namespace uammd{
     real beta = 0.0;
     /**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
     /**** H^1/2·e1 = Pt· first_column_of(sqrt(Hdiag)·P) ******/
-
     /**************LAPACKE********************/
-
     /*The tridiagonal matrix is stored only with its diagonal and subdiagonal*/
     /*Store both in a temporal array*/
     fori(0,iter){
@@ -102,13 +82,10 @@ namespace uammd{
     if(info!=0){
       System::log<System::CRITICAL>("[LanczosAlgorithm] Could not diagonalize tridiagonal krylov matrix, steqr failed with code %d", info);
     }
-
     /***Hdiag_temp = Hdiag·P·e1****/
     forj(0,iter){
       htemp[j] = sqrt(htemp[j])*P[iter*j];
     }
-
-
     /***** Htemp = H^1/2·e1 = Pt· hdiag_temp ****/
     /*Compute with blas*/
     cblas_gemv(CblasColMajor, CblasNoTrans,
@@ -124,24 +101,6 @@ namespace uammd{
 
     CublasSafeCall(cublasSetStream(cublas_handle, st));
     real * d_V = thrust::raw_pointer_cast(V.data());
-
-    // thrust::host_vector<real> h_V = V;
-    // fori(0, iter){
-    //   std::cerr<<h_V[3*N*i]*z2<<" ";
-    // }
-    // std::cerr<<std::endl;
-    // fori(0, iter){
-    //   std::cerr<<h_V[3*N*i+1]*z2<<" ";
-    // }
-    // std::cerr<<std::endl;
-    // fori(1,iter+1){
-    //   forj(1,3*N)
-    // 	if(h_V[3*N*i+j] != real(0.0)){
-    // 	  std::cerr<<i<<" "<<j<<" "<<h_V[3*N*i+j]<<std::endl;
-    // 	}
-    //   if(htemp[iter+i] != real(0.0)) 	  std::cerr<<i<<" "<<htemp[iter+i]<<std::endl;
-    // }
-
     /*y = ||z||_2 * Vm · H^1/2 · e1 = Vm · (z2·hdiag_temp)*/
     beta = 0.0;
     CublasSafeCall(cublasgemv(cublas_handle, CUBLAS_OP_N,
@@ -151,7 +110,6 @@ namespace uammd{
 			      d_htempGPU, 1,
 			      &beta,
 			      BdW, 1));
-    //System::log<System::MESSAGE>("[LanczosAlgorithm] H**1/2[0][0] = %e %e %e %e", htemp[iter], htemp[iter+1], htemp[iter+2], htemp[iter+3]);
   }
 
 }
