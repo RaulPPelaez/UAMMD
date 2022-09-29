@@ -115,7 +115,7 @@ namespace uammd{
 	fct_ns::scaleFFTToInverseChebyshevTransform<<<nblocks, blockSize, 0, st>>>(d_gridDataFou,
 										   make_int3(n.x, n.y, n.z));
 	fct_ns::periodicExtension<<<nblocks, blockSize, 0, st>>>(d_gridDataFou, make_int3((n.x/2+1), n.y, n.z));
-	DataXYZ<real> gridData(2*(n.x/2+1)*n.y*n.z);
+	DataXYZ<real> gridData(2*(n.x/2+1)*n.y*(2*n.z-2));
 	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridDataFourier.x(), gridData.x()));
 	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridDataFourier.y(), gridData.y()));
 	CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse, gridDataFourier.z(), gridData.z()));

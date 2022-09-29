@@ -173,14 +173,18 @@ struct Gaussian{
 	  curl.z()[index] += {half*(-Dx*T.y.y + Dy*T.x.y),
 	                      half*(Dx*T.y.x - Dy*T.x.x)};
 	}
+	auto Tx = make_third_index_iterator(input.x(), ik.x, ik.y, Index3D(n.x/2+1, n.y, 2*n.z-2));
+	auto Ty = make_third_index_iterator(input.y(), ik.x, ik.y, Index3D(n.x/2+1, n.y, 2*n.z-2));
 	//Overwrite input torque with Z derivatives
-	chebyshevDerivate(input.z(), input.z(), n.z, real(0.5)*L.z);
+	chebyshevDerivate(Tx, Tx, n.z, real(0.5)*L.z);
+	chebyshevDerivate(Ty, Ty, n.z, real(0.5)*L.z);
 	//Sum the rest of the terms
 	fori(0, n.z){
 	  int index = zToIndex[i];
-	  const auto DzT = input.z()[index];
-	  curl.x()[index] += -half*DzT.y;
-	  curl.y()[index] += half*DzT.x;
+	  const auto DzTx = Tx[i];
+	  const auto DzTy = Ty[i];
+	  curl.x()[index] += -half*DzTy;
+	  curl.y()[index] += half*DzTx;
 	}
       }
     }
@@ -241,7 +245,8 @@ struct Gaussian{
 	DataXYZ<real> particleTorques(torques, numberParticles);
 	DataXYZ<real> gridTorque(2*(n.x/2+1)*n.y*(2*n.z-2));
 	gridTorque.fillWithZero();
-	IBM<KernelTorque, Grid> ibm(kernelTorque, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<KernelTorque, Grid> ibm(kernelTorque, grid,
+				    IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibm.spread(pos, particleTorques.x(), gridTorque.x(), numberParticles, st);
 	ibm.spread(pos, particleTorques.y(), gridTorque.y(), numberParticles, st);
 	ibm.spread(pos, particleTorques.z(), gridTorque.z(), numberParticles, st);
@@ -250,8 +255,8 @@ struct Gaussian{
 	const int numberSystems = n.y*(n.x/2+1);
 	const int numberBlocks = numberSystems/blockSize+1;
 	detail::addCurlCheb<<<numberBlocks, blockSize, 0, st>>>(DataXYZPtr<complex>(gridTorqueCheb),
-								      DataXYZPtr<complex>(gridForceCheb),
-								      grid.box.boxSize, n);
+								DataXYZPtr<complex>(gridForceCheb),
+								grid.box.boxSize, n);
 	CudaCheckError();
       }
 
@@ -301,7 +306,8 @@ struct Gaussian{
 	const int3 n = grid.cellDim;
 	DataXYZ<real> particleAngVels(numberParticles);
 	particleAngVels.fillWithZero();
-	IBM<KernelTorque, Grid> ibm(kernelTorque, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<KernelTorque, Grid> ibm(kernelTorque, grid,
+				    IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, 2*n.z-2));
 	ibm.gather(pos, particleAngVels.x(), gridAngVel.x(),
 		   *qw, IBM_ns::DefaultWeightCompute(),
 		   numberParticles, st);
