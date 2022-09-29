@@ -136,6 +136,7 @@ namespace uammd{
 
 	void operator()(real3 *mv, real3* m){
 	  auto res = dpstokes->Mdot(pos, m, numberParticles, 0);
+	  thrust::copy(thrust::cuda::par, res.begin(), res.end(), mv);
 	}
 
       };
@@ -177,7 +178,7 @@ namespace uammd{
 	real3* sqrtmdw;
 	real3* mpw;
 	real3* mmw;
-	real deltaRFD;
+	real rfdPrefactor;
 	real dt;
 	real noisePrefactor;
 	BDIntegrate(real4* pos,
@@ -185,13 +186,14 @@ namespace uammd{
 		    real3* mpw, real3* mmw, real deltaRFD,
 		    real dt, real temperature):
 	  pos(pos), mf(mf), sqrtmdw(sqrtmdw),
-	  mpw(mpw), mmw(mmw), deltaRFD(deltaRFD), dt(dt){
+	  mpw(mpw), mmw(mmw), dt(dt){
 	  this->noisePrefactor = sqrt(2*temperature*dt);
+	  this->rfdPrefactor = dt*temperature/deltaRFD;
 	}
 	__device__ void operator()(int id){
 	  real3 displacement = mf[id]*dt +
 	    noisePrefactor*sqrtmdw[id] +
-	    real(1.0)/deltaRFD * (mpw[id] - mmw[id]);
+	    rfdPrefactor * (mpw[id] - mmw[id]);
 	  pos[id] += make_real4(displacement);
 	}
       };
@@ -241,19 +243,21 @@ namespace uammd{
 		       (real*)bdw.data().get(), (real*)noise.data().get(),
 		       numberParticles, 0);
 	auto noise2 = detail::fillRandomVectorReal3(numberParticles, seed, 2*steps+1);
-	auto posp = thrust::make_transform_iterator(thrust::make_counting_iterator(0),
+	auto cit = thrust::make_counting_iterator(0);
+	auto posp = thrust::make_transform_iterator(cit,
 						    detail::SumPosAndNoise(pos.raw(),
 									   noise2.data().get(),
 									   deltaRFD*0.5));
 	auto mpw = dpstokes->Mdot(posp, noise2.data().get(), numberParticles, 0);
-	auto posm = thrust::make_transform_iterator(thrust::make_counting_iterator(0),
+	auto posm = thrust::make_transform_iterator(cit,
 						    detail::SumPosAndNoise(pos.raw(),
 									   noise2.data().get(),
 									   -deltaRFD*0.5));
 	auto mmw = dpstokes->Mdot(posm, noise2.data().get(), numberParticles, 0);
-	detail::BDIntegrate(pos.raw(), mf.data().get(), bdw.data().get(),
+	detail::BDIntegrate bd(pos.raw(), mf.data().get(), bdw.data().get(),
 			    mpw.data().get(), mmw.data().get(),
 			    deltaRFD, par.dt, par.temperature);
+	thrust::for_each_n(cit, numberParticles, bd);
 	steps++;
       }
 
