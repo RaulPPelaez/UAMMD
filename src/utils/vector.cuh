@@ -966,4 +966,231 @@ VECATTR  void operator *=(int3 &a, const int3 &b) {a = a*b;}
 VECATTR  int3 operator *(const int3 &a, const int &b){return make_int3(a.x*b, a.y*b, a.z*b);}
 VECATTR  int3 operator *(const int &b, const int3 &a){return a*b;}
 
+
+////////////////////////////////////VEC3///////////////////////////////////////
+namespace uammd{
+  template<class T>
+  struct vec3{
+    T x,y,z;
+  };
+
+  template<class T>
+  vec3<T> make_vec3(T x, T y, T z){ return {x, y, z};}
+
+  template<class T>
+  VECATTR  vec3<T> operator +(const vec3<T> &a, const vec3<T> &b){
+    return {a.x + b.x, a.y + b.y, a.z + b.z};
+  }
+
+  template<class T>
+  VECATTR  vec3<T> operator +(const vec3<T> &a, const T &b){
+    return {a.x + b, a.y + b, a.z + b};
+  }
+
+  template<class T>
+  VECATTR  vec3<T> operator -(const vec3<T> &a, const vec3<T> &b){
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+  }
+
+
+  template<class T>
+  VECATTR  vec3<T> operator -(const vec3<T> &a, const T &b){
+    return {a.x - b, a.y - b, a.z - b};
+  }
+
+  template<class T>
+  VECATTR  vec3<T> operator -(const T &b, const vec3<T> &a){
+    return {b-a.x, b-a.y, b-a.z};
+  }
+
+
+  template<class T>
+  VECATTR  vec3<T> operator *(const vec3<T> &a, const vec3<T> &b){
+    return {a.x * b.x, a.y * b.y, a.z * b.z};
+  }
+
+
+  template<class T>
+  VECATTR  vec3<T> operator *(const vec3<T> &a, const T &b){
+    return {a.x * b, a.y * b, a.z * b};
+  }
+
+  template<class T>
+  VECATTR  vec3<T> operator /(const vec3<T> &a, const vec3<T> &b){
+    return {a.x / b.x, a.y / b.y, a.z / b.z};
+  }
+
+  template<class T>
+  VECATTR  vec3<T> operator /(const vec3<T> &a, const T &b){
+    return {a.x/b, a.y/b, a.z/b};
+  }
+
+
+  template<class T>
+  VECATTR  vec3<T> operator /(const T &b, const vec3<T> &a){
+    return {b / a.x, b / a.y, b / a.z};
+  }
+
+
+
+  template<class T>
+  VECATTR  void operator +=(vec3<T> &a, const vec3<T> &b){
+    a = a + b;
+  }
+
+  template<class T>
+  VECATTR  vec3<T> operator +(const T &b, const vec3<T> &a){return a+b;}
+
+  template<class T>
+  VECATTR  void operator +=(vec3<T> &a, const T &b){
+    a = a+b;
+  }
+
+  template<class T>
+  VECATTR  void operator -=(vec3<T> &a, const vec3<T> &b){
+    a = a-b;
+  }
+  template<class T>
+  VECATTR  void operator -=(vec3<T> &a, const T &b){
+    a=a-b;
+  }
+  template<class T>
+  VECATTR  void operator *=(vec3<T> &a, const vec3<T> &b){
+    a = a*b;
+  }
+
+  template<class T>
+  VECATTR  vec3<T> operator *(const T &b, const vec3<T> &a){
+    return a*b;
+  }
+
+  template<class T>
+  VECATTR  void operator *=(vec3<T> &a, const T &b){
+    a=a*b;
+  }
+
+  template<class T>
+  VECATTR  void operator /=(vec3<T> &a, const vec3<T> &b){
+    a = a/b;
+  }
+
+  template<class T>
+  VECATTR  void operator /=(vec3<T> &a, const T &b){
+    a = a/b;
+  }
+
+  /////////////////////////////////VEC4//////////////////////////
+
+  template<class T>
+  struct vec4{
+    T x,y,z,w;
+  };
+
+
+
+  template<class T>
+  vec4<T> make_vec4(T x, T y, T z, T w){ return {x, y, z, w};}
+
+  template<class T>
+  VECATTR  vec4<T> operator +(const vec4<T> &a, const vec4<T> &b){
+    return {a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};
+  }
+
+  template<class T>
+  VECATTR  vec4<T> operator +(const vec4<T> &a, const T &b){
+    return {a.x + b, a.y + b, a.z + b, a.w + b};
+  }
+
+  template<class T>
+  VECATTR  vec4<T> operator -(const vec4<T> &a, const vec4<T> &b){
+    return {a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w};
+  }
+
+
+  template<class T>
+  VECATTR  vec4<T> operator -(const vec4<T> &a, const T &b){
+    return {a.x - b, a.y - b, a.z - b, a.w - b};
+  }
+
+  template<class T>
+  VECATTR  vec4<T> operator -(const T &b, const vec4<T> &a){
+    return {b-a.x, b-a.y, b-a.z, b-a.w};
+  }
+
+
+  template<class T>
+  VECATTR  vec4<T> operator *(const vec4<T> &a, const vec4<T> &b){
+    return {a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};
+  }
+
+
+  template<class T>
+  VECATTR  vec4<T> operator *(const vec4<T> &a, const T &b){
+    return {a.x * b, a.y * b, a.z * b, a.w * b};
+  }
+
+  template<class T>
+  VECATTR  vec4<T> operator /(const vec4<T> &a, const vec4<T> &b){
+    return {a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};
+  }
+
+  template<class T>
+  VECATTR  vec4<T> operator /(const vec4<T> &a, const T &b){
+    return {a.x/b, a.y/b, a.z/b, a.w/b};
+  }
+
+
+  template<class T>
+  VECATTR  vec4<T> operator /(const T &b, const vec4<T> &a){
+    return {b / a.x, b / a.y, b / a.z, b / a.w};
+  }
+
+
+
+  template<class T>
+  VECATTR  void operator +=(vec4<T> &a, const vec4<T> &b){
+    a = a + b;
+  }
+
+  template<class T>
+  VECATTR  vec4<T> operator +(const T &b, const vec4<T> &a){return a+b;}
+
+  template<class T>
+  VECATTR  void operator +=(vec4<T> &a, const T &b){
+    a = a+b;
+  }
+
+  template<class T>
+  VECATTR  void operator -=(vec4<T> &a, const vec4<T> &b){
+    a = a-b;
+  }
+  template<class T>
+  VECATTR  void operator -=(vec4<T> &a, const T &b){
+    a=a-b;
+  }
+  template<class T>
+  VECATTR  void operator *=(vec4<T> &a, const vec4<T> &b){
+    a = a*b;
+  }
+
+  template<class T>
+  VECATTR  vec4<T> operator *(const T &b, const vec4<T> &a){
+    return a*b;
+  }
+
+  template<class T>
+  VECATTR  void operator *=(vec4<T> &a, const T &b){
+    a=a*b;
+  }
+
+  template<class T>
+  VECATTR  void operator /=(vec4<T> &a, const vec4<T> &b){
+    a = a/b;
+  }
+
+  template<class T>
+  VECATTR  void operator /=(vec4<T> &a, const T &b){
+    a = a/b;
+  }
+}
 #endif
