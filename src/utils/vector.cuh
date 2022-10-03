@@ -966,9 +966,117 @@ VECATTR  void operator *=(int3 &a, const int3 &b) {a = a*b;}
 VECATTR  int3 operator *(const int3 &a, const int &b){return make_int3(a.x*b, a.y*b, a.z*b);}
 VECATTR  int3 operator *(const int &b, const int3 &a){return a*b;}
 
+namespace uammd{
+////////////////////////////////////VEC2///////////////////////////////////////
+  template<class T>
+  struct vec2{
+    T x,y;
+  };
+
+  template<class T>
+  vec2<T> make_vec2(T x, T y){ return {x, y};}
+
+  template<class T>
+  VECATTR  vec2<T> operator +(const vec2<T> &a, const vec2<T> &b){
+    return {a.x + b.x, a.y + b.y};
+  }
+
+  template<class T>
+  VECATTR  vec2<T> operator +(const vec2<T> &a, const T &b){
+    return {a.x + b, a.y + b};
+  }
+
+  template<class T>
+  VECATTR  vec2<T> operator -(const vec2<T> &a, const vec2<T> &b){
+    return {a.x - b.x, a.y - b.y};
+  }
+
+
+  template<class T>
+  VECATTR  vec2<T> operator -(const vec2<T> &a, const T &b){
+    return {a.x - b, a.y - b};
+  }
+
+  template<class T>
+  VECATTR  vec2<T> operator -(const T &b, const vec2<T> &a){
+    return {b-a.x, b-a.y};
+  }
+
+
+  template<class T>
+  VECATTR  vec2<T> operator *(const vec2<T> &a, const vec2<T> &b){
+    return {a.x * b.x, a.y * b.y};
+  }
+
+
+  template<class T>
+  VECATTR  vec2<T> operator *(const vec2<T> &a, const T &b){
+    return {a.x * b, a.y * b};
+  }
+
+  template<class T>
+  VECATTR  vec2<T> operator /(const vec2<T> &a, const vec2<T> &b){
+    return {a.x / b.x, a.y / b.y};
+  }
+
+  template<class T>
+  VECATTR  vec2<T> operator /(const vec2<T> &a, const T &b){
+    return {a.x/b, a.y/b};
+  }
+
+
+  template<class T>
+  VECATTR  vec2<T> operator /(const T &b, const vec2<T> &a){
+    return {b / a.x, b / a.y};
+  }
+
+  template<class T>
+  VECATTR  void operator +=(vec2<T> &a, const vec2<T> &b){
+    a = a + b;
+  }
+
+  template<class T>
+  VECATTR  vec2<T> operator +(const T &b, const vec2<T> &a){return a+b;}
+
+  template<class T>
+  VECATTR  void operator +=(vec2<T> &a, const T &b){
+    a = a+b;
+  }
+
+  template<class T>
+  VECATTR  void operator -=(vec2<T> &a, const vec2<T> &b){
+    a = a-b;
+  }
+  template<class T>
+  VECATTR  void operator -=(vec2<T> &a, const T &b){
+    a=a-b;
+  }
+  template<class T>
+  VECATTR  void operator *=(vec2<T> &a, const vec2<T> &b){
+    a = a*b;
+  }
+
+  template<class T>
+  VECATTR  vec2<T> operator *(const T &b, const vec2<T> &a){
+    return a*b;
+  }
+
+  template<class T>
+  VECATTR  void operator *=(vec2<T> &a, const T &b){
+    a=a*b;
+  }
+
+  template<class T>
+  VECATTR  void operator /=(vec2<T> &a, const vec2<T> &b){
+    a = a/b;
+  }
+
+  template<class T>
+  VECATTR  void operator /=(vec2<T> &a, const T &b){
+    a = a/b;
+  }
 
 ////////////////////////////////////VEC3///////////////////////////////////////
-namespace uammd{
   template<class T>
   struct vec3{
     T x,y,z;
