@@ -216,6 +216,8 @@ namespace uammd{
 	Integrator(pd, "DPStokes"), par(par){
 	dpstokes = std::make_shared<DPStokes>(par);
 	lanczos = std::make_shared<LanczosAlgorithm>(par.tolerance);
+	System::log<System::MESSAGE>("[DPStokes] dt %g", par.dt);
+	System::log<System::MESSAGE>("[DPStokes] temperature: %g", par.temperature);
 	this->seed = pd->getSystem()->rng().next32();
 	this->deltaRFD = 1e-4;
       }
