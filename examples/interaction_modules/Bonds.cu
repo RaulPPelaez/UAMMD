@@ -2,20 +2,20 @@
    Copy pastable examples of bonded interactions.
    This file contains ways to create two, three and four particle bonded interactions.
 
-   UAMMD interactor modules always need some kind of specialization. 
+   UAMMD interactor modules always need some kind of specialization.
    For example, UAMMD offers a BondedForces module and provides some specialization (such as FENE or Harmonic bonds).
    You can, however, specialize it with any structure that follows the necessary rules.
-   In this code you have some examples with specializations for the different bonded interactions.   
+   In this code you have some examples with specializations for the different bonded interactions.
 
    Every bond interaction needs a file with a list of bonded particles and any needed data for each of them.
    In the case of the harmonic bond below the file must have the following format:
-   
+
    [number of bonds]
    i j k r0
    .
    .
    .
-   
+
    The data needed for each bond (in the cas eof the harmonic bond belo k and r0) can be customized, see HarmonicBond::readBond
    With two particle bonds (BondedForces) a special kind of bond, called fixed point bond, can also be included in the file.
    Instead of joining two particles, a fixed bond joins a particle and a location in space. If fixed point bonds are required they must be placed after the two particle bonds (note the number of particle-particle bonds can be zero if only fixed point bonds exist):
@@ -29,7 +29,7 @@
    .
    .
    .
-   
+
    The file format for three and four particle bonds is similar, but instead of listing two particle ids each line must contain 3 r 4 particle names:
    For angular bonds:
    [number of bonds]
@@ -47,6 +47,7 @@
 #include"uammd.cuh"
 #include"Interactor/BondedForces.cuh"
 #include <fstream>
+#include<random>
 // #include"Interactor/AngularBondedForces.cuh"
 // #include"Interactor/TorsionalBondedForces.cuh"
 using namespace uammd;
@@ -88,7 +89,7 @@ struct HarmonicBond{
   }
 
   //This function will be called for each bond in the bond file and read the information of a bond
-  //It must use the stream that is handed to it to construct a BondInfo.  
+  //It must use the stream that is handed to it to construct a BondInfo.
   static __host__ BondInfo readBond(std::istream &in){
     /*BondedForces will read i j, readBond has to read the rest of the line*/
     BondInfo bi;
@@ -119,7 +120,7 @@ struct Angular{
   //bi: bond information for the current bond (as returned by readBond)
   inline __device__ ComputeType compute(int bond_index, int ids[3], real3 pos[3], Interactor::Computables comp, BondInfo bi){
     const real ang0 = bi.ang0;
-    const real kspring = bi.k;    
+    const real kspring = bi.k;
     //         i -------- j -------- k
     //             rij->     rjk ->
     //Compute distances and vectors
@@ -172,12 +173,12 @@ struct Angular{
   }
 
   //This function will be called for each bond in the bond file and read the information of a bond
-  //It must use the stream that is handed to it to construct a BondInfo.  
+  //It must use the stream that is handed to it to construct a BondInfo.
   static BondInfo readBond(std::istream &in){
     BondInfo bi;
     in>>bi.k>>bi.ang0;
     return bi;
-  }  
+  }
 };
 
 // //This torsional potential is similar to the HarmonicBond above, the difference is that
@@ -290,7 +291,7 @@ std::shared_ptr<Interactor> createTorsionalBondInteractor(UAMMD sim){
   using Bond = Torsional;
   using BF = BondedForces<Bond, 4>;
   typename BF::Parameters params;
-  params.file = "torsional.bonds"; 
+  params.file = "torsional.bonds";
   real3 lbox = make_real3(32,32,32);
   auto bond = std::make_shared<Bond>(lbox);
   auto bf = std::make_shared<BF>(sim.pd, params, bond);
@@ -326,9 +327,9 @@ int main(){
 	bs.push_back({i,jj});
       }
     }
-    
+
     out<<bs.size()<<std::endl;
-    fori(0, bs.size()){       
+    fori(0, bs.size()){
       out<<bs[i].x<<" "<<bs[i].y<<" 10 0\n";
     }
   }

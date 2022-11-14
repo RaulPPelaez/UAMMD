@@ -9,7 +9,8 @@
 #include "utils/cufftComplex4.cuh"
 #include "utils/cufftComplex2.cuh"
 #include <fstream>
-#include<iomanip>
+#include <iomanip>
+#include<numeric>
 namespace uammd{
   namespace DPPoissonSlab_ns{
     struct Permitivity{

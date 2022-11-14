@@ -212,12 +212,12 @@ function noiseVariance {
 
 
 #./fcm pairMobility_q2D 0 $viscosity $hydrodynamicRadius $tolerance  > uammd.pairMobility_q2D.log 2>&1
-#selfMobilityCubicBox
-#hydrodynamicRadiusVariance
-#pairMobilityCubicBox
-#selfMobility_q2D
+selfMobilityCubicBox
+hydrodynamicRadiusVariance
+pairMobilityCubicBox
+selfMobility_q2D
 selfDiffusionCubicBox
 selfDiffusion_q2D
-#noiseVariance
+noiseVariance
 
 rm -f fit.log

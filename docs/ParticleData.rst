@@ -142,6 +142,13 @@ Basic properties include (type name):
   * And more defined in ParticleData.cuh
 
 
+You can add new properties in :code:`ALL_PROPERTIES_LIST`. Alternatively, you can populate the :code:`EXTRA_PARTICLE_PROPERTIES` macro without modifying :code:`ParticleData.cuh`. For instance by defining the macro before including :code:`uammd.cuh` or at the compilation line. The format of this macro is a list of properties like :code:`((PropertyName, propertyName, TYPE))`. For instance:
+
+.. code:: cpp
+
+   #define EXTRA_PARTICLE_PROPERTIES ((MyProp1, myprop1, real))((MyProp2, myprop2, real3))
+
+   
 .. _particle_id_assignation:
 
 Particle id assignation
@@ -197,6 +204,9 @@ Advanced usage
 ParticleData allocates properties the first time they are requested. Sometimes one would like to know if a certain property has been previously requested to decide upon a fall back behavior.
 For example, one would like to use the mass of each particle for a certain algorithm. If mass has not been set for each particle independently one would like to assume that all particles have the same mass, equal to some default value. There are two ways to obtain this information:
 
+.. cpp:function:: bool ParticleData::isPropertyAllocated(access::location loc, access::mode mode);
+
+		  Returns true if the property called "Property" has been previously requested via :cpp:any:`ParticleData::getProperty` and false otherwise. A different function is autodefined for each existing property, so do not call :cpp:any:`isPropertyAllocated`, rather :cpp:any:`isPosAllocated`, :cpp:any:`isMassAllocated` and so on and so forth.
 
 .. cpp:function:: property_ptr<type> ParticleData::getPropertyIfAllocated(access::location loc, access::mode mode);
 

@@ -37,7 +37,6 @@ REFERENCES:
 #include"third_party/type_names.h"
 #include <thrust/device_vector.h>
 #include<third_party/uammd_cub.cuh>
-#include<bits/stdc++.h>
 namespace uammd{
 
   namespace Sorter{

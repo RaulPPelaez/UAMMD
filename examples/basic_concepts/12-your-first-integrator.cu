@@ -10,7 +10,8 @@
 
 
 #include <uammd.cuh>
-#include<Interactor/SpectralEwaldPoisson.cuh> //We will add electrostatics later in this example
+#include <Interactor/SpectralEwaldPoisson.cuh> //We will add electrostatics later in this example
+#include<random>
 using namespace uammd;
 
 // We start by defining a class that inherits from Integrator.

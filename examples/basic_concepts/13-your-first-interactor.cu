@@ -12,7 +12,7 @@
 
 #include <uammd.cuh>
 #include <Integrator/BDHI/BDHI_FCM.cuh> //We will add out Interactor to a hydrodynamic Integrator.
-
+#include<random>
 using namespace uammd;
 
 // We start by defining a class that inherits from Interactor.

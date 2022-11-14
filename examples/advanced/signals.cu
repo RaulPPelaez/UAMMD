@@ -1,11 +1,11 @@
 /*Raul P. Pelaez 2021. Example showing how to connect to ParticleData signals.
 
-  Say the class called "User" wants to know when some particle property has been modified. For example because it needs to keep something up to date when the positions are modified. 
-  The class "User" might be an Integrator, Interactor, a Potential, a Transverser... or anything outside the UAMMD framework.  
+  Say the class called "User" wants to know when some particle property has been modified. For example because it needs to keep something up to date when the positions are modified.
+  The class "User" might be an Integrator, Interactor, a Potential, a Transverser... or anything outside the UAMMD framework.
 
  */
 #include"uammd.cuh"
-
+#include<numeric>
 using namespace uammd;
 using std::endl;
 using std::make_shared;
@@ -23,7 +23,7 @@ class User{
 public:
   User(std::shared_ptr<ParticleData> pd):pd(pd){
     //Here we bind some member functions to the related signals.
-    //When the signal emits the bound function will be called 
+    //When the signal emits the bound function will be called
       positionConnection = pd->getPosWriteRequestedSignal()->connect([this](){this->handle_pos_access();});
       velocityConnection = pd->getVelWriteRequestedSignal()->connect([this](){this->handle_vel_access();});
   }
@@ -50,7 +50,7 @@ public:
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       //The center of mass in X, just because
       currentResults.x = std::accumulate(pos.begin(), pos.end(), real4()).x/pd->getNumParticles();
-      //No work needs to be done until the next time positions change 
+      //No work needs to be done until the next time positions change
       pos_needs_processing = false;
     }
     //Only do work with velocities if we know it has been potentially modified since last call
@@ -59,7 +59,7 @@ public:
       auto vel = pd->getVel(access::location::cpu, access::mode::read);
       //The total velocity in X, just because
       currentResults.y = std::accumulate(vel.begin(), vel.end(), real3()).x;
-      //No work needs to be done until the next time velocities change 
+      //No work needs to be done until the next time velocities change
       vel_needs_processing = false;
     }
     //Notice that if this function is called two times, without modifying pos or vel in between, the second time
@@ -74,7 +74,7 @@ private:
     //The positions have not been modified yet.
     //Still you can use this slot function to set up some flag:
     pos_needs_processing = true;
-    System::log<System::MESSAGE>("[USER] Positions was requested for writting");       
+    System::log<System::MESSAGE>("[USER] Positions was requested for writting");
   }
   //This function will be called when pd->getVel() is called with access::mode::write or readwrite.
   void handle_vel_access(){
@@ -93,7 +93,7 @@ void modify_positions(std::shared_ptr<ParticleData> pd){
 }
 
 void modify_velocities(std::shared_ptr<ParticleData> pd){
-  auto vel = pd->getVel(access::location::cpu, access::mode::write);  
+  auto vel = pd->getVel(access::location::cpu, access::mode::write);
   vel[0] = {1,0,0};
   vel[1] = {-2,0,0};
 }
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]){
     vel[0] = {1,0,0};
     vel[1] = {-2,0,0};
   }
-  //User construction will connect to pd such that it will be informed when positions or velocities are requested for writting.  
+  //User construction will connect to pd such that it will be informed when positions or velocities are requested for writting.
   User user(pd);
   real2 res;
   //Work will be done the first time
@@ -132,7 +132,7 @@ int main(int argc, char *argv[]){
   modify_velocities(pd);
   //Work will be done to take into account new pos and vel
   res = user.some_work_using_current_pos_and_vel();
-  
+
   //this line is here to silence the "unused variable" warning when compiling
   [&res]{}();
   sys->finish();
