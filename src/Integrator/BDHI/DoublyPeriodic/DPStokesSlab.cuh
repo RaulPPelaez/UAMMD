@@ -4,7 +4,7 @@
 
 #ifndef DOUBLYPERIODIC_STOKES_CUH
 #define DOUBLYPERIODIC_STOKES_CUH
-
+#include"uammd.cuh"
 #include"Integrator/Integrator.cuh"
 #include "System/System.h"
 #include "utils/utils.h"
@@ -20,7 +20,6 @@
 
 namespace uammd{
   namespace DPStokesSlab_ns{
-
 
     class DPStokes{
     public:
@@ -56,7 +55,7 @@ namespace uammd{
       // acting on a group of positions.
       template<class PosIterator, class ForceIterator>
       cached_vector<real3> Mdot(PosIterator pos, ForceIterator forces,
-				int numberParticles, cudaStream_t st){
+				int numberParticles, cudaStream_t st = 0){
 	auto M = Mdot(pos, forces, (real4*) nullptr, numberParticles, st);
 	return M.first;
       }
@@ -124,7 +123,6 @@ namespace uammd{
 
     };
 
-
     namespace detail{
       struct LanczosAdaptor{
 	std::shared_ptr<DPStokes> dpstokes;
@@ -135,7 +133,7 @@ namespace uammd{
 	  dpstokes(dpstokes),pos(pos),numberParticles(numberParticles){}
 
 	void operator()(real3 *mv, real3* m){
-	  auto res = dpstokes->Mdot(pos, m, numberParticles, 0);
+	  auto res = dpstokes->Mdot(pos, m, numberParticles);
 	  thrust::copy(thrust::cuda::par, res.begin(), res.end(), mv);
 	}
 
