@@ -86,6 +86,10 @@ namespace uammd{
         m_data.swap(another.m_data);
       }
 
+      thrust::device_reference<T> operator[](uint i){
+	return thrust::device_reference<T>(data() + i);
+      }
+
       // auto operator=(UninitializedCachedContainer<T> &other){
       // 	return UninitializedCachedContainer<T>(other);
       // }
