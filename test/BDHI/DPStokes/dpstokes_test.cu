@@ -244,7 +244,10 @@ TEST(DPStokesIntegrator, ObeysFluctuationDissipationBalanceAtEveryHeight){
     dpstokes_integrator->forwardTime();
     auto r = (make_real3(pd->getPos(access::cpu, access::read)[0]));
     m0[iz] = (r-make_real3(0,0,z))/pari.dt;
-    std::cout<<z<<" "<<m0[iz]<<" "<<d0[iz]<<std::endl;
+    real3 err = abs((m0[iz] -d0[iz])/m0[iz]);
+    ASSERT_LE(err.x, 0.05);
+    ASSERT_LE(err.y, 0.05);
+    ASSERT_LE(err.z, 0.05);
   }
 
 
