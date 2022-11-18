@@ -3,7 +3,9 @@ project(vqcm_dpstokes)
 enable_language(CUDA)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_BUILD_TYPE Debug)
-# GoogleTest requires at least C++14
+#set( CMAKE_VERBOSE_MAKEFILE on )
+#add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
+#GoogleTest requires at least C++14
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
