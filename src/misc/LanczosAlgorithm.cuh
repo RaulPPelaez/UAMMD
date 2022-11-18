@@ -1,275 +1,78 @@
-/*Raul P. Pelaez 2017-2022. Lanczos Algotihm,
-  Computes the matrix-vector product sqrt(M)·v recursively. In the case of solveNoise, v is a random gaussian vector.
-
-  For that, it requires a functor in which the () operator takes an output real3* array and an input real3* (both device memory) as:
-  void operator()(real3* out, real3 * a_v);
-
-  This function must fill out with the result of performing the M·v dot product- > out = M·a_v.
-
+/*Raul P. Pelaez 2022. Lanczos Algotihm,
+  Computes the matrix-vector product sqrt(M)·v using a recursive algorithm.
+  For that, it requires a functor in which the () operator takes an output real* array and an input real* (both device memory) as:
+  inline void operator()(real* in_v, real * out_Mv);
+  This function must fill "out" with the result of performing the M·v dot product- > out = M·a_v.
   If M has size NxN and the cost of the dot product is O(M). The total cost of the algorithm is O(m·M). Where m << N.
-
   If M·v performs a dense M-V product, the cost of the algorithm would be O(m·N^2).
-
   References:
-
   [1] Krylov subspace methods for computing hydrodynamic interactions in Brownian dynamics simulations
   J. Chem. Phys. 137, 064106 (2012); doi: 10.1063/1.4742347
-
-
 Some notes:
-
   From what I have seen, this algorithm converges to an error of ~1e-3 in a few steps (<5) and from that point a lot of iterations are needed to lower the error.
   It usually achieves machine precision in under 50 iterations.
-
-  If the matrix does not have a sqrt (not positive definite, not symmetric...) it will usually be reflected as a nan in the current error estimation and leave the algorithm in an UNKNOWN_ERROR state.
-
-  TODO:
-  80- w can be V.d_m+ 3*N*(i+1), avoiding the cudaMemcpy at the end of each step
+  If the matrix does not have a sqrt (not positive definite, not symmetric...) it will usually be reflected as a nan in the current error estimation. An exception will be thrown in this case.
 */
 
-#ifndef LANCZOSALGORITHM_CUH
-#define LANCZOSALGORITHM_CUH
-#include"utils/utils.h"
-#include"utils/cuda_lib_defines.h"
-#include<thrust/device_vector.h>
-#include<thrust/host_vector.h>
-#include"System/System.h"
-#include"utils/cublasDebug.h"
-#include<memory>
+#ifndef LANCZOSALGORITHM2_CUH
+#define LANCZOSALGORITHM2_CUH
+#include<iostream>
+#include"global/defines.h"
+#include"LanczosAlgorithm/device_blas.h"
+#include<vector>
+#include <memory>
+#include<functional>
+#include"LanczosAlgorithm/device_container.h"
+#include"LanczosAlgorithm/MatrixDot.h"
 namespace uammd{
-  enum class LanczosStatus{
-    SUCCESS,   //Everything is fine
-      SIZE_MISMATCH,  // V was asked with a certain size and provided to solve with a different one
-      CUBLAS_ERROR,
-      CUDA_ERROR, //Error in memcpy, malloc ...
-    TOO_MANY_ITERATIONS, //Convergence was not achieved after the maximum number of iterations
-      UNKNOWN_ERROR
-      };
+namespace lanczos{
 
-  struct LanczosAlgorithm{
-    LanczosAlgorithm(real tolerance = 1e-3);
+  struct Solver{
+    Solver();
 
-    ~LanczosAlgorithm(){
-      CublasSafeCall(cublasDestroy_v2(cublas_handle));
-      System::log<System::DEBUG>("[LanczosAlgorithm] Destroyed");
+    ~Solver();
+
+    //Given a Dotctor that computes a product M·v (where M is handled by Dotctor ), computes Bv = sqrt(M)·v
+    //Returns the number of iterations required to achieve the requested tolerance
+    //B = sqrt(M)
+    int run(MatrixDot *dot, real *Bv, const real* v, real tolerance, int N, cudaStream_t st = 0);
+    int run(MatrixDot &dot, real *Bv, const real* v, real tolerance, int N, cudaStream_t st = 0){
+      return run(&dot, Bv, v, tolerance, N, st);
+    }
+    int run(std::function<void(real*, real*)> dot, real *Bv, const real* v,
+	    real tolerance, int N, cudaStream_t st = 0){
+      auto lanczos_dot = createMatrixDotAdaptor(dot);
+      return run(lanczos_dot, Bv, v, tolerance, N, st);
+    }
+    //Given a Dotctor that computes a product M·v (where M is handled by Dotctor ), computes Bv = sqrt(M)·v
+    //Returns the residual after numberIterations iterations
+    //B = sqrt(M)
+    real runIterations(MatrixDot *dot, real *Bz, const real*z, int numberIterations, int N);
+    real runIterations(MatrixDot &dot, real *Bv, const real* v, int numberIterations, int N){
+      return runIterations(&dot, Bv, v, numberIterations, N);
+    }
+    real runIterations(std::function<void(real*, real*)> dot, real *Bv, const real* v, int numberIterations, int N){
+      auto lanczos_dot = createMatrixDotAdaptor(dot);
+      return runIterations(lanczos_dot, Bv, v, numberIterations, N);
     }
 
-    //Fill the first N values of V and pass it to solve as "v" instead of an external array,
-    //this will save a memcpy
-    real * getV(int N){
-      System::log<System::DEBUG1>("[LanczosAlgorithm] V requested");
-      if(N != this->N) numElementsChanged(N);
-      return thrust::raw_pointer_cast(V.data());
-    }
+    void setIterationHardLimit(int newLimit){this->iterationHardLimit = newLimit;}
 
-    //Given a Dotctor that computes a product M·v ( is handled by Dotctor ), computes Bv = sqrt(M)·v
-    template<class Dotctor> //B = sqrt(M)
-    LanczosStatus solve(Dotctor &dot, real *Bv, real* v, int N, cudaStream_t st = 0);
+    int getLastRunRequiredSteps(){ return this->lastRunRequiredSteps;}
 
-    LanczosStatus getLastError(){ return errorStatus; }
   private:
-    //Init cuBLAS for Lanczos process
-    void init(){
-      CublasSafeCall(cublasCreate_v2(&cublas_handle));
-      System::log<System::DEBUG1>("[LanczosAlgorithm] Success!");
-    }
-    void compResult(real z2, int N, int iter, real *BdW, cudaStream_t st = 0);
     //Increases storage space
-    void increment_max_iter(int inc = 2);
-    void numElementsChanged(int Nnew);
-    int N;
-    /*CUBLAS*/
+    real computeError(real* Bz, int N, int iter);
+    void registerRequiredStepsForConverge(int steps_needed);
+
     cublasHandle_t cublas_handle;
-    /*Maximum number of Lanczos iterations*/
-    int max_iter; //<100 in general, increases as needed
-    int iterationHardLimit = 100; //Do not perform more than this iterations
-    /*Lanczos algorithm auxiliar memory*/
-    thrust::device_vector<real3> w; //size N, v in each iteration
-    thrust::device_vector<real> V; //size 3Nxmax_iter; Krylov subspace base transformation matrix
-    //Mobility Matrix in the Krylov subspace
-    thrust::host_vector<real> P;    //Transformation Matrix to diagonalize H, max_iter x max_iter
-    /*upper diagonal and diagonal of H*/
-    thrust::host_vector<real> hdiag, hsup, htemp;
-    thrust::device_vector<real> htempGPU;
-    thrust::device_vector<real3> oldBz;
+    cudaStream_t st = 0;
+    device_container<real> oldBz;
     int check_convergence_steps;
-    LanczosStatus errorStatus = LanczosStatus::SUCCESS;
-    real tolerance;
+    int iterationHardLimit = 200;
+    int lastRunRequiredSteps = 0;
   };
-
-
-
-  template<class Dotctor>
-  LanczosStatus LanczosAlgorithm::solve(Dotctor &dot, real *Bz, real*z, int N, cudaStream_t st){
-    st = 0;
-    System::log<System::DEBUG1>("[LanczosAlgorithm] Computing sqrt(M)·v");
-    //Exit if this instance has become boggus, in which case it should be reinitialized
-    if(errorStatus != LanczosStatus::SUCCESS){
-      return errorStatus;
-    }
-
-    //Handles the case of the number of elements changing since last call
-    if(N != this->N){
-      real * d_V = thrust::raw_pointer_cast(V.data());
-      if(z == d_V){
-	errorStatus = LanczosStatus::SIZE_MISMATCH;
-	return errorStatus;
-      }
-      numElementsChanged(N);
-    }
-
-    real * d_V = thrust::raw_pointer_cast(V.data());
-    int steps_needed = 0;
-    CublasSafeCall(cublasSetStream(cublas_handle, st));
-
-    System::log<System::DEBUG2>("[LanczosAlgorithm] Starting");
-    real normNoise_prev = 1.0; //For error estimation, see eq 27 in [1]
-
-    /*See algorithm I in [1]*/
-    /************v[0] = z/||z||_2*****/
-
-    /*If v doesnt come from solveNoise*/
-    if(z != d_V){
-      System::log<System::DEBUG2>("[LanczosAlgorithm] Copying input to subspace  proyection matrix");
-      CudaSafeCall(cudaMemcpyAsync(d_V, z, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
-    }
-    /*1/norm(z)*/
-    real invz2;
-    CublasSafeCall(cublasnrm2(cublas_handle, 3*N, d_V, 1, &invz2));
-    invz2 = 1.0/invz2;
-
-    /*v[0] = v[0]*1/norm(z)*/
-    CublasSafeCall(cublasscal(cublas_handle, 3*N, &invz2,  d_V, 1));
-
-    real alpha=1.0;
-    /*Lanczos iterations for Krylov decomposition*/
-    /*Will perform iterations until Error<=tolerance*/
-    int i = -1;
-    while(errorStatus == LanczosStatus::SUCCESS){
-      i++;
-      real3 * d_w = thrust::raw_pointer_cast(w.data());
-      System::log<System::DEBUG3>("[LanczosAlgorithm] Iteration %d", i);
-      /*w = D·vi ---> See i.e BDHI::Lanczos_ns::NbodyFreeMatrixMobilityDot and BDHI::Lanczos_ns::Dotctor on how this works*/
-      System::log<System::DEBUG3>("[LanczosAlgorithm] Computing M·v");
-      dot(d_w, (real3 *)(d_V+3*N*i));
-
-      if(i>0){
-	/*w = w-h[i-1][i]·vi*/
-	alpha = -hsup[i-1];
-	CublasSafeCall(cublasaxpy(cublas_handle, 3*N,
-				  &alpha,
-				  d_V+3*N*(i-1), 1,
-				  (real *)d_w, 1));
-      }
-
-      /*h[i][i] = dot(w, vi)*/
-      CublasSafeCall(cublasdot(cublas_handle, 3*N,
-		(real *)d_w, 1,
-		d_V+3*N*i, 1,
-		&(hdiag[i])));
-      System::log<System::DEBUG4>("[LanczosAlgorithm] hdiag[%d] %e", i, hdiag[i]);
-      /*Allocate more space if needed*/
-      if(i == max_iter-1){
-	CudaSafeCall(cudaStreamSynchronize(st));
-	this->increment_max_iter();
-	d_V = thrust::raw_pointer_cast(V.data());
-	d_w = thrust::raw_pointer_cast(w.data());
-      }
-
-      if(i<(int)max_iter-1){
-	/*w = w-h[i][i]·vi*/
-	alpha = -hdiag[i];
-	CublasSafeCall(cublasaxpy(cublas_handle, 3*N,
-				  &alpha,
-				  d_V+3*N*i, 1,
-				  (real *)d_w, 1));
-	/*h[i+1][i] = h[i][i+1] = norm(w)*/
-	CublasSafeCall(cublasnrm2(cublas_handle, 3*N, (real*)d_w, 1, &(hsup[i])));
-	/*v_(i+1) = w·1/ norm(w)*/
-	real tol = 1e-3*hdiag[i]*invz2;
-	if(hsup[i]<tol) hsup[i] = real(0.0);
-	if(hsup[i]>real(0.0)){
-	  real invw2 = 1.0/hsup[i];
-	  CublasSafeCall(cublasscal(cublas_handle, 3*N, &invw2,  (real *)d_w, 1));
-	}
-	else{/*If norm(w) = 0 that means all elements of w are zero, so set w = e1*/
-	  //CudaSafeCall(cudaMemset(d_w, 0, 3*N*sizeof(real)));
-	  try{
-	    thrust::fill(w.begin(), w.end(), real3());
-	  }
-	  catch(thrust::system_error &e){
-	    System::log<System::CRITICAL>("[LanczosAlgorithm] thurst::fill failed with error: %s", e.what());
-	  }
-	  real one = 1;
-	  CudaSafeCall(cudaMemcpyAsync(d_w, &one , sizeof(real), cudaMemcpyHostToDevice, st));
-	}
-	System::log<System::DEBUG4>("[LanczosAlgorithm] norm(w) = %e in iteration %d! z2 = %e, threshold= %e", hsup[i], i,1.0/invz2, tol);
-	CudaSafeCall(cudaMemcpyAsync(d_V+3*N*(i+1), (real *)d_w, 3*N*sizeof(real), cudaMemcpyDeviceToDevice, st));
-      }
-
-      /*Check convergence if needed*/
-      steps_needed++;
-      if(i >= check_convergence_steps){ //Miminum of 3 iterations
-	System::log<System::DEBUG3>("[LanczosAlgorithm] Checking convergence");
-	/*Compute Bz using h and z*/
-	/**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
-	this->compResult(1.0/invz2, N, i, (real *)Bz, st);
-
-	/*The first time the result is computed it is only stored as oldBz*/
-	if((i-check_convergence_steps)>0 && i > 0){
-	  /*Compute error as in eq 27 in [1]
-	    Error = ||Bz_i - Bz_{i-1}||_2 / ||Bz_{i-1}||_2
-	  */
-	  /*oldBz = Bz-oldBz*/
-	  real * d_oldBz = (real*) thrust::raw_pointer_cast(oldBz.data());
-	  real a=-1.0;
-	  CublasSafeCall(cublasaxpy(cublas_handle, 3*N,
-				    &a,
-				    Bz, 1,
-				    d_oldBz, 1));
-
-	  /*yy = ||Bz_i - Bz_{i-1}||_2*/
-	  real yy;
-	  CublasSafeCall(cublasnrm2(cublas_handle, 3*N,  d_oldBz, 1, &yy));
-	  //eq. 27 in [1]
-	  real Error = abs(yy/normNoise_prev);
-	  if(isnan(Error)){
-	    System::log<System::DEBUG>("[LanczosAlgorithm] Error is nan!!!");
-	    errorStatus = LanczosStatus::UNKNOWN_ERROR;
-	    return errorStatus;
-	  }
-	  //Convergence achieved!
-	  if(Error <= tolerance){
-	    if(steps_needed-2 > check_convergence_steps){
-	      check_convergence_steps += 1;
-	    }
-	    //Or check more often if I performed too many iterations
-	    else{
-	      check_convergence_steps = std::max(1, check_convergence_steps - 2);
-
-	    }
-	    System::log<System::DEBUG1>("[LanczosAlgorithm] Convergence in %d iterations with error %e",i, Error);
-	    return errorStatus;
-	  }
-	  else{
-	    System::log<System::DEBUG3>("[LanczosAlgorithm] Convergence not achieved! Error: %e, Tolerance: %e", Error, tolerance);
-	    System::log<System::DEBUG3>("[LanczosAlgorithm] yy: %e, normNoise_prev: %e", yy, normNoise_prev);
-	    if(i>=iterationHardLimit){
-	      System::log<System::DEBUG>("[LanczosAlgorithm] Convergence not achieved after %d iterations! I will stop trying. Error: %e, Tolerance: %e", i, Error, tolerance);
-	      return LanczosStatus::TOO_MANY_ITERATIONS;
-	    }
-	  }
-	}
-	System::log<System::DEBUG3>("[LanczosAlgorithm] Saving current result.");
-	/*Always save the current result as oldBz*/
-	real * d_oldBz = (real*) thrust::raw_pointer_cast(oldBz.data());
-	CudaSafeCall(cudaMemcpyAsync(d_oldBz, Bz, N*sizeof(real3), cudaMemcpyDeviceToDevice, st));
-	CublasSafeCall(cublasnrm2(cublas_handle, 3*N, (real*) d_oldBz, 1, &normNoise_prev));
-      }
-    }
-    return errorStatus;
-  }
-
 }
-#include"LanczosAlgorithm.cu"
+}
+#include"LanczosAlgorithm/LanczosAlgorithm.cu"
 #endif
