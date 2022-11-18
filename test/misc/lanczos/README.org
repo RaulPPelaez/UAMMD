@@ -24,6 +24,7 @@ title: Lanczos tests
 #+latex_header: \newcommand{\noise}{\widetilde{W}}
 :END:
 
+* How to run the tests
 These tests use gtest and are meant to be compiled using the CMake file present here. Run:
 
 #+begin_src bash
@@ -37,3 +38,8 @@ Then, to run the tests:
 #+begin_src bash
   make all test
 #+end_src
+
+* About the tests
+
+This test suite tries to compute $\vec{b} = \sqrt{\tens{M}}\vec{v}$ with increasingly complex matrices $\tens{M}$.
+From a diagonal matrix to a dense, symmetric positive-definite one. All with arbitrary vectors $\vec{v}$.
