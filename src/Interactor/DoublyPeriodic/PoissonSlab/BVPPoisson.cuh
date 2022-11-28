@@ -80,9 +80,9 @@ namespace uammd{
 	const bool isPairedY = ik.y != (nky/2);
 	fori(0, nz){
 	  const cufftComplex poti = potential[i];
-	  gridFieldPotential[i].x = cufftComplex({-kvec.x*poti.y, kvec.x*poti.x})*isPairedX;
-	  gridFieldPotential[i].y = cufftComplex({-kvec.y*poti.y, kvec.y*poti.x})*isPairedY;
-	  gridFieldPotential[i].z = {dphi_dz[i].x, dphi_dz[i].y};
+	  gridFieldPotential[i].x = -cufftComplex({-kvec.x*poti.y, kvec.x*poti.x})*isPairedX;
+	  gridFieldPotential[i].y = -cufftComplex({-kvec.y*poti.y, kvec.y*poti.x})*isPairedY;
+	  gridFieldPotential[i].z = {-dphi_dz[i].x, -dphi_dz[i].y};
 	  gridFieldPotential[i].w = poti;
 	  fn[i] *= permitivity;
 	}
@@ -123,7 +123,7 @@ namespace uammd{
 	auto tmp = bvp_ns::setUpBVPKernelTemporalStorage(numberSystems, n.z);
 	cached_vector<char> tmp_storage(tmp.allocationSize);
 	auto tmp_storage_ptr = thrust::raw_pointer_cast(tmp_storage.data());
-	auto gpuSolver = bvpSolver->getGPUSolver();	
+	auto gpuSolver = bvpSolver->getGPUSolver();
 	const int blockSize = 64;
 	const int numberBlocks = numberSystems/blockSize+1;
         bvp_ns::solveBVPFieldPotential<<<numberBlocks, blockSize, 0, st>>>(gpuSolver, n.x, n.y, n.z,

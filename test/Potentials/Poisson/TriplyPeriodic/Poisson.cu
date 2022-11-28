@@ -13,7 +13,7 @@ Ex =  exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
 #include"uammd.cuh"
 #include"Interactor/SpectralEwaldPoisson.cuh"
 #include<fstream>
-
+#include<iomanip>
 using namespace uammd;
 using std::make_shared;
 using std::endl;
@@ -68,5 +68,3 @@ int main(int argc, char *argv[]){
   sys->finish();
   return 0;
 }
-
-

@@ -144,16 +144,20 @@ namespace uammd{
 	  return {cellSize.x, cellSize.y, csz};
 	}
 
-	inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell){
+	inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell) const{
+	  const auto cellCenterPos = getCellCenter(cell);
+	  const auto dist = box.apply_pbc(pos - cellCenterPos);
+	  return dist;
+	}
+	inline __host__ __device__ real3 getCellCenter(int3 cell) const{
 	  const real centerZ = cellHeight(cell.z);
 	  const real3 cellCenterPos = make_real3(real(-0.5)*box.boxSize.x + cellSize.x*(cell.x),
 						 real(-0.5)*box.boxSize.y + cellSize.y*(cell.y),
 						 centerZ);
-	  const auto dist = box.apply_pbc(pos - cellCenterPos);
-	  return dist;
+	  return cellCenterPos;
 	}
 
-	inline __host__ __device__ real cellHeight(int cellz){
+	inline __host__ __device__ real cellHeight(int cellz) const{
 	  return real(0.5)*box.boxSize.z*cospi((real(cellz))/(cellDim.z-1));
 	}
 

@@ -109,7 +109,11 @@ namespace uammd{
     inline __host__ __device__ real3 getCellSize() const{return cellSize;}
 
     inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell) const{
-      return box.apply_pbc(pos + box.boxSize*real(0.5) - cellSize*(make_real3(cell)+real(0.5)));
+      return box.apply_pbc(pos + box.boxSize*real(0.5) - getCellCenter(cell));
+    }
+
+    inline __host__ __device__ real3 getCellCenter(int3 cell) const{
+      return cellSize*(make_real3(cell)+real(0.5));
     }
 
     inline __host__ __device__ real3 distanceToCellUpperLeftCorner(real3 pos, int3 cell) const{

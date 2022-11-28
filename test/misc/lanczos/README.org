@@ -1,0 +1,45 @@
+title: Lanczos tests
+#+author: Raul P.Pelaez
+:DRAWER:
+#+OPTIONS: ^:{} toc:nil tags:nil  \n:t
+#+STARTUP: hidestars indent inlineimages latexpreview content
+#+LATEX_CLASS: report
+#+LATEX_HEADER: \usepackage{bm}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{amsmath}
+#+LATEX_HEADER:\usepackage{graphicx}
+#+LATEX_HEADER:\usepackage{float}
+#+LATEX_HEADER:\usepackage{amsmath}
+#+LATEX_HEADER:\usepackage{amssymb}
+#+LATEX_HEADER:\usepackage{hyperref}
+#+LATEX_HEADER:\usepackage{color}
+#+LATEX_HEADER:\usepackage{enumerate}
+#+latex_header: \renewcommand{\vec}[1]{\bm{#1}}
+#+latex_header: \newcommand{\tens}[1]{\bm{\mathcal{#1}}}
+#+latex_header: \newcommand{\oper}[1]{\mathcal{#1}}
+#+latex_header: \newcommand{\kT}{k_B T}
+#+latex_header: \newcommand{\fou}[1]{\widehat{#1}}
+#+latex_header: \DeclareMathOperator{\erf}{erf}
+#+latex_header: \DeclareMathOperator{\erfc}{erfc}
+#+latex_header: \newcommand{\noise}{\widetilde{W}}
+:END:
+
+* How to run the tests
+These tests use gtest and are meant to be compiled using the CMake file present here. Run:
+
+#+begin_src bash
+  mkdir build
+  cd build
+  cmake ..
+#+end_src
+You might need to solve any dependency issues raised by cmake and run it again.
+Then, to run the tests:
+
+#+begin_src bash
+  make all test
+#+end_src
+
+* About the tests
+
+This test suite tries to compute $\vec{b} = \sqrt{\tens{M}}\vec{v}$ with increasingly complex matrices $\tens{M}$.
+From a diagonal matrix to a dense, symmetric positive-definite one. All with arbitrary vectors $\vec{v}$.

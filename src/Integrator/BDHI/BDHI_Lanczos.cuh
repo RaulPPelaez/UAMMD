@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. BDHI Lanczos submodule. Intended to be used with BDHI::EulerMaruyama
+/*Raul P. Pelaez 2017-2022. BDHI Lanczos submodule. Intended to be used with BDHI::EulerMaruyama
 
   Computes the mobility matrix on the fly when needed, so it is a mtrix free method.
 
@@ -15,6 +15,7 @@ References:
 #ifndef BDHI_LANCZOS_CUH
 #define BDHI_LANCZOS_CUH
 
+#include"uammd.cuh"
 #include "BDHI.cuh"
 #include "misc/LanczosAlgorithm.cuh"
 namespace uammd{
@@ -51,7 +52,7 @@ namespace uammd{
       /*Rodne Prager Yamakawa device functions and parameters*/
       BDHI::RotnePragerYamakawa rpy;
 
-      shared_ptr<LanczosAlgorithm> lanczosAlgorithm;
+      std::shared_ptr<lanczos::Solver> lanczosAlgorithm;
 
       curandGenerator_t curng;
       real hydrodynamicRadius;

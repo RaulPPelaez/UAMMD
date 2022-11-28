@@ -11,7 +11,7 @@ References:
 #define UAMMD_UTILS_H
 #include<cstdint>
 #include<limits>
-#include<sys/time.h>
+#include<chrono>
 #include <vector>
 #include"utils/ForceEnergyVirial.cuh"
 #include"printOverloads.h"
@@ -19,16 +19,14 @@ namespace uammd{
 /*A timer class to measure time, just use
   t.tic to start and t.toc to get elapsed seconds*/
 class Timer{
-  struct timeval start, end;
+  std::chrono::time_point<std::chrono::system_clock> start, end;
 public:
-  Timer():
-    start((struct timeval){0,0}),
-    end((struct timeval){0,0}){}
-  void tic(){ gettimeofday(&start, NULL); }
+  void tic(){
+    start = std::chrono::system_clock::now();
+  }
   float toc(){
-    gettimeofday(&end, NULL);
-    return ((end.tv_sec  - start.tv_sec) * 1000000u +
-	    end.tv_usec - start.tv_usec) / 1.e6;
+    end = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count()*1e-9;
   }
 };
 

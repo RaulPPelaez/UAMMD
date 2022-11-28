@@ -1,0 +1,95 @@
+#+title: IBM tests
+#+author: Raul P.Pelaez
+#+OPTIONS: ^:{} toc:nil \n:t tags:nil
+#+STARTUP: hidestars indent inlineimages latexpreview
+#+LATEX_CLASS: report
+#+LATEX_HEADER: \usepackage{bm}
+#+LATEX_HEADER: \usepackage{svg}
+#+LATEX_HEADER: \usepackage{amsmath}
+#+LATEX_HEADER:\usepackage{graphicx}
+#+LATEX_HEADER:\usepackage{float}
+#+LATEX_HEADER:\usepackage{amsmath}
+#+LATEX_HEADER:\usepackage{amssymb}
+#+LATEX_HEADER:\usepackage{hyperref}
+#+LATEX_HEADER:\usepackage{color}
+#+LATEX_HEADER:\usepackage{enumerate}
+#+latex_header: \renewcommand{\vec}[1]{\bm{#1}}
+#+latex_header: \newcommand{\tens}[1]{\bm{\mathcal{#1}}}
+#+latex_header: \newcommand{\oper}[1]{\mathcal{#1}}
+#+latex_header: \newcommand{\kT}{k_B T}
+#+latex_header: \newcommand{\fou}[1]{\widehat{#1}}
+#+latex_header: \newcommand{\noise}{\widetilde{W}}
+
+* <2022-08-23 Tue 18:29> Adding a test for the spreading code
+
+In order to test the spreading we can place one particle at the center of the domain ($\vec{r} = (0,0,0)$) with a forcing $\vec{F} = (1,0,0)$. If we use a Gaussian with width $\sigma$ for spreading we end up with:
+#+NAME: eqn:fgaussian
+$$\vec{f}(\vec{r}) = \frac{1}{(2\pi\sigma) ^{3/2}}\exp\left(-\frac{1}{2}\frac{x^2+y^2+z^2}{\sigma^2}\right)\hat{\alpha}$$
+Where $\alpha$ can be any direction.
+
+Furthermore, we will spread to a Chebyshev grid, to test this part of the infrastructure.
+We will perform two tests:
+** Check that spreading yields the right field
+We will check the correctness of
+ $$\oper{S}\vec{F} = \vec{f}(\vec{r}).$$
+For this test we will spread a force $\vec{F} = (1,1,1)$ using a Gaussian at a random location $\vec{q}$ and check that every cell contains the correct information.
+Cell $\vec{c} = (i,j,k)$ (with $i,j,k\in [0,n_{x,y,z}-1]$) is located at $\vec{r}_i = (x_i, y_j, z_k)$, where  
+   \begin{align*}
+   x_i &= -\frac{L_x}{2} + ih_x\\
+   y_i &= -\frac{L_y}{2} + jh_y\\
+   z_i &= H\cos\left(\frac{\pi k}{n_z-1}\right)
+   \end{align*}
+On the other hand $\oper{S}(\vec{r})\vec{F} = \sum_i \delta_a(\vec{r}-\vec{q}_i)\vec{F}_i$
+For this test we will use a Gaussian, so that
+$$\delta_a(r) = \frac{1}{\left(2\pi\sigma\right)^{3/2}}\exp\left(-\frac{r^2}{2\sigma^2}\right)$$
+Consequently, the contents of cell $\vec{c}$ should be:
+#+NAME: eqn:fijk
+$$f(i,j,k) = \frac{1}{\left(2\pi\sigma\right)^{3/2}}\exp\left(-\frac{d(i,j,k)^2}{2\sigma^2}\right),$$
+where
+$$d(i,j,k) = \left(r_x^2 + r_y^2 + r_z^2\right)^{1/2}$$
+and
+
+\begin{align*}
+r_x &= -\frac{L_x}{2} + ih_x -q_x\\
+r_y &= -\frac{L_y}{2} + ih_y -q_y\\
+r_z &= H\cos\left(\frac{\pi k}{n_z-1}\right)-q_z
+\end{align*}
+
+$f(i,j,k)$ should be zero if any of $r_x,r_y,r_z> \frac{sh}{2}$, being $s$ the number of support cells.
+
+Additionally, eq. [[eqn:fijk]] should also be zero if the kernel overlaps a wall.
+- <2022-08-24 Wed 14:13> After a few bug fixes the comparison is machine-precision perfect.
+  I realized that depending on whether you spread to cell centers or faces you need a different rule for the support shift.
+  I believe a generic rule for it is:
+  $$P = s/2 - (|r_s| > sh/2)$$
+  Where $r_s$ is the distance of the particle to the cell $c(q_i) - s/2$ in each direction.
+  I wrote a test that spreads a random particle and checks every cell.
+  Additionally I placed particles near the walls, or even at the walls.
+
+
+** Check interpolation+spreading
+We can write
+$$\oper{J}\oper{S} 1 = \int_{-\infty}^{\infty} \delta_a(\vec{r})d\vec{r}$$
+If we are using a Gaussian of width $\sigma$ in a cubic domain of size $l$ the solution to this is
+$$\oper{J}\oper{S} 1 = \frac{9278850 \pi^{3/2} \text{erf}\left(\frac{l}{s})^3}{2301620723 s^3}$$
+
+<2022-08-24 Wed 20:39> After some bug fixes and small tweaks to the spreading code this test comes out perfect.
+
+As a side note, I think I have finally cracked what was causing the differences between  Ondrej's spreading matlab code and UAMMD. In the end it was basically a > that should be a >= in the kernel.
+I have also simplified and change some rules (z support computation) in the spreading kernel.
+When a particle lies at the exact limit between two cells, for instance $q_x=0$, one has to choose which cell to spread to between the left-most and the rightmost ones.
+#+NAME: fig:spread
+#+ATTR_ORG: :width 500px
+[[file:./spread.svg]]
+
+Imagine that for this figure the support is just one cell, meaning that a particle will only spread to two cells: Its own and the one to the left or to the right. It is clear for the green particle that the cell to the right (we are spreading to cell faces) should be used. But there is no correct answer for the blue particle, since both the right and left cells have the exact same weight. In this case we have to either choose one of the two or increase the support just for this case.
+There is yet another choice here, where is the blue particle located? is it assigned to cell $1$ or $2$?.
+
+One solution to this is to simply make $\phi(r\ge sh/2)=0$.
+
+I am going to keep putting the blue particle at cell 1, since the alternative requires shifting the particle when computing its cell, which is problematic, for instance when $x=L/2$.
+
+** <2022-09-16 Fri 10:39>
+ I need a way for atomicAdd to work on real* pointers and also tuples of pointers
+
+ I think I can do this by overloading atomicAdd, and instead of passing to it an lvalue reference just store a variable with the address previously, then I can desambiguate.

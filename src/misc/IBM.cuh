@@ -51,7 +51,8 @@ REFERENCES:
 #include"global/defines.h"
 #include"utils/utils.h"
 #include"System/System.h"
-#include"IBM.cu"
+#include "IBM.cu"
+#include "IBM_utils.cuh"
 #include "utils/Grid.cuh"
 
 namespace uammd{
@@ -79,15 +80,15 @@ namespace uammd{
     };
 
     struct DefaultWeightCompute{
-      template<class T1>
-      inline __device__ auto operator()(T1 value, real3 kernel) const{
-	return value*kernel.x*kernel.y*kernel.z;
+      template<class T1, class T2>
+      inline __device__ auto operator()(T1 value, thrust::tuple<T2,T2,T2> kernel) const{
+	auto phiX = thrust::get<0>(kernel);
+	auto phiY = thrust::get<1>(kernel);
+	auto phiZ = thrust::get<2>(kernel);
+	return value*phiX*phiY*phiZ;
       }
-
     };
-
   }
-
   template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>
   class IBM{
     shared_ptr<Kernel> kernel;
@@ -116,7 +117,8 @@ namespace uammd{
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }
-      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(real);
+      using KernelValueType = decltype(IBM_ns::detail::phiX(*kernel,real(), real3()));
+      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(KernelValueType);
       IBM_ns::particles2GridD<is2D><<<numberParticles, threadsPerParticle, shMemory, st>>>
 	(pos, v, gridData, numberParticles, grid, cell2index, *kernel, weightCompute);
     }
@@ -133,7 +135,8 @@ namespace uammd{
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
       int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 64);
-      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(real);
+      using KernelValueType = decltype(IBM_ns::detail::phiX(*kernel,real(), real3()));
+      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(KernelValueType);
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }

@@ -55,7 +55,7 @@ namespace uammd{
 	    real w = computeW(tolerance);
 	    //real beta=sqrt(2*M_PI)*w*2;
 	    real beta=1.8*w*2;
-	    return IBM_kernels::BarnettMagland(w, w*0.5, beta);
+	    return IBM_kernels::BarnettMagland(w*0.5, beta);
 	  }
 	  static real computeW(real tolerance){
 	    real w = std::max(1.5, int(-log10(tolerance) + 2)/2.0);
@@ -83,7 +83,7 @@ namespace uammd{
 
 	  BarnettMagland(real h, real tolerance):
 	    bm(initBM(tolerance)){
-	    support = int(2*bm.w + 0.5);
+	    support = int(2*bm.alpha + 0.5);
 	    this->a = h;
 	  }
 
@@ -94,7 +94,7 @@ namespace uammd{
 	  }
 
 	  real fixHydrodynamicRadius(real hydrodynamicRadius, real h) const{
-	    real upsampling = computeUpsampling(bm.w);
+	    real upsampling = computeUpsampling(2*bm.alpha);
 	    return h/upsampling;
 	  }
 
