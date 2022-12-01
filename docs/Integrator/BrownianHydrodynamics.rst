@@ -593,7 +593,7 @@ The following parameters are available:
   int main(){
     //Assume an instance of ParticleData, called "pd", is available
     ...
-    //A strategy is mixed with an integration scheme
+    //A strategy is paired with an integration scheme
     using PSE = BDHI::EulerMaruyama<BDHI::PSE>;
     PSE::Parameters par;
     par.temperature = 1.0;
@@ -629,6 +629,7 @@ Fluctuating Immersed Boundary
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Identical to :ref:`FCM`, but using a :ref:`staggered grid<Staggered grid>` [10]_.
+The two integration schemes described in the reference are available. Furthermore, and although in the triply periodic domain in this module, thermal drift is computed.
 
 .. todo:: fill
 
@@ -648,27 +649,27 @@ The following parameters are available:
   * :cpp:`real viscosity` Viscosity of the solvent.
   * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles)
   * :cpp:`real dt`  Time step
-  * :cpp:`real tolerance` Overall tolerance of the solver (affects the grid size and kernel support).
+  * :cpp:`real tolerance` Overall tolerance of the spreading kernel (affects the grid size and kernel support).
+  * :cpp:`FIB::Scheme scheme = FIB::Scheme::IMPROVED_MIDPOINT` The integration scheme, can also be just MIDPOINT.
   * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.
 
+By default the 3pt Peskin kernel is used which hardcodes the support to 3 cells and forces the grid size to be 0.91 times the hydrodynamic radius, so the tolerance parameter is ignored. The kernel can be changed by changing the alias Kernel in the FIB class definition.
 
 .. code:: c++
 
   #include"uammd.cuh"
-  #include<Integrator/BDHI/BDHI_EulerMaruyama.cuh>
-  #include<Integrator/BDHI/BDHI_FIB.cuh>
+  #include<Integrator/BDHI/FIB.cuh>
   using namespace uammd;
   int main(){
     //Assume an instance of ParticleData, called "pd", is available
     ...
-    //A strategy is mixed with an integration scheme
-    using FIB = BDHI::EulerMaruyama<BDHI::FIB>;
+    using FIB = BDHI::FIB;
     FIB::Parameters par;
     par.temperature = 1.0;
     par.viscosity = 1.0;
     par.hydrodynamicRadius = 1.0;
     par.dt = 0.01;
-    par.tolerance = 1e-3;
+    par.scheme = FIB::Scheme::IMPROVED_MIDPOINT;
     par.box = Box({128, 128, 128});
     auto bdhi = std::make_shared<FIB>(pd, par);
     ...
@@ -683,7 +684,7 @@ The following parameters are available:
 
 Here, :code:`pd` is a :ref:`ParticleData` instance.
 
-.. hint:: Being a triply periodic solver, FIB requires a simulation box as a parameter. Additionally, since this is a non-exact solver (with spatial discretization errors), a tolerance is also required.
+.. hint:: Being a triply periodic solver, FIB requires a simulation box as a parameter. 
 
 .. warning:: Contrary to the open boundary methods, in FIB all particles must have the same hydrodynamic radius.
 
@@ -700,13 +701,126 @@ Doubly periodic BDHI solvers
 Quasi two-dimensional
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+.. figure:: ../img/q2d.*
+	    :width: 50%
+	    :align: center
+		    
+In the Quasi2D geometry, an incompressible fluid exists in a domain which is periodic in the plane and open in the third direction. The particles embedded in the fluid are able to move only in the plane directions, as if confined by an infinitely stiff potential in the third direction.
 
-.. todo:: fill
+Thus, the Quasi2D solver (described in detail at [3]_ and in Raul's manuscript) can be defined only in the plane, with the effect of the fluid in third direction added in an implicit manner. Doing so means that the flow as seen in the plane appears to be compressible, resulting in the arising of an effective thermal drift term in the BDHI equation.
+
+.. math::
+
+     \frac{d\vec{\ppos}_i}{dt} = \oper{J}_{\vec{\ppos}_i}\left[\tens{G}_{\qtd}\left(\oper{S}\vec{F} + \vec{\partial}\oper{S}(\kT)\right) + \vec{w}(\vec{\fpos}, t)\right].
+
+The Quasi2D algorithm is based on the :ref:`FCM` and thus part of the computation is carried out in Fourier space. The key of the Quasi2D algorithm lies in the realization that in general the hydrodynamic kernel can be written in Fourier space as
+
+.. math::
+
+     \fou{\tens{G}}_{\qtd}(\vec{k}) =  \eta^{-1}\left(g_k(ka)\vec{k}_{\perp}\otimes\vec{k}_{\perp} + f_k(ka)\vec{k}\otimes\vec{k}\right).
+
+A Gaussian is used for spreading, which allows to compute the thermal drift term by spreading :math:`\kT` at the positions of the particles using the known derivative of the Gaussian.
+
+Finally, the fluctuations are cheaply computed by using
+
+.. math::
+   
+  \left\langle\fou{\vec{w}}\otimes \fou{\vec{w}}\right\rangle = 2\kT \fou{\tens{G}}_{\qtd}
+
+as
+
+.. math::
+   
+   \fou{\vec{w}}(\vec{k}, t) := \sqrt{\frac{2\kT}{\eta}}\left(\sqrt{f_k(ka)}\vec{k}_\perp\fou{\tens{Z}}^1_k + \sqrt{g_k(ka)}\vec{k}\fou{\tens{Z}}^2_k\right).
+
+By choosing the functions :math:`f_k` and :math:`g_k` different regimes can be modeled. For instance, when using a Gaussian for spreading a quasi2D regime corresponds to
+
+.. math::
+
+   g_{k}\left(K\right) & = \frac{1}{2K^3}\left[1-{\erf}\left(\frac{K}{\sqrt{\pi}}\right)\right]\exp\left(\frac{K^2}{\pi}\right)\\
+   f_{k}\left(K\right) & = \left(\frac{1}{2} - \frac{K^{2}}{\pi}\right)g_k(K) - \frac{1}{2\pi K^3},
+
+while a purely two dimensional fluid, denoted as true2D, in which both fluid and particles exist in a two dimensions, corresponds to
+
+.. math::
+
+   g_{k}\left(K\right) & = 0\\
+   f_{k}\left(K\right) & = \frac{a}{K^4}.
+
+The general framework to obtain these functions consists of preconvolving analytically the third direction in the three dimensional Greens function, by defining
+
+.. math::
+
+   \hat{\tens{G}}_{\qtd}(\vec{k} = (k_x, k_y)) = \frac{1}{2\pi}\int_{k_z=-\infty}^\infty\fou{\phi}(k_z)^2\fou{\tens{G}}_{\text{3D}}(\vec{k};k_z)dk_z,
+
+which requires knowing the analytic expression of the spreading kernel and is the reason why a Gaussian is used in the current implementation.
+
+UAMMD's implementation abstracts away the :math:`f_k` and :math:`g_k` functions, which can be provided as a template parameter via a functor of the following form:
+
+.. cpp:class:: Quasi2DHydrodynamicKernel
+
+   A class with arbitrary name that will be used the BDHI2D Integrator with the  :math:`f_k` and :math:`g_k` functions.
+
+   .. cpp:function:: bool hasThermalDrift();
+
+      Must return true if the thermal drift term should be included (it is zero in the true2D case, for instance).
+
+   .. cpp:function:: real getGaussianVariance(real hydrodynamicRadius);
+
+      Returns the relation between the hydrodynamicRadius and the width of the Gaussian kernel.
+
+   .. cpp:function:: __device__ real2 operator()(real k2, real hydrodynamicKernel);
+
+      Must return a :code:`real2` with the :math:`f_k` and :math:`g_k` as the first and second elements respectively for a given squared norm of a wave number and a hydrodynamicRadius.
+
+
+The name of this object must be provided as a template argument to the Quasi2D Integrator module, which is called :code:`BDHI::BDHI2D`.
+The first lines of the source file :code:`Integrator/Hydro/BDHI_quasi2D.cuh` contain the currently implemented ones, which to this day are:
+ * True2D: Available as an alias :code:`BDHI::True2D`
+ * Quasi2D: Available as an alias :code:`BDHI::Quasi2D`
+
 
 Usage
 ********
 
-.. todo:: fill
+Use as the rest of the :ref:`Integrator` modules.
+
+.. sidebar::
+
+   .. warning:: Note that the temperature is provided in units of energy.
+
+The following parameters are available:
+
+  * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
+  * :cpp:`real viscosity` Viscosity of the solvent.
+  * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles)
+  * :cpp:`real dt`  Time step
+  * :cpp:`real tolerance` Controls how fine the grid is and the support of the Gaussian spreading kernel.
+  * :cpp:`Box box` A :cpp:class:`Box` with the domain size information (third direction is ignored).
+  * :cpp:`shared_ptr<HydrodynamicKernel> hydroKernel` An instance of the hydrodynamic kernel can be passed. Allowing for it to hold a state (which can be modified between steps, for instance).
+    
+.. code:: c++
+
+   #include<uammd.cuh>
+   #include<Integrator/Hydro/BDHI_quasi2D.cuh>
+   using namespace uammd;
+   //A function that creates and returns a quasi 2D integrator
+   auto createIntegratorQ2D(UAMMD sim){
+     //Choose the hydrodynamic kernel
+     using Hydro2D = BDHI::Quasi2D;
+     //using Hydro2D = BDHI::True2D;
+     //using Hydro2D = BDHI::BDHI2D<YourOwnHydrodynamicKernel>;
+     Hydro2D::Parameters par;
+     par.temperature = sim.par.temperature;
+     par.viscosity = sim.par.viscosity;
+     par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
+     par.dt = sim.par.dt;
+     par.tolerance = sim.par.tolerance;
+     par.box = sim.par.box;
+     //par.hydroKernel = std::make_shared<YourOwnHydrodynamicKernel>(/*any parameters*/);
+     auto q2d = std::make_shared<Hydro2D>(sim.pd, par);
+     return q2d;
+  }
 
 
 .. _DPStokes:
