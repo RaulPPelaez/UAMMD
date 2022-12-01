@@ -6,6 +6,7 @@
 #include"System/System.h"
 #include"misc/allocator.h"
 #include<thrust/device_vector.h>
+#include<thrust/host_vector.h>
 namespace uammd{
   namespace detail{
     //This is a very barebones container. Its purpose is only to avoid the unnecessary unninitialized_fill kernel that thrust issues on device_vector creation. Thus it mascarades as a thrust::device_vector.
@@ -13,7 +14,6 @@ namespace uammd{
     class UninitializedCachedContainer{
       using Container = std::shared_ptr<T>;
       using Ptr = T*;
-      using iterator = typename thrust::device_vector<T>::iterator;
       Container m_data;
       size_t m_size, capacity;
 
@@ -33,6 +33,8 @@ namespace uammd{
       }
 
     public:
+      using iterator = typename thrust::device_vector<T>::iterator;
+
       UninitializedCachedContainer(size_t i_size = 0)
 	: m_size(0), capacity(0), m_data() {
 	this->resize(i_size);
@@ -40,7 +42,17 @@ namespace uammd{
 
       UninitializedCachedContainer(const std::vector<T> &other):
 	UninitializedCachedContainer(other.size()){
-	thrust::copy(other.begin(), other.end(), thrust::device_ptr<T>(begin()));
+	thrust::copy(other.begin(), other.end(), begin());
+      }
+
+      UninitializedCachedContainer(const thrust::host_vector<T> &other):
+	UninitializedCachedContainer(other.size()){
+	thrust::copy(other.begin(), other.end(), begin());
+      }
+
+      UninitializedCachedContainer(const UninitializedCachedContainer<T> &other):
+	UninitializedCachedContainer(other.size()){
+	thrust::copy(other.begin(), other.end(), begin());
       }
 
       iterator begin() const{ return iterator(data()); }
@@ -75,6 +87,21 @@ namespace uammd{
 	m_data = create(0);
 	capacity = 0;
       }
+
+      void swap(UninitializedCachedContainer<T> & another){
+        m_data.swap(another.m_data);
+      }
+
+      thrust::device_reference<T> operator[](uint i){
+	return thrust::device_reference<T>(data() + i);
+      }
+
+      operator thrust::host_vector<T>() const{
+	thrust::host_vector<T> hvec(size());
+	thrust::copy(begin(), end(), hvec.begin());
+	return hvec;
+      }
+
     };
   }
 

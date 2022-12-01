@@ -36,7 +36,7 @@ References:
 
  */
 #include"SPH.cuh"
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 
 #include"utils/GPUUtils.cuh"
 #include"SPH/Kernel.cuh"
@@ -182,7 +182,7 @@ namespace uammd{
     int numberParticles = pg->getNumberParticles();
     using Kernel = SPH_ns::Kernel::M4CubicSpline;
     if(!nl){
-      nl = std::make_shared<NeighbourList>(pd, pg, sys);
+      nl = std::make_shared<NeighbourList>(pg);
     }
     real rcut = Kernel::getCutOff(support);
     sys->log<System::DEBUG3>("[SPH] Using cutOff: %f", rcut);

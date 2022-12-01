@@ -18,50 +18,48 @@ namespace uammd{
   namespace DPPoissonSlab_ns{
 
     struct Gaussian{
-      int3 support;
+    int3 support;
       Gaussian(real tolerance, real width, real h, real H, real He, real nz, int supportxy):
-	nz(nz){
-	this-> prefactor = cbrt(pow(2*M_PI*width*width, -1.5));
-	this-> tau = -1.0/(2.0*width*width);	
-	rmax = supportxy*h*0.5;//5.0*h;//sqrt(log(tolerance/prefactor)/tau);
-	support.x = supportxy>0?(supportxy):std::max(3, int(2*rmax/h + 0.5)+1);
-	support.y = support.x;
-	this->Htot = H + 4*He;
-	int czmax = int((nz-1)*(acos(2.0*(0.5*H + He)/Htot)/real(M_PI)));
-	support.z = 2*czmax;
-	if(support.z%2==0){
-	  support.z--;
-	}
-      }
+      nz(nz){
+      this-> prefactor = 1.0/(width*sqrt(2*M_PI));
+      this-> tau = -1.0/(2.0*width*width);
+      this->rmax = supportxy*h*0.5;
+      support.x = supportxy;
+      support.y = support.x;
+      this->Htot = H +6*He;
+      int czmax = ceil((nz-1)*(acos((0.5*H+He)/(0.5*Htot))/real(M_PI)));
+      support.z = 2*czmax+1;
+    }
 
-      inline __host__  __device__ int3 getMaxSupport() const{
-	return make_int3(support.x, support.y, support.z);
-      }
-      
-      inline __host__  __device__ int3 getSupport(int3 cell) const{
-	real ch = real(0.5)*Htot*cospi((real(cell.z))/(nz-1));
-	int czt = int((nz)*(acos(real(2.0)*(ch+rmax)/Htot)/real(M_PI)));
-	int czb = int((nz)*(acos(real(2.0)*(ch-rmax)/Htot)/real(M_PI)));
-	int sz = 2*thrust::max(cell.z - czt, czb - cell.z)+1;
-	return make_int3(support.x, support.y, sz);
-      }
+    inline __host__  __device__ int3 getMaxSupport() const{
+      return make_int3(support.x, support.y, support.z);
+    }
 
-      inline __host__  __device__ real phi(real r) const{
-	return (abs(r)>=rmax)?0:(prefactor*exp(tau*r*r));
-      }
+    inline __host__  __device__ int3 getSupport(real3 pos, int3 cell) const{
+      real bound = Htot*real(0.5);
+      real ztop = thrust::min(pos.z+rmax, bound);
+      real zbot = thrust::max(pos.z-rmax, -bound);
+      int czb = int((nz-1)*(acos(ztop/bound)/real(M_PI)));
+      int czt = int((nz-1)*(acos(zbot/bound)/real(M_PI)));
+      int sz = 2*thrust::max(cell.z - czb, czt - cell.z)+1;
+      return make_int3(support.x, support.y, sz);
+    }
 
-      inline __host__  __device__ real delta(real3 rvec, real3 h) const{
-	const real r2 = dot(rvec, rvec);	
-	return (abs(rvec.z)>=rmax)?0:(prefactor*prefactor*prefactor*exp(tau*r2));
-      }
+    __host__  __device__ real phi(real r, real3 pos) const{
+      //This is to ensure that r==rmax is also included.
+      if(abs(r)>rmax*(1.000001)) return 0;
+      real val = 0;
+      val = prefactor*exp(tau*r*r);
+      return val;
+    }
 
-    private:
-      real prefactor;
-      real tau;
-      real rmax;
-      int nz;
-      real Htot;
-    };
+  private:
+    real prefactor;
+    real tau;
+    real rmax;
+    int nz;
+    real Htot;
+  };
 
     template<class PosIterator, class ChargeIterator>
     struct ChargeGroup{
@@ -98,7 +96,8 @@ namespace uammd{
       __device__ __host__ real operator()(int i){
 	real q = -charges[i];
 	real ep = permivityRatio;
-	return q*(ep-1)/(ep+1);
+	real epratio = isinf(ep)?real(1.0):(ep-1)/(ep+1);
+	return q*epratio;
       }
 
     };
@@ -201,9 +200,10 @@ namespace uammd{
       real4* force;
       real* energy;
       real* charge;
+      real4* field;
       int i;
 
-      FieldPotential2ForceEnergy(real4* f, real* e, real *q):force(f), energy(e), charge(q), i(-1){}
+      FieldPotential2ForceEnergy(real4* f, real* e, real *q, real4* field):force(f), energy(e), charge(q), field(field), i(-1){}
 
       __device__ FieldPotential2ForceEnergy operator()(int ai){
 	this->i = ai;
@@ -213,6 +213,7 @@ namespace uammd{
       __device__ void operator += (real4 fande) const{
 	force[i] += charge[i]*make_real4(fande.x, fande.y, fande.z, 0);
 	energy[i] += charge[i]*fande.w;
+	if(field) field[i] += make_real4(fande.x, fande.y, fande.z, 0);
       }
     };
 
@@ -272,7 +273,7 @@ namespace uammd{
       }
 
       template<class Real4Container>
-      void interpolateFieldsToParticles(Real4Container &gridFieldPotential, cudaStream_t st){
+      void interpolateFieldsToParticles(Real4Container &gridFieldPotential, cudaStream_t st, real4* fieldAtParticles){
 	sys->log<System::DEBUG2>("[DPPoissonSlab] Interpolating forces and energies");
 	int numberParticles = pd->getNumParticles();
 	auto pos = pd->getPos(access::location::gpu, access::mode::read);
@@ -280,11 +281,13 @@ namespace uammd{
 	auto forces = pd->getForce(access::location::gpu, access::mode::readwrite);
 	auto energies = pd->getEnergy(access::location::gpu, access::mode::readwrite);
 	real4* d_gridForcesEnergies = (real4*)thrust::raw_pointer_cast(gridFieldPotential.data());
-	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(), charge.begin());
+	auto Ep2fe = DPPoissonSlab_ns::FieldPotential2ForceEnergy(forces.begin(), energies.begin(),
+								  charge.begin(), fieldAtParticles);
 	auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), Ep2fe);
 	int3 n = grid.cellDim;
-	IBM<Kernel, Grid> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
-	ibm.gather(pos.begin(), f_tr, d_gridForcesEnergies, *qw, numberParticles, st);
+	IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM_ns::DefaultWeightCompute wc; //If non-default QuadratureWeights are used, a weight compute must also be passed.
+	ibm.gather(pos.begin(), f_tr, d_gridForcesEnergies, *qw, wc, numberParticles, st);
 	CudaCheckError();
       }
 
@@ -299,8 +302,9 @@ namespace uammd{
 	sys->log<System::MESSAGE>("[DPPoissonSlab] Maximum support allowed: %d", maximumSupport);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] Kernel width %g", gaussianWidth);
 	sys->log<System::MESSAGE>("[DPPoissonSlab] Grid XY spacing %g", h);
-	sys->log<System::MESSAGE>("[DPPoissonSlab] Spread weight at h: %g", kernel->delta(make_real3(0,0,h), make_real3(h)));
-	sys->log<System::MESSAGE>("[DPPoissonSlab] Spread at maximum distance (%g) : %g", h*(kernel->support.x/2), kernel->delta(make_real3(0,0, h*(kernel->support.x/2)-1e-5), make_real3(h)));
+	sys->log<System::MESSAGE>("[DPPoissonSlab] Spread weight at h: %g", kernel->phi(h, make_real3(h)));
+	sys->log<System::MESSAGE>("[DPPoissonSlab] Spread at maximum distance (%g) : %g", h*(kernel->support.x/2),
+				  kernel->phi(h*(kernel->support.x/2)-1e-5, make_real3(h)));
       }
 
       void initializeQuadratureWeights(){
@@ -350,7 +354,7 @@ namespace uammd{
 	sys->log<System::DEBUG>("Spreading %d particles", group.numberParticles);
 	auto minusChargeIterator = thrust::make_transform_iterator(group.charge, thrust::negate<real>());
 	int3 n = grid.cellDim;
-	IBM<Kernel, Grid> ibm(sys, kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
+	IBM<Kernel, Grid> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
 	ibm.spread(group.pos, minusChargeIterator, d_gridCharges, group.numberParticles, st);
 	CudaCheckError();
       }

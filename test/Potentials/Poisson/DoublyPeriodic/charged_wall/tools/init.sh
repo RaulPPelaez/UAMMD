@@ -8,13 +8,13 @@ seq $numberParticles |
     awk 'BEGIN{srand('$seed')}
         {acc=0;
 	 K='$K'/(H - 2.0);
-	 M=1/cos(K*0.5*H)**2;
+	 M=1/cos(K*0.5*H)^2;
          while(acc==0){
                 H='$H';
                 x=(rand()-0.5)*'$L';
                 y=(rand()-0.5)*'$L';
                 z=(rand()-0.5)*(H-2.0);
-                p=(1.0/(cos(K*z))**2)/M;
+                p=(1.0/(cos(K*z))^2)/M;
                 Z=rand();
                 if(Z<p){
                     acc=1;

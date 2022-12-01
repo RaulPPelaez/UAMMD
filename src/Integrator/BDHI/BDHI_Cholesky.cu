@@ -78,63 +78,48 @@ namespace uammd{
       }
     }
 
-    Cholesky::Cholesky(shared_ptr<ParticleData> pd,
-		       shared_ptr<ParticleGroup> pg,
-		       shared_ptr<System> sys,
-		       Parameters par):
-      pd(pd), pg(pg), sys(sys),
+    Cholesky::Cholesky(shared_ptr<ParticleGroup> pg, Parameters par):
+      pg(pg),
       par(par),
       rpy(par.viscosity){
-
-      sys->log<System::MESSAGE>("[BDHI::Cholesky] Initialized");
-
+      System::log<System::MESSAGE>("[BDHI::Cholesky] Initialized");
       int numberParticles = pg->getNumberParticles();
-
       force3.resize(numberParticles, real3());
       mobilityMatrix.resize(pow(3*numberParticles,2)+1, real());
-
-
-
-
+      auto pd = pg->getParticleData();
       if(par.hydrodynamicRadius>0)
-	sys->log<System::MESSAGE>("[BDHI::Cholesky] Self mobility: %g", rpy(0,par.hydrodynamicRadius, par.hydrodynamicRadius).x);
+	System::log<System::MESSAGE>("[BDHI::Cholesky] Self mobility: %g", rpy(0,par.hydrodynamicRadius, par.hydrodynamicRadius).x);
       else{
-	sys->log<System::MESSAGE>("[BDHI::Cholesky] Self mobility dependent on particle radius as 1/(6πηa)");
+	System::log<System::MESSAGE>("[BDHI::Cholesky] Self mobility dependent on particle radius as 1/(6πηa)");
       }
-
       if(par.hydrodynamicRadius<0 and ! pd->isRadiusAllocated())
-	sys->log<System::CRITICAL>("[BDHI::Cholesky] You need to provide Cholesky with either an hydrodynamic radius or via the individual particle radius.");
+	System::log<System::CRITICAL>("[BDHI::Cholesky] You need to provide Cholesky with either an hydrodynamic radius or via the individual particle radius.");
       if(par.hydrodynamicRadius>0 and pd->isRadiusAllocated())
-	sys->log<System::MESSAGE>("[BDHI::Cholesky] Taking particle radius from parameter's hydrodynamicRadius");
-
+	System::log<System::MESSAGE>("[BDHI::Cholesky] Taking particle radius from parameter's hydrodynamicRadius");
       /*Init cuSolver for BdW*/
       CusolverSafeCall(cusolverDnCreate(&solver_handle));
       h_work_size = 0;//work size of operation
-
       auto d_M = thrust::raw_pointer_cast(mobilityMatrix.data());
       CusolverSafeCall(cusolverDnpotrf_bufferSize(solver_handle,
-				 CUBLAS_FILL_MODE_UPPER,
-				 3*numberParticles,
-				 d_M, 3*numberParticles,
+						  CUBLAS_FILL_MODE_UPPER,
+						  3*numberParticles,
+						  d_M, 3*numberParticles,
 						  &h_work_size));
       CudaSafeCall(cudaMalloc(&d_work, h_work_size));
       CudaSafeCall(cudaMalloc(&d_info, sizeof(int)));
       /*Init cuBLAS for MF*/
       CublasSafeCall(cublasCreate(&handle));
-
       /*Create noise*/
       curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
-      curandSetPseudoRandomGeneratorSeed(curng, sys->rng().next());
+      curandSetPseudoRandomGeneratorSeed(curng, pd->getSystem()->rng().next());
       /*Create a temporal vector to warm up curand*/
       thrust::device_vector<real> noise(numberParticles+1);
       //Curand fill with gaussian numbers with mean 0 and var 1
       /*This shit is obscure, curand will only work with an even number of elements*/
       auto d_noise = thrust::raw_pointer_cast(noise.data());
       curandGenerateNormal(curng, d_noise, 3*numberParticles + ((3*numberParticles)%2), real(0.0), real(1.0));
-
       isMup2date = false;
     }
-
 
     Cholesky::~Cholesky(){
       cublasDestroy(handle);
@@ -143,25 +128,19 @@ namespace uammd{
       cudaFree(d_info);
     }
 
-
     void Cholesky::init(){}
 
     void Cholesky::setup_step(cudaStream_t st){
-
-      sys->log<System::DEBUG3>("[BDHI::Cholesky] Setup Step");
+      System::log<System::DEBUG3>("[BDHI::Cholesky] Setup Step");
       int numberParticles = pg->getNumberParticles();
-
+      auto pd = pg->getParticleData();
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto groupIter = pg->getIndexIterator(access::location::gpu);
-
       auto d_M = thrust::raw_pointer_cast(mobilityMatrix.data());
-
       int BLOCKSIZE = 128;
       int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
       auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
-
       /*Fill the upper part of symmetric mobility matrix*/
       Cholesky_ns::fillMobilityRPYD<<<Nblocks, Nthreads, 0 ,st>>>(d_M,
        								  pos.raw(),
@@ -189,13 +168,13 @@ namespace uammd{
     }
 
     void Cholesky::computeMF(real3* MF, cudaStream_t st){
-      sys->log<System::DEBUG3>("[BDHI::Cholesky] MF");
+      System::log<System::DEBUG3>("[BDHI::Cholesky] MF");
       /*computeMF should be called before computeBdW*/
       static bool warning_printed = false;
       if(!isMup2date){
 	setup_step(st);
 	if(!warning_printed){
-	  sys->log<System::WARNING>("[BDHI::Cholesky] You should call computeMF inmediatly after setup_step, otherwise M will be compute twice per step!");
+	  System::log<System::WARNING>("[BDHI::Cholesky] You should call computeMF inmediatly after setup_step, otherwise M will be compute twice per step!");
 	  warning_printed = true;
 	}
       }
@@ -203,76 +182,55 @@ namespace uammd{
       int numberParticles = pg->getNumberParticles();
       /*Morphs a real4 vector into a real3 one, needed by cublas*/
       CublasSafeCall(cublasSetStream(handle, st));
-
+      auto pd = pg->getParticleData();
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       auto indexIter = pg->getIndexIterator(access::location::gpu);
-
-
       int BLOCKSIZE = 128;
       int Nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
-
       Cholesky_ns::real4ToReal3<<<Nblocks, Nthreads, 0 , st>>>(indexIter,
 							       force.raw(),
 							       force3.begin(),
 							       numberParticles);
-
       real alpha = 1.0;
       real beta = 0;
       /*Compute M·F*/
       real * d_M = thrust::raw_pointer_cast(mobilityMatrix.data());
       real * d_force3 = (real*)thrust::raw_pointer_cast(force3.data());
-
       CublasSafeCall(cublassymv(handle, CUBLAS_FILL_MODE_UPPER,
-		 3*numberParticles,
-		 &alpha,
-		 d_M, 3*numberParticles,
-		 d_force3, 1,
-		 &beta,
+				3*numberParticles,
+				&alpha,
+				d_M, 3*numberParticles,
+				d_force3, 1,
+				&beta,
 				(real *)MF, 1));
     }
 
 
     void Cholesky::computeBdW(real3 *BdW, cudaStream_t st){
-      sys->log<System::DEBUG3>("[BDHI::Cholesky] BdW");
+      System::log<System::DEBUG3>("[BDHI::Cholesky] BdW");
       if(!isMup2date) setup_step();
       /*computeBdw messes up M, fills it with B*/
       isMup2date = false;
-
       int numberParticles = pg->getNumberParticles();
-
-
       CusolverSafeCall(cusolverDnSetStream(solver_handle, st));
-
       real * d_M = thrust::raw_pointer_cast(mobilityMatrix.data());
       /*Perform cholesky factorization, store B on LOWER part of M matrix*/
-
       CusolverSafeCall(cusolverDnpotrf(solver_handle, CUBLAS_FILL_MODE_UPPER,
 				       3*numberParticles, d_M, 3*numberParticles, d_work, h_work_size, d_info));
-
-      // int h_info = 0;
-      // cudaMemcpy(&h_info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
-      // if(h_info)
-      // 	sys->log<System::ERROR>("[BDHI::Cholesky] Error at Cholesky factorization with code: %d", h_info);
-
       curandSetStream(curng, st);
-
       /*Gen new noise in BdW*/
       curandGenerateNormal(curng,
 			   (real*) BdW,
 			   3*numberParticles + ((3*numberParticles)%2),
 			   real(0.0), real(1.0));
-
       CublasSafeCall(cublasSetStream(handle, st));
-
       /*Compute B·dW -> y = M·y*/
       CublasSafeCall(cublastrmv(handle, //B is an upper triangular matrix (with non unit diagonal)
-		 CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_T, CUBLAS_DIAG_NON_UNIT,
-		 3*numberParticles,
-		 d_M, 3*numberParticles,
-				  (real*)BdW, 1));
-
-
+				CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_T, CUBLAS_DIAG_NON_UNIT,
+				3*numberParticles,
+				d_M, 3*numberParticles,
+				(real*)BdW, 1));
     }
 
 

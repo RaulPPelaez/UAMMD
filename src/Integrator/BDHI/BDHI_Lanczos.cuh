@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017. BDHI Lanczos submodule. Intended to be used with BDHI::EulerMaruyama
+/*Raul P. Pelaez 2017-2022. BDHI Lanczos submodule. Intended to be used with BDHI::EulerMaruyama
 
   Computes the mobility matrix on the fly when needed, so it is a mtrix free method.
 
@@ -15,6 +15,7 @@ References:
 #ifndef BDHI_LANCZOS_CUH
 #define BDHI_LANCZOS_CUH
 
+#include"uammd.cuh"
 #include "BDHI.cuh"
 #include "misc/LanczosAlgorithm.cuh"
 namespace uammd{
@@ -22,11 +23,13 @@ namespace uammd{
     class Lanczos{
     public:
       using Parameters = BDHI::Parameters;
-      Lanczos(shared_ptr<ParticleData> pd,
-	      shared_ptr<ParticleGroup> pg,
-	      shared_ptr<System> sys,
-	      Parameters par);
-      ~Lanczos();
+      Lanczos(shared_ptr<ParticleData> pd, Parameters par):
+	Lanczos(std::make_shared<ParticleGroup>(pd, "All"), par){}
+
+      Lanczos(shared_ptr<ParticleGroup> pg, Parameters par);
+
+      ~Lanczos(){}
+
       void setup_step(              cudaStream_t st = 0){};
       void computeMF(real3* MF,     cudaStream_t st = 0);
       void computeBdW(real3* BdW,   cudaStream_t st = 0);
@@ -44,14 +47,12 @@ namespace uammd{
 
 
     private:
-      shared_ptr<ParticleData> pd;
       shared_ptr<ParticleGroup> pg;
-      shared_ptr<System> sys;
 
       /*Rodne Prager Yamakawa device functions and parameters*/
       BDHI::RotnePragerYamakawa rpy;
 
-      shared_ptr<LanczosAlgorithm> lanczosAlgorithm;
+      std::shared_ptr<lanczos::Solver> lanczosAlgorithm;
 
       curandGenerator_t curng;
       real hydrodynamicRadius;

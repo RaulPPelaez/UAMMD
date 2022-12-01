@@ -8,7 +8,7 @@ Hhalf=$(grep -Eo '^H[[:space:]].*' $datamain | awk '{print $2*0.5}')
 N=$(grep -Eo '^numberParticles[[:space:]].*' $datamain | awk '{print $2}')
 ep=$(grep -Eo '^permitivity[[:space:]].*' $datamain | awk '{print $2}')
 
-nm=$(echo 1 | awk '{printf "%.14g\n", 2*'$K'**2*'$ep'/(1.0-1.0/'$Hhalf')**2;}') 
+nm=$(echo 1 | awk '{printf "%.14g\n", 2*'$K'^2*'$ep'/(1.0-1.0/'$Hhalf')^2;}') 
 
 function histogram {
 nbins=$1

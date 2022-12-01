@@ -17,9 +17,9 @@ HarmonicWall(real k, real zwall):k(k), zwall(zwall){}
     real virial = comp.virial?dot(f,make_real3(pos)):0;
     return {force,energy, virial};
   }
-    
+
   auto getArrays(ParticleData* pd){
-    auto pos = pd->getPos(access::gpu, access::read);    
+    auto pos = pd->getPos(access::gpu, access::read);
     return pos.begin();
     //If more than one property is needed this would be the way to do it:
     //auto mass = pd->getMass(access::gpu, access::read);
@@ -141,14 +141,15 @@ namespace uammd{
       if(comp.force)  force [myParticleIndex] += make_real4(res.force);
       if(comp.energy) energy[myParticleIndex] += res.energy;
       if(comp.virial) virial[myParticleIndex] += res.virial;
-      
+
     }
   }
-  
+
   template<class Functor>
   void ExternalForces<Functor>::sum(Computables comp, cudaStream_t st){
     sys->log<System::DEBUG1>("[ExternalForces] Computing...");
     int numberParticles = pg->getNumberParticles();
+    if(numberParticles <= 0) return;
     int blocksize = 128;
     int Nthreads = blocksize<numberParticles?blocksize:numberParticles;
     int Nblocks = numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);

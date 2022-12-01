@@ -19,7 +19,7 @@ awk '{min='$lower'; max='$upper'; nbins='$nbins';b=int(($1-min)/(max-min)*nbins)
 seq $N | awk '{H='$H';
 	        z=(rand())*(H*0.5);
 		Kd='$K'/(H-2.0);
-		theo=(z<(H*0.5-1)&&z>-(H*0.5-1))/cos(Kd*z)**2;
+		theo=(z<(H*0.5-1)&&z>-(H*0.5-1))/cos(Kd*z)^2;
 		print z, theo*('$nbins'/'$N');
 	       }' | histogram $nbins $(echo $H | awk '{print $1*0.5;}') 0
 

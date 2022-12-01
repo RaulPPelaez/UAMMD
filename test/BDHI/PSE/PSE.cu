@@ -22,13 +22,12 @@ class miniInteractor: public Interactor{
 public:
   using Interactor::Interactor;
   real F= 0;
-  void sumForce(cudaStream_t st) override{
+  void sum(Computables comp, cudaStream_t st) override{
     auto force = pd->getForce(access::location::cpu, access::mode::write);
     force.raw()[0] = make_real4(F,0,0,0);
     if(pg->getNumberParticles()>1)
       force.raw()[1] = make_real4(-F,0,0,0);
   }
-  real sumEnergy() override{return 0;}
 };
 
 
@@ -40,7 +39,7 @@ long double pullForce_measureMobility(real L, real psi){
   real F = 1.0;
   auto sys = make_shared<System>();
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
   Box box(L);
   BDHI::PSE::Parameters par;
   par.temperature = 0.0;
@@ -50,10 +49,10 @@ long double pullForce_measureMobility(real L, real psi){
   par.box = box;
   par.tolerance = tolerance;
   par.psi = psi;
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, par);
   auto M0 = bdhi->getSelfMobility();
   {
-    auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+    auto inter= make_shared<miniInteractor>(pd, "puller");
     inter->F = F;
     bdhi->addInteractor(inter);
   }
@@ -110,7 +109,7 @@ double pullForce_pairMobility_measureMobility(real L, real psi, real F){
   int N = 2;
   auto sys = make_shared<System>();
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
   Box box(L);
   BDHI::PSE::Parameters par;
   par.temperature = 0.0;
@@ -120,9 +119,9 @@ double pullForce_pairMobility_measureMobility(real L, real psi, real F){
   par.box = box;
   par.tolerance = tolerance;
   par.psi = psi;
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, par);
   {
-    auto inter= make_shared<miniInteractor>(pd, pg, sys, "puller");
+    auto inter= make_shared<miniInteractor>(pd, "puller");
     inter->F = F;
     bdhi->addInteractor(inter);
   }
@@ -187,7 +186,7 @@ bool idealParticlesDiffusion(int N, real L, real psi){
   auto sys = make_shared<System>();
   sys->rng().setSeed(0x33dbff9^time(NULL));
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
   Box box(L);
   BDHI::PSE::Parameters par;
   par.temperature = temperature;
@@ -197,7 +196,7 @@ bool idealParticlesDiffusion(int N, real L, real psi){
   par.box = box;
   par.tolerance = tolerance;
   par.psi = psi;
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, par);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     fori(0, pd->getNumParticles()){
@@ -244,7 +243,7 @@ double3 singleParticleNoise(real T, real L, real psi){
   auto sys = make_shared<System>();
   sys->rng().setSeed(1234791);
   auto pd = make_shared<ParticleData>(N, sys);
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
+
   Box box(L);
   BDHI::PSE::Parameters par;
   par.temperature = T;
@@ -254,7 +253,7 @@ double3 singleParticleNoise(real T, real L, real psi){
   par.box = box;
   par.tolerance = tolerance;
   par.psi = psi;
-  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, pg, sys, par);
+  auto bdhi = make_shared<BDHI::EulerMaruyama<BDHI::PSE>>(pd, par);
   double3 prevp;
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);

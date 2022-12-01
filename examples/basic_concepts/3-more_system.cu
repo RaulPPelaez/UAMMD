@@ -25,14 +25,14 @@ int main(int argc, char* argv[]){
   //std::random_device rd;
   //auto seed = rd();
   sys->rng().setSeed(seed);
-  //This rng can generate numbers in several ways, lets see a few:  
+  //This rng can generate numbers in several ways, lets see a few:
   //A number chosen among all the representable by uint (0 and 2^32-1)
   uint integer = sys->rng().next32();
   sys->log<System::MESSAGE>("An integer number between 0 and 2^32-1: %u", integer);
-  //A number chosen among all the representable by uint64_t  (0 and 2^64-1)  
+  //A number chosen among all the representable by uint64_t  (0 and 2^64-1)
   uint64_t long_integer  = sys->rng().next();
   sys->log<System::MESSAGE>("An integer number between 0 and 2^64-1: %lu", long_integer);
-  //An uniform random number between 0 and1 
+  //An uniform random number between 0 and1
   double uniform = sys->rng().uniform(0, 1);
   sys->log<System::MESSAGE>("An uniformly distributed number between 0 and 1: %.13g", uniform);
   //A normally distributed number with 0 mean and standard deviation 1
@@ -45,13 +45,13 @@ int main(int argc, char* argv[]){
     auto argv = sys->getargv();
     sys->log<System::MESSAGE>("The name of this executable is %s, %d arguments were passed to it.", argv[0], argc-1);
   }
-  
+
   //GPU memory allocation is really slow, for that matter System provides a C++ compatible GPU memory pool allocator.
   // This allocator caches queries to it, so multiple allocations/deallocations of similar sizes will be almost instantaneous
   // We will just mention it exists or now, though, and leave it to the advanced examples.
   // auto alloc =  sys->getTemporaryDeviceAllocator<double>();
   // thrust::device_vector<double, System::allocator_thrust<double>> vec(10000, alloc);
-  
+
   //Destroy the UAMMD environment and exit
   sys->finish();
   return 0;

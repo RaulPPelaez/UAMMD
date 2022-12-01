@@ -1,3 +1,6 @@
+/*Raul P. Pelaez 2019-2021. Some utilities for working with Chebyshev grids.
+
+ */
 #ifndef CHEVYSHEVUTILS_CUH
 #define CHEVYSHEVUTILS_CUH
 #include"global/defines.h"
@@ -34,7 +37,7 @@ namespace uammd{
 	  this->hxhy = cellSizex*cellSizey;
 	  std::vector<real> weights(nz+1, 0);
 	  for(int i = 0; i<nz; i++){
-	    weights[i] = -0.5*H*clencurt(i, nz-1);
+	    weights[i] = 0.5*H*clencurt(i, nz-1);
 	  }
 	  CudaSafeCall(cudaMemcpy(clencurtWeights, weights.data(), (nz+1)*sizeof(real), cudaMemcpyHostToDevice));
 	}
@@ -88,7 +91,7 @@ namespace uammd{
 	template<class VecType>
 	inline __host__ __device__ int3 getCell(const VecType &r) const{
 	  real3 pos_inBox = box.apply_pbc(make_real3(r));
-	  int cz = int((cellDim.z)*(acos(real(2.0)*pos_inBox.z/box.boxSize.z)/real(M_PI)));
+	  int cz = int((cellDim.z-1)*(acos(real(2.0)*pos_inBox.z/box.boxSize.z)/real(M_PI)));
 	  int3 cell = make_int3((pos_inBox.x+real(0.5)*box.boxSize.x)*invCellSize.x,
 				(pos_inBox.y+real(0.5)*box.boxSize.y)*invCellSize.y,
 				cz);
@@ -105,7 +108,7 @@ namespace uammd{
 	  int3 cellPBC;
 	  cellPBC.x = pbc_cell_coord<0>(cell.x);
 	  cellPBC.y = pbc_cell_coord<1>(cell.y);
-	  cellPBC.z = cell.z;
+	  cellPBC.z = pbc_cell_coord<2>(cell.z);
 	  return cellPBC;
 	}
 
@@ -119,7 +122,7 @@ namespace uammd{
 	    ncells = cellDim.y;
 	  }
 	  if(coordinate == 2){
-	    return cell;
+	    return (cell<0 or cell>=cellDim.z)?-1:cell;
 	  }
 	  if(cell <= -1) cell += ncells;
 	  else if(cell >= ncells) cell -= ncells;
@@ -141,16 +144,20 @@ namespace uammd{
 	  return {cellSize.x, cellSize.y, csz};
 	}
 
-	inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell){
+	inline __host__ __device__ real3 distanceToCellCenter(real3 pos, int3 cell) const{
+	  const auto cellCenterPos = getCellCenter(cell);
+	  const auto dist = box.apply_pbc(pos - cellCenterPos);
+	  return dist;
+	}
+	inline __host__ __device__ real3 getCellCenter(int3 cell) const{
 	  const real centerZ = cellHeight(cell.z);
 	  const real3 cellCenterPos = make_real3(real(-0.5)*box.boxSize.x + cellSize.x*(cell.x),
 						 real(-0.5)*box.boxSize.y + cellSize.y*(cell.y),
 						 centerZ);
-	  const auto dist = box.apply_pbc(pos - cellCenterPos);
-	  return dist;
+	  return cellCenterPos;
 	}
 
-	inline __host__ __device__ real cellHeight(int cellz){
+	inline __host__ __device__ real cellHeight(int cellz) const{
 	  return real(0.5)*box.boxSize.z*cospi((real(cellz))/(cellDim.z-1));
 	}
 

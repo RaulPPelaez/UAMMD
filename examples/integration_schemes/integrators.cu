@@ -129,8 +129,8 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
 }
 
 #include "Integrator/Hydro/ICM.cuh"
-//Inertial Coupling Method
-std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
+//Incompressible Inertial Coupling Method
+auto createIntegratorICM(UAMMD sim){
   using ICM = Hydro::ICM;
   ICM::Parameters par;
   par.dt = 0.1;
@@ -153,6 +153,29 @@ std::shared_ptr<Integrator> createIntegratorICM(UAMMD sim){
   //The velocity of cell i,j,k is located at ptr[i+(j+k*n.y)*n.x]
   //Note that the velocities are defined in a staggered grid, corresponding to cell face centers.
   return icm;
+}
+
+#include "Integrator/Hydro/ICM_Compressible.cuh"
+auto createIntegratorICM_Compressible(UAMMD sim){
+  using ICM = Hydro::ICM_Compressible;
+  ICM::Parameters par;
+  par.shearViscosity = 1.0;
+  par.bulkViscosity = 1.0;
+  par.speedOfSound = 16; //For the equation of state
+  par.temperature = 0;
+  //par.hydrodynamicRadius = 1.0; //Particle hydrodynamic radius (used to determine the number of fluid cells)
+  par.cellDim = {32,32,32}; //Number of fluid cells, if set the hydrodynamicRadius is ignored
+  par.dt = 0.1;
+  par.boxSize = {32,32,32}; //Simulation domain
+  par.seed = 1234; //0 will take a value from the UAMMD generator
+  //The initial fluid density and velocity can be customized:
+  par.initialDensity = [](real3 position){return 1.0;};
+  par.initialVelocityX = [](real3 position){return sin(2*M_PI*position.y);};
+  par.initialVelocityY = [](real3 position){return 1.0;};
+  par.initialVelocityZ = [](real3 position){return 1.0;};
+
+  auto compressible = std::make_shared<ICM>(sim.pd, par);
+  return compressible;
 }
 
 #include"Integrator/BDHI/BDHI_EulerMaruyama.cuh"

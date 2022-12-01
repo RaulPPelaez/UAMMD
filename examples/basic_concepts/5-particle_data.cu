@@ -1,7 +1,7 @@
 /* Raul P. Pelaez 2021
    Lets jump to the next basic UAMMD component: ParticleData
-   UAMMD uses this class to handle particle information, such as positions, forces, charges,... 
-   Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from 
+   UAMMD uses this class to handle particle information, such as positions, forces, charges,...
+   Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from
    CPU or GPU transparently.
 
    In this tutorial we will see hoy to create a set of particles and modify them.
@@ -82,14 +82,14 @@ int main(int argc, char* argv[]){
   //An error will arise if you try to run it because the second request is illegal (given that another handle has ownershp at the time).
   //There is an exception to this rule: As many handles as needed can be used at the same time if the intention is access::mode::read.
   //This is why it is important to call pd->get* with the right access flags.
-  //ParticleData maitains CPU and GPU copies of the properties and uses the access mode to detect if one has to be updated (requiring a CPU-GPU memory copy), so do not lie to ParticleData or expect undefined behavior.  
-  
+  //ParticleData maitains CPU and GPU copies of the properties and uses the access mode to detect if one has to be updated (requiring a CPU-GPU memory copy), so do not lie to ParticleData or expect undefined behavior.
+
   //Similar to how we got a handle to the positions, there are several other properties in ParticleData:
   //Get particle velocities to read them from the cpu:
   auto velocities = pd->getVel(access::cpu, access::read);
   //You will notice the above call issues a warning log event if you execute it.
   //Requesting a property for the first time with the intention of reading makes little sense, since it will be filled with garbage.
-  //Since we have not created any kind of UAMMD module that sets the v5elocities the above call is the first.
+  //Since we have not created any kind of UAMMD module that sets the velocities the above call is the first.
 
   //Another example: get the particle masses with the intention of writing to them from the gpu:
   auto mass = pd->getMass(access::gpu, access::write);

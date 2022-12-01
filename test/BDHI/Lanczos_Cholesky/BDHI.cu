@@ -34,24 +34,20 @@ class miniInteractor: public Interactor{
 public:
   using Interactor::Interactor;
   real3 F = make_real3(0);
-  void sumForce(cudaStream_t st) override{
+  void sum(Computables comp, cudaStream_t st) override{
     auto force = pd->getForce(access::location::cpu, access::mode::write);
     const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
     force.raw()[sortedIndex[0]] = make_real4(F,0);
   }
-  real sumEnergy() override{return 0;}
 };
 
 
 void readParameters(shared_ptr<System> sys);
 int main(int argc, char *argv[]){
   auto sys = make_shared<System>(argc, argv);
-
   readParameters(sys);
   sys->rng().setSeed(seed);
-
   auto pd = make_shared<ParticleData>(N, sys);
-
   Box box(boxSize);
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
@@ -70,17 +66,16 @@ int main(int argc, char *argv[]){
   par.viscosity = viscosity;
   par.dt = dt;
   par.tolerance = tolerance;
-
-  auto pg = make_shared<ParticleGroup>(pd, sys, "all");
+ 
   shared_ptr<Integrator> bdhi;
   if(mode == "Lanczos")
-    bdhi = make_shared<BDHI::EulerMaruyama<BDHI::Lanczos>>(pd, pg, sys, par);
+    bdhi = make_shared<BDHI::EulerMaruyama<BDHI::Lanczos>>(pd, par);
   else if(mode =="Cholesky")
-    bdhi = make_shared<BDHI::EulerMaruyama<BDHI::Cholesky>>(pd, pg, sys, par);
+    bdhi = make_shared<BDHI::EulerMaruyama<BDHI::Cholesky>>(pd, par);
   else
     sys->log<System::CRITICAL>("[System] Unrecognized mode! choose Lanczos or Cholesky");
 
-  auto inter = make_shared<miniInteractor>(pd, sys, "puller");
+  auto inter = make_shared<miniInteractor>(pd, "puller");
   inter->F.x = 1;
   bdhi->addInteractor(inter);
 

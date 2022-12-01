@@ -1,0 +1,16 @@
+#Parameters from Figure 2.8 in Florencio Balboa's Ph.D. manuscript.
+scheme icm_compressible
+dt  1
+boxSize  3000 3000 3000
+cellDim  30 30 30
+bulkViscosity 127.05
+speedOfSound  14.67
+shearViscosity 53.71
+temperature 294.4
+initialDensity 0.632
+
+relaxTime 100
+simulationTime 100000
+printTime      100
+
+numberParticles 16384

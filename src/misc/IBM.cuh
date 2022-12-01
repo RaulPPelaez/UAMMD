@@ -51,7 +51,8 @@ REFERENCES:
 #include"global/defines.h"
 #include"utils/utils.h"
 #include"System/System.h"
-#include"IBM.cu"
+#include "IBM.cu"
+#include "IBM_utils.cuh"
 #include "utils/Grid.cuh"
 
 namespace uammd{
@@ -72,91 +73,120 @@ namespace uammd{
     };
 
     struct DefaultQuadratureWeights{
+      template<class Grid>
       inline __host__ __device__ real operator()(int3 cellj, const Grid &grid) const{
 	return grid.getCellVolume(cellj);
       }
     };
-  }  
 
+    struct DefaultWeightCompute{
+      template<class T1, class T2>
+      inline __device__ auto operator()(T1 value, thrust::tuple<T2,T2,T2> kernel) const{
+	auto phiX = thrust::get<0>(kernel);
+	auto phiY = thrust::get<1>(kernel);
+	auto phiZ = thrust::get<2>(kernel);
+	return value*phiX*phiY*phiZ;
+      }
+    };
+  }
   template<class Kernel, class Grid = uammd::Grid, class Index3D = IBM_ns::LinearIndex3D>
   class IBM{
     shared_ptr<Kernel> kernel;
     Grid grid;
     Index3D cell2index;
   public:
-    IBM(shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index): IBM(nullptr, kern, a_grid, cell2index){}
 
-    IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index):
+    IBM(shared_ptr<Kernel> kern, Grid a_grid, Index3D cell2index):
       kernel(kern), grid(a_grid), cell2index(cell2index){
       System::log<System::DEBUG2>("[IBM] Initialized with kernel: %s", type_name<Kernel>().c_str());
     }
 
-    IBM(shared_ptr<Kernel> kern, Grid a_grid): IBM(nullptr, kern, a_grid){}
+    IBM(shared_ptr<Kernel> kern, Grid a_grid):
+      IBM(kern, a_grid, Index3D(a_grid.cellDim.x, a_grid.cellDim.y,a_grid.cellDim.z )){}
 
-    IBM(shared_ptr<System> sys, shared_ptr<Kernel> kern, Grid a_grid):
-      IBM(sys, kern, a_grid, Index3D(a_grid.cellDim.x, a_grid.cellDim.y,a_grid.cellDim.z )){}
-
-    template<class PosIterator, class QuantityIterator, class GridDataIterator>
+    template<bool is2D, class PosIterator, class QuantityIterator,
+	     class GridDataIterator, class WeightCompute = IBM_ns::DefaultWeightCompute>
     void spread(const PosIterator &pos, const QuantityIterator &v,
 		GridDataIterator &gridData,
-		int numberParticles, cudaStream_t st = 0){
+		WeightCompute &weightCompute,
+		int numberParticles, cudaStream_t st = 0) const{
       System::log<System::DEBUG2>("[IBM] Spreading");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
-      const bool is2D = grid.cellDim.z == 1;
       int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
       int threadsPerParticle = std::min(32*(numberNeighbourCells/32), 128);
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }
-      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(real);
-      if(is2D){
-	IBM_ns::particles2GridD<true><<<numberParticles, threadsPerParticle, shMemory, st>>>
-	  (pos, v, gridData, numberParticles, grid, cell2index, *kernel);
-      }
-      else{
-	IBM_ns::particles2GridD<false><<<numberParticles, threadsPerParticle, shMemory, st>>>
-	  (pos, v, gridData, numberParticles, grid, cell2index, *kernel);
-      }
-    }
-
-    template<class PosIterator, class ResultIterator, class GridQuantityIterator>
-    void gather(const PosIterator &pos, const ResultIterator &Jq,
-		const GridQuantityIterator &gridData,
-		int numberParticles, cudaStream_t st = 0){
-      IBM_ns::DefaultQuadratureWeights qw;
-      this->gather(pos, Jq, gridData, qw, numberParticles, st);
-    }
-
-    template<class PosIterator, class ResultIterator, class GridQuantityIterator,
-      class QuadratureWeights>
-    void gather(const PosIterator &pos, const ResultIterator &Jq,
-		const GridQuantityIterator &gridData,
-		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
-      if(grid.cellDim.z == 1)
-	gather<true>(pos, Jq, gridData, qw, numberParticles, st);
-      else
-	gather<false>(pos, Jq, gridData, qw, numberParticles, st);
+      using KernelValueType = decltype(IBM_ns::detail::phiX(*kernel,real(), real3()));
+      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(KernelValueType);
+      IBM_ns::particles2GridD<is2D><<<numberParticles, threadsPerParticle, shMemory, st>>>
+	(pos, v, gridData, numberParticles, grid, cell2index, *kernel, weightCompute);
     }
 
     template<bool is2D,
       class PosIterator, class ResultIterator, class GridQuantityIterator,
-      class QuadratureWeights>
-    void gather(const PosIterator &pos, const ResultIterator &Jq,
+	     class QuadratureWeights, class WeightCompute>
+    void gather(const PosIterator &pos, ResultIterator &Jq,
 		const GridQuantityIterator &gridData,
-		const QuadratureWeights &qw, int numberParticles, cudaStream_t st = 0){
+		const QuadratureWeights &qw,
+		const WeightCompute &wc,
+		int numberParticles, cudaStream_t st = 0) const{
       System::log<System::DEBUG2>("[IBM] Gathering");
       int3 support = IBM_ns::detail::GetMaxSupport<Kernel>::get(*kernel);
       int numberNeighbourCells = support.x*support.y*((is2D?1:support.z));
       int threadsPerParticle = std::min(int(pow(2,int(std::log2(numberNeighbourCells)+0.5))), 64);
-      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(real);
+      using KernelValueType = decltype(IBM_ns::detail::phiX(*kernel,real(), real3()));
+      size_t shMemory = (support.x+support.y+(!is2D)*support.z)*sizeof(KernelValueType);
       if(numberNeighbourCells < 64){
 	threadsPerParticle = 32;
       }
-#define KERNEL(x) if(threadsPerParticle<=x){ IBM_ns::callGather<x, is2D>(numberParticles, shMemory, st, pos, Jq, gridData, numberParticles, grid, cell2index, *kernel, qw); return;}
+#define KERNEL(x) if(threadsPerParticle<=x){ \
+	              IBM_ns::callGather<x, is2D>(numberParticles,      \
+						  shMemory, st,		\
+						  pos, Jq, gridData,	\
+						  numberParticles,	\
+						  grid, cell2index,	\
+						  *kernel, wc, qw);	\
+		      return;						\
+                  }
       KERNEL(32)
 	KERNEL(64)
 #undef KERNEL
 
+    }
+
+    template<class ...T>
+    void gather(T... args) const{
+      if(grid.cellDim.z == 1)
+	gather<true>(args...);
+      else
+	gather<false>(args...);
+    }
+
+    template<class PosIterator, class ResultIterator, class GridQuantityIterator>
+    void gather(PosIterator pos, ResultIterator Jq,
+	        GridQuantityIterator gridData,
+		int numberParticles, cudaStream_t st = 0) const{
+      IBM_ns::DefaultQuadratureWeights qw;
+      IBM_ns::DefaultWeightCompute wc;
+      this->gather(pos, Jq, gridData, qw, wc, numberParticles, st);
+    }
+
+    template<class ...T>
+    void spread(T... args) const{
+      if(grid.cellDim.z == 1)
+	spread<true>(args...);
+      else
+	spread<false>(args...);
+    }
+
+    template<bool is2D, class PosIterator, class QuantityIterator,
+	     class GridDataIterator>
+    void spread(const PosIterator &pos, const QuantityIterator &v,
+		GridDataIterator &gridData,
+		int numberParticles, cudaStream_t st = 0) const{
+      IBM_ns::DefaultWeightCompute wc;
+      spread(pos, v, gridData, wc, numberParticles, st);
     }
 
     shared_ptr<Kernel> getKernel(){ return this->kernel;}

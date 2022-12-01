@@ -37,18 +37,14 @@ namespace uammd{
       
     }
   
-    PSE::PSE(shared_ptr<ParticleData> pd,
-	     shared_ptr<ParticleGroup> pg,
-	     shared_ptr<System> sys,
-	     Parameters par):
-      pd(pd), pg(pg), sys(sys),
-      hydrodynamicRadius(par.hydrodynamicRadius){
-      sys->log<System::MESSAGE>("[BDHI::PSE] Initialized");
+    PSE::PSE(shared_ptr<ParticleGroup> pg, Parameters par):
+      pg(pg), hydrodynamicRadius(par.hydrodynamicRadius){
+      System::log<System::MESSAGE>("[BDHI::PSE] Initialized");
       this->M0 = pse_ns::computeSelfMobility(par);
-      sys->log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", M0);
+      System::log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", M0);
       pse_ns::checkInputValidity(par);
-      nearField = std::make_shared<pse_ns::NearField>(par, sys, pd, pg);
-      farField = std::make_shared<pse_ns::FarField>(par, sys);
+      nearField = std::make_shared<pse_ns::NearField>(par, pg);
+      farField = std::make_shared<pse_ns::FarField>(pg->getParticleData()->getSystem(), par);
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
     }

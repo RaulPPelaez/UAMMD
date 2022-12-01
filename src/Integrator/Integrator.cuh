@@ -4,7 +4,7 @@
    An Integrator has the ability to move the simulation one step forward in time.
 
    For that, it can use any number of Interactors.
-   
+
    Integrator can also hold a list of references to ParameterUpdatable derived objects.
    Adding an Interactor via addInteractor() will also add it as a ParameterUpdatable.
 
@@ -12,15 +12,15 @@
 
    USAGE:
    //Say "integrator" is an instance of an Integrator derived class (such as BD::EulerMaruyama or VerletNVE).
-   
+
    //Forward the simulation to the next time step:
    integrator.forwardTime();
-   
+
    //Add an Interactor derived object (as a shared_ptr) to the integrator:
    integrator.addInteractor(an_interactor);
    //Add a ParameterUpdatable derived object (asa shared_ptr) to the integrator:
    //Note that interactors are automatically added as updatables as well, so there is no need to manually add them as updatables.
-   integrator.addUpdatable(an_updatable);   
+   integrator.addUpdatable(an_updatable);
 
    //Get a list of Interactors that have been added to the Integrator:
    auto interactors = integrator.getInteractors();
@@ -41,6 +41,7 @@
 #include"Interactor/Interactor.cuh"
 #include<memory>
 #include<vector>
+#include<set>
 
 namespace uammd{
   class Integrator{
@@ -84,7 +85,7 @@ namespace uammd{
       return interactors;
     }
 
-    //Adds a ParameterUpdatable to the Integrator.    
+    //Adds a ParameterUpdatable to the Integrator.
     void addUpdatable(shared_ptr<ParameterUpdatable> an_updatable){
       sys->log<System::MESSAGE>("[%s] Adding updatable", name.c_str());
       updatables.emplace(an_updatable);

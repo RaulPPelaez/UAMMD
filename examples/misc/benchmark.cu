@@ -76,7 +76,7 @@ int main(int argc, char *argv[]){
     //You can force the use of a certain neighbour list passing its name as a second template argument
 
     using PairForces = PairForces<Potential::LJ, VerletList>;
-    auto nl = std::make_shared<VerletList>(pd, sys);
+    auto nl = std::make_shared<VerletList>(pd);
     nl->setCutOffMultiplier(rcutmult);
     //This is the general interface for setting up a potential
     auto pot = make_shared<Potential::LJ>();
@@ -174,6 +174,7 @@ void readParameters(std::shared_ptr<System> sys, std::string file){
       default_options<<"outputFile /dev/stdout"<<std::endl;
       default_options<<"temperature 1.0"<<std::endl;
       default_options<<"friction 1"<<std::endl;
+      default_options<<"rcutmult 1.2"<<std::endl;
       default_options<<"periodicity 1 1 1"<<std::endl;
     }
   }

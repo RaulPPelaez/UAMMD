@@ -18,6 +18,7 @@ REFERENCES:
  */
 #ifndef IBMKERNELS_CUH
 #define IBMKERNELS_CUH
+#include"uammd.cuh"
 #include"global/defines.h"
 #include "misc/TabulatedFunction.cuh"
 namespace uammd{
@@ -31,53 +32,78 @@ namespace uammd{
 	prefactor(pow(2.0*M_PI*width*width, -0.5)),
 	tau(-0.5/(width*width)){}
 
-      __host__ __device__ real phi(real r) const{
+      __host__ __device__ real phi(real r, real3 pos = real3()) const{
 	return prefactor*exp(tau*r*r);
       }
     };
 
     namespace detail{
-      template<class Foo>
-      real integrate(Foo foo, real rmin, real rmax, int Nr){
-	double integral = foo(rmin)*0.5;
-	for(int i = 1; i<Nr; i++){
-	  integral += foo(rmin+i*(rmax-rmin)/Nr);
+
+      //Sum all values in a container using Kahan Summation, which increases floating point accuracy
+      template<class Container>
+      auto kahanSum(Container &v){
+	auto c = v[0]*0;
+	auto sum = c;
+	for(auto f: v){
+	  auto y = f - c;
+	  auto t = sum + y;
+	  c = (t - sum) - y;
+	  sum = t;
 	}
-	integral += foo(rmax)*0.5;
-	integral *= (rmax-rmin)/(real)Nr;
+	return sum;
+      }
+
+      //Integrate the function foo(x) from x=rmin to x=rmax using the Simpson rule with Nr intervals
+      template<class Foo>
+      auto integrate(Foo foo, real rmin, real rmax, int Nr){
+	using T = decltype(foo(rmin));
+	if(Nr%2 == 1) Nr++; //Need an even number of points
+	std::vector<T> integral_vals(Nr+1);
+	real dx = (rmax-rmin)/Nr;
+	for(int i = 0; i<=Nr; i++){
+	  real weight;
+	  if(i==0 or i==Nr) weight = 1;
+	  else if(i%2==1) weight = 4;
+	  else weight = 2;
+	  integral_vals[i] = weight*foo(rmin+i*dx);
+	}
+	auto integral = dx/3.0*kahanSum(integral_vals);
 	return integral;
       }
 
     }
 
     //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
-    __host__ __device__ real BM(real zz, real w, real beta){
-      const real z = zz/w;
+    __host__ __device__ real BM(real zz, real alpha, real beta){
+      const real z = zz/alpha;
       const real z2 = z*z;
-      return (z2>=real(1.0))?0:(exp(beta*(sqrt(real(1.0)-z2)-real(1.0))));
+      const real dz2 = real(1.0)-z2;
+      auto kern = (dz2<real(0.0))?0:(exp(beta*(sqrt(dz2)-real(1.0))));
+      return kern;
     }
 
     struct BarnettMagland{
     private:
       real computeNorm() const{
-	auto foo=[=](real r){return BM(r, w, beta);};
-	real norm = detail::integrate(foo, -w, w, 100000);
+	auto foo=[=](real r){return BM(r, alpha, beta);};
+	real norm = 2.0*detail::integrate(foo, 0, alpha, 20000);
 	return norm;
       }
 
       real invnorm;
     public:
       const real beta;
-      const real w;
-
-      BarnettMagland(real i_w, real i_beta):
-	w(i_w),
+      real alpha;
+      //Alpha is half the support ( phi(r>alpha) = 0)
+      //Beta is the beta parameter of the ES kernel.
+      BarnettMagland(real i_alpha, real i_beta):
+	alpha(i_alpha),
 	beta(i_beta){
 	this->invnorm = 1.0/computeNorm();
       }
 
       inline __host__  __device__ real phi(real zz) const{
-	return BM(zz, w, beta)*invnorm;
+	return BM(zz, alpha, beta)*invnorm;
       }
     };
 
@@ -88,7 +114,7 @@ namespace uammd{
 	const real invh;
 	static constexpr int support = 3;
 	threePoint(real h):invh(1.0/h){}
-	__host__ __device__ real phi(real rr) const{
+	__host__ __device__ real phi(real rr, real3 pos = real3()) const{
 	  const real r = fabs(rr)*invh;
 	  if(r<real(0.5)){
 	    constexpr real onediv3 = real(1/3.0);
@@ -109,7 +135,7 @@ namespace uammd{
 	static constexpr int support = 4;
 	fourPoint(real h):invh(1.0/h){}
 
-	 __host__  __device__ real phi(real rr) const{
+	__host__  __device__ real phi(real rr, real3 pos = real3()) const{
 	   const real r = fabs(rr)*invh;
 	   constexpr real onediv8 = real(0.125);
 	   if(r<real(1.0)){
@@ -187,7 +213,7 @@ namespace uammd{
 
 	~sixPoint() = default;
 
-	inline __host__  __device__ real phi(real r) const{
+	inline __host__  __device__ real phi(real r, real3 pos = real3()) const{
 	  return phi_impl(fabs(r)*invh)*invh;
 	}
 

@@ -60,6 +60,16 @@ namespace uammd{
 			      par.permitivity.inside, par.permitivity.top, par.permitivity.bottom);
     sys->log<System::MESSAGE>("[DPPoissonSlab] Gaussian source width: %g", par.gw);
     sys->log<System::WARNING>("[DPPoissonSlab] Not subtracting adding phi(0,0,0)");
+    bool isMetallicTop =  std::isinf(par.permitivity.top);
+    bool isMetallicBottom =  std::isinf(par.permitivity.bottom);
+    if(isMetallicTop)
+      sys->log<System::MESSAGE>("[DPPoissonSlab] Top wall is metallic, surface values will be interpreted as potential for the top wall.");
+    if(isMetallicBottom)
+      sys->log<System::MESSAGE>("[DPPoissonSlab] Bottom wall is metallic, surface values will be interpreted as potential for the bottom wall.");
+    if(isMetallicBottom and not isMetallicTop){
+      sys->log<System::ERROR>("[DPPoissonSlab] If only one wall is metallic, it must be the top wall");
+      throw std::runtime_error("[DPPoissonSlab] Bottom metallic wall not implemented");
+    }
   }
 
   void DPPoissonSlab::initializeNearField(Parameters par){
@@ -71,7 +81,7 @@ namespace uammd{
     nfpar.Lxy = par.Lxy;
     nfpar.tolerance = par.tolerance;
     nfpar.numberStandardDeviations = par.numberStandardDeviations;
-    this->nearField = std::make_shared<DPPoissonSlab_ns::NearField>(sys, pd, pg, nfpar);
+    this->nearField = std::make_shared<DPPoissonSlab_ns::NearField>(pg, nfpar);
   }
 
   void DPPoissonSlab::initializeFarField(Parameters par){
@@ -84,8 +94,9 @@ namespace uammd{
     ffpar.Lxy = par.Lxy;
     ffpar.tolerance = par.tolerance;
     ffpar.upsampling = par.upsampling;
-    ffpar.surfaceCharge = par.surfaceCharge;
+    ffpar.surfaceValues = par.surfaceValues;
     ffpar.support = par.support;
+    ffpar.printK0Mode = par.printK0Mode;
     this->farField = std::make_shared<DPPoissonSlab_ns::FarField>(sys, pd, pg, ffpar);
   }
 }

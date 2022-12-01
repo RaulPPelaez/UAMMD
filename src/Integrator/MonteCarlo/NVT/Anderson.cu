@@ -65,11 +65,9 @@ namespace uammd {
 
     template<class Pot>
     Anderson<Pot>::Anderson(shared_ptr<ParticleData> pd,
-					 shared_ptr<ParticleGroup> pg,
-					 shared_ptr<System> sys,
-					 shared_ptr<Pot> pot,
-					 Parameters in_par):
-      Integrator(pd, pg, sys),
+			    shared_ptr<Pot> pot,
+			    Parameters in_par):
+      Integrator(pd, "MonteCarlo::Anderson"),
       pot(pot),
       steps(0),
       par(in_par),
@@ -263,8 +261,8 @@ namespace uammd {
 	Adaptor adaptor;
 	auto quantity = Adaptor::zero(pot);
 	adaptor.getInfo(pot, group_i);
-	real oldEnergy = 0;
-	real newEnergy = 0;
+	ForceEnergyVirial oldE{};
+	ForceEnergyVirial newE{};
 	const bool is2D = cl.grid.cellDim.z == 1;
 	const int numberNeighbourCells = is2D?9:27;
 	for(int i = 0; i<numberNeighbourCells; i++){
@@ -282,15 +280,16 @@ namespace uammd {
 	  const int nincell = lastParticle - firstParticle;
 	  for(int j = firstParticle; j < nincell + firstParticle; j++) {
 	    auto pos_j = pos[j];
-	    const int group_j = cl.groupIndex[j];
-	    Adaptor::accumulate(pot, oldEnergy, adaptor.compute(pot, group_j, oldPos, pos_j));
+	    const int group_j = cl.groupIndex[j];	    
+	    Adaptor::accumulate(pot, oldE,
+				adaptor.compute(pot, group_j, oldPos, pos_j));
 	    if(group_i == group_j){
 	      pos_j = newPos;
 	    }
-	    Adaptor::accumulate(pot, newEnergy, adaptor.compute(pot, group_j, newPos, pos_j));
+	    Adaptor::accumulate(pot, newE, adaptor.compute(pot, group_j, newPos, pos_j));
 	  }
 	}
-	return newEnergy - oldEnergy;
+	return newE.energy - oldE.energy;
       }
 
       template<class CellList, class PotentialTransverser>
@@ -356,7 +355,7 @@ namespace uammd {
       auto sortPos_ptr = thrust::raw_pointer_cast(sortPos.data());
       int Nthreads = 128;
       int Nblocks = (grid.getNumberCells()/8)/Nthreads + (((grid.getNumberCells()/8)%Nthreads)?1:0);
-      auto pot_tr = pot->getEnergyTransverser(grid.box, pd);
+      auto pot_tr = pot->getTransverser({false, true, false}, grid.box, pd);
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<decltype(pot_tr)>().getSharedMemorySize(pot_tr);
       Anderson_ns::MCStepKernel<<<Nblocks, Nthreads, shMemorySize, st>>>(
 					 pot_tr, clData, sortPos_ptr,
@@ -388,7 +387,7 @@ namespace uammd {
       int Nthreads=128;
       int Nblocks=numberParticles/Nthreads + ((numberParticles%Nthreads)?1:0);
       auto globalIndex = pg->getIndexIterator(access::location::gpu);
-      auto tr = pot->getEnergyTransverser(grid.box, pd);
+      auto tr = pot->getTransverser({false, true, false}, grid.box, pd);
       size_t shMemorySize = SFINAE::SharedMemorySizeDelegator<decltype(tr)>().getSharedMemorySize(tr);
       auto ni = CellList_ns::NeighbourContainer(cl->getCellList());
       NeighbourList_ns::transverseWithNeighbourContainer<<<Nblocks, Nthreads, shMemorySize, 0>>>(tr,

@@ -1,0 +1,9 @@
+
+dt 0.02
+temperature 0
+simulationTime 500
+printTime 0.5
+initPos init.pos
+bondFile particles.bonds
+
+lbox 32 32 32

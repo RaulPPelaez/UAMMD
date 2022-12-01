@@ -1,9 +1,9 @@
 /* Raul P. Pelaez 2021
-   
-   Hardcoding parameters in the source code becomes a problem really soon. 
+
+   Hardcoding parameters in the source code becomes a problem quickly.
    It would be better if we read this parameters from a file at initialization.
 
-   In this tutorial we will see a convenient object exposed in UAMMD called InputFile that does just that.  
+   In this tutorial we will see a convenient object exposed by UAMMD called InputFile that does just that.
 
    You will see that you do not even need UAMMD for this, feel free to copy paste it into your project.
  */
@@ -84,6 +84,5 @@ Parameters readParameters(std::string datamain){
   //You can also do just this:
   par.someOption = bool(in.getOption("someOption", InputFile::Optional));
 
-  return par;  
+  return par;
 }
-

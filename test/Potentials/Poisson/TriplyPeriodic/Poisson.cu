@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2020. Poisson test
+/*Raul P. Pelaez 2019-2022. Poisson test
 Computes the electric field between two opposite charges placed in a periodic box.
 USAGE:
 ./poisson [gw] [L] [r]
@@ -13,7 +13,7 @@ Ex =  exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
 #include"uammd.cuh"
 #include"Interactor/SpectralEwaldPoisson.cuh"
 #include<fstream>
-
+#include<iomanip>
 using namespace uammd;
 using std::make_shared;
 using std::endl;
@@ -37,7 +37,6 @@ int main(int argc, char *argv[]){
     charge[0] = 1;
     charge[1] = -1;
   }
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
   Poisson::Parameters par;
   par.box = box;
   par.epsilon = 1;
@@ -45,14 +44,14 @@ int main(int argc, char *argv[]){
   par.tolerance = tolerance;
   par.split = split;
   //par.upsampling = 1.0;
-  auto poisson = make_shared<Poisson>(pd, pg, sys, par);
+  auto poisson = make_shared<Poisson>(pd, par);
   {
     auto force = pd->getForce(access::location::gpu, access::mode::write);
     thrust::fill(thrust::cuda::par, force.begin(), force.end(), real4());
     auto energy = pd->getEnergy(access::location::gpu, access::mode::write);
     thrust::fill(thrust::cuda::par, energy.begin(), energy.end(), real());
   }
-    poisson->sumForceEnergy(0);
+  poisson->sum({.force=true, .energy=true, .virial=false});
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::read);
     auto force = pd->getForce(access::location::cpu, access::mode::read);
@@ -69,5 +68,3 @@ int main(int argc, char *argv[]){
   sys->finish();
   return 0;
 }
-
-

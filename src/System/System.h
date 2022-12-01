@@ -139,7 +139,9 @@ namespace uammd{
     System(int argc, char *argv[]): m_argc(argc), m_argv(argv){
       tim.tic();
       this->printWelcome();
-      auto seed = 0xf31337Bada55D00dULL^time(NULL);
+      auto now = std::chrono::steady_clock::now().time_since_epoch();
+      auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+      auto seed = 0xf31337Bada55D00dULL^nanoseconds;
       m_rng.setSeed(seed);
       auto options = processInputArguments();
       sysPar.device = -1;

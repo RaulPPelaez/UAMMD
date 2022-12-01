@@ -1,6 +1,6 @@
 /*Raul P. Pelaez 2017-2021. PairForces definition.
 
-  PairForces Module is an interactor that computes forces and/or energies between pairs of particle closer to a given cut off distance.
+  PairForces Module is an interactor that computes forces, energies and/or virials between pairs of particle closer to a given cut off distance.
   If the cut off reaches a certain threshold the algorithm switches to n-body.
 
   A Potential describing the interaction must be provided. 

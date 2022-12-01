@@ -4,7 +4,8 @@
 #define UAMMD_ALLOCATOR_H
 #include<thrust/device_ptr.h>
 #include<thrust/system/cuda/memory.h>
-#include"utils/debugTools.h"
+#include "utils/debugTools.h"
+#include<cstddef>
 #include<map>
 
 namespace uammd{

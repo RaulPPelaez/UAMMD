@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2018. MonteCarlo NVT test.
+/*Raul P. Pelaez 2018-2022. MonteCarlo NVT test.
 
   Performs a NVT MC simulation of a LJ liquid.
   It uses the MC_NVT::Anderson integrator.
@@ -13,7 +13,7 @@
 #include"utils/InitialConditions.cuh"
 #include"utils/InputFile.h"
 #include<fstream>
-
+#include<iomanip>
 
 using namespace uammd;
 
@@ -37,10 +37,10 @@ real desiredAcceptanceRatio;
 
 using namespace std;
 
-void readParameters(std::string datamain, shared_ptr<System> sys);
+void readParameters(std::string datamain);
 int main(int argc, char *argv[]){
   auto sys = make_shared<System>();
-  readParameters("data.main", sys);
+  readParameters("data.main");
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
   auto pd = make_shared<ParticleData>(numberParticles, sys);
@@ -56,13 +56,12 @@ int main(int argc, char *argv[]){
       energy[i] = 0;
     }
   }
-  auto pg = make_shared<ParticleGroup>(pd, sys, "All");
   if(shift)
     sys->log<System::MESSAGE>("[System] LJ Parameters: sigma %e, epsilon %e, cutOff %e·sigma, shift: truncated and shifted", sigma, epsilon, cutOff);
   else
     sys->log<System::MESSAGE>("[System] LJ Parameters: sigma %e, epsilon %e, cutOff %e·sigma, shift: truncated", sigma, epsilon, cutOff);
 
-  auto pot = make_shared<Potential::LJ>(sys);
+  auto pot = make_shared<Potential::LJ>();
   {
     Potential::LJ::InputPairParameters par;
     par.epsilon = epsilon;
@@ -79,7 +78,7 @@ int main(int argc, char *argv[]){
   par.initialJumpSize		= initialJumpSize;
   par.acceptanceRatio	= desiredAcceptanceRatio;
   par.tuneSteps = tuneSteps;
-  auto mc = make_shared<NVT>(pd, pg, sys, pot, par);
+  auto mc = make_shared<NVT>(pd, pot, par);
   sys->log<System::MESSAGE>("RUNNING!!!");
   pd->sortParticles();
   std::ofstream out(outfile);
@@ -124,8 +123,8 @@ int main(int argc, char *argv[]){
   return 0;
 }
 
-void readParameters(std::string datamain, shared_ptr<System> sys){
-  InputFile in(datamain, sys);
+void readParameters(std::string datamain){
+  InputFile in(datamain);
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
   in.getOption("numberSteps", InputFile::Required)>>numberSteps;
   in.getOption("printSteps", InputFile::Required)>>printSteps;

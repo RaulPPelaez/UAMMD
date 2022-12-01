@@ -1,12 +1,12 @@
 
 
-#Default log level is 5, which prints up to MESSAGE, 0 will only print critical errors and 14 will print everything up to the most low level debug information 
+#Default log level is 5, which prints up to MESSAGE, 0 will only print critical errors and 14 will print everything up to the most low level debug information
 LOG_LEVEL=5
 
 NVCC=nvcc
 CXX=g++
 
-CUDA_ROOT=/usr/local/cuda
+CUDA_ROOT=$(shell dirname `which nvcc`)/..
 UAMMD_ROOT=../../
 #Uncomment to compile in double precision mode
 #DOUBLE_PRECISION=-DDOUBLE_PRECISION
@@ -17,6 +17,13 @@ all: $(patsubst %.cu, %, $(wildcard *.cu))
 
 %: %.cu Makefile
 	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=)
+
+
+12-%: 12-%.cu Makefile
+	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=) -lcufft
+
+13-%: 13-%.cu Makefile
+	$(NVCC) $(NVCCFLAGS) $< -o $(@:.out=) -lcufft
 
 clean: $(patsubst %.cu, %.clean, $(wildcard *.cu))
 

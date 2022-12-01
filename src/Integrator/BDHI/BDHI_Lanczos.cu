@@ -15,56 +15,43 @@
 
 */
 #include"BDHI_Lanczos.cuh"
+#include "misc/LanczosAlgorithm/MatrixDot.h"
 #include"utils/GPUUtils.cuh"
 #include"Interactor/NBody.cuh"
+#include "utils/container.h"
 
 
 namespace uammd{
   namespace BDHI{
 
-    Lanczos::Lanczos(shared_ptr<ParticleData> pd,
-		     shared_ptr<ParticleGroup> pg,
-		     shared_ptr<System> sys,
-		     Parameters par):
-      pd(pd), pg(pg), sys(sys),
+    Lanczos::Lanczos(shared_ptr<ParticleGroup> pg, Parameters par):
+      pg(pg),
       hydrodynamicRadius(par.hydrodynamicRadius),
       temperature(par.temperature),
       tolerance(par.tolerance),
       rpy(par.viscosity),par(par){
-
-      sys->log<System::MESSAGE>("[BDHI::Lanczos] Initialized");
-
+      System::log<System::MESSAGE>("[BDHI::Lanczos] Initialized");
+      auto pd = pg->getParticleData();
       //Lanczos algorithm computes,
       //given an object that computes the product of a Matrix(M) and a vector(v), sqrt(M)·v
-      lanczosAlgorithm = std::make_shared<LanczosAlgorithm>(sys, par.tolerance);
-
+      lanczosAlgorithm = std::make_shared<lanczos::Solver>();
       if(par.hydrodynamicRadius>0)
-	sys->log<System::MESSAGE>("[BDHI::Lanczos] Self mobility: %g", rpy(0,par.hydrodynamicRadius, par.hydrodynamicRadius).x);
+	System::log<System::MESSAGE>("[BDHI::Lanczos] Self mobility: %g", rpy(0,par.hydrodynamicRadius, par.hydrodynamicRadius).x);
       else{
-	sys->log<System::MESSAGE>("[BDHI::Lanczos] Self mobility dependent on particle radius as 1/(6πηa)");
+	System::log<System::MESSAGE>("[BDHI::Lanczos] Self mobility dependent on particle radius as 1/(6πηa)");
       }
-
       if(par.hydrodynamicRadius<0 and ! pd->isRadiusAllocated())
-	sys->log<System::CRITICAL>("[BDHI::Lanczos] You need to provide Lanczos with either an hydrodynamic radius or via the individual particle radius.");
+	System::log<System::CRITICAL>("[BDHI::Lanczos] You need to provide Lanczos with either an hydrodynamic radius or via the individual particle radius.");
       if(par.hydrodynamicRadius>0 and pd->isRadiusAllocated())
-	sys->log<System::MESSAGE>("[BDHI::Lanczos] Taking particle radius from parameter's hydrodynamicRadius");
-
+	System::log<System::MESSAGE>("[BDHI::Lanczos] Taking particle radius from parameter's hydrodynamicRadius");
       //Init rng
       curandCreateGenerator(&curng, CURAND_RNG_PSEUDO_DEFAULT);
-
-      curandSetPseudoRandomGeneratorSeed(curng, sys->rng().next());
-
+      curandSetPseudoRandomGeneratorSeed(curng, pd->getSystem()->rng().next());
       thrust::device_vector<real> noise(30000);
       auto noise_ptr = thrust::raw_pointer_cast(noise.data());
       //Warm cuRNG
       curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0);
       curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0);
-
-    }
-
-
-    Lanczos::~Lanczos(){
-
     }
 
     namespace Lanczos_ns{
@@ -133,7 +120,7 @@ namespace uammd{
 
       /*A functor to pass to LanczosAlgorithm the operation Mv = M·v*/
       template<typename vtype>
-      struct Dotctor{
+      struct Dotctor: public lanczos::MatrixDot{
 	using myTransverser = Lanczos_ns::NbodyMatrixFreeMobilityDot<vtype>;
 	myTransverser Mv_tr;
     	shared_ptr<NBody> nbody;
@@ -145,9 +132,9 @@ namespace uammd{
 	  st(st)
 	  {}
 
-	inline void operator()(real3* Mv, vtype *v){
-	  Mv_tr.v  = v; /*src*/
-	  Mv_tr.Mv = Mv; /*Result*/
+	inline void operator()(real* v, real *Mv){
+	  Mv_tr.v  = (vtype*)v; /*src*/
+	  Mv_tr.Mv = (real3*)Mv; /*Result*/
 	  nbody->transverse(Mv_tr, st);
 	}
 
@@ -162,87 +149,37 @@ namespace uammd{
 	Although M is 3Nx3N, it is treated as a Matrix of NxN boxes of size 3x3,
 	and v is a vector3.
       */
-      sys->log<System::DEBUG1>("[BDHI::Lanczos] MF");
+      System::log<System::DEBUG1>("[BDHI::Lanczos] MF");
       using myTransverser = Lanczos_ns::NbodyMatrixFreeMobilityDot<real4>;
-
+      auto pd = pg->getParticleData();
       auto force = pd->getForce(access::location::gpu, access::mode::read);
       auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
-
       real * radius_ptr =  this->hydrodynamicRadius>0?nullptr:radius.raw();
       myTransverser Mv_tr(force.raw(), MF, this->hydrodynamicRadius, radius_ptr, rpy);
-
-      NBody nbody(pd, pg, sys);
-
+      NBody nbody(pg);
       nbody.transverse(Mv_tr, st);
     }
 
-
     void Lanczos::computeBdW(real3 *BdW, cudaStream_t st){
-      sys->log<System::DEBUG1>("[BDHI::Lanczos] BdW");
+      System::log<System::DEBUG1>("[BDHI::Lanczos] BdW");
       if(temperature > real(0.0)){
 	st = 0;
 	int numberParticles = pg->getNumberParticles();
-	auto nbody = std::make_shared<NBody>(pd, pg, sys);
+	auto nbody = std::make_shared<NBody>(pg);
+	auto pd = pg->getParticleData();
 	/*Lanczos Algorithm needs a functor that provides the dot product of M and a vector*/
 	auto radius = pd->getRadiusIfAllocated(access::location::gpu, access::mode::read);
 	real * radius_ptr =  this->hydrodynamicRadius>0?nullptr:radius.raw();
-
 	Lanczos_ns::Dotctor<real3> Mdot(rpy, this->hydrodynamicRadius, radius_ptr, nbody, st);
-
 	//Filling V instead of an external array (for v in sqrt(M)·v) is faster
-	real *noise = lanczosAlgorithm->getV(numberParticles);
-	curandGenerateNormal(curng, noise,
+	uninitialized_cached_vector<real3> noise(numberParticles);
+	curandGenerateNormal(curng, (real*)noise.data().get(),
 			     3*numberParticles + (3*numberParticles)%2,
 			     real(0.0), real(1.0));
-	lanczosAlgorithm->solve(Mdot, (real*) BdW, noise, numberParticles, st);
+	//lanczosAlgorithm->solve(Mdot, (real*) BdW, noise, numberParticles, st);
+	lanczosAlgorithm->run(Mdot, (real*) BdW, (real*)noise.data().get(),
+			      tolerance, 3*numberParticles, st);
       }
     }
-
-    // namespace Lanczos_ns{
-    //   /*This Nbody Transverser computes the analytic divergence of the RPY tensor*/
-    //   struct divMTransverser{
-    // 	divMTransverser(real3* divM, real M0, real rh): divM(divM), M0(M0), rh(rh){
-    // 	  this->invrh = 1.0/rh;
-    // 	}
-
-    // 	inline __device__ real3 zero(){ return make_real3(real(0.0));}
-    // 	inline __device__ real3 compute(const real4 &pi, const real4 &pj){
-    // 	  /*Work in units of rh*/
-    // 	  const real3 r12 = (make_real3(pi)-make_real3(pj))*invrh;
-    // 	  const real r2 = dot(r12, r12);
-    // 	  if(r2==real(0.0))
-    // 	    return make_real3(real(0.0));
-    // 	  real invr = rsqrtf(r2);
-    // 	  /*Just the divergence of the RPY tensor in 2D, taken from A. Donev's notes*/
-    // 	  /*The 1/6pia is in M0, the factor kT is in the integrator, and the factor 1/a is in set*/
-    // 	  if(r2>real(4.0)){
-    // 	    real invr2 = invr*invr;
-    // 	    return real(0.75)*(r2-real(2.0))*invr2*invr2*r12*invr;
-    // 	  }
-    // 	  else{
-    // 	    return real(0.09375)*r12*invr;
-    // 	  }
-    // 	}
-    // 	inline __device__ void accumulate(real3 &total, const real3 &cur){total += cur;}
-
-    // 	inline __device__ void set(int id, const real3 &total){
-    // 	  divM[id] = M0*total*invrh;
-    // 	}
-    //   private:
-    // 	real3* divM;
-    // 	real M0;
-    // 	real rh, invrh;
-    //   };
-
-    // }
-
-    // void Lanczos::computeDivM(real3* divM, cudaStream_t st){
-    //   sys->log<System::DEBUG1>("[BDHI::Lanczos] divM");
-    //   Lanczos_ns::divMTransverser divMtr(divM, selfMobility, hydrodynamicRadius);
-
-    //   NBody nbody(pd, pg, sys);
-
-    //   nbody.transverse(divMtr, st);
-    // }
   }
 }
