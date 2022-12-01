@@ -775,6 +775,7 @@ UAMMD's implementation abstracts away the :math:`f_k` and :math:`g_k` functions,
 
 
 The name of this object must be provided as a template argument to the Quasi2D Integrator module, which is called :code:`BDHI::BDHI2D`.
+
 The first lines of the source file :code:`Integrator/Hydro/BDHI_quasi2D.cuh` contain the currently implemented ones, which to this day are:
  * True2D: Available as an alias :code:`BDHI::True2D`
  * Quasi2D: Available as an alias :code:`BDHI::Quasi2D`
@@ -790,7 +791,6 @@ Use as the rest of the :ref:`Integrator` modules.
    .. warning:: Note that the temperature is provided in units of energy.
 
 The following parameters are available:
-
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
   * :cpp:`real viscosity` Viscosity of the solvent.
   * :cpp:`real hydrodynamicRadius` Hydrodynamic radius of the particles (same for all particles)
@@ -828,12 +828,166 @@ The following parameters are available:
 Doubly Periodic Stokes (DPStokes)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. todo:: fill
+.. figure:: ../img/dpstokes_sketch.*
+	    :width: 50%
+	    :align: center
+
+In the Doubly periodic Stokes geometry (DPStokes), an incompressible fluid exists in a domain which is periodic in the plane and open in the third direction. Contrary to the Quasi2D regime, in DPStokes particles are free to move in any direction (i.e they are not confined to a plane).
+
+The DPStokes solver (described in detail in Raul's manuscript [11]_) distinguishes between three different regimes:
+ * Fully open: the fluid is bounded at infinity.
+ * A no-slip wall at the bottom of the domain.
+ * A no-slip wall at top and bottom (slit channel).
+
+When there are no walls, a virtual domain size exists in the z direction that must contain all the force exerted by the particles to the fluid. A similar thing happens when there is a wall only at the bottom. In all cases, the domain in z is such that :math:`z\in(-H/2, H/2)`.
+
+The BM kernel (see :ref:`IBM`) is used for spreading and interpolating in this module, which can deal with both particle forces and toques. The BM kernel is defined as:
+
+.. math::
+   
+  \phi_{BM}(r,\{\alpha, \beta, w\}) = 
+  \begin{cases}
+  \frac{1}{S}\exp\left[\beta(\sqrt{1-(r/(h\alpha))^2}-1)\right] & |r|/(he/2)\le 1\\
+   0 & \textrm{otherwise}
+  \end{cases}
+
+where :math:`h` is the size of a grid cell in the plane.
+
+Note that typically one would set :math:`\alpha = w/2`, however it can be useful to set them separately. Also note that it can never happen that :math:`\alpha>w/2`, since that would result in a complex number.
+
+As usual, the width of the kernel (:math:`\beta`) is related to the hydrodynamic kernel while its support (:math:`\alpha,w`) and the size of a grid cell in the plane, :math:`h` are set according to a certain tolerance.
+
+There are some basic heuristics to choose the optimal parameters for the kernel depending on whether particle forces and torques or just forces are applied.
+
+The current implementation does not choose these for you, so you must explicitly introduce them.
+
+.. table:: 
+  
+  +------------------------------------------------------------------+--------------------------------------------+
+  | .. list-table:: Applying both forces (M) and torques (D).        |    .. list-table:: Applying only forces(M) |
+  |   :header-rows: 1		                                     |	       :header-rows: 1	      	          |
+  |				                                     |	    			      	          |
+  |   * - :math:`w_M(=\!w_D)`	                                     |	       * - w_M	      	                  |
+  |     - 5			                                     |	         - 4		      	          |
+  |     - 6			                                     |	         - 5		      	          |
+  |   * - :math:`a/h`		                                     |	         - 6		      	          |
+  |     - 1.560			                                     |	       * - :math:`a/h`	      	          |
+  |     - 1.731			                                     |	         - 1.205		          |     
+  |   * - :math:`\beta_M/w_M`	                                     |	         - 1.244		          |     
+  |     - 1.305			                                     |	         - 1.554		          |     
+  |     - 1.327			                                     |	       * - :math:`\beta_M/w_M`            | 
+  |   * - :math:`\beta_D/w_D`	                                     |	         - 1.785		          |     
+  |     - 2.232			                                     |	         - 1.886		          |     
+  |     - 2.216			                                     |	         - 1.714		          |     
+  |   * - :math:`\% error_M`	                                     |	       * - :math:`\% error_M`             | 
+  |     - 0.897			                                     |	         - 0.370		          |     
+  |     - 0.151			                                     |	         - 0.055		          |     
+  |   * - :math:`\% error_D`	                                     |	         - 0.021                          | 
+  |     - 0.810                                                      |                                            |
+  |     - 0.212                                                      |                                            |
+  +------------------------------------------------------------------+--------------------------------------------+	 
+  
+Additionally, the number of cells in the z direction is chosen such that the largest cell size is :math:`h`, which requires :math:`n_z = \frac{\pi H}{h}`.
+
+Currently there is no efficient way to compute fluctuations for BDHI, however, the Integrator includes them using the :ref:`Lanczos` algorithm. Testing shows that the hydrodynamic screening caused by the walls allows Lanczos to converge fast and independently of the number of particles.
+Thermal drift must also be included (the resulting mobility depends of the height), which is computed via Random Finite Differences.
+
 
 Usage
 ********
 
-.. todo:: fill
+The DPStokes solver comes in two different forms:
+ * As an independent solver in the class :code:`DPStokesSlab_ns::DPStokes`
+ * As an :ref:`Integrator` (which uses the solver under the hood) in the class :code:`DPStokesSlab_ns::DPStokesIntegrator`.
+
+The solver can be used to compute the hydrodynamic displacements of a group of particles with some forces and/or torques acting on them, i.e applying the mobility operator.
+
+The Integrator is able to carry out :ref:`BDHI` simulations by including fluctuations.
+   
+Both the solver and the integrator share these parameters:
+ * :code:`real viscosity`
+ * :code:`real Lx`
+ * :code:`real Ly`
+ * :code:`real H`: Domain size in z, goes from -H/2 to H/2
+ * :code:`int nx`: Number of grid points in each direction
+ * :code:`int ny`
+ * :code:`int nz`
+ * :code:`WallMode mode = WallMode::none`: Can also be bottom or slit.
+Parameters for the kernel (_d) implies dipole (rotation).
+ * :code:`real w`
+ * :code:`real w_d`
+ * :code:`real beta`
+ * :code:`real beta_d`
+ * :code:`real alpha`
+ * :code:`real alpha_d`
+Note that the dipole parameters can be omitted if torques are not used. At the time of writing, the Integrator version only understands forces on particles, ignoring torques.
+
+In addition to the previous ones, the integrator also requires:
+  * :code:`real dt`: Time step
+  * :code:`real tolerance`: Tolerance for the Lanczos algorithm.
+  * :code:`real temperature`: Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
+  * :code:`bool useLeimkuhler = false`: If true use a Leimkuhler integration scheme, default uses Euler.
+
+
+   
+.. code:: c++
+
+  #include <Integrator/BDHI/DoublyPeriodic/DPStokesSlab.cuh>
+  using namespace uammd::DPStokesSlab_ns;  
+  auto createDPStokesSolver(Parameters ipar){
+    DPStokes::Parameters par;
+    par.nx         = ipar.nx;
+    par.ny         = ipar.ny;
+    par.nz	 = ipar.nz;
+    par.viscosity	 = ipar.viscosity;
+    par.Lx	 = ipar.Lx;
+    par.Ly	 = ipar.Ly;
+    par.H		 = ipar.H;
+    par.w = ipar.w; //support for the forces
+    par.beta = ipar.beta; //beta for the forces
+    par.w_d = ipar.w_d; //suport for the torques
+    par.beta_d = ipar.beta_d; //beta for the torques
+    par.mode = WallMode::none; //Can also be bottom or slit
+    auto dpstokes = std::make_shared<DPStokes>(par);
+    return dpstokes;
+  }
+  
+  auto computeHydrodynamicDisplacements(UAMMD sim, std::shared_ptr<DPStokes> dpstokes){
+    auto pos = sim.pd->getPos(access::gpu, access::read);
+    auto force = sim.pd->getForce(access::gpu, access::read);
+    auto torques = sim.pd->getTorque(access::gpu, access::read);
+    int numberParticles = pos.size();
+    //The forces or torques can be replaced by a nullptr, which will spare the related computations.
+    auto displacements = dpstokes->Mdot(pos.begin(), force.begin(), torques.begin(), numberParticles);
+    //The result of Mdot contains the linear and dipolar displacements:
+    //auto MF = displacements.first; //linear displacements
+    //auto MT = displacements.second; //angular displacements
+    return displacements;
+  }
+
+  auto createDPStokesIntegrator(Parameters ipar){
+    DPStokesIntegrator::Parameters par;
+    par.nx         = ipar.nx;
+    par.ny         = ipar.ny;
+    par.nz	 = ipar.nz;
+    par.viscosity = ipar.viscosity;
+    par.Lx	 = ipar.Lx;
+    par.Ly	 = ipar.Ly;
+    par.H	 = ipar.H;
+    par.w = ipar.w; //support for the forces
+    par.beta = ipar.beta; //beta for the forces
+    par.mode = WallMode::none; //Can also be bottom or slit
+    par.dt = ipar.dt;
+    par.temperature = ipar.temperature;
+    auto dpstokes = std::make_shared<DPStokes>(par);
+    return dpstokes;
+  }
+
+
+.. warning::
+
+   Both the solver and Integrator will fail if some particle lies beyond the domain limits in the z direction.
+
 
 
 
