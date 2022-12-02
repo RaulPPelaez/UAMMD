@@ -123,7 +123,9 @@ UAMMD exposes a cached allocator of GPU memory via System under the names :cpp:a
 
       Thurst containers require an allocator with a pointer type :cpp:any:`thrust::device_ptr\<T>` (instead of the plain :cpp:expr:`T*` provided by :cpp:type:`System::allocator\<T>`). This type behaves identical to :cpp:any:`System::allocator\<T>` (and shares its memory pool) but can be used with thrust containers.
 
-            
+.. hint::
+
+   System's allocators normally work with GPU global memory, but turn to managed memory if UAMMD_DEBUG is defined.
       
 
 Usage example:

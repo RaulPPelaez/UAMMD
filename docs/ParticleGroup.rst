@@ -28,12 +28,24 @@ A group can contain all particles, no particles or anything in between.
 		     
    .. cpp:function:: const int * getIndicesRawPtr(access::location loc);
 
-		     Get a raw memory pointer to the index list if it exists (:ref:`ParticleGroup` not always creates an actual list of particles).
-		     
+		     Get a raw memory pointer to a list with the indices of the particles in this group.
+		     Returns a null pointer if all or none particles are in the group.
     
    .. cpp:function:: IndexIterator getIndexIterator(access::location loc);
 
-		     Get an iterator with the indices of particles in this group
+		     Get an iterator with the indices of particles in this group.
+		     
+
+   .. cpp:function:: const int * getGroupIndexMaskRawPtr(access::location loc);
+
+		     Get an int pointer of size pd->getNumParticles() returning 1 if the particle in the particle currently in that index index is part of the group and 0 otherwise.
+		     loc specifies the memory location of the underlying array.
+		     Returns a null pointer if all or none particles are in the group.
+		     
+    
+   .. cpp:function:: MaskIterator getGroupIndexMask(access::location loc);
+
+		     Same as :cpp:`getGroupIndexMask` but will also work with groups containing all particles, returning a constant iterator with a value of 1.
 
 
    .. cpp:function:: template<class Iterator> accessIterator<Iterator> getPropertyIterator(Iterator property, access::location loc);

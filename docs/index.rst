@@ -222,11 +222,12 @@ Although this documentation should be your primary source of knowledge for UAMMD
    ParticleSorter
    ErrorHandling
    ProgrammingTools
-   Postprocessing
+   PostProcessing
    VectorTypes
    RandomNumbers
-
-
+   Containers
+   BoundaryValueProblemSolver
+   FastChebyshevTransform
 
 
 Indices and tables
