@@ -1,3 +1,5 @@
+/* Raul P. Pelaez 2022. Definition of the ForceEnergyVirial struct.
+ */
 #ifndef UAMMD_FORCEENERGYVIRIAL_CUH
 #define UAMMD_FORCEENERGYVIRIAL_CUH
 #include"global/defines.h"
@@ -8,7 +10,7 @@ namespace uammd{
     real energy;
     real virial;
   };
-  
+
   VECATTR ForceEnergyVirial operator +(const ForceEnergyVirial &a, const ForceEnergyVirial &b){
     return {a.force + b.force, a.energy + b.energy, a.virial + b.virial};
   }

@@ -1,5 +1,5 @@
-/*Raul P. Pelaez 2017. Some GPU utilities
-
+/*Raul P. Pelaez 2017. Some GPU utilities.
+  These are outdated and you should not used them. Instead you should use the thrust functions available for them.
 
  */
 #ifndef GPUUTILS_CUH
