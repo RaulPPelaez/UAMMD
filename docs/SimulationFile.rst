@@ -14,9 +14,10 @@ A minimal input file that initializes the basic UAMMD objects (:ref:`System` and
   using namespace uammd;
   int main(int argc, char * argv[]){
     int numberParticles = 1<<14;
-    //Creating a System will initialize uammd. All modules need a system to work
+    //Creating a System will initialize uammd. All modules need a system to work. Most of them will ask ParticleData for it.
     auto sys = make_shared<System>(argc, argv);
     //ParticleData will hold arrays for any particle property needed by any module, every module needs a ParticleData
+    //ParticleData will create an instance of System if not provided with one
     auto pd = make_shared<ParticleData>(numberParticles, sys);
     //This call will ensure all UAMMD operations are gracefully terminated. 
     //When all modules are out of scope, any remaining memory allocated by UAMMD will be freed.
