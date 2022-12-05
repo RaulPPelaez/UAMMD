@@ -2,7 +2,6 @@
   See BDHI_quasi2D.cuh for more information.
  */
 #include"BDHI_quasi2D.cuh"
-#include"utils/GPUUtils.cuh"
 #include"third_party/saruprng.cuh"
 #include<vector>
 #include<algorithm>
