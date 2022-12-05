@@ -9,7 +9,6 @@
 #define BOX_CUH
 #include"global/defines.h"
 #include"utils/vector.cuh"
-#include"utils/GPUUtils.cuh"
 
 namespace uammd{
   struct Box{

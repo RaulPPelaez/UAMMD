@@ -16,7 +16,6 @@
 */
 #include"BDHI_Lanczos.cuh"
 #include "misc/LanczosAlgorithm/MatrixDot.h"
-#include"utils/GPUUtils.cuh"
 #include"Interactor/NBody.cuh"
 #include "utils/container.h"
 
