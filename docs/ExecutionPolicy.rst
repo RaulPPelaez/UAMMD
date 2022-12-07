@@ -5,6 +5,7 @@ UAMMD exposes a custom execution policy compatible with thrust.
 When used on a thrust algorithm this policy will make thrust leverage UAMMD's cached allocator meachanism.
 This is useful, for instance, when calling algorithms that require memory allocation such as thrust::sort
 
+You should just use this when you would put thrust::device.
 
 Example
 -------
