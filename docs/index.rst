@@ -220,14 +220,15 @@ Although this documentation should be your primary source of knowledge for UAMMD
    TabulatedFunctions
    Grid
    ParticleSorter
-   ErrorHandling
+   BoundaryValueProblemSolver
+   FastChebyshevTransform
    ProgrammingTools
+   ErrorHandling
    PostProcessing
    VectorTypes
    RandomNumbers
    Containers
-   BoundaryValueProblemSolver
-   FastChebyshevTransform
+   ExecutionPolicy
 
 
 Indices and tables
