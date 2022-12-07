@@ -1,4 +1,13 @@
+v2.5:
+ - Added a custom execution policy, compatible with thrust algorithms and leveraging UAMMDs cached allocator.
 
+v2.4:
+ - Added a library to compute Fast Fourier-Chebyshev Transforms
+ - Added ParticleGroup mask functions
+ - Added DPStokesIntegrator
+ - Added several vector overloads
+ - Added many tests
+ 
 v2.3:
  -Many vector overloads has been added
  -The DPStokes module has been added
