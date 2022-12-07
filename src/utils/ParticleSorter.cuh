@@ -3,9 +3,7 @@
    A helper class to sort particles according to their positions following a certain rule.
    This rule can be a morton hash, so the particle positions are sorted to follow a Z-order curve, a cell hash, particle ID...
 
-
    USAGE:
-   This class is meant to be used by ParticleData, but can be used to sort from others.
 
    //Create an instance of ParticleSorter:
    ParticleSorter ps;
@@ -13,9 +11,6 @@
    ps.updateOrderByHash<Sorter::MortonHash>(pos, numberParticles, BoxSize, cudaStream);
    //Apply new order to some array
    ps.applyCurrentOrder(array_in, array_out, numberParticles, cudaStream);
-
-   //Sort a key/value pair list with cub
-   ps.sortByKey(key_dobleBuffer, value_dobleBuffer, numberParticles, cudaStream);
 
    //Order the id array (without changing it) as keys and a 0..numberparticles array as values,
    //return this device array. It does not affect the current order.
