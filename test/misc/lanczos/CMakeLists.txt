@@ -59,7 +59,6 @@ include(GoogleTest)
 gtest_discover_tests(lanczos_test)
 
 IF (CMAKE_BUILD_TYPE MATCHES "Debug")
-  add_compile_options(PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:
-    -G -src-in-ptx
-    >)
+ set(CMAKE_CUDA_FLAGS "-g -G  -lineinfo -src-in-ptx")
+ set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -pedantic")
 ENDIF()
