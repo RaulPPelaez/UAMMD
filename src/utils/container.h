@@ -5,6 +5,7 @@
 #include"global/defines.h"
 #include"System/System.h"
 #include"misc/allocator.h"
+#include <iterator>
 #include<thrust/device_vector.h>
 #include<thrust/host_vector.h>
 namespace uammd{
@@ -58,6 +59,10 @@ namespace uammd{
       iterator begin() const{ return iterator(data()); }
 
       iterator end() const{ return begin() + m_size; }
+
+      thrust::reverse_iterator<iterator> rbegin() const{return thrust::make_reverse_iterator(end());}
+
+      thrust::reverse_iterator<iterator> rend() const{return thrust::make_reverse_iterator(begin());}
 
       size_t size() const{
 	return m_size;
