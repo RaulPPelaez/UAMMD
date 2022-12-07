@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(vqcm_dpstokes)
+project(dpstokes)
 enable_language(CUDA)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_BUILD_TYPE Debug)
