@@ -12,9 +12,7 @@
 
 #include<System/System.h>
 #include <memory>
-#include <thrust/system/cuda/execution_policy.h>
-#include <thrust/system/cuda/memory.h>
-
+#include <thrust/execution_policy.h>
 namespace uammd{
 
   namespace detail{
