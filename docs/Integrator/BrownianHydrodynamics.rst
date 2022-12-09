@@ -769,7 +769,7 @@ UAMMD's implementation abstracts away the :math:`f_k` and :math:`g_k` functions,
 
       Returns the relation between the hydrodynamicRadius and the width of the Gaussian kernel.
 
-   .. cpp:function:: __device__ real2 operator()(real k2, real hydrodynamicKernel);
+   .. cpp:function:: __device__ real2 operator()(real k2, real hydrodynamicRadius);
 
       Must return a :code:`real2` with the :math:`f_k` and :math:`g_k` as the first and second elements respectively for a given squared norm of a wave number and a hydrodynamicRadius.
 
