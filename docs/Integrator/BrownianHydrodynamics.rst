@@ -847,7 +847,7 @@ The BM kernel (see :ref:`IBM`) is used for spreading and interpolating in this m
    
   \phi_{BM}(r,\{\alpha, \beta, w\}) = 
   \begin{cases}
-  \frac{1}{S}\exp\left[\beta(\sqrt{1-(r/(h\alpha))^2}-1)\right] & |r|/(he/2)\le 1\\
+  \frac{1}{S}\exp\left[\beta(\sqrt{1-(r/(h\alpha))^2}-1)\right] & |r|/(hw/2)\le 1\\
    0 & \textrm{otherwise}
   \end{cases}
 
