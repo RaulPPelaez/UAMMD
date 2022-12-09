@@ -222,6 +222,7 @@ Although this documentation should be your primary source of knowledge for UAMMD
    ParticleSorter
    BoundaryValueProblemSolver
    FastChebyshevTransform
+   LanczosAlgorithm
    ProgrammingTools
    ErrorHandling
    PostProcessing
