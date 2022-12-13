@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
-cmake_policy(SET CMP0104 OLD)
+#cmake_policy(SET CMP0104 OLD)
 
 #add_compile_definitions(PUBLIC DOUBLE_PRECISION)
 set(UAMMD_INCLUDE ../src ../src/third_party)
@@ -30,7 +30,7 @@ endif()
 
 include_directories(${UAMMD_INCLUDE})
 link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES} ${BLAS_LIBRARIES} ${CUDA_LIBRARY})
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr -extended-lambda -Wno-dev")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr -extended-lambda")
 
 add_subdirectory(generic_md)
 add_subdirectory(advanced)
