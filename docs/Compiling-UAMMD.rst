@@ -108,4 +108,15 @@ https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-
 
 Which will provide you with a set of flags, for instance: :code:`-L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl`
 
-   
+Compiling with CMake
+.........................
+
+The examples and many tests can be compiled with CMake, an example that should work most of the time is in the examples folder.
+
+When a CMakeLists.txt file is present you can compile its target by running:
+
+.. code:: bash
+
+	  $ mkdir -p build && cd build
+	  $ cmake ..
+	  $ make
