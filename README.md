@@ -1,4 +1,4 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 2.3**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 2.5**
 
 [![Documentation Status](https://readthedocs.org/projects/uammd/badge/?version=latest)](https://uammd.readthedocs.io/en/latest/?badge=latest)
 

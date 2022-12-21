@@ -11,7 +11,6 @@
 #define PROPERTY_CUH
 
 #include"System/System.h"
-#include"utils/GPUUtils.cuh"
 #include"utils/debugTools.h"
 #include<thrust/device_vector.h>
 #include <thrust/iterator/iterator_adaptor.h>

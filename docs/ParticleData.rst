@@ -312,3 +312,13 @@ List of available signals
 		 
       
 
+Saving and restoring from a file
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+.. cpp:function::   void saveParticleData(std::string fileName, std::shared_ptr<ParticleData> pd);
+
+   Writes all allocated properties in :code:`pd` to the file (overwrites if existing);
+
+.. cpp:function::   std::shared_ptr<ParticleData> restoreParticleData(std::string fileName, std::shared_ptr<System> sys);
+
+   Loads the :code:`ParticleData` instance stored by :code:`saveParticleData` in the file :code:`fileName`.

@@ -1,11 +1,9 @@
-/* Raul P. Pelaez 2019. ParticleSorter.
+/* Raul P. Pelaez 2019-2022. ParticleSorter.
 
    A helper class to sort particles according to their positions following a certain rule.
    This rule can be a morton hash, so the particle positions are sorted to follow a Z-order curve, a cell hash, particle ID...
 
-
    USAGE:
-   This class is meant to be used by ParticleData, but can be used to sort from others.
 
    //Create an instance of ParticleSorter:
    ParticleSorter ps;
@@ -14,14 +12,13 @@
    //Apply new order to some array
    ps.applyCurrentOrder(array_in, array_out, numberParticles, cudaStream);
 
-   //Sort a key/value pair list with cub
-   ps.sortByKey(key_dobleBuffer, value_dobleBuffer, numberParticles, cudaStream);
-
    //Order the id array (without changing it) as keys and a 0..numberparticles array as values,
    //return this device array. It does not affect the current order.
    ps.getIndexArrayById(id, numberParticles, cudaStream);
    TODO:
    100-More hashes
+
+   I tried to use thrust::sort_by_key, but it is not smart enough to leverage the end bit of the maximum hash and is approx 30% slower.
 
 REFERENCES:
 [1] https://stackoverflow.com/questions/18529057/produce-interleaving-bit-patterns-morton-keys-for-32-bit-64-bit-and-128bit
@@ -35,7 +32,11 @@ REFERENCES:
 #include"System/System.h"
 #include"utils/debugTools.h"
 #include"third_party/type_names.h"
+#include"utils/execution_policy.cuh"
 #include <thrust/device_vector.h>
+#include<thrust/sequence.h>
+#include<thrust/iterator/transform_iterator.h>
+#include<thrust/iterator/permutation_iterator.h>
 #include<third_party/uammd_cub.cuh>
 namespace uammd{
 
@@ -98,56 +99,25 @@ namespace uammd{
       hash[i]  = ihash;
     }
 
-    template<class InputIterator, class OutputIterator>
-    __global__ void reorderArray(const InputIterator old,
-				 OutputIterator sorted,
-				 int* __restrict__ pindex, int N){
-      int i = blockIdx.x*blockDim.x + threadIdx.x;
-      if(i>=N) return;
-      sorted[i] = old[pindex[i]];
-    }
-
   }
 
-  class ParticleSorter{
-  public:
-    template<class hashType>
-    void sortByKey(cub::DoubleBuffer<int> &index,
-		   cub::DoubleBuffer<hashType> &hash,
-		   int N, cudaStream_t st = 0, int end_bit = sizeof(uint)*8){
-      if(N > maxRequestedElements){
-        maxRequestedElements = N;
-	cub_temp_storage_bytes = 0;
-	CudaSafeCall(cub::DeviceRadixSort::SortPairs(nullptr, cub_temp_storage_bytes,
-						     hash,
-						     index,
-						     N,
-						     0, end_bit,
-						     st));
-      }
-      auto alloc = System::getTemporaryDeviceAllocator<char>();
-      std::shared_ptr<char> d_temp_storage(alloc.allocate(cub_temp_storage_bytes),
-					   [=](char* ptr){ alloc.deallocate(ptr);});
-      void* d_temp_storage_ptr = d_temp_storage.get();
-      CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage_ptr, cub_temp_storage_bytes,
-						   hash,
-						   index,
-						   N,
-						   0, end_bit,
-						   st));
-    }
+  namespace detail{
     //Return the most significant bit of an unsigned integral type
     template<typename T> inline int msb(T n){
       static_assert(std::is_integral<T>::value && !std::is_signed<T>::value,
 		    "msb<T>(): T must be an unsigned integral type.");
       for(T i = std::numeric_limits<T>::digits - 1, mask = 1 << i;
-	   i >= 0;
-	   --i, mask >>= 1){
+	  i >= 0;
+	  --i, mask >>= 1){
 	if((n & mask) != 0) return i;
-	}
+      }
       return 0;
     }
+  }
 
+  class ParticleSorter{
+  public:
+    //Sets the current sorting according to the input hashes.
     template<class HashIterator>
     void updateOrderWithCustomHash(HashIterator &hasher,
 				   uint N, uint maxHash = std::numeric_limits<uint>::max(),
@@ -166,6 +136,7 @@ namespace uammd{
       }
     }
 
+    //Sets the current sorting using the linear index of the cell of the given positions
     template<class CellHasher = Sorter::MortonHash, class InputIterator>
     void updateOrderByCellHash(InputIterator pos, uint N, Box box, int3 cellDim, cudaStream_t st = 0){
       Grid grid(box, cellDim);
@@ -175,6 +146,7 @@ namespace uammd{
       this->updateOrderWithCustomHash(hashIterator, N, maxHash, st);
     }
 
+    //Sets the current sorting using the input list of ids as hashes
     void updateOrderById(int *id, int N, cudaStream_t st = 0){
       try{
 	tryToUpdateOrderById(id, N, st);
@@ -189,12 +161,9 @@ namespace uammd{
     template<class InputIterator, class OutputIterator>
     void applyCurrentOrder(InputIterator d_property_unsorted, OutputIterator d_property_sorted,
 			   int N, cudaStream_t st = 0){
-      int Nthreads=128;
-      int Nblocks=N/Nthreads + ((N%Nthreads)?1:0);
-      Sorter::reorderArray<<<Nblocks, Nthreads, 0, st>>>(d_property_unsorted,
-							 d_property_sorted,
-							 thrust::raw_pointer_cast(index.data()),
-							 N);
+      auto pi = thrust::make_permutation_iterator(d_property_unsorted,
+						  index.begin());
+      thrust::copy_n(uammd::cached_device_execution_policy.on(st), pi, N, d_property_sorted);
       CudaCheckError();
     }
 
@@ -239,9 +208,10 @@ namespace uammd{
       hash.resize(N);
       hash_alt.resize(N);
       cub::CountingInputIterator<int> ci(0);
-      thrust::copy(thrust::cuda::par, ci, ci+N, original_index.begin());
+      thrust::sequence(uammd::cached_device_execution_policy.on(st),
+		       original_index.begin(), original_index.end(), 0);
       int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
-      CudaSafeCall(cudaMemcpyAsync(d_hash, id, N*sizeof(int), cudaMemcpyDeviceToDevice,st));
+      thrust::copy_n(uammd::cached_device_execution_policy.on(st), id, N, hash.begin());
       auto db_index = cub::DoubleBuffer<int>(thrust::raw_pointer_cast(original_index.data()),
 					     thrust::raw_pointer_cast(index_alt.data()));
       auto db_hash  = cub::DoubleBuffer<int>(d_hash, (int*)thrust::raw_pointer_cast(hash_alt.data()));
@@ -304,6 +274,33 @@ namespace uammd{
       }
       return thrust::raw_pointer_cast(original_index.data());
     }
+
+    template<class hashType>
+    void sortByKey(cub::DoubleBuffer<int> &index,
+		   cub::DoubleBuffer<hashType> &hash,
+		   int N, cudaStream_t st = 0, int end_bit = sizeof(uint)*8){
+      if(N > maxRequestedElements){
+        maxRequestedElements = N;
+	cub_temp_storage_bytes = 0;
+	CudaSafeCall(cub::DeviceRadixSort::SortPairs(nullptr, cub_temp_storage_bytes,
+						     hash,
+						     index,
+						     N,
+						     0, end_bit,
+						     st));
+      }
+      auto alloc = System::getTemporaryDeviceAllocator<char>();
+      std::shared_ptr<char> d_temp_storage(alloc.allocate(cub_temp_storage_bytes),
+					   [=](char* ptr){ alloc.deallocate(ptr);});
+      void* d_temp_storage_ptr = d_temp_storage.get();
+      CudaSafeCall(cub::DeviceRadixSort::SortPairs(d_temp_storage_ptr, cub_temp_storage_bytes,
+						   hash,
+						   index,
+						   N,
+						   0, end_bit,
+						   st));
+    }
+
 
   };
 }

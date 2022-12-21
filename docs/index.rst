@@ -5,7 +5,7 @@
 
 .. _index:
 
-Welcome to the UAMMD v2.3 documentation!
+Welcome to the UAMMD v2.5 documentation!
 =========================================
 ----------------------------------------------------
 Universally Adaptable Multiscale Molecular Dynamics
@@ -220,13 +220,16 @@ Although this documentation should be your primary source of knowledge for UAMMD
    TabulatedFunctions
    Grid
    ParticleSorter
-   ErrorHandling
+   BoundaryValueProblemSolver
+   FastChebyshevTransform
+   LanczosAlgorithm
    ProgrammingTools
-   Postprocessing
+   ErrorHandling
+   PostProcessing
    VectorTypes
    RandomNumbers
-
-
+   Containers
+   ExecutionPolicy
 
 
 Indices and tables
