@@ -5,8 +5,7 @@
 #include "utils/cufftDebug.h"
 #include "Interactor/DoublyPeriodic/PoissonSlab/utils.cuh"
 #include "Interactor/DoublyPeriodic/PoissonSlab/MismatchCompute.cuh"
-#include<fstream>
-#include<iomanip>
+
 namespace uammd{
   namespace DPPoissonSlab_ns{
 
@@ -234,10 +233,8 @@ namespace uammd{
 	System::log<System::DEBUG>("Correction");
 	real3 boxSize = make_real3(Lxy, H);
 	auto analyticalCorrection = computeAnalyticalCorrectionFourierSpace(mismatchData, st); //Step 4
-	DPPoissonSlab_ns::writeComplex2Field(analyticalCorrection, cellDim, H, "correctionFourier.dat");
 	takeAnalyticalCorrectionToChebyshevSpace(analyticalCorrection, st); //Step 4
 	auto fullCorrection = computeFullCorrectionXY(analyticalCorrection, boxSize, cellDim); //Step 4
-	DPPoissonSlab_ns::writeComplex4Field(fullCorrection, cellDim, H, "correctionCheb.dat");
 	sumCorrectionToInsideSolution(fullCorrection, insideSolution, st); //Step 5, 6
       }
 

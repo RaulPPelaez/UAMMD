@@ -5,7 +5,9 @@
 #include"global/defines.h"
 #include"System/System.h"
 #include"misc/allocator.h"
+#include <iterator>
 #include<thrust/device_vector.h>
+#include<thrust/host_vector.h>
 namespace uammd{
   namespace detail{
     //This is a very barebones container. Its purpose is only to avoid the unnecessary unninitialized_fill kernel that thrust issues on device_vector creation. Thus it mascarades as a thrust::device_vector.
@@ -44,6 +46,11 @@ namespace uammd{
 	thrust::copy(other.begin(), other.end(), begin());
       }
 
+      UninitializedCachedContainer(const thrust::host_vector<T> &other):
+	UninitializedCachedContainer(other.size()){
+	thrust::copy(other.begin(), other.end(), begin());
+      }
+
       UninitializedCachedContainer(const UninitializedCachedContainer<T> &other):
 	UninitializedCachedContainer(other.size()){
 	thrust::copy(other.begin(), other.end(), begin());
@@ -52,6 +59,10 @@ namespace uammd{
       iterator begin() const{ return iterator(data()); }
 
       iterator end() const{ return begin() + m_size; }
+
+      thrust::reverse_iterator<iterator> rbegin() const{return thrust::make_reverse_iterator(end());}
+
+      thrust::reverse_iterator<iterator> rend() const{return thrust::make_reverse_iterator(begin());}
 
       size_t size() const{
 	return m_size;
@@ -86,9 +97,16 @@ namespace uammd{
         m_data.swap(another.m_data);
       }
 
-      // auto operator=(UninitializedCachedContainer<T> &other){
-      // 	return UninitializedCachedContainer<T>(other);
-      // }
+      thrust::device_reference<T> operator[](uint i){
+	return thrust::device_reference<T>(data() + i);
+      }
+
+      operator thrust::host_vector<T>() const{
+	thrust::host_vector<T> hvec(size());
+	thrust::copy(begin(), end(), hvec.begin());
+	return hvec;
+      }
+
     };
   }
 

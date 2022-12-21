@@ -32,8 +32,9 @@ armadillo*
 work
 examples/data.main*
 *.dat
-
+*.data
 docs/_static
 docs/_build
 docs/uammd
 /test/misc/ibm/ltximg/
+__pycache__

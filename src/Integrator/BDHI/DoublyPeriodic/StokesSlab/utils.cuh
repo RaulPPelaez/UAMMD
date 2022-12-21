@@ -8,10 +8,11 @@
 #include"utils/cufftDebug.h"
 #include "utils/cufftPrecisionAgnostic.h"
 #include "utils/cufftComplex4.cuh"
+#include "utils/cufftComplex3.cuh"
 #include "utils/cufftComplex2.cuh"
 #include"utils/container.h"
 namespace uammd{
-  namespace DPStokesSlab_ns{  
+  namespace DPStokesSlab_ns{
 #ifndef UAMMD_DEBUG
     template<class T> using gpu_container = thrust::device_vector<T>;
     template<class T>  using cached_vector = uninitialized_cached_vector<T>;
@@ -88,7 +89,7 @@ namespace uammd{
     };
 
     using WaveVectorListIterator = thrust::transform_iterator<IndexToWaveVectorModulus,
-      thrust::counting_iterator<int>>;
+							      thrust::counting_iterator<int>>;
 
     WaveVectorListIterator make_wave_vector_modulus_iterator(int2 nk, real2 Lxy){
       IndexToWaveVectorModulus i2k(IndexToWaveNumber(nk.x, nk.y),
@@ -130,23 +131,229 @@ namespace uammd{
     };
 
     template<class RandomAccessIterator>
-    using Iterator = thrust::permutation_iterator<RandomAccessIterator,
-      thrust::transform_iterator<ThirdIndexIteratorTransform, thrust::counting_iterator<int>>>;
-
-    template<class RandomAccessIterator>
     inline __host__ __device__
-    Iterator<RandomAccessIterator> make_third_index_iterator(RandomAccessIterator ptr,
-							     int ikx, int iky,
-							     const Index3D &index){
+    auto make_third_index_iterator(RandomAccessIterator ptr,
+				   int ikx, int iky,
+				   const Index3D &index){
       auto tr = thrust::make_transform_iterator(thrust::make_counting_iterator(0),
 					        ThirdIndexIteratorTransform(index, ikx, iky));
       return thrust::make_permutation_iterator(ptr, tr);
     }
 
-    using cufftComplex4 = cufftComplex4_t<real>;
-    using cufftComplex2 = cufftComplex2_t<real>;
-    using cufftComplex = cufftComplex_t<real>;
-    using cufftReal = cufftReal_t<real>;
+    using complex4 = cufftComplex4_t<real>;
+    using complex3 = cufftComplex3_t<real>;
+    using complex2 = cufftComplex2_t<real>;
+    using complex = cufftComplex_t<real>;
+    template<class T>
+    struct AoSToSoAVec3{
+      template<class VecType>
+      __device__ thrust::tuple<T,T,T> operator()(VecType v){
+	return thrust::make_tuple(v.x, v.y, v.z);
+      }
+    };
+
+    struct SoAToAoSVec3{
+      __device__ real3 operator()(thrust::tuple<real, real, real> v){
+	return {thrust::get<0>(v), thrust::get<1>(v), thrust::get<2>(v)};
+      }
+      __device__ complex3 operator()(thrust::tuple<complex, complex, complex> v){
+	return {thrust::get<0>(v), thrust::get<1>(v), thrust::get<2>(v)};
+      }
+      __device__ complex4 operator()(thrust::tuple<complex, complex, complex, complex> v){
+	return {thrust::get<0>(v), thrust::get<1>(v), thrust::get<2>(v), thrust::get<3>(v)};
+      }
+
+    };
+
+    struct ToReal3 {
+      template <class T> __device__ real3 operator()(T v) {
+        return make_real3(v);
+      }
+      };
+    __device__ complex3 toComplex3(thrust::tuple<complex, complex, complex> v) {
+      return {thrust::get<0>(v), thrust::get<1>(v), thrust::get<2>(v)};
+    }
+
+    __device__ auto toTuple(complex3 v) {
+      return thrust::make_tuple(v.x, v.y, v.z);
+    }
+
+    struct ToReal4{template<class T> __device__ real4 operator()(T v){return make_real4(v);}};
+
+    template<class T>
+    struct DataXYZ{
+      cached_vector<T> m_x, m_y, m_z;
+
+      DataXYZ():DataXYZ(0){}
+
+      template<class VectorTypeIterator>
+      DataXYZ(VectorTypeIterator &input, int size):DataXYZ(size){
+	auto zip = thrust::make_zip_iterator(thrust::make_tuple(m_x.begin(), m_y.begin(), m_z.begin()));
+	thrust::transform(thrust::cuda::par, input, input + size, zip, AoSToSoAVec3<T>());
+      }
+
+      DataXYZ(int size){
+	resize(size);
+      }
+
+      void resize(int newSize){
+	m_x.resize(newSize);
+	m_y.resize(newSize);
+	m_z.resize(newSize);
+      }
+
+      void fillWithZero() const{
+	thrust::fill(m_x.begin(), m_x.end(), T());
+	thrust::fill(m_y.begin(), m_y.end(), T());
+	thrust::fill(m_z.begin(), m_z.end(), T());
+      }
+
+      using Iterator = T*;
+      Iterator x()const{return thrust::raw_pointer_cast(m_x.data());}
+      Iterator y()const{return thrust::raw_pointer_cast(m_y.data());}
+      Iterator z()const{return thrust::raw_pointer_cast(m_z.data());}
+
+      auto xyz() const{
+	auto zip = thrust::make_zip_iterator(thrust::make_tuple(x(), y(), z()));
+	const auto tr = thrust::make_transform_iterator(zip, SoAToAoSVec3());
+	return tr;
+      }
+
+      void swap(DataXYZ &another){
+	m_x.swap(another.m_x);
+	m_y.swap(another.m_y);
+	m_z.swap(another.m_z);
+      }
+
+      void clear(){
+	m_x.clear();
+	m_y.clear();
+	m_z.clear();
+      }
+
+      auto size() const{
+	return this->m_x.size();
+      }
+
+      DataXYZ(const DataXYZ<T> &other): //copy constructor
+	m_x(other.m_x),
+	m_y(other.m_y),
+	m_z(other.m_z)
+      {}
+
+      DataXYZ(DataXYZ<T> &&other) noexcept: //move constructor
+	m_x(std::exchange(other.m_x, cached_vector<T>())),
+	m_y(std::exchange(other.m_y, cached_vector<T>())),
+	m_z(std::exchange(other.m_z, cached_vector<T>()))
+      {}
+
+      auto operator=(const DataXYZ<T> &other) {//copy assignment
+	return *this = other;
+      }
+
+      DataXYZ<T>& operator=(DataXYZ<T>&& other){//move assignment
+	std::swap(m_x, other.m_x);
+	std::swap(m_y, other.m_y);
+	std::swap(m_z, other.m_z);
+	return *this;
+      }
+
+    };
+
+    template<class T>
+    class DataXYZPtr{
+      typename DataXYZ<T>::Iterator m_x,m_y,m_z;
+    public:
+      DataXYZPtr(const DataXYZ<T> & data):
+	m_x(data.x()), m_y(data.y()),m_z(data.z()){}
+
+      using Iterator = T*;
+      __host__ __device__ Iterator x()const{return m_x;}
+      __host__ __device__ Iterator y()const{return m_y;}
+      __host__ __device__ Iterator z()const{return m_z;}
+
+      __host__ __device__ auto xyz() const{
+	auto zip = thrust::make_zip_iterator(thrust::make_tuple(x(), y(), z()));
+	const auto tr = thrust::make_transform_iterator(zip, SoAToAoSVec3());
+	return tr;
+      }
+
+    };
+
+    auto toReal3Vector(DataXYZ<real> &data){
+      cached_vector<real3> out(data.size());
+      thrust::copy(thrust::cuda::par, data.xyz(), data.xyz() + data.size(), out.begin());
+      return out;
+    }
+
+
+    template<class T>
+    struct FluidPointers{
+      FluidPointers(){}
+      template<class Container>
+      FluidPointers(const Container &pressure, const DataXYZ<T> &vel):
+	pressure(thrust::raw_pointer_cast(pressure.data())),
+	velocityX(vel.x()), velocityY(vel.y()), velocityZ(vel.z()){}
+      T* pressure;
+      typename DataXYZ<T>::Iterator velocityX, velocityY, velocityZ;
+    };
+
+    template<class T>
+    struct FluidData{
+      FluidData(int3 n):
+	m_size(n),
+	velocity(n.x*n.y*n.z),
+	pressure(n.x*n.y*n.z){}
+
+      FluidData(): FluidData({0,0,0}){}
+
+      DataXYZ<T> velocity;
+      cached_vector<T> pressure;
+      int3 m_size;
+
+      FluidPointers<T> getPointers() const{
+	return FluidPointers<T>(pressure, velocity);
+      }
+
+      void resize(int3 n){
+	this->m_size = n;
+	int newSize = n.x*n.y*n.z;
+	velocity.resize(newSize);
+	pressure.resize(newSize);
+      }
+
+      void clear(){
+	velocity.clear();
+	pressure.clear();
+      }
+
+      int3 size() const{
+        return m_size;
+      }
+
+      auto operator=(const FluidData<T> &other) { //copy assignment
+	return *this = FluidData(other);
+      }
+
+      FluidData(const FluidData<T>& other): //copy constructor
+	velocity(other.velocity),
+	pressure(other.pressure),
+	m_size(other.m_size)
+      {}
+
+      FluidData(FluidData<T>&& other) noexcept: // move constructor
+	velocity(std::exchange(other.velocity, DataXYZ<T>())),
+	pressure(std::exchange(other.pressure, cached_vector<T>())),
+	m_size(std::exchange(other.m_size, int3()))
+      {}
+
+      FluidData<T>& operator=(FluidData<T>&& other) noexcept{ // move assignment
+	std::swap(velocity, other.velocity);
+	std::swap(pressure, other.pressure);
+	std::swap(m_size, other.m_size);
+        return *this;
+      }
+    };
 
   }
 }

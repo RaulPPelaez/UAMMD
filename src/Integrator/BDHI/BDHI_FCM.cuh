@@ -23,6 +23,64 @@ You can choose different Kernels by changing the "using Kernel" below. A bunch o
 
 namespace uammd{
   namespace BDHI{
+    namespace detail{
+
+      template<class Kernel, class Parameters>
+      Grid initializeGrid(Parameters par){
+	int3 cellDim;
+	real h;
+	auto box = par.box;
+	if(par.cells.x<=0){
+	  if(par.hydrodynamicRadius<=0)
+	    System::log<System::CRITICAL>("[BDHI::FCM] I need an hydrodynamic radius if cell dimensions are not provided!");
+	  h = Kernel::adviseGridSize(par.hydrodynamicRadius, par.tolerance);
+	  cellDim = make_int3(box.boxSize/h);
+	  cellDim = nextFFTWiseSize3D(cellDim);
+	  if(par.adaptBoxSize){
+	    box = Box(make_real3(cellDim)*h);
+	  }
+	}
+	else{
+	  cellDim = par.cells;
+	}
+	return Grid(box, cellDim);
+      }
+
+      template<class Kernel, class Parameters>
+      auto initializeKernel(Parameters par, Grid grid){
+	real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
+	std::shared_ptr<Kernel> kernel;
+	if(not par.kernel)
+	  kernel = std::make_shared<Kernel>(h, par.tolerance);
+	else
+	  kernel = par.kernel;
+	if(kernel->support >= grid.cellDim.x or
+	   kernel->support >= grid.cellDim.y or
+	   kernel->support >= grid.cellDim.z){
+	  System::log<System::ERROR>("[BDHI::FCM] Kernel support is too big, try lowering the tolerance or increasing the box size!.");
+	}
+	System::log<System::MESSAGE>("[BDHI::FCM] Kernel support is %d points.", kernel->support);
+	return kernel;
+      }
+
+      template<class KernelTorque, class Parameters>
+      auto initializeKernelTorque(Parameters par, Grid grid){
+	std::shared_ptr<KernelTorque> kernelTorque;
+	if(not par.kernelTorque){
+	  real a = par.hydrodynamicRadius;
+	  real width = a/(pow(6*sqrt(M_PI), 1/3.));
+	  real h = std::min({grid.cellSize.x, grid.cellSize.y, grid.cellSize.z});
+	  kernelTorque = std::make_shared<KernelTorque>(width, h, par.tolerance);
+	}
+	else{
+	  kernelTorque = par.kernelTorque;
+	}
+	return kernelTorque;
+      }
+
+
+    }
+
     class FCM{
       using Kernel = FCM_ns::Kernels::Gaussian;
       using KernelTorque = FCM_ns::Kernels::GaussianTorque;
@@ -41,6 +99,12 @@ namespace uammd{
 	temperature(par.temperature), dt(par.dt){
 	if(par.seed == 0)
 	  par.seed = pg->getParticleData()->getSystem()->rng().next32();
+	auto grid = detail::initializeGrid<Kernel>(par);
+	par.box = grid.box;
+	par.cells = grid.cellDim;
+	par.kernel = detail::initializeKernel<Kernel>(par, grid);
+	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(par.hydrodynamicRadius, grid.cellSize.x);
+	par.kernelTorque = detail::initializeKernelTorque<KernelTorque>(par, grid);
 	this->fcm = std::make_shared<FCM_super>(par);
       }
 
@@ -98,6 +162,12 @@ namespace uammd{
 	temperature(par.temperature), dt(par.dt){
 	if(par.seed == 0)
 	  par.seed = sys->rng().next32();
+	auto grid = detail::initializeGrid<Kernel>(par);
+	par.cells = grid.cellDim;
+	par.box = grid.box;
+	par.kernel = detail::initializeKernel<Kernel>(par, grid);
+	par.hydrodynamicRadius = par.kernel->fixHydrodynamicRadius(par.hydrodynamicRadius, grid.cellSize.x);
+	par.kernelTorque = detail::initializeKernelTorque<KernelTorque>(par, grid);
 	this->fcm = std::make_shared<FCM_super>(par);
 	cudaStreamCreate(&st);
       }
