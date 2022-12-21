@@ -10,7 +10,7 @@ UAMMD is header-only, so a module is compiled only when its header is included. 
   #. Thrust (The version shipped with the cuda release will do)  
   #. LAPACKE/CBLAS or Intel MKL (For some modules only)  
 
-The newest compiler versions I have tested are g++-11.x and clang++-13.0 with cuda-11.6 in Fedora 35.  You can even compile a source containing UAMMD code with clang++-7+ alone, without nvcc.
+The newest compiler versions I have tested are g++-12.x and clang++-13.0 with cuda-12 in Fedora 37.  You can even compile a source containing UAMMD code with clang++-7+ alone, without nvcc.
 
 Additionally, UAMMD makes use of the following external libraries, **which are already included in the repo under third_party**. You can either compile using these or place symlinks to your preferred versions (I have seen recent versions of cub not compiling on some platforms).  
 
@@ -73,7 +73,7 @@ You might get an error similar to this one:
 
 This error might arise if the mechanism UAMMD uses to include cub in older CUDA versions fails and :code:`third_party/cub_bak` is included instead (in which case the version provided by the CUDA installation should be used). In order to fix this, start looking in the file :code:`third_party/cub_bak`.
 
-Bug in GCC >11.2.1 with CUDA 11
+Bug in GCC >11.2.1 with CUDA 11+
 ......................................
 
 You might get an error containing something like:
