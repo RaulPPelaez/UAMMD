@@ -9,6 +9,7 @@
 
 #include"utils/execution_policy.cuh"
 #include<thrust/device_vector.h>
+#include<thrust/sort.h>
 #include<thrust/sequence.h>
 #include <sstream>
 #include <cuda_profiler_api.h>

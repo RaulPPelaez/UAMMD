@@ -13,6 +13,7 @@
 #include "Interactor/DoublyPeriodic/PoissonSlab/utils.cuh"
 #include <iostream>
 #include <thrust/iterator/discard_iterator.h>
+#include<thrust/partition.h>
 
 namespace uammd{
   namespace DPPoissonSlab_ns{

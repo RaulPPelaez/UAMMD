@@ -19,6 +19,9 @@ all: $(patsubst %.cu, %, $(filter-out python_wrapper.cu, $(wildcard *.cu))) $(PY
 %: %.cu Makefile
 	$(NVCC) $(NVCCFLAGS) $< -o $@
 
+electrostatic_forces: electrostatic_forces.cu Makefile
+	$(NVCC) $(NVCCFLAGS) $< -o $@ -lcufft
+
 $(PYTHON_LIBRARY_NAME): python_wrapper.cu Makefile pybind11
 	$(NVCC)  $(NVCCFLAGS) $< -o $(PYTHON_LIBRARY_NAME) -w -shared -I pybind11/include -Xcompiler "-fPIC -w" `$(PYTHON)-config --includes`
 
