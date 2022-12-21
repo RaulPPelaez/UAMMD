@@ -7,6 +7,7 @@
 #include"misc/LanczosAlgorithm.cuh"
 #include <memory>
 #include<random>
+#include<thrust/iterator/constant_iterator.h>
 #include<thrust/host_vector.h>
 
 using namespace uammd;
