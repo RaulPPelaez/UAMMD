@@ -13,7 +13,8 @@ if(NOT pybind11_POPULATED)
 endif()
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
-add_executable( neighbour_list neighbour_list.cu )
+add_executable(neighbour_list neighbour_list.cu )
+add_executable(electrostatic_forces electrostatic_forces.cu)
 pybind11_add_module(python_wrapper python_wrapper.cu)
 set_target_properties(python_wrapper PROPERTIES CUDA_ARCHITECTURES OFF)
 
