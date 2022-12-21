@@ -11,7 +11,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
 set(CUDA_ARCHITECTURES OFF)
 
-set(UAMMD_INCLUDE ../../../../uammd/src ../../../../uammd/src/third_party)
+set(UAMMD_INCLUDE ../../../src ../../../src/third_party)
 
 include(FetchContent)
 FetchContent_Declare(
