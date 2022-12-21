@@ -34,6 +34,9 @@ REFERENCES:
 #include"third_party/type_names.h"
 #include"utils/execution_policy.cuh"
 #include <thrust/device_vector.h>
+#include<thrust/sequence.h>
+#include<thrust/iterator/transform_iterator.h>
+#include<thrust/iterator/permutation_iterator.h>
 #include<third_party/uammd_cub.cuh>
 namespace uammd{
 
