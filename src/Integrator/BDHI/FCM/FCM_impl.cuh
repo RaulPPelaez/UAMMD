@@ -81,10 +81,6 @@ namespace uammd{
 	  System::log<System::EXCEPTION>("FCM_impl requires instances of the spreading kernels");
 	  throw std::runtime_error("Invalid arguments");
 	}
-	if(par.cells.x <= 0){
-	  System::log<System::EXCEPTION>("FCM_impl requires valid grid dimensions");
-	  throw std::runtime_error("Invalid arguments");
-	}
 	printMessages(par);
 	initCuFFT();
 	CudaSafeCall(cudaDeviceSynchronize());
