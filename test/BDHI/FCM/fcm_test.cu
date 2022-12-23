@@ -16,21 +16,17 @@ using namespace uammd;
 using BDHI::FCM_impl;
 using Kernel = BDHI::FCM_ns::Kernels::Gaussian;
 using KernelTorque = BDHI::FCM_ns::Kernels::GaussianTorque;
+//Different  kernels can  achieve different  maximum accuracies.   For
+//instance,  the  Gaussian  kernel  can safely  achieve  8  digits  of
+//accuracy in the  self mobility, but the Peskin 3pt  kernel will only
+//give about 3.  Place the maximum expected accuracy  in this variable
+//if you want to check a new kernel.
+constexpr real expectedAccuracy = 1e-8;
+//Although the  Gaussian kernel  should be able  to achieve  even more
+//accuracy, beyond 8 digits the  approximate solution for the periodic
+//correction of the self mobility I am using starts to fail.
 
 template<class T> using cached_vector = uninitialized_cached_vector<T>;
-
-// int3 createGrid(real3 L, real hydrodynamicRadius, real tolerance){
-//   int3 cellDim;
-//   real h;
-//   auto box = Box(L);
-//   h = Kernel::adviseGridSize(hydrodynamicRadius, tolerance);
-//   cellDim = make_int3(box.boxSize/h);
-//   cellDim = nextFFTWiseSize3D(cellDim);
-//   // if(par.adaptBoxSize){
-//   //   box = Box(make_real3(cellDim)*h);
-//   // }
-//   return cellDim;
-// }
 
 auto initializeKernel(real tolerance, real3 L, int3 n){
   real h = std::min({L.x/n.x, L.y/n.y, L.z/n.z});
@@ -83,10 +79,12 @@ TEST(FCM_impl, SelfMobilityIsCorrectUpToTolerance){
   FCM::Parameters par;
   real hydrodynamicRadius = 1.012312;
   par.viscosity = 1.12321;
-  par.tolerance = 1e-7;
+  par.tolerance = expectedAccuracy;
   par.dt = 1;
   real h = Kernel::adviseGridSize(hydrodynamicRadius, par.tolerance);
-  real3 L = make_real3(128, 128, 128)*h;
+  //Ensure the box size is a multiple of the grid size
+  //A box approximately 128*hydrodynamicRadius in size
+  real3 L = make_real3(96*h*ceil(hydrodynamicRadius/h));
   par.cells = make_int3(L/h);
   par.box = Box(L);
   //par.cells = createGrid(L, hydrodynamicRadius, par. tolerance);
@@ -101,7 +99,7 @@ TEST(FCM_impl, SelfMobilityIsCorrectUpToTolerance){
   real4* torque = nullptr;
   auto force = pos;
   real3 m0;
-  int ntest = 100;
+  int ntest = 20;
   Saru rng(1234);
   for(int j = 0; j<ntest; j++){
     real3 randomPos = make_real3(rng.f(-0.5, 0.5), rng.f(-0.5, 0.5), rng.f(-0.5, 0.5))*L;
