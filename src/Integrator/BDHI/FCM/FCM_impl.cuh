@@ -145,8 +145,10 @@ namespace uammd{
 	auto rh = this->getHydrodynamicRadius();
 	auto M0 = this->getSelfMobility();
 	System::log<System::MESSAGE>("[BDHI::FCM] Using kernel: %s", type_name<Kernel>().c_str());
-	System::log<System::MESSAGE>("[BDHI::FCM] Closest possible hydrodynamic radius: %g", rh);
-	System::log<System::MESSAGE>("[BDHI::FCM] Self mobility: %g", (double)M0);
+	if(rh>0){
+	  System::log<System::MESSAGE>("[BDHI::FCM] Hydrodynamic radius: %g", rh);
+	  System::log<System::MESSAGE>("[BDHI::FCM] Self mobility: %g", (double)M0);
+	}
 	if(box.boxSize.x != box.boxSize.y || box.boxSize.y != box.boxSize.z || box.boxSize.x != box.boxSize.z){
 	  System::log<System::WARNING>("[BDHI::FCM] Self mobility will be different for non cubic boxes!");
 	}
