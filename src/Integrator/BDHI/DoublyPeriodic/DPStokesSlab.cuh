@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include "misc/LanczosAlgorithm.cuh"
 #include"StokesSlab/spreadInterp.cuh"
+#include<thrust/functional.h>
 
 namespace uammd{
   namespace DPStokesSlab_ns{
@@ -140,21 +141,23 @@ namespace uammd{
 
       };
 
-       struct SaruTransform{
+      struct SaruTransform{
 	uint s1, s2;
-	SaruTransform(uint s1, uint s2):s1(s1), s2(s2){}
+	real std;
+	SaruTransform(uint s1, uint s2, real std = 1.0):
+	  s1(s1), s2(s2), std(std){}
 
 	__device__ real3 operator()(uint id){
 	  Saru rng(s1, s2, id);
-	  return make_real3(rng.gf(0.0f,1.0f), rng.gf(0.0f,1.0f).x);
+	  return make_real3(rng.gf(0.0f,std), rng.gf(0.0f,std).x);
 
 	}
       };
 
-      auto fillRandomVectorReal3(int numberParticles, uint s1, uint s2){
+      auto fillRandomVectorReal3(int numberParticles, uint s1, uint s2, real std = 1.0){
 	cached_vector<real3> noise(numberParticles);
 	auto cit = thrust::make_counting_iterator<uint>(0);
-	auto tr = thrust::make_transform_iterator(cit, SaruTransform(s1, s2));
+	auto tr = thrust::make_transform_iterator(cit, SaruTransform(s1, s2, std));
 	thrust::copy(thrust::cuda::par,
 		     tr, tr + numberParticles,
 		     noise.begin());
@@ -175,32 +178,28 @@ namespace uammd{
       struct BDIntegrate{
 	real4* pos;
 	real3* mf;
-	real3* sqrtmdwn;
-	real3* sqrtmdwnm1;
-	real3* mpw;
-	real3* mmw;
-	real rfdPrefactor;
+	real3* noise;
+	real3* noisePrev;
+	real3* rfd;
 	real dt;
-	real noisePrefactor;
 	BDIntegrate(real4* pos,
 		    real3* mf,
-		    real3* sqrtmdwn, real3* sqrtmdwnm1,
-		    real3* mpw, real3* mmw, real deltaRFD,
+		    real3* noise, real3* noisePrev,
+		    real3* rfd,
 		    real dt, real temperature):
-	  pos(pos), mf(mf), sqrtmdwn(sqrtmdwn),sqrtmdwnm1(sqrtmdwnm1),
-	  mpw(mpw), mmw(mmw), dt(dt){
-	  this->noisePrefactor = sqrt(2*temperature*dt);
-	  this->rfdPrefactor = dt*temperature/deltaRFD;
+	  pos(pos), mf(mf), noise(noise),noisePrev(noisePrev),
+	  rfd(rfd), dt(dt){
 	}
 	__device__ void operator()(int id){
-	  real3 fluct;
-	  if(sqrtmdwnm1)
-	    fluct = noisePrefactor*real(0.5)*(sqrtmdwn[id] + sqrtmdwnm1[id]);
-	  else
-	    fluct = noisePrefactor*sqrtmdwn[id];
-	  real3 displacement = mf[id]*dt +
-	    fluct
-	    +rfdPrefactor * (mpw[id] - mmw[id]);
+	  real3 displacement = mf[id]*dt;
+	  if(noise){
+	    real3 fluct;
+	    if(noisePrev)
+	      fluct = dt*real(0.5)*(noise[id] + noisePrev[id]);
+	    else
+	      fluct = dt*noise[id];
+	    displacement += fluct + rfd[id];
+	  }
 	  pos[id] += make_real4(displacement);
 	}
       };
@@ -209,7 +208,7 @@ namespace uammd{
 
     class DPStokesIntegrator: public Integrator{
       int steps = 0;
-      uint seed;
+      uint seed, seedRFD;
       std::shared_ptr<DPStokes> dpstokes;
       std::shared_ptr<lanczos::Solver> lanczos;
       thrust::device_vector<real3> previousNoise;
@@ -228,38 +227,15 @@ namespace uammd{
 	System::log<System::MESSAGE>("[DPStokes] dt %g", par.dt);
 	System::log<System::MESSAGE>("[DPStokes] temperature: %g", par.temperature);
 	this->seed = pd->getSystem()->rng().next32();
+	this->seedRFD = pd->getSystem()->rng().next32();
 	this->deltaRFD = 1e-6*par.hydrodynamicRadius;
       }
 
-      void forwardTime(){
-	System::log<System::DEBUG2>("[DPStokes] Running step %d", steps);
-	if(steps==0) setUpInteractors();
-	resetForces();
-	for(auto i: interactors){
-	  i->updateSimulationTime(par.dt*steps);
-	  i->sum({.force=true});
-	}
-	auto pos = pd->getPos(access::gpu, access::readwrite);
-	auto force = pd->getForce(access::gpu, access::read);
-	auto torque = pd->getTorqueIfAllocated(access::gpu, access::read);
+      //Returns the thermal drift term: temperature*dt*(\partial_q \cdot M)
+      auto computeThermalDrift(){
+	auto pos = pd->getPos(access::gpu, access::read);
 	const int numberParticles = pd->getNumParticles();
-	auto mf = dpstokes->Mdot(pos.raw(), force.raw(), numberParticles, 0);
-	if(torque.raw()){
-	  System::log<System::EXCEPTION>("[DPStokes] Torques are not yet implemented");
-	  throw std::runtime_error("Operation not implemented");
-	}
-	cached_vector<real3> bdw(numberParticles);
-	thrust::fill(bdw.begin(), bdw.end(), real3());
-	detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
-	auto noise = detail::fillRandomVectorReal3(numberParticles, seed, 2*steps);
-	lanczos->run(dot,
-		     (real*)bdw.data().get(), (real*)noise.data().get(),
-		     par.tolerance, 3*numberParticles);
-	if(par.useLeimkuhler and previousNoise.size() != numberParticles){
-	  previousNoise.resize(numberParticles);
-	  thrust::copy(bdw.begin(), bdw.end(), previousNoise.begin());
-	}
-	auto noise2 = detail::fillRandomVectorReal3(numberParticles, seed, 2*steps+1);
+	auto noise2 = detail::fillRandomVectorReal3(numberParticles, seedRFD, steps);
 	auto cit = thrust::make_counting_iterator(0);
 	auto posp = thrust::make_transform_iterator(cit,
 						    detail::SumPosAndNoise(pos.raw(),
@@ -271,14 +247,77 @@ namespace uammd{
 									   noise2.data().get(),
 									   -deltaRFD*0.5));
 	auto mmw = dpstokes->Mdot(posm, noise2.data().get(), numberParticles, 0);
-	real3* d_prevNoise = par.useLeimkuhler?previousNoise.data().get():nullptr;
-	detail::BDIntegrate bd(pos.raw(), mf.data().get(),
-			       bdw.data().get(), d_prevNoise,
-			       mpw.data().get(), mmw.data().get(),
-			       deltaRFD, par.dt, par.temperature);
-	thrust::for_each_n(thrust::cuda::par, cit, numberParticles, bd);
-	if(par.useLeimkuhler)
-	  thrust::copy(bdw.begin(), bdw.end(), previousNoise.begin());
+	using namespace thrust::placeholders;
+	thrust::transform(mpw.begin(), mpw.end(),
+			  mmw.begin(),
+			  mpw.begin(),
+			  make_real3(par.dt*par.temperature/deltaRFD)*(_1 - _2));
+	return mpw;
+      }
+
+      //Returns sqrt(2*M*temperature/dt)dW
+      auto computeFluctuations(){
+	auto pos = pd->getPos(access::gpu, access::read);
+	const int numberParticles = pd->getNumParticles();
+	cached_vector<real3> bdw(numberParticles);
+	thrust::fill(bdw.begin(), bdw.end(), real3());
+	detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
+	auto noise = detail::fillRandomVectorReal3(numberParticles, seed, steps,
+						   sqrt(2*par.temperature/par.dt));
+	lanczos->run(dot,
+		     (real*)bdw.data().get(), (real*)noise.data().get(),
+		     par.tolerance, 3*numberParticles);
+	return bdw;
+      }
+
+      //Returns the product of the forces and the mobility matrix, M F
+      auto computeDeterministicDisplacements(){
+	auto pos = pd->getPos(access::gpu, access::read);
+	auto force = pd->getForce(access::gpu, access::read);
+	if(pd->isTorqueAllocated()){
+	  System::log<System::EXCEPTION>("[DPStokes] Torques are not yet implemented");
+	  throw std::runtime_error("Operation not implemented");
+	}
+	const int numberParticles = pd->getNumParticles();
+    	return dpstokes->Mdot(pos.raw(), force.raw(), numberParticles, 0);
+      }
+
+      void forwardTime(){
+	System::log<System::DEBUG2>("[DPStokes] Running step %d", steps);
+	if(steps==0) setUpInteractors();
+	resetForces();
+	for(auto i: interactors){
+	  i->updateSimulationTime(par.dt*steps);
+	  i->sum({.force=true});
+	}
+	const int numberParticles = pd->getNumParticles();
+	auto mf = computeDeterministicDisplacements();
+	if(par.temperature){
+	  auto bdw = computeFluctuations();
+	  if(par.useLeimkuhler and previousNoise.size() != numberParticles){
+	    previousNoise.resize(numberParticles);
+	    thrust::copy(bdw.begin(), bdw.end(), previousNoise.begin());
+	  }
+	  auto rfd = computeThermalDrift();
+	  real3* d_prevNoise = par.useLeimkuhler?previousNoise.data().get():nullptr;
+	  auto pos = pd->getPos(access::gpu, access::readwrite);
+	  detail::BDIntegrate bd(pos.raw(), mf.data().get(),
+				 bdw.data().get(), d_prevNoise,
+				 rfd.data().get(),
+				 par.dt, par.temperature);
+	  auto cit = thrust::make_counting_iterator(0);
+	  thrust::for_each_n(thrust::cuda::par, cit, numberParticles, bd);
+	  if(par.useLeimkuhler)
+	    thrust::copy(bdw.begin(), bdw.end(), previousNoise.begin());
+	}
+	else{
+	  auto pos = pd->getPos(access::gpu, access::readwrite);
+	  detail::BDIntegrate bd(pos.raw(), mf.data().get(),
+				 nullptr, nullptr, nullptr,
+				 par.dt, 0);
+	  auto cit = thrust::make_counting_iterator(0);
+	  thrust::for_each_n(thrust::cuda::par, cit, numberParticles, bd);
+	}
 	steps++;
       }
 
