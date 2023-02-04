@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.14)
-project(lanczos_test)
+project(fcm_test)
 enable_language(CUDA)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 #set( CMAKE_VERBOSE_MAKEFILE on )
 #add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
 #GoogleTest requires at least C++14
@@ -28,7 +28,7 @@ enable_testing()
 
 
 
-set(BLA_VENDOR Intel10_64lp)
+#set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 if(BLAS_FOUND)
   message("mkl environment detected")
@@ -45,18 +45,18 @@ include_directories(${UAMMD_INCLUDE})
 link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES} ${BLAS_LIBRARIES} ${CUDA_LIBRARY} cufft cublas cusolver)
 
 add_executable(
-  lanczos_test
-  lanczos_test.cu
+  fcm_test
+  fcm_test.cu
 )
 
 target_link_libraries(
-  lanczos_test
+  fcm_test
   GTest::gtest_main
   GTest::gmock_main
 )
 
 include(GoogleTest)
-gtest_discover_tests(lanczos_test)
+gtest_discover_tests(fcm_test)
 
 IF (CMAKE_BUILD_TYPE MATCHES "Debug")
  set(CMAKE_CUDA_FLAGS "-g -G  -lineinfo -src-in-ptx")
