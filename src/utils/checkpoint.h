@@ -1,10 +1,11 @@
-/*Raul P. Pelaez 2021. Utilities for storing/restoring the simulation state.
+/*Raul P. Pelaez 2021-2022. Utilities for storing/restoring the simulation state.
 
  */
 #ifndef UAMMD_CHECKPOINT_H
 #define UAMMD_CHECKPOINT_H
 #include "ParticleData/ParticleData.cuh"
-#include<uammd.cuh>
+#include <uammd.cuh>
+#include <fstream>
 namespace uammd{
 
   namespace detail{

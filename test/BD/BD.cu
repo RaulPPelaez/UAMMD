@@ -13,7 +13,7 @@
 #include"Interactor/Potential/Potential.cuh"
 #include"SoftPotential.cuh"
 #include"RepulsivePotential.cuh"
-
+#include<random>
 using namespace uammd;
 
 struct Parameters{
@@ -334,4 +334,3 @@ Parameters readParameters(std::string datamain){
 
   return par;
 }
-

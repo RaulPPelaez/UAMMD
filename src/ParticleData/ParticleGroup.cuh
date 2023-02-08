@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017-2021. ParticleGroup
+/*Raul P. Pelaez 2017-2022. ParticleGroup
 
   ParticleGroup allows to track a certain subset of the particles in the system.
 
@@ -45,9 +45,10 @@ You can request the current indices of the particles in a group with:
 
 #include"System/System.h"
 #include"ParticleData.cuh"
+#include<thrust/iterator/constant_iterator.h>
 #include<thrust/device_vector.h>
 #include<vector>
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 #include"third_party/type_names.h"
 #include<memory>
 namespace uammd{
@@ -164,6 +165,8 @@ namespace uammd{
     //A list of the particle indices and ids of the group (updated to current order)
     thrust::device_vector<int> myParticlesIndicesGPU, myParticlesIdsGPU;
     thrust::host_vector<int>   myParticlesIndicesCPU;
+    thrust::device_vector<bool> myParticlesIndexMaskGPU;
+    thrust::host_vector<bool>   myParticlesIndexMaskCPU;
 
     bool updateHostVector = true;
     bool needsIndexListUpdate = false;
@@ -176,6 +179,10 @@ namespace uammd{
     std::string name;
 
     connection reorderConnection;
+
+    //Update index list if needed
+    void computeIndexList(bool forceUpdate = false);
+    void computeIndexMaskList(bool forceUpdate = false);
 
   public:
     //Defaults to all particles in group
@@ -211,8 +218,6 @@ namespace uammd{
     void addParticlesById(access::location loc, const int *ids, int N);
     //Add particles to the group via an array with the current indices of the particles in pd (faster)
     void addParticlesByCurrentIndex(access::location loc, const int *indices, int N);
-    //Update index list if needed
-    void computeIndexList(bool forceUpdate = false);
 
     void handleReorder(){
       sys->log<System::DEBUG>("[ParticleGroup] Handling reorder signal in group %s", this->name.c_str());
@@ -243,6 +248,34 @@ namespace uammd{
       return ptr;
     }
 
+    //Get an int pointer of size pd->getNumParticles() returning 1 if the particle in that index is
+    // part of the group and 0 otherwise.
+    //loc specifies the memory location of the underlying array
+    const int * getGroupIndexMaskRawPtr(access::location loc){
+      if(this->allParticlesInGroup || numberParticles == 0 ) return nullptr;
+      auto indicesInGroupRaw = this->getIndicesRawPtr(access::gpu);
+      if(not indicesInGroupRaw)	return nullptr;
+      int totalNumberParticles = pd->getNumParticles();
+      auto perm = thrust::make_permutation_iterator(thrust::make_constant_iterator(true),
+						    indicesInGroupRaw);
+      myParticlesIndexMaskGPU.resize(totalNumberParticles);
+      thrust::copy(thrust::cuda::par,
+		   perm, perm + numberParticles, myParticlesIndexMaskGPU.begin());
+      int *ptr;
+      switch(loc){
+      case access::gpu:
+	ptr = thrust::raw_pointer_cast(myParticlesIndicesGPU.data());
+	break;
+      case access::cpu:
+	myParticlesIndexMaskCPU = myParticlesIndexMaskGPU;
+	ptr = thrust::raw_pointer_cast(myParticlesIndicesCPU.data());
+	break;
+      default:
+	ptr = nullptr;
+      }
+      return ptr;
+    }
+
     //Access the index array only if it is not a nullptr (AKA if the group does not contain all particles)
     struct IndexAccess{
       IndexAccess(const int * indices):indices(indices){}
@@ -265,10 +298,32 @@ namespace uammd{
       return IndexIterator(thrust::make_counting_iterator<int>(0), IndexAccess(this->getIndicesRawPtr(loc)));
     }
 
+    //Access the mask array only if it is not a nullptr (AKA if the group does not contain all particles)
+    //Otherwise always return true
+    struct MaskAccess{
+      MaskAccess(const int * masks):masks(masks){}
+
+      inline __host__ __device__ bool operator()(int i) const{
+	return masks?masks[i]:true;
+      }
+
+    private:
+      const int * masks;
+    };
+
+    using MaskIterator = thrust::transform_iterator<MaskAccess, thrust::counting_iterator<int>>;
+
+    //Get an iterator of size pd->getNumParticles() returning 1 if the particle in that index is
+    // part of the group and 0 otherwise.
+    //loc specifies the memory location of the underlying array
+    MaskIterator getGroupIndexMask(access::location loc){
+      return MaskIterator(thrust::make_counting_iterator<int>(0), MaskAccess(this->getGroupIndexMaskRawPtr(loc)));
+    }
+
   private:
 
     template<class Iterator>
-    accessIterator<Iterator> make_permutation_iterator(Iterator it, access::location loc){
+    auto make_permutation_iterator(Iterator it, access::location loc){
       return accessIterator<Iterator>(it, getIndexIterator(loc));
     }
 
@@ -279,12 +334,13 @@ namespace uammd{
     //For example, If a group contains only the particle with id=10, passing pd->getPos(...).begin() to this function
     // will return an iterator so that iterator[0] = pos[10]; and it will take into account any possible reordering of the pos array.
     template<class Iterator>
-    accessIterator<Iterator> getPropertyIterator(Iterator property, access::location loc){
-      return this->make_permutation_iterator(property, loc);
+    auto getPropertyIterator(Iterator iter, access::location loc){
+      return this->make_permutation_iterator(iter, loc);
     }
 
+    //Overload when using a ParticleData::Property
     template<class Iterator>
-    accessIterator<typename Iterator::Iterator> getPropertyIterator(Iterator property){
+    auto getPropertyIterator(Iterator property){
       // using value_type = typename std::iterator_traits<Iterator>::element_type;
       // static_assert(std::is_same<Iterator, typename Property<value_type>::iterator>::value,
       // 	       "You must specify a location or call this function with a Property::iterator argument");

@@ -1,0 +1,126 @@
+
+#+TITLE: Investigating the correctness of the BVP solver
+#+AUTHOR: Raul P. Pelaez
+#+OPTIONS: toc:nil author date 
+#+LATEX_CLASS: report
+#+LATEX_CLASS_OPTIONS: [a4paper]
+#+LATEX_HEADER: \usepackage{times}
+#+LATEX_HEADER: \usepackage{amsmath}
+
+* Introduction
+
+Let us use UAMMD's BVP solver to solve an equation with a known solution:
+
+$$ \begin{aligned}
+    \left(\partial_z^2 -k^2\right)y(z) &= f(z) = exp(-\gamma z^2) \\
+    \left(\partial_z \pm k\right)y(z=\pm1) & = \begin{bmatrix}
+                                  \alpha\\
+                                  \beta
+                                  \end{bmatrix}
+\end{aligned} $$
+
+The code bvp.cu runs three separated tests:
+
+ 1. Solve a known equation (see below) and compare with analytic result.
+    The solver is setup to solve 1000 copies of the same equation in a batch.
+    All copies are compared to check that they are identical.   
+ 2. The above test is repeated, but using a randomized value of $k$ for each solve.
+    All of them are compared with the known solution.
+ 3. The right hand side is filled with random data and the solution is compared with an equivalent implementation
+    of the BVP solver written in matlab. Again the solver batches 1000 identical simulations and compares them to each other.
+
+Parameters can be set in data.main. Note, however, that the analytic solution only works for $H=1$, so the first two tests will fail if $H\neq 1$.
+An additional test, comparing the results of test 1. with the matlab implementation is presented below for reference.
+
+For comparing with the known result, let us set $k=2$, $\gamma = 1$ and $\alpha=\beta = 1$.
+
+The solution to this equation is:
+
+$$ \begin{aligned}
+y(x) &= -(\exp(-(-2 a - k)^2/(4 a) - (k - 2 a)^2/(4 a) - k x - 2 k)\nonumber \\
+         &(-2 \sqrt{a} b k \exp((-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k x + k)\nonumber \\
+         &+ 2 \sqrt{a} c k \exp((-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + k)\nonumber \\
+         &+ \sqrt{\pi} k \text{erf}((2 a + k)/(2 \sqrt{a})) \exp(k^2/(4 a)\nonumber \\
+         &+ (-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k x + 2 k)\nonumber \\
+         &+ \sqrt{\pi} k \exp(k^2/(4 a) + (-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k) erf((2 a x - k)/(2 \sqrt{a}))\nonumber \\
+         &- \sqrt{\pi} k \text{erf}((2 a x + k)/(2 \sqrt{a})) \exp(k^2/(4 a) + (-2 a - k)^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k x + 2 k)\nonumber \\
+         &- \sqrt{\pi} k \text{erf}((-2 a - k)/(2 \sqrt{a})) \exp(k^2/(4 a) + (-2 a - k)^2/(4 a)\nonumber \\
+         &+ (k - 2 a)^2/(4 a) + 2 k) - \sqrt{a} \exp(k^2/(4 a) + (-2 a - k)^2/(4 a) + 2 k x)\nonumber \\
+         &+ \sqrt{a} \exp(k^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k x + 2 k) - \sqrt{a} \exp(k^2/(4 a) + (-2 a - k)^2/(4 a))\nonumber \\
+         &+ \sqrt{a} \exp(k^2/(4 a) + (k - 2 a)^2/(4 a) + 2 k)))/(4 \sqrt{a} k^2) 
+\end{aligned} $$
+
+
+Being $a=\gamma, b=\alpha, c=\beta$.
+
+
+* Preparing the input for the BVP solver
+
+Our BVP solvers work in Chebyshev space, requiring as input the Chebyshev modes of the right hand side.
+We can expand a given function, $g(z)$, into the first $N$ terms of its Chebyshev so that
+
+$$g(z) = \sum_{i=0}^{N-1}\hat{g}_nT_n(z).$$
+
+Obtaining the Chebyshev coefficients gets easier once we know that $T_n(cos(\theta)) = cos(n\theta)$.
+By evaluating the function at the extrema points $x_n = cos(n\pi/(N-1))$ we make the Chebyshev transform into a cosine series.
+Finally, we can evaluate the Chebyshev coefficients of $g(z)$ using
+
+$$\hat{g}_n = p_m \left(\frac{1}{2} g(x_0)(-1)^n + g(x_{N-1}\right) + \sum_{i=1}^{N-2}\frac{p_m}{N-1}g(x_i)(-1)^n\cos(in\pi/(N-1)).$$
+
+Where $p_m = 1$ if $n=0$ and $2$ otherwise.
+
+In a similar way, our BVP solvers return the Chebyshev coefficients of the solution, which we can take back to
+real space for comparison using
+
+$$g(x_n) =\sum_{i=0}^{N-1}\hat{g}_i\cos\left(in\pi/(N-1)\right).$$
+
+In this case, however, we will be comparing the Chebyshev coefficients returned by the BVP solver with
+the Chebyshev coefficients of the solution directly.
+
+
+* Results
+For these tests, we set $N=16$. The Chebyshev coefficients of the right hand side and the solution in this case are:
+
+#+NAME: table:1
+#+CAPTION: results
+#+attr_latex: :align |c|c|c|c|c|
+|----+-----------------------+-----------------------+-----------------------+-----------------------|
+|  n |                 $f_n$ |          Theory $y_n$ |           UAMMD $y_n$ |          MATLAB $y_n$ |
+|----+-----------------------+-----------------------+-----------------------+-----------------------|
+|  0 |      0.64503527044915 |    -0.129312310367017 |    -0.129312310370865 |    -0.129312310370865 |
+|  1 | -1.38777878078145e-17 |     0.215269289248938 |     0.215269289248941 |     0.215269289248941 |
+|  2 |    -0.312841606369743 |    0.0511040842701627 |    0.0511040842678368 |    0.0511040842678368 |
+|  3 |  6.93889390390723e-18 |    0.0287912226394709 |    0.0287912226394713 |    0.0287912226394713 |
+|  4 |    0.0387041154193267 |  -0.00315583599456852 |   -0.0031558359947398 |   -0.0031558359947398 |
+|  5 |  3.12250225675825e-16 |   0.00132976109418817 |   0.00132976109418817 |   0.00132976109418817 |
+|  6 |  -0.00320868301513091 |  0.000249827360235372 |  0.000249827360229982 |  0.000249827360229982 |
+|  7 | -2.20309881449055e-16 |  3.04016019087743e-05 |  3.04016019087855e-05 |  3.04016019087855e-05 |
+|  8 |  0.000199919237748264 |  -1.1124828433622e-05 | -1.11248284330126e-05 | -1.11248284330126e-05 |
+|  9 | -1.73472347597681e-17 |  4.11985761364538e-07 |  4.11985761368537e-07 |  4.11985761368537e-07 |
+| 10 | -9.97521072256674e-06 |  4.73332382037658e-07 |  4.73332366525882e-07 |  4.73332366525883e-07 |
+| 11 |  3.40005801291454e-16 |   3.6841002540311e-09 |  3.68410023969649e-09 |  3.68410023969649e-09 |
+| 12 |  4.15004064419078e-07 | -1.65463719045689e-08 | -1.65459568023771e-08 | -1.65459568023771e-08 |
+| 13 | -3.05311331771918e-16 |  2.33392020987377e-11 |  2.33387935601059e-11 |  2.33387935601059e-11 |
+| 14 | -1.43432504207119e-08 |  4.98259253300937e-10 |  5.10688412792193e-10 |  5.10688412792194e-10 |
+| 15 | -2.77555756156289e-17 |  2.20302942555151e-13 |  1.10610067161928e-13 |  1.10610067161928e-13 |
+|----+-----------------------+-----------------------+-----------------------+-----------------------|
+We are comparing here between UAMMD's implementation and the BVP writen by Ondrej in MATLAB.
+
+Looking at [[table:1]] we can see that first, both UAMMD and Matlab are identical up to machine precision and second,
+both provide an accuracy of about 10 digits with the theory.
+The small discrepancies with the theory are reduced even more if we choose a finer grid ( $N=32$ gives machine precision already).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

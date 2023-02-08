@@ -24,8 +24,7 @@
 #ifndef TABULATEDFUNCTION_CUH
 #define TABULATEDFUNCTION_CUH
 
-#include "cub/iterator/cache_modified_input_iterator.cuh"
-#include "cub/thread/thread_load.cuh"
+#include "third_party/uammd_cub.cuh"
 #include"global/defines.h"
 #include"utils/debugTools.h"
 #include <vector>
@@ -160,47 +159,6 @@ namespace uammd{
 
   };
 
-  /*
-    struct LJ{
-    __device__ __host__ real2 operator()(real x){
-
-    return {(real)(pow(x, -13) - pow(x,-7)), real(1.0/(x*x))};
-    }
-    };
-
-  template<class Table, class Functor>
-  __global__ void sample(Table table, Functor foo, real rmin, real rmax, int N){
-    int id = blockIdx.x*blockDim.x + threadIdx.x;
-
-    real x = (real(id)/real(N))*(rmax-rmin)+rmin;
-    printf("%d %.9f %.9f %.9f\n", id, x, foo(x).y, table(x).y);
-
-
-  }
-
-
-  int main(){
-
-    int Ntable = 64000;
-    LJ lj;
-    real rmax = 2.5;
-    real rmin = 0.1;
-    Table<real2, LinearInterpolation> table(Ntable, rmin, rmax, lj);
-
-    cerr<<rmax/Ntable<<endl;
-
-
-
-    int N = 2*Ntable;
-    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1e8*sizeof(char));
-
-    sample<<<N, 1>>>(table, lj, rmin, rmax, N);
-
-    cudaDeviceSynchronize();
-
-    return 0;
-  }
-  */
 }
 
 #endif

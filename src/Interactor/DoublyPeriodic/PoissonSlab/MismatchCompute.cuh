@@ -13,13 +13,13 @@ namespace uammd{
     struct MismatchVals{
       cufftComplex mP0, mPH, mE0, mEH;
     };
-    
+
     struct MismatchPtr{
       cufftComplex* potentialTop;
       cufftComplex* potentialBottom;
       cufftComplex* fieldZTop;
       cufftComplex* fieldZBottom;
-      cufftComplex* linearModeCorrection;
+      cufftComplex2* linearModeCorrection;
       __device__ MismatchVals fetchMisMatch(int2 ik, int2 nk){
 	Index3D indexer(nk.x/2 + 1, nk.y, 1);
 	MismatchVals mis;
@@ -33,47 +33,86 @@ namespace uammd{
 
     class MismatchGPU{
       int nz;
+      real H;
       Permitivity perm;
       real thetaTop, thetaBottom;
-
+      bool metallicTop = false;
+      bool metallicBottom = false;
     public:
       MismatchGPU(int nz,
+		  real H,
 		  Permitivity perm,
 		  real thetaTop, real thetaBottom):
 	nz(nz),
+	H(H),
 	perm(perm),
 	thetaTop(thetaTop), thetaBottom(thetaBottom){
+	this->metallicTop = std::isinf(perm.top);
+	this->metallicBottom = std::isinf(perm.bottom);
       }
 
       template<class Iterator1, class Iterator2>
       __device__ MismatchVals computeMismatch(Iterator1 insideSolution, Iterator2 outsideSolution,
-					      cufftComplex2 surfaceChargeFourier){
+					      cufftComplex2 surfaceValueFourier){
 	auto evalthetaInside = evaluateThetas(insideSolution, thetaTop, thetaBottom, nz);
 	auto evalthetaOutside = evaluateThetas(outsideSolution, thetaTop, thetaBottom, nz);
 	MismatchVals mismatch;
 	const real eb = real(2.0)*perm.inside/(perm.bottom + perm.inside);
 	const real et = real(2.0)*perm.inside/(perm.top + perm.inside);
-	mismatch.mP0 = evalthetaInside.x - eb*evalthetaOutside.x;
-	mismatch.mPH = evalthetaInside.y - et*evalthetaOutside.y;
-	mismatch.mE0 = perm.bottom*eb*evalthetaOutside.z - perm.inside*evalthetaInside.z + surfaceChargeFourier.y;
-	mismatch.mEH = perm.top*et*evalthetaOutside.w - perm.inside*evalthetaInside.w - surfaceChargeFourier.x;
+	if(not metallicTop){
+	  const auto surfaceChargeAtTopWallFourier = surfaceValueFourier.x;
+	  mismatch.mPH = evalthetaInside.y - et*evalthetaOutside.y;
+	  mismatch.mEH = perm.top*et*evalthetaOutside.w - perm.inside*evalthetaInside.w - surfaceChargeAtTopWallFourier;
+	}
+	else{
+	  const auto potentialAtTopWallFourier = surfaceValueFourier.x;
+	  mismatch.mEH = cufftComplex();
+	  mismatch.mPH = evalthetaInside.y - potentialAtTopWallFourier;
+	}
+	if(not metallicBottom){
+	  const auto surfaceChargeAtBottomWallFourier = surfaceValueFourier.y;
+	  mismatch.mP0 = evalthetaInside.x - eb*evalthetaOutside.x;
+	  mismatch.mE0 = perm.bottom*eb*evalthetaOutside.z - perm.inside*evalthetaInside.z + surfaceChargeAtBottomWallFourier;
+	}
+	else{
+	  const auto potentialAtBottomWallFourier = surfaceValueFourier.y;
+	  mismatch.mE0 = cufftComplex();
+	  mismatch.mP0 = evalthetaInside.x - potentialAtBottomWallFourier;
+	}
 	return mismatch;
       }
 
-
       template<class Iterator>
-      __device__ cufftComplex computeLinearModeCorrection(cufftComplex mismatchFieldZBottom,
-							  cufftComplex mismatchFieldZTop,
-							  Iterator outsideSolutionMode0){
-	auto evalThetaOutside = evaluateThetas(outsideSolutionMode0, 0, real(M_PI), nz);
+      __device__ cufftComplex2 computeLinearModeCorrection(cufftComplex mismatchFieldZBottom,
+							   cufftComplex mismatchFieldZTop,
+							   cufftComplex mismatchPotentialBottom,
+							   cufftComplex mismatchPotentialTop,
+							   Iterator outsideSolutionMode0){
+	auto evalThetaOutside = evaluateThetas(outsideSolutionMode0, thetaTop, thetaBottom, nz);
 	const real et = perm.top/perm.inside;
 	const real eb = perm.bottom/perm.inside;
-	auto C = real(2.0)/(et + real(1.0))*evalThetaOutside.w;
-	auto E = real(2.0)/(eb + real(1.0))*evalThetaOutside.z;
-	auto A0 = (E*eb - mismatchFieldZBottom.x/perm.inside + C*et - mismatchFieldZTop/perm.inside)*real(0.5);
-	return A0;
+	const auto C = real(2.0)/(et + real(1.0))*evalThetaOutside.w;
+	const auto E = real(2.0)/(eb + real(1.0))*evalThetaOutside.z;
+	cufftComplex A0 = cufftComplex();
+	cufftComplex B0 = cufftComplex();
+	if(metallicTop and not metallicBottom){
+	  A0 = E*eb - mismatchFieldZBottom.x/perm.inside;
+	  B0 = -mismatchPotentialTop - A0*H;
+	}
+	else if(metallicBottom and not metallicTop){
+	  A0 = C*et - mismatchFieldZTop/perm.inside;
+	  B0 = -mismatchPotentialBottom - A0*H;
+	}
+	else if(metallicTop and metallicBottom){
+	  A0 = -(mismatchPotentialTop - mismatchPotentialBottom)/H;
+	  B0 = -mismatchPotentialBottom;
+	}
+	else if(not metallicTop and not metallicBottom){
+	  A0 = (E*eb - mismatchFieldZBottom/perm.inside + C*et - mismatchFieldZTop/perm.inside)*real(0.5);
+	  B0 = cufftComplex();
+	}
+	return {A0, B0};
       }
-
     private:
       template<class SolutionIterator>
       __device__ cufftComplex4 evaluateThetas(SolutionIterator sol, real thetaTop, real thetaBot, int Nz){
@@ -105,7 +144,7 @@ namespace uammd{
 
     __global__ void computeMismatchD(const cufftComplex4 *insideSolution,
 				     const cufftComplex4 *outsideSolution,
-				     const cufftComplex2 *surfaceChargesFourier,
+				     const cufftComplex2 *surfaceValuesFourier,
 				     MismatchPtr mismatch,
 				     MismatchGPU mcomp,
 				     int nkx, int nky, int nz){
@@ -117,27 +156,29 @@ namespace uammd{
       Index3D indexer(nkx/2+1, nky, 2*nz-2);
       auto inside_ik = make_third_index_iterator(insideSolution, ik.x, ik.y, indexer);
       auto outside_ik = make_third_index_iterator(outsideSolution, ik.x, ik.y, indexer);
-      cufftComplex2 sfc = *make_third_index_iterator(surfaceChargesFourier, ik.x, ik.y, indexer);
+      cufftComplex2 sfc = *make_third_index_iterator(surfaceValuesFourier, ik.x, ik.y, indexer);
       auto m = mcomp.computeMismatch(inside_ik, outside_ik, sfc);
       detail::storeMismatch(m, mismatch, ik, indexer);
       if(id == 0){
-	mismatch.linearModeCorrection[0] = mcomp.computeLinearModeCorrection(m.mE0, m.mEH, outside_ik);
+	mismatch.linearModeCorrection[0] = mcomp.computeLinearModeCorrection(m.mE0, m.mEH, m.mP0, m.mPH, outside_ik);
       }
     }
 
     class Mismatch{
       using container = cached_vector<cufftComplex>;
+      using container2 = cached_vector<cufftComplex2>;
       container potentialTop;
       container potentialBottom;
       container fieldZTop;
       container fieldZBottom;
-      container linearModeCorrection;
+      container2 linearModeCorrection;
       int3 cellDim;
       Permitivity permitivity;
+      real H;
       real thetaTop, thetaBot;
     public:
       Mismatch(int3 cellDim, Permitivity perm, real H, real extraHeight):
-	cellDim(cellDim), permitivity(perm){
+	cellDim(cellDim), permitivity(perm), H(H){
 	int numberElements = (cellDim.x/2 + 1)*cellDim.y;
 	potentialTop.resize(numberElements);
 	potentialBottom.resize(numberElements);
@@ -145,23 +186,26 @@ namespace uammd{
 	fieldZBottom.resize(numberElements);
 	linearModeCorrection.resize(1);
 	real He = extraHeight;
-	real Lz = 0.5*(H + 4*He);
-	this->thetaTop = acos((2*He+H)/Lz-1);
-	this->thetaBot = acos((2*He)/Lz-1);
+	real Lz = 0.5*(H + 6*He);
+	this->thetaTop = acos((3*He+H)/Lz-1);
+	this->thetaBot = acos((3*He)/Lz-1);
       }
 
+      //surfaceValues hold surface charges of the walls. If the permittivity is infinite (metallic boundary) at some wall, surfaceValues hold the potential at the wall instead.
       template<class Container>
-      MismatchPtr compute(Container &insideSolution, Container &outsideSolution, const cufftComplex2* surfaceChargesFourier, cudaStream_t st){
+      MismatchPtr compute(Container &insideSolution, Container &outsideSolution,
+			  const cufftComplex2* surfaceValuesFourier,
+			  cudaStream_t st){
 	System::log<System::DEBUG>("Computing mismatch");
 	const auto i_ptr = thrust::raw_pointer_cast(insideSolution.data());
 	const auto o_ptr = thrust::raw_pointer_cast(outsideSolution.data());
 	auto mismatch_ptr = this->getRawPointers();
 	int3 n = cellDim;
-	MismatchGPU gpuCompute(n.z, permitivity, thetaTop, thetaBot);
+	MismatchGPU gpuCompute(n.z, H, permitivity, thetaTop, thetaBot);
 	int blockSize = 128;
 	int nblocks = ((n.x/2+1)*n.y)/blockSize + 1;
         computeMismatchD<<<nblocks, blockSize, 0, st>>>(i_ptr, o_ptr,
-							surfaceChargesFourier,
+							surfaceValuesFourier,
 							mismatch_ptr,
 							gpuCompute,
 							n.x, n.y, n.z);

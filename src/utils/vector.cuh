@@ -9,7 +9,7 @@
 #include <math.h>
 #include"global/defines.h"
 #include"utils/cxx_utils.h"
-
+#include<thrust/tuple.h>
 typedef unsigned short ushort;
 typedef unsigned int uint;
 typedef unsigned long long int ullint;
@@ -370,6 +370,12 @@ VECATTR  float4 floorf(const float4 &a){
 
 VECATTR float dot(float4 a, float4 b){return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;}
 
+VECATTR float4 normalize(float4 v)
+{
+  float invLen = 1.0/sqrt(dot(v, v));
+  return v * invLen;
+}
+
 
 
 namespace uammd{
@@ -385,8 +391,10 @@ VECATTR real4 make_real4(real x, real y, real z, real w){
 
 VECATTR real4 make_real4(real s){return make_real4(s, s, s, s);}
 VECATTR real4 make_real4(real3 a){ return make_real4(a.x, a.y, a.z, real(0.0));}
+VECATTR real4 make_real4(real4 a){ return a;}
 VECATTR real4 make_real4(real3 a, real w){ return make_real4(a.x, a.y, a.z, w);}
 VECATTR real4 make_real4(real2 a){ return make_real4(a.x, a.y, real(0.0), real(0.0));}
+VECATTR real4 make_real4(real2 a, real z, real w){ return make_real4(a.x, a.y, z, w);}
 #ifdef SINGLE_PRECISION
 VECATTR real4 make_real4(double3 a, real w){return make_real4(a.x, a.y, a.z, w);}
 #else
@@ -865,24 +873,35 @@ VECATTR int dot(const int2 &a, const int2 &b){return a.x * b.x + a.y * b.y;}
 
 
 VECATTR double length(double3 v){return sqrt(dot(v, v));}
-VECATTR double3 normalize(double3 v)
-{
-  double invLen = 1.0/sqrt(dot(v, v));
+
+VECATTR double3 normalize(double3 v){
+  double invLen = rsqrt(dot(v, v));
+  return v * invLen;
+}
+
+VECATTR float length(float3 v){return sqrt(dot(v, v));}
+
+VECATTR float3 normalize(float3 v){
+  float invLen = rsqrtf(dot(v, v));
   return v * invLen;
 }
 
 VECATTR double3 cross(double3 a, double3 b){
   return make_double3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
+
 VECATTR float3 cross(float3 a, float3 b){
   return make_float3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
 }
 
 
 VECATTR float3 sqrt(const float3 &a){ return {sqrtf(a.x), sqrtf(a.y), sqrtf(a.z)};}
+
 VECATTR double3 sqrt(const double3 &a){ return {sqrt(a.x), sqrt(a.y), sqrt(a.z)};}
 
 
+VECATTR double3 abs(const double3 &a) { return {abs(a.x), abs(a.y), abs(a.z)}; }
+VECATTR float3 abs(const float3 &a){ return {fabs(a.x), fabs(a.y), fabs(a.z)};}
 //////////////////////////////////////////////////////////
 
 
@@ -946,6 +965,15 @@ VECATTR  int3 operator -(const int &b, const int3 &a){
 VECATTR  int3 operator *(const int3 &a, const int3 &b){return make_int3(a.x*b.x, a.y*b.y, a.z*b.z);}
 VECATTR  void operator *=(int3 &a, const int3 &b) {a = a*b;}
 VECATTR  int3 operator *(const int3 &a, const int &b){return make_int3(a.x*b, a.y*b, a.z*b);}
-VECATTR  int3 operator *(const int &b, const int3 &a){return a*b;}
+VECATTR int3 operator*(const int &b, const int3 &a) { return a * b; }
+
+namespace uammd{
+  VECATTR thrust::tuple<real, real, real> operator +(real3 a, thrust::tuple<real, real, real> b){
+    return thrust::make_tuple(a.x + thrust::get<0>(b), a.y + thrust::get<1>(b),a.z + thrust::get<2>(b));
+  }
+  VECATTR real3 operator +(thrust::tuple<real, real, real> b, real3 a){
+    return make_real3(a.x + thrust::get<0>(b), a.y + thrust::get<1>(b),a.z + thrust::get<2>(b));
+  }
+}
 
 #endif

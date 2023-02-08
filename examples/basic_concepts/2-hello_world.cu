@@ -1,14 +1,14 @@
 /* Raul P. Pelaez 2021
    Hello world with UAMMD
    We will start from the previous example and see the first utility provided by System, the log function.
-   System::log allows to, well, log messages with several levels of priority. 
+   System::log allows to, well, log messages with several levels of priority.
    Internally UAMMD modules use this utility to print everything ranging from informational messages to critical errors and low level debug messages.
    In this example we will use System::log to print a simple message along with the date.
  */
 
 //uammd.cuh is the basic uammd include containing, among other things, the System struct.
 #include<uammd.cuh>
-#include<ctime> //For time and ctime 
+#include<ctime> //For time and ctime
 using namespace uammd;
 //The main function will initialize an UAMMD environment, print a message, then destroy it and exit
 int main(int argc, char* argv[]){
@@ -29,7 +29,7 @@ int main(int argc, char* argv[]){
   //The special level CRITICAL will terminate the execution of the program with an error code.
   //Unless the log level STDOUT is used, all messages will be issued to stderr.
   //Since it is known at compile time, any log calls with levels above the maximum one will not be compiled and thus will incur
-  // no performance penalty  
+  // no performance penalty
   //Destroy the UAMMD environment and exit
   sys->finish();
   return 0;

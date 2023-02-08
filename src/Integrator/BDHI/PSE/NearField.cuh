@@ -16,7 +16,7 @@ Ondrej implemented the sheared-cell functionality.
 #include "Interactor/NeighbourList/CellList.cuh"
 //#include"Interactor/NeighbourList/VerletList.cuh"
 #include"misc/LanczosAlgorithm.cuh"
-#include "Interactor/NBody.cuh"
+#include"utils/container.h"
 namespace uammd{
   namespace BDHI{
     namespace pse_ns{
@@ -24,7 +24,7 @@ namespace uammd{
 	real g = shearStrain;
 	return 1+0.5*g*g+0.5*sqrt(g*g*(g*g+4.0));
       }
-      
+
       class NearField{
       public:
 	using NeighbourList = CellList;
@@ -50,7 +50,7 @@ namespace uammd{
 	void setShearStrain(real newStrain){
 	  this->shearStrain = newStrain;
 	}
-	
+
       private:
 	shared_ptr<ParticleGroup> pg;
 	Box box;
@@ -62,15 +62,15 @@ namespace uammd{
 	uint seed;
 	shared_ptr<NeighbourList> cl;
 	real tolerance;
-	shared_ptr<LanczosAlgorithm> lanczos;
-	
+	shared_ptr<lanczos::Solver> lanczos;
+	real lanczosTolerance;
 	void initializeDeterministicPart(Parameters par){
 	  const double split = par.psi;
 	  /*Near neighbour list cutoff distance, see sec II:C in [1]*/
 	  this->rcut = sqrt(-log(par.tolerance))/split;
 	  if(0.5*box.boxSize.x < rcut){
 	    System::log<System::EXCEPTION>("[BDHI::PSE] A real space cut off (%e) larger than half the box size (%e) can result in artifacts!, try increasing the splitting parameter (%e)", rcut, 0.5*box.boxSize.x, split);
-	    throw std::runtime_error("[BDHI::PSE] Cut off is too large, try decrasing psi");	    
+	    throw std::runtime_error("[BDHI::PSE] Cut off is too large, try decrasing psi");
 	  }
 	  this->cl = std::make_shared<NeighbourList>(pg);
 	  const double a = par.hydrodynamicRadius;
@@ -144,7 +144,7 @@ namespace uammd{
 	  }
 	  /*Compute the dot product Mr_ij(3x3)·vj(3)*/
 	  inline __device__ computeType compute(const real4 &pi, const real4 &pj,
-						const infoType &vi, const infoType &vj){	    
+						const infoType &vi, const infoType &vj){
 	    real3 rij = computeShearedDistancePBC(make_real3(pi), make_real3(pj));
 	    const real r2 = dot(rij, rij);
 	    if(r2>=rcut2) return real3();
@@ -186,7 +186,7 @@ namespace uammd{
 	/*LanczosAlgorithm needs a functor that computes the product M·v*/
 	/*Dotctor takes a list transverser and a cell list on construction,
 	  and the operator () takes an array v and returns the product M·v*/
-	struct Dotctor{
+	struct Dotctor: lanczos::MatrixDot{
 	  /*Dotctor uses the same transverser as in Mr·F*/
 	  using myTransverser = RPYNearTransverser<real3>;
 	  myTransverser Mv_tr;
@@ -197,10 +197,10 @@ namespace uammd{
 	  Dotctor(myTransverser Mv_tr, shared_ptr<NearField::NeighbourList> cl, int numberParticles, cudaStream_t st):
 	    Mv_tr(Mv_tr), cl(cl), numberParticles(numberParticles), st(st){ }
 
-	  inline void operator()(real3* Mv, real3 *v){
-	    Mv_tr.v = v;
-	    Mv_tr.Mv = Mv;
-	    thrust::fill(thrust::cuda::par.on(st), Mv, Mv + numberParticles, real3());
+	  inline void operator()(real* v, real *Mv){
+	    Mv_tr.v = (real3*)v;
+	    Mv_tr.Mv = (real3*)Mv;
+	    thrust::fill(thrust::cuda::par.on(st), Mv, Mv + 3*numberParticles, real());
 	    cl->transverseList(Mv_tr, st);
 	  }
 	};
@@ -216,13 +216,13 @@ namespace uammd{
 	    return make_real3(rng.gf(0,1), rng.gf(0,1).x)*variance;
 	  }
 	};
-      
+
       }
 
       void NearField::updateNeighbourList(cudaStream_t st){
 	//Sheared coordinates fix. The rcut must be increased by a safety factor
 	real safetyFactor = cutOffShearedSafetyFactor(shearStrain);
-	System::log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);	
+	System::log<System::DEBUG1>("[BDHI::PSE] Safety factor %f", safetyFactor);
 	cl->update(box, rcut*safetyFactor, st);
       }
 
@@ -237,32 +237,26 @@ namespace uammd{
       }
 
       void NearField::computeStochasticDisplacements(real3* BdW, real temperature, real prefactor, cudaStream_t st){
-	//Compute stochastic term only if T>0 
+	//Compute stochastic term only if T>0
 	if(temperature == real(0.0)) return;
 	updateNeighbourList(st);
 	pse_ns::RPYNearTransverser<real3> tr(nullptr, nullptr, *RPY_near, rcut, box, shearStrain);
 	if(not lanczos){
 	  //It appears that this tolerance is unnecesary for lanczos, but I am not sure so better leave it like this.
-	  auto lanczosTolerance = this->tolerance; //std::min(0.05f, sqrt(par.tolerance));
-	  this->lanczos = std::make_shared<LanczosAlgorithm>(lanczosTolerance);
+	  this->lanczosTolerance = this->tolerance; //std::min(0.05f, sqrt(par.tolerance));
+	  this->lanczos = std::make_shared<lanczos::Solver>();
 	}
 	int numberParticles = pg->getNumberParticles();
 	pse_ns::Dotctor Mvdot_near(tr, cl, numberParticles, st);
 	/*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/
-	real *noise = lanczos->getV(numberParticles);
+	uninitialized_cached_vector<real3> noise(numberParticles);
 	const auto id_tr = thrust::make_counting_iterator<uint>(0);
 	const uint seed2 = pg->getParticleData()->getSystem()->rng().next32();
 	real noise_prefactor = prefactor*sqrt(2*temperature);
-	thrust::transform(thrust::cuda::par.on(st), id_tr, id_tr + numberParticles, (real3*)noise,
+	thrust::transform(thrust::cuda::par.on(st), id_tr, id_tr + numberParticles, noise.begin(),
 			  pse_ns::SaruTransform(noise_prefactor, seed, seed2));
-	auto status = lanczos->solve(Mvdot_near, (real *)BdW, noise, numberParticles, st);
-	if(status == LanczosStatus::TOO_MANY_ITERATIONS){
-	  System::log<System::WARNING>("[BDHI::PSE] This is probably fine, but Lanczos could not achieve convergence, try increasing the tolerance or switching to double precision.");
-	}
-	else if(status != LanczosStatus::SUCCESS){
-	  System::log<System::EXCEPTION>("[BDHI::PSE] Lanczos Algorithm failed with code %d!", status);
-	  throw std::runtime_error("Lanczos algorithm exited abnormally");
-	}
+	lanczos->run(Mvdot_near, (real*) BdW, (real*)noise.data().get(),
+		     tolerance, 3*numberParticles, st);
       }
     }
   }

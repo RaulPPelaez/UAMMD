@@ -11,82 +11,24 @@ References:
 #define UAMMD_UTILS_H
 #include<cstdint>
 #include<limits>
-#include<sys/time.h>
-#include<cstring>
-#include<ostream>
-#include<istream>
-#include<vector>
-#include"utils/vector.cuh"
+#include<chrono>
+#include <vector>
 #include"utils/ForceEnergyVirial.cuh"
-inline std::ostream& operator<<(std::ostream& out, const uammd::real2 &f){
-  return out<<f.x<<" "<<f.y;
-}
-
-inline std::ostream& operator<<(std::ostream& out, const uammd::real3 &f){
-  return out<<f.x<<" "<<f.y<<" "<<f.z;
-}
-
-inline std::ostream& operator<<(std::ostream& out, const uammd::real4 &f){
-  return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
-}
-
-inline std::ostream& operator<<(std::ostream& out, const int3 &f){
-  return out<<f.x<<" "<<f.y<<" "<<f.z;
-}
-
-inline std::ostream& operator<<(std::ostream& out, const int4 &f){
-  return out<<f.x<<" "<<f.y<<" "<<f.z<<" "<<f.w;
-}
-
-inline std::istream& operator>>(std::istream& in, float2 &f){
-  return in >> f.x>>f.y;
-}
-
-inline std::istream& operator>>(std::istream& in, float3 &f){
-  return in >> f.x>>f.y>>f.z;
-}
-
-inline std::istream& operator>>(std::istream& in, float4 &f){
-  return in>>f.x>>f.y>>f.z>>f.w;
-}
-
-inline std::istream& operator>>(std::istream& in, double2 &f){
-  return in >> f.x>>f.y;
-}
-
-inline std::istream& operator>>(std::istream& in, double3 &f){
-  return in >> f.x>>f.y>>f.z;
-}
-
-inline std::istream& operator>>(std::istream& in, double4 &f){
-  return in>>f.x>>f.y>>f.z>>f.w;
-}
-
-inline std::istream& operator>>(std::istream& in,  int3 &f){
-  return in>>f.x>>f.y>>f.z;
-}
-
-inline std::istream& operator>>(std::istream& in,  int4 &f){
-  return in>>f.x>>f.y>>f.z>>f.w;
-}
-
+#include"printOverloads.h"
 namespace uammd{
 /*A timer class to measure time, just use
   t.tic to start and t.toc to get elapsed seconds*/
 class Timer{
-  struct timeval start, end;
+  std::chrono::time_point<std::chrono::system_clock> start, end;
 public:
-  Timer():
-    start((struct timeval){0,0}),
-    end((struct timeval){0,0}){}
-  void tic(){ gettimeofday(&start, NULL); }
+  void tic(){
+    start = std::chrono::system_clock::now();
+  }
   float toc(){
-    gettimeofday(&end, NULL);
-    return ((end.tv_sec  - start.tv_sec) * 1000000u +
-	    end.tv_usec - start.tv_usec) / 1.e6;
+    end = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count()*1e-9;
   }
 };
-
 
 //2^64-1
 #define RANDOM_MAX 0xFFffFFffFFffFFffULL

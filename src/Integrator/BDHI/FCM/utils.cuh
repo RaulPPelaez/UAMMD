@@ -5,19 +5,22 @@
 #ifndef FCM_UTILS_CUH
 #define FCM_UTILS_CUH
 #include"uammd.cuh"
+#include"utils/cufftPrecisionAgnostic.h"
+#include"utils/cufftComplex3.cuh"
+#include"utils/container.h"
 namespace uammd{
   namespace BDHI{
-#ifdef UAMMD_DEBUG
+#ifndef UAMMD_DEBUG
     template<class T> using gpu_container = thrust::device_vector<T>;
-    template<class T>  using cached_vector = detail::UninitializedCachedContainer<T>;
+    template<class T>  using cached_vector = uninitialized_cached_vector<T>;
 #else
     template<class T> using gpu_container = thrust::device_vector<T, managed_allocator<T>>;
     template<class T> using cached_vector = thrust::device_vector<T, managed_allocator<T>>;
-#endif    
-    
+#endif
+
     namespace fcm_detail{
-      using cufftComplex = cufftComplex_t<real>;
-      using cufftComplex3 = cufftComplex3_t<real>;
+      using complex = cufftComplex_t<real>;
+      using complex3 = cufftComplex3_t<real>;
 
       __device__ int3 indexToWaveNumber(int i, int3 nk){
 	int ikx = i%(nk.x/2+1);
@@ -33,35 +36,50 @@ namespace uammd{
 	return (real(2.0)*real(M_PI)/L)*make_real3(ik.x, ik.y, ik.z);
       }
 
-      /*Apply the projection operator to a wave number with a certain complex factor.
-	res = (I-\hat{k}^\hat{k})·factor*/
-      __device__ cufftComplex3 projectFourier(real3 k, cufftComplex3 factor){
-	const real invk2 = real(1.0)/dot(k,k);
-	cufftComplex3 res;
-	{//Real part
-	  const real3 fr = make_real3(factor.x.x, factor.y.x, factor.z.x);
-	  const real kfr = dot(k,fr)*invk2;
-	  const real3 vr = (fr-k*kfr);
-	  res.x.x = vr.x;
-	  res.y.x = vr.y;
-	  res.z.x = vr.z;
-	}
-	{//Imaginary part
-	  const real3 fi = make_real3(factor.x.y, factor.y.y, factor.z.y);
-	  const real kfi = dot(k,fi)*invk2;
-	  const real3 vi = (fi-k*kfi);
-	  res.x.y = vi.x;
-	  res.y.y = vi.y;
-	  res.z.y = vi.z;
-	}
+      __device__ real3 getGradientFourier(int3 ik, int3 nk, real3 L){
+	const bool isUnpairedX = ik.x == (nk.x - ik.x);
+	const bool isUnpairedY = ik.y == (nk.y - ik.y);
+	const bool isUnpairedZ = ik.z == (nk.z - ik.z);
+	const real3 k = waveNumberToWaveVector(ik, L);
+	const real Dx = isUnpairedX?0:k.x;
+	const real Dy = isUnpairedY?0:k.y;
+	const real Dz = isUnpairedZ?0:k.z;
+	const real3 dk = {Dx, Dy, Dz};
+	return dk;
+      }
+
+      /*Apply the projection operator to a wave number with a certain real3 factor.
+	res = (I-\hat{k}^\hat{k})·factor
+	k2 is the laplacian operator in Fourier space, just the wave vector squared.
+	dk is the gradient operator in Fourier space, it is equal to the wave vector but with the
+	  unpaired modes set to zero
+	fr is the factor to project
+      */
+      __device__ real3 projectFourier(real k2, real3 dk, real3 fr){
+	const real invk2 = real(1.0)/k2;
+	real3 vr = fr - dk*dot(fr, dk*invk2);
+	return vr;
+      }
+
+      /*Apply the projection operator to a wave number with a certain complex3 factor.
+	res = (I-\hat{k}^\hat{k})·factor
+	k2 is the laplacian operator in Fourier space, just the wave vector squared.
+	dk is the gradient operator in Fourier space, it is equal to the wave vector but with the
+	  unpaired modes set to zero
+	fr is the factor to project
+      */
+      __device__ complex3 projectFourier(real k2, real3 dk, complex3 factor){
+	real3 re = projectFourier(k2, dk, make_real3(factor.x.x, factor.y.x, factor.z.x));
+	real3 imag = projectFourier(k2, dk, make_real3(factor.x.y, factor.y.y, factor.z.y));
+	complex3 res = { {re.x, imag.x}, {re.y, imag.y}, {re.z, imag.z} };
 	return res;
       }
-      
+
       /*Compute gaussian complex noise dW, std = prefactor -> ||z||^2 = <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
       /*A complex random number for each direction*/
-      __device__ cufftComplex3 generateNoise(real prefactor, uint id, uint seed1, uint seed2){	  //Uncomment to use uniform numbers instead of gaussian
+      __device__ complex3 generateNoise(real prefactor, uint id, uint seed1, uint seed2){	  //Uncomment to use uniform numbers instead of gaussian
 	Saru saru(id, seed1, seed2);
-	cufftComplex3 noise;
+	complex3 noise;
 	const real complex_gaussian_sc = real(0.707106781186547)*prefactor; //1/sqrt(2)
 	//const real sqrt32 = real(1.22474487139159)*prefactor;
 	// = make_real2(saru.f(-1.0f, 1.0f),saru.f(-1.0f, 1.0f))*sqrt32;

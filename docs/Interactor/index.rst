@@ -30,7 +30,8 @@ The Interactor interface exposes the following functions:
      
    .. cpp:type:: Computables
 
-      A POD structure containing three booleans called :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
+      A POD structure containing a series of booleans like :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
+      New computables can be added at compile time by populating the :code:`EXTRA_COMPUTABLES` preprocessor macro. See below
 
       .. cpp:member:: bool force
 
@@ -46,8 +47,27 @@ The Interactor interface exposes the following functions:
 
 		   Defaults to :cpp:`false`.
 		   
+      .. cpp:member:: bool stress
+
+		   Defaults to :cpp:`false`.
 		   
-   
+
+**Adding new computables:**
+In the compilation line, or before including uammd.cuh, you can define the :code:`EXTRA_COMPUTABLES` macro with a list of new computables that will be available to the rest of the code. For instance:
+
+.. code:: cpp
+	  
+   //Before including uammd.cuh:
+   #define EXTRA_COMPUTABLES (mycomputable1)(mycomputable2)
+   //Alternatively, you can compile with something like: $ nvcc -DEXTRA_COMPUTABLES=(mycomputable1)(mycomputable2) ...
+   //... Later in the sum function of an Interactor:
+     void sum(Interactor::Computables comp, cudaStream_t st = 0) override{
+       if(comp.mycomputable1){
+         //Do something
+       }
+     }
+
+     
 Additionally, the following members are available as private members for any class inheriting Interactor:
   * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.
   * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :cpp:any:`ParticleData::getSystem`.
@@ -128,7 +148,7 @@ A minimal example of an Interactor:
         //Sum forces to each particle
         //For instance, adding a force to the x coordinate
         // of the first particle
-        auto forces = pd->getForces(access::cpu, access::write);
+        auto forces = pd->getForce(access::cpu, access::write);
         forces[0].x += 1;
       }
       if(comp.energy){

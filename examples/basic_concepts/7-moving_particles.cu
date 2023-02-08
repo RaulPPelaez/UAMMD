@@ -17,7 +17,9 @@ using namespace uammd;
 //Now that we are closing in a full blown particle simulation, lets take the chance to encapsulate in functions what we have learned in previous tutorials.
 //Consider this a suggestion based on how I usually organize these UAMMD simulation codes.
 
-//Lets group here a few parameters that our example is going to use. For the time being, lets simply hardcode some values
+// Lets group here a few parameters that our example is going to use. For the
+// time being, lets simply hardcode some values
+// Later, we will see how to read these parameters from a file.
 struct Parameters{
   int numberParticles = 1e5;
   real boxSize = 64;
@@ -55,7 +57,7 @@ void randomlyPlaceParticles(UAMMD sim){
 }
 
 //This function constructs and returns a Brownian Dynamics integrator.
-auto createBrownianDynamicsIntegrator(UAMMD sim){
+std::shared_ptr<Integrator> createBrownianDynamicsIntegrator(UAMMD sim){
   //Most Integrators in UAMMD are created in a very similar manner
   //First we choose the Integrator, in this case we are going to use the most basic Brownian Dynamics Integrator, Euler Maruyama
   using BD = BD::EulerMaruyama;
@@ -63,17 +65,17 @@ auto createBrownianDynamicsIntegrator(UAMMD sim){
   // see the wiki page for Brownian Dynamics.
   //Integrators always have a Parameters type inside of them that their constructor needs:
   BD::Parameters par;
-  //Lets simply copy the parameters we hardcoded at the beginning 
+  //Lets simply copy the parameters we hardcoded at the beginning
   par.dt = sim.par.dt;
   par.temperature = sim.par.temperature;
   par.hydrodynamicRadius = sim.par.hydrodynamicRadius;
   par.viscosity = sim.par.viscosity;
-  //You should check the relevant wiki page for information on how to construct each integrator, but 99% of the time you will see
+  //You should check the relevant doc page for information on how to construct each integrator, but 99% of the time you will see
   //The arguments are the same as for this one:
   auto bd = std::make_shared<BD>(sim.pd, par);
   //I like to store Integrators in shared pointers to easily pass them around.
   //You might have noticed that the we are returning a pointer to "Integrator" instead of BD
-  //This is ok because all integrators in UAMMD inherit from the base class Integrator. Meaning that they can maskarade as one
+  //This is ok because all integrators in UAMMD inherit from the base class Integrator. Meaning that they can pass as one
   //This means that you can store any integrator in a variable with type std::shared_ptr<Integrator>.
   return bd;
 }
@@ -90,7 +92,7 @@ void printFirst10Particles(UAMMD sim){
     std::cout<<i<<"\t"<<pos_by_id[i]<<std::endl;
 }
 
-//This function stores a vector with the particle positions ordered by id (name) and returns it
+//This function fills a vector with the particle positions ordered by id (name) and returns it
 auto vector_from_pd_positions(UAMMD sim){
   auto id2index = sim.pd->getIdOrderedIndices(access::cpu);
   auto pos = sim.pd->getPos(access::cpu, access::read);
@@ -108,7 +110,7 @@ int main(int argc, char* argv[]){
   //In the case of a Brownian dynamics simulation of ideal particles, this means moving the particles randomly according to a certain diffusion coeficient (which we set to 1). Every other particle property (such as velocities) is irrelevant and thus left untouched.
   //First, lets print the first 10 particles
   printFirst10Particles(sim);
-  //Now lets forward time: 
+  //Now lets forward time:
   bd->forwardTime();
   //And print the positions again:
   printFirst10Particles(sim);
@@ -147,7 +149,7 @@ int main(int argc, char* argv[]){
   //Had we used C-style loops for this, porting it to the GPU would result in quite different (much more complex) code.
 
   //Integrators provide a couple more functions, you can check them in the relevant wiki page if you are impatient, but we will soon cover them.
-  
+
   //Destroy the UAMMD environment and exit
   sim.pd->getSystem()->finish();
   return 0;

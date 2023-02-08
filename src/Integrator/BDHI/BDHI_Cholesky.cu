@@ -14,7 +14,6 @@ References:
 */
 #include"BDHI_Cholesky.cuh"
 #include"Interactor/NBody.cuh"
-#include"utils/GPUUtils.cuh"
 #include"utils/debugTools.h"
 #include<cublas_v2.h>
 #include"utils/cublasDebug.h"

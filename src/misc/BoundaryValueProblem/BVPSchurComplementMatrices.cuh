@@ -125,10 +125,10 @@ namespace uammd{
       SchurBoundaryCondition(int nz, real H):nz(nz), H(H), bcs(nz){}
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeBoundaryConditionMatrix(real k, const TopBC &top, const BottomBC &bottom){
+      std::vector<real> computeBoundaryConditionMatrix(const TopBC &top, const BottomBC &bottom){
 	std::vector<real> CandD(2*nz+4, 0);
-	auto topRow = computeTopRow(k, top, bottom);
-	auto bottomRow = computeBottomRow(k, top, bottom);
+	auto topRow = computeTopRow(top, bottom);
+	auto bottomRow = computeBottomRow(top, bottom);
 	std::copy(topRow.begin(), topRow.end()-2, CandD.begin());
 	std::copy(bottomRow.begin(), bottomRow.end()-2, CandD.begin() + nz);
 	fori(0, 2){
@@ -141,7 +141,7 @@ namespace uammd{
     private:
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeTopRow(real k, const TopBC &top, const BottomBC &bottom){
+      std::vector<real> computeTopRow(const TopBC &top, const BottomBC &bottom){
 	std::vector<real> topRow(nz+2, 0);
 	auto tfi = bcs.topFirstIntegral();
 	auto tsi = bcs.topSecondIntegral();
@@ -150,13 +150,13 @@ namespace uammd{
 	fori(0,nz+2){
 	  auto topSecondIntegral = tsiFactor*tsi[i];
 	  auto topFirstIntegral = tfiFactor*tfi[i];
-	  topRow[i] = topSecondIntegral + (k!=0)*(H*topFirstIntegral + (H*H*k - real(1.0))*topSecondIntegral);
+	  topRow[i] = topFirstIntegral + topSecondIntegral;
 	}
 	return std::move(topRow);
       }
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeBottomRow(real k, const TopBC &top, const BottomBC &bottom){
+      std::vector<real> computeBottomRow(const TopBC &top, const BottomBC &bottom){
 	std::vector<real> bottomRow(nz+2, 0);
 	auto bfi = bcs.bottomFirstIntegral();
 	auto bsi = bcs.bottomSecondIntegral();
@@ -165,7 +165,7 @@ namespace uammd{
 	fori(0,nz+2){
 	  auto bottomSecondIntegral = bsiFactor*bsi[i];
 	  auto bottomFirstIntegral = bfiFactor*bfi[i];
-	  bottomRow[i] = bottomSecondIntegral + (k!=0)*(H*bottomFirstIntegral - (H*H*k + real(1.0))*bottomSecondIntegral);
+	  bottomRow[i] = bottomFirstIntegral + bottomSecondIntegral;
 	}
 	return std::move(bottomRow);
       }

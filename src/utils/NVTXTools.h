@@ -6,7 +6,9 @@
 
 const uint32_t colors[] = {0x0000ff00, 0x000000ff, 0x00ffff00, 0x00ff00ff, 0x0000ffff, 0x00ff0000, 0x00ffffff};
 const int num_colors = sizeof(colors)/sizeof(uint32_t);
-
+bool isNVTXEnabled = false;
+void enableNVTX(){isNVTXEnabled = true;}
+void disableNVTX(){isNVTXEnabled = false;}
 #define PUSH_RANGE(name,cid) {\
     int color_id = cid;\
     color_id = color_id%num_colors;\
@@ -17,12 +19,14 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
     eventAttrib.color = colors[color_id]; \
     eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII; \
     eventAttrib.message.ascii = name; \
-    nvtxRangePushEx(&eventAttrib); \
+    if(isNVTXEnabled) nvtxRangePushEx(&eventAttrib);	\
   }
-#define POP_RANGE nvtxRangePop();
+#define POP_RANGE if(isNVTXEnabled){cudaDeviceSynchronize(); nvtxRangePop();}
 #else
 #define PUSH_RANGE(name,cid)
 #define POP_RANGE
+void enableNVTX(){}
+void disableNVTX(){}
 #endif
 
 #endif

@@ -53,7 +53,7 @@ pp. 95–102.
 #include<thrust/gather.h>
 #include<thrust/for_each.h>
 
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 
 #include<limits>
 #include<fstream>
@@ -244,7 +244,7 @@ namespace uammd{
       using Adaptor = SFINAE::TransverserAdaptor<Transverser>;
       Adaptor adaptor;
       auto quantity = Adaptor::zero(tr);
-      const int ori = globalIndex[nl.groupIndex[i]];     
+      const int ori = globalIndex[nl.groupIndex[i]];
       adaptor.getInfo(tr, ori);
       //For every type tree
       for(int treecount = 0; treecount<nl.Ntrees; treecount++){
@@ -730,7 +730,7 @@ namespace uammd{
       int NInternalNodes= numberParticles-1;
       int NtotalNodes = NInternalNodes + numberParticles;
       auto visitCount = allocate_temporary_vector<int>(NtotalNodes);
-      fillWithGPU<<<NtotalNodes/128+1, 128, 0, st>>>(visitCount.get(), 0, NtotalNodes);
+      thrust::fill_n(thrust::cuda::par.on(st), visitCount.get(), NtotalNodes, 0);
       auto d_aabbs = thrust::raw_pointer_cast(aabbs.data());
       {
 	//AABB of each node in uncompressed format, real4 for faster memory access.
@@ -1049,11 +1049,11 @@ namespace uammd{
       return NeighbourContainer(nl);
     }
 #endif
-    
+
     const real4* getSortedPositionIterator(){
       return thrust::raw_pointer_cast(sortPos.data());
     }
-    
+
     const int* getGroupIndexIterator(){
       auto nl = getLBVHList();
       return nl.groupIndex;
@@ -1063,5 +1063,3 @@ namespace uammd{
 
 }
 #endif
-
-

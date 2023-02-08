@@ -10,6 +10,9 @@
 !extensions
 src/Interactor/Experimental
 *.o
+*.so
+*log
+*.test
 a.out
 *~
 *.particles
@@ -29,7 +32,9 @@ armadillo*
 work
 examples/data.main*
 *.dat
-
+*.data
 docs/_static
 docs/_build
 docs/uammd
+/test/misc/ibm/ltximg/
+__pycache__

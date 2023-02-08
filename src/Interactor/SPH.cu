@@ -36,9 +36,8 @@ References:
 
  */
 #include"SPH.cuh"
-#include<cub/cub.cuh>
+#include<third_party/uammd_cub.cuh>
 
-#include"utils/GPUUtils.cuh"
 #include"SPH/Kernel.cuh"
 
 namespace uammd{

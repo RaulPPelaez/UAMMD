@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2021. ParticleData.
+/*Raul P. Pelaez 2019-2022. ParticleData.
   Handles and stores all properties a particle can have.
   However they are only initialized when they are asked for the first time.
   Offers a way to access this properties.
@@ -15,7 +15,7 @@
   CREATION:
 
   auto pd = make_shared<ParticleData>(numberParticles, system);
-  //System can be ommited if a handle to it is not needed. 
+  //System can be ommited if a handle to it is not needed.
   //It will be auto created by ParticleData.
   auto pd = make_shared<ParticleData>(numberParticles);
 
@@ -101,8 +101,8 @@
 //List here all the properties with this syntax:
 /*       ((PropertyName, propertyName, TYPE))				\      */
 //The preprocessor ensures that they are included wherever is needed
-#ifndef EXTRA_PARTICLE_PROPERTIES 
-#define EXTRA_PARTICLE_PROPERTIES 
+#ifndef EXTRA_PARTICLE_PROPERTIES
+#define EXTRA_PARTICLE_PROPERTIES
 #endif
 #define IMPL_ALL_PROPERTIES_LIST ((Pos, pos, real4))	\
                             ((Id, id, int))	       \
@@ -137,11 +137,11 @@ namespace uammd{
 
   template<class T> using signal = typename nod::unsafe_signal<T>;
   using connection = nod::connection;
-  /*
-    UAMMD uses this class to handle particle information, such as positions, forces, charges,...
-    Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from
-    CPU or GPU transparently.
-  */
+
+  //A GPU-CPU multicontainer for particle properties.
+  //UAMMD uses this class to handle particle information, such as positions, forces, charges,...
+  //Besides serving as a communication element to share particles between modules, ParticleData allows to access particles from
+  //CPU or GPU transparently.
   class ParticleData{
   public:
     //Hints to ParticleData about how to perform different task. Mainly how to sort the particles.
@@ -235,7 +235,7 @@ namespace uammd{
     PROPERTY_LOOP(IS_ALLOCATED)
 
     //Trigger a particle sort, which assigns an spatial hash to each particle and then reorders them in memory, you can access the original order via getIdOrderedIndices
-    void sortParticles();
+    void sortParticles(cudaStream_t st);
     //Returns an array with the current location of each particle by id. i.e. the particle with id=i can be found at index getIdOrderedIndices()[i]
     const int * getIdOrderedIndices(access::location dev){
       sys->log<System::DEBUG5>("[ParticleData] Id order requested for %d (0=cpu, 1=gpu)", dev);
@@ -334,14 +334,14 @@ namespace uammd{
   }
 
   //Sort the particles to improve data locality
-  void ParticleData::sortParticles(){
+  void ParticleData::sortParticles(cudaStream_t st=0){
     sys->log<System::DEBUG>("[ParticleData] Sorting particles...");
 
     {
       auto posPtr     = pos.data(access::gpu, access::read);
       if(hints.orderByHash || !hints.orderByType){
 	int3 cellDim = make_int3(hints.hash_box.boxSize/hints.hash_cutOff);
-	particle_sorter->updateOrderByCellHash(posPtr.raw(), numberParticles, hints.hash_box, cellDim);
+	particle_sorter->updateOrderByCellHash(posPtr.raw(), numberParticles, hints.hash_box, cellDim, st);
       }
 
     }
@@ -409,4 +409,3 @@ namespace uammd{
 
 
 #endif
-

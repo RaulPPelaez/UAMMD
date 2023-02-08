@@ -32,11 +32,11 @@ int main(int argc, char* argv[]){
     auto pos = pd->getPos(access::cpu, access::read);
     std::cout<<"Ten first particles after creation"<<std::endl;
     std::cout<<"Index\tName\tposition"<<std::endl;
-    for(int i = 0; i<10; i++) std::cout<<i<<"\t"<<id[i]<<"\t"<<pos[i]<<std::endl;    
+    for(int i = 0; i<10; i++) std::cout<<i<<"\t"<<id[i]<<"\t"<<pos[i]<<std::endl;
   }//As always, we delete the handles as soon as possible
 
   //If id[i]=i why is it that we need this "id" property at all?
-  //ParticleData can reorder the particles in memory at any time, so that id[i] != i. It can decide to do this to increase the spatial locality of the data in memory, which can have a positive effect in performance. 
+  //ParticleData can reorder the particles in memory at any time, so that id[i] != i. It can decide to do this to increase the spatial locality of the data in memory, which can have a positive effect in performance.
   //Usually this reorder is not an issue in GPU code, since many times we assign threads to particles and do not control the execution order anyway. But sometimes we need the initial order, for instance when writing particles to disk we would like to use the same order every time.
   //Lets see how to deal with this:
   //First lets force a reorder to happen:
@@ -46,8 +46,8 @@ int main(int argc, char* argv[]){
     auto pos = pd->getPos(access::cpu, access::read);
     std::cout<<"Ten first particles after reordering"<<std::endl;
     std::cout<<"Index\tName\tposition"<<std::endl;
-    for(int i = 0; i<10; i++) std::cout<<i<<"\t"<<id[i]<<"\t"<<pos[i]<<std::endl;    
-  }//You might notice that the printed particles are indeed close in space, cool, right? 
+    for(int i = 0; i<10; i++) std::cout<<i<<"\t"<<id[i]<<"\t"<<pos[i]<<std::endl;
+  }//You might notice that the printed particles are indeed close in space, cool, right?
   //ParticleData can provide an array that stores the current index of a particle given its id:
   auto id2index = pd->getIdOrderedIndices(access::cpu);
   //Lets print the same thing now but using this indirection:
@@ -78,10 +78,10 @@ int main(int argc, char* argv[]){
     for(int i = 0; i<10; i++){
       std::cout<<i<<"\t"<<id_by_id[i]<<"\t"<<pos_by_id[i]<<std::endl;
     }
-    //We can use these permutation iterators with any function that expects an iterator, either in the GPU or CPU (remember to choose the correct access to ParticleData in any case). In general, pos.begin() and pos_by_id as defined above present the same properties, so a templated function that takes one can also take the other. For instance, std::transform or thrust::transform.  
+    //We can use these permutation iterators with any function that expects an iterator, either in the GPU or CPU (remember to choose the correct access to ParticleData in any case). In general, pos.begin() and pos_by_id as defined above present the same properties, so a templated function that takes one can also take the other. For instance, std::transform or thrust::transform.
     //thrust provides a lot of convenient fancy iterators, look it up in the net, many times they will save you some headaches.
   }//The exact same thing gets printed again.
-  
+
   //Destroy the UAMMD environment and exit
   pd->getSystem()->finish();
   return 0;

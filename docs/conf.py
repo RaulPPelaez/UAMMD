@@ -43,6 +43,10 @@ extensions = [
     "sphinx_disqus.disqus"
 ]
 
+imgmath_image_format='svg'
+imgmath_use_preview=True
+
+
 disqus_shortname = 'uammd-readthedocs'
 
 todo_include_todos=True

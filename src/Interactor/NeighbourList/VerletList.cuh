@@ -150,6 +150,10 @@ namespace uammd{
       nl.setCutOffMultiplier(newMultiplier);
     }
 
+    int getNumberOfStepsSinceLastUpdate(){
+      return nl.getNumberOfStepsSinceLastUpdate();
+    }
+
   private:
     void handlePosWriteRequested(){
       System::log<System::DEBUG1>("[VerletList] Issuing a list update after positions were written to.");

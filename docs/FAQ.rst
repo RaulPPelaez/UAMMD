@@ -110,7 +110,7 @@ How do I use a neighbour list?
 --------------------------------
 
 You can find the workings of UAMMD's neighbour lists :ref:`here <NeighbourList>`.
-UAMMD offers several ways to interface with a neighbour list. The prefered way is to use a so-called :doc:`"Transverser" <Interactor/Transverser>`, although there are other ways. This structure provides the building blocks for a very generic computation using a neighbour list, in the below example you have a simple "neighbour counter" you can adapt.  
+UAMMD offers several ways to interface with a neighbour list. The preferred way is to use a so-called :doc:`"Transverser" <Interactor/Transverser>`, although there are other ways. This structure provides the building blocks for a very generic computation using a neighbour list, in the below example you have a simple "neighbour counter" you can adapt.  
 
 Here you have some copy pastable example on how to use a :ref:`CellList` (although any neighbour list will behave the same).
 
@@ -121,7 +121,7 @@ Here you have some copy pastable example on how to use a :ref:`CellList` (althou
   #include<thrust/device_vector.h>
   using namespace uammd;
   
-  //A transverser that counts particle pairs
+  //A transverser that counts the number of neighbours of each particle
   struct NeighbourCounter{
     struct Info{
       real3 nothingUseful;
@@ -134,7 +134,7 @@ Here you have some copy pastable example on how to use a :ref:`CellList` (althou
     NeighbourCounter(int* perParticleNeighbourCounter):
       perParticleNeighbourCounter(perParticleNeighbourCounter){}
   
-    __device__ returnInfo zero(){ return {make_real3(0)};}
+    __device__ returnInfo zero(){return {0};}
      
     __device__ Info getInfo(int pi){
       real3 somePerParticleQuantity = real3();

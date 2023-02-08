@@ -1,7 +1,8 @@
-#Default log level is 5, which prints up to MESSAGE, 0 will only print critical errors and 14 will print everything up to the most low level debug information 
+#Default log level is 5, which prints up to MESSAGE, 0 will only print critical errors and 14 will print everything up to the most low level debug information
 LOG_LEVEL=5
 
-NVCC=nvcc
+CXX=g++
+NVCC=nvcc -ccbin=$(CXX)
 CUDA_ROOT=$(shell dirname `which nvcc`)/..
 #Python is required for the python_wrappers example
 PYTHON=python3
@@ -18,8 +19,11 @@ all: $(patsubst %.cu, %, $(filter-out python_wrapper.cu, $(wildcard *.cu))) $(PY
 %: %.cu Makefile
 	$(NVCC) $(NVCCFLAGS) $< -o $@
 
+electrostatic_forces: electrostatic_forces.cu Makefile
+	$(NVCC) $(NVCCFLAGS) $< -o $@ -lcufft
+
 $(PYTHON_LIBRARY_NAME): python_wrapper.cu Makefile pybind11
-	$(NVCC)  $(NVCCFLAGS) $< -o $(PYTHON_LIBRARY_NAME) -w -shared -I pybind11/include -Xcompiler "-fPIC -w" `$(PYTHON)-config --includes` 
+	$(NVCC)  $(NVCCFLAGS) $< -o $(PYTHON_LIBRARY_NAME) -w -shared -I pybind11/include -Xcompiler "-fPIC -w" `$(PYTHON)-config --includes`
 
 pybind11:
 	git clone https://github.com/pybind/pybind11

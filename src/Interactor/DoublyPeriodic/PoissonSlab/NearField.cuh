@@ -100,7 +100,7 @@ namespace uammd{
     public:
 
       NearField(shared_ptr<ParticleGroup> pg, Parameters par):
-	pg(pg), par(par), split(par.split), gw(par.gw){	
+	pg(pg), par(par), split(par.split), gw(par.gw){
 	this->rcut = nearField_ns::computeCutOffDistance(par);
 	nearField_ns::throwIfInvalidConfiguration(rcut, par.H);
 	System::log<System::MESSAGE>("[DPPoissonSlab] Near field cut off: %g", rcut);
@@ -109,7 +109,7 @@ namespace uammd{
 
       void initializeTabulatedGreensFunctions();
 
-      void compute(cudaStream_t st);
+      void compute(cudaStream_t st, real4* fieldAtParticles = nullptr);
 
     };
 
@@ -132,11 +132,11 @@ namespace uammd{
 
       NearFieldTransverser(real* energy_ptr, real4* force_ptr, real* charge,
 			   TabulatedFunction<real2> greenTables,
-			   Box box, real H, real rcut, Permitivity perm, real split, real gw):
+			   Box box, real H, real rcut, Permitivity perm, real split, real gw,
+			   real4* field_ptr):
 	energy_ptr(energy_ptr), force_ptr(force_ptr), charge(charge),split(split), gw(gw),
-        box(box), H(H), rcut(rcut), perm(perm), GreensFunctionFieldAndPotential(greenTables){}
-
-      __device__ returnInfo zero() const{ return returnInfo();}
+        box(box), H(H), rcut(rcut), perm(perm), GreensFunctionFieldAndPotential(greenTables),
+	field_ptr(field_ptr){}
 
       struct Info{
 	real charge;
@@ -152,28 +152,31 @@ namespace uammd{
 	   real3 pjim = make_real3(pj);
 	   pjim.z = (pj.z>0?H:-H) - pj.z;
 	   real ep = pj.z<0?perm.bottom:perm.top;
-           real chargeImage = -infoj.charge * (ep - perm.inside) / (ep + perm.inside);
+	   real epratio = isinf(ep)?real(1.0):((ep - perm.inside) / (ep + perm.inside));
+           real chargeImage = -infoj.charge * epratio;
 	   FandE += chargeImage*computeFieldPotential(make_real3(pi), pjim);
 	   //Image in the opposite side
 	   if(rcut >= H*real(0.5) ){
 	     pjim = make_real3(pj);
 	     pjim.z = (pj.z>0?-H:H) - pj.z;
 	     ep = pj.z<0?perm.top:perm.bottom;
-	     chargeImage = -infoj.charge * (ep - perm.inside) / (ep + perm.inside);
+	     epratio = isinf(ep)?real(1.0):((ep - perm.inside) / (ep + perm.inside));
+	     chargeImage = -infoj.charge * epratio;
 	     FandE += chargeImage*computeFieldPotential(make_real3(pi), pjim);
 	   }
          }
-	return infoi.charge*FandE;
+	return FandE;
       }
 
-      __device__ void accumulate(returnInfo &total, returnInfo current) const {total += current;}
-
       __device__ void set(uint pi, returnInfo total) const {
-	force_ptr[pi] += make_real4(make_real3(total), 0);
-	//energy_ptr[pi] += total.w;
+	real qi = charge[pi];
+	force_ptr[pi] += qi*make_real4(make_real3(total), 0);
+	if(energy_ptr) energy_ptr[pi] += qi*total.w;
+	if(field_ptr) field_ptr[pi] += make_real4(make_real3(total), 0);
       }
 
     private:
+      real4* field_ptr;
       real* energy_ptr;
       real4* force_ptr;
       real* charge;
@@ -189,8 +192,8 @@ namespace uammd{
         real r2 = dot(rij, rij);
 	if(r2 >= rcut*rcut) return real4();
         real2 greensFunctions = GreensFunctionFieldAndPotential(r2);
-	// real2 greensFunctions = make_real2(nearField_ns::GreensFunctionNearPotential(r2, split, gw, perm.inside),
-	// 				   nearField_ns::GreensFunctionNearField(r2, split, gw, perm.inside));
+	//real2 greensFunctions = make_real2(nearField_ns::GreensFunctionNearPotential(r2, split, gw, perm.inside),
+	//				   nearField_ns::GreensFunctionNearField(r2, split, gw, perm.inside));
 	real potential = greensFunctions.x;
 	real3 field = greensFunctions.y*rij;
 	return make_real4(field, potential);
@@ -198,7 +201,7 @@ namespace uammd{
 
     };
 
-    void NearField::compute(cudaStream_t st){
+    void NearField::compute(cudaStream_t st, real4* fieldAtParticles){
       if(par.split){
 	System::log<System::DEBUG2>("[DPPoissonSlab] Near field energy computation");
 	Box box(make_real3(par.Lxy, par.H));
@@ -212,7 +215,8 @@ namespace uammd{
 	auto charge = pd->getCharge(access::location::gpu, access::mode::read);
 	auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
         auto tr = NearFieldTransverser(energy.begin(), force.begin(), charge.begin(),
-				       *greenTables, box, par.H, rcut, par.permitivity, split, gw);
+				       *greenTables, box, par.H, rcut, par.permitivity, split, gw,
+				       fieldAtParticles);
 	nl->transverseList(tr, st);
 	CudaCheckError();
       }
