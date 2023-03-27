@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017-2020. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
+/*Raul P. Pelaez 2017-2022. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
 
 
   As this is a BDHI module. BDHI_PSE computes the terms M·F and B·dW in the differential equation:
@@ -83,11 +83,25 @@ namespace uammd{
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
 	auto pd = pg->getParticleData();
+	computeMFFarField(MF, st);
+	computeMFNearField(MF, st);
+      }
+
+      void computeMFNearField(real3* MF, cudaStream_t st){
+	System::log<System::DEBUG1>("[BDHI::PSE] Computing MFNearField....");
+	auto pd = pg->getParticleData();
+	auto force = pd->getForce(access::location::gpu, access::mode::read);
+	nearField->Mdot(force.begin(), MF, st);
+      }
+
+      void computeMFFarField(real3* MF, cudaStream_t st){
+	System::log<System::DEBUG1>("[BDHI::PSE] Computing MFFarField....");	
+	auto pd = pg->getParticleData();
+	int numberParticles = pg->getNumberParticles();
 	auto pos = pd->getPos(access::gpu, access::read);
 	auto force = pd->getForce(access::gpu, access::read);	
-	nearField->Mdot(force.begin(), MF, st);
 	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles,
-						   temperature, 1.0/sqrt(dt), st);
+						   0.0, 0.0, st);
       }
 
       void computeBdW(real3* BdW, cudaStream_t st){
@@ -115,6 +129,16 @@ namespace uammd{
 						   temperature, noise_prefactor, st);
       }
 
+      void setShearStrain(real newStrain){
+	System::log<System::DEBUG>("[BDHI::PSE] Shear strain changed to %g", newStrain);
+        nearField->setShearStrain(newStrain);
+	farField->setShearStrain(newStrain);
+      }
+      
+      int getNumLanczosIterations(){
+        return nearField-> getNumLanczosIterations();
+      }
+      
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
       }
