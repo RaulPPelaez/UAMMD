@@ -96,6 +96,44 @@ namespace uammd{
 	return {particleVelocities, particleAngularVelocities};
       }
 
+      // compute average velocity in the x direction as a function of z
+      template<class PosIterator, class ForceIterator>
+      std::vector<double>
+      computeAverageVelocity(PosIterator pos, ForceIterator forces,
+			     int numberParticles, cudaStream_t st = 0){
+      	cudaDeviceSynchronize();
+      	System::log<System::DEBUG2>("[DPStokes] Computing displacements");
+      	auto gridData = ibm->spreadForces(pos, forces, numberParticles, st);
+      	auto gridForceCheb = fct->forwardTransform(gridData, st);
+      	FluidData<complex> fluid = solveBVPVelocity(gridForceCheb, st);
+      	if(mode != WallMode::none){
+      	  correction->correctSolution(fluid, gridForceCheb, st);
+      	}
+	int nx = this->grid.cellDim.x, ny = this->grid.cellDim.y, nz = this->grid.cellDim.z;
+	// std::cout << "printing average velocity" << std::endl;
+	auto xvel = fluid.velocity.m_x;
+	std::vector<double> averageVelocity(nz);
+	std::vector<complex> chebCoeff(nz);
+	for(int i=0;i<nz;i++){
+	  chebCoeff[i] = xvel[(nx/2+1)*ny*i]/(nx*ny);
+	}
+	// transfer to real space by direct summation
+	// Chebyshev stuff refresher
+	// f(z) = c_0+c_1T_1(z)+c_2T_2(z)+...
+	// z = (b+a)/2+(b-a)/2*cos(i*M_PI/(nz-1));
+	// arg = acos(-1+2*(z-a)/(b-a));
+	// T_j(z) = cos(j acos(-1+2*(z-a)/(b-a))) with z = (b+a)/2+(b-a)/2*cos(i*M_PI/(nz-1))
+	for(int i=0;i<nz;i++){
+	  real arg = i*M_PI/(nz-1);
+	  for(int j=0;j<nz;j++){
+	    averageVelocity[i] += chebCoeff[j].x*cos(j*arg);
+	  }
+	}
+	
+      	CudaCheckError();
+      	return averageVelocity;
+      }
+
     private:
       shared_ptr<FastChebyshevTransform> fct;
       shared_ptr<Correction> correction;
