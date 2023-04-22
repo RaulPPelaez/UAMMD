@@ -51,7 +51,7 @@ jobs:
         auto-activate-base: true
         miniforge-variant: Mambaforge
 
-    - name: Prepare dependencies (with CUDA)
+    - name: Prepare dependencies
       run: |
         sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda }}" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
@@ -75,5 +75,6 @@ jobs:
       run: |
         conda activate uammd
         mkdir examples/build && cd examples/build
-        cmake .. 
+        cmake ..
+        export CPATH=$CPATH:$CONDA_PREFIX
         make
