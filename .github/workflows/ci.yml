@@ -75,6 +75,5 @@ jobs:
       run: |
         conda activate uammd
         mkdir examples/build && cd examples/build
-        cmake ..
-        export CPATH=$CPATH:$CONDA_PREFIX
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
         make
