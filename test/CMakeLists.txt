@@ -1,17 +1,16 @@
 cmake_minimum_required(VERSION 3.22)
-project(examples)
+project(tests)
 enable_language(CUDA)
+#add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_BUILD_TYPE Release)
-
-#add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
 
-#add_compile_definitions(PUBLIC DOUBLE_PRECISION)
+add_compile_definitions(PUBLIC DOUBLE_PRECISION)
 set(UAMMD_INCLUDE ../src ../src/third_party)
 set(BLA_STATIC OFF)
 set(BLA_VENDOR Intel10_64lp)
@@ -51,18 +50,21 @@ else()
   )
 
 endif()
-
 include_directories(${UAMMD_INCLUDE} ${BLAS_INCLUDE_DIRS} ${LAPACKE_INCLUDE_DIRS})
 link_libraries(${CUDA_LIBRARY})
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr -extended-lambda")
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG release-1.12.1
+)
+FetchContent_MakeAvailable(googletest)
 
-add_subdirectory(generic_md)
-add_subdirectory(advanced)
-add_subdirectory(basic_concepts)
-add_subdirectory(integration_schemes)
-add_subdirectory(interaction_modules)
-add_subdirectory(misc)
-add_subdirectory(uammd_as_a_library)
+add_subdirectory(BDHI/DPStokes)
+add_subdirectory(BDHI/FCM)
+add_subdirectory(utils)
+add_subdirectory(misc/chebyshev)
 
 IF (CMAKE_BUILD_TYPE MATCHES "Debug")
  set(CMAKE_CUDA_FLAGS "-g -G  -lineinfo -src-in-ptx")

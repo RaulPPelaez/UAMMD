@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ v2.x ]
   pull_request:
-    branches: [ master ]
+    branches: [ v2.x ]
   schedule:
     # Run every Sunday at midnight
     - cron:  '0 0 * * 0'
@@ -51,7 +51,7 @@ jobs:
         auto-activate-base: true
         miniforge-variant: Mambaforge
 
-    - name: Prepare dependencies (with CUDA)
+    - name: Prepare dependencies
       run: |
         sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda }}" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
@@ -71,9 +71,16 @@ jobs:
         conda activate uammd
         conda list
 
-    - name: Configure, compile, and install
+    - name: Configure and compile examples
       run: |
         conda activate uammd
         mkdir examples/build && cd examples/build
-        cmake .. 
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        make -j3
+    - name: Configure and compile tests
+      run: |
+        conda activate uammd
+        mkdir test/build && cd test/build
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        make -j3
         
