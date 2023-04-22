@@ -45,7 +45,7 @@ jobs:
         linux-local-args: '["--toolkit", "--override"]' 
 
     - name: Install Miniconda
-      uses: conda-incubator/setup-miniconda@v2
+      uses: mamba-org/provision-with-micromamba
       with:
         activate-environment: ""
         auto-activate-base: true
