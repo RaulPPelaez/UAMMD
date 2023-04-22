@@ -97,7 +97,7 @@ namespace uammd{
         m_data.swap(another.m_data);
       }
 
-      thrust::device_reference<T> operator[](uint i){
+      thrust::device_reference<T> operator[](uint i) const{
 	return thrust::device_reference<T>(data() + i);
       }
 
