@@ -50,6 +50,7 @@ jobs:
         environment-name: uammd
         cache-env: true
         cache-downloads: true
+
     - name: Prepare dependencies
       run: |
         sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda }}" \
