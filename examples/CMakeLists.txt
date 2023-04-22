@@ -20,16 +20,21 @@ find_package(BLAS)
 if(BLAS_FOUND)
   message("mkl environment detected")
   add_compile_definitions(PUBLIC USE_MKL)
+  link_libraries(
+    BLAS::BLAS
+  )
+
 else()
   unset(BLA_VENDOR)
   find_package(LAPACK REQUIRED)
   find_package(LAPACKE REQUIRED)
   find_package(BLAS REQUIRED)
+  link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES})
 endif()
 
 
 include_directories(${UAMMD_INCLUDE})
-link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES} ${BLAS_LIBRARIES} ${CUDA_LIBRARY})
+link_libraries(${CUDA_LIBRARY})
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr -extended-lambda")
 
 add_subdirectory(generic_md)
