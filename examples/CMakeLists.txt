@@ -20,13 +20,6 @@ find_package(BLAS)
 if(BLAS_FOUND)
   message("mkl environment detected")
   add_compile_definitions(PUBLIC USE_MKL)
-  find_path(BLAS_INCLUDE_DIRS mkl.h
-    $ENV{CONDA_PREFIX}/include
-    /usr/include
-    /usr/local/include
-    $ENV{MKLROOT}/include
-    $ENV{BLAS_HOME}/include
-  )
   link_libraries(
     BLAS::BLAS
   )
@@ -38,8 +31,15 @@ else()
   link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES})
 endif()
 
+find_path(BLAS_INCLUDE_DIRS mkl.h
+  $ENV{CONDA_PREFIX}/include
+  /usr/include
+  /usr/local/include
+  $ENV{MKLROOT}/include
+  $ENV{BLAS_HOME}/include
+)
 
-include_directories(${UAMMD_INCLUDE})
+include_directories(${UAMMD_INCLUDE} ${BLAS_INCLUDE_DIRS})
 link_libraries(${CUDA_LIBRARY})
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr -extended-lambda")
 
