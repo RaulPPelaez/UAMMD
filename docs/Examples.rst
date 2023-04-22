@@ -38,3 +38,32 @@ misc
 ---------
 Examples that do not fit in the other categories.  
 
+
+
+Compiling the examples
+-----------------------
+
+The examples/ folder contains both a Makefile and a CMakeLists.txt file as examples, both will try to compile every example.
+The Makefile will go into each subfolder and compile each source code to a binary in its folder. To use it simply  cd to examples/ and run:
+
+.. code:: bash
+
+	  $ make
+
+You might need to edit the Makefile with the particular configuration of your system. You can also tweak here UAMMD variables such as the log level or the floating precision.
+
+The CMake option will instead dump every binary inside a bin/ folder. Use it as a standard CMake file:
+
+.. code:: bash
+
+	  $ mkdir -p build && cd build
+	  $ cmake ..
+	  $ make
+
+You can pass to CMake any UAMMD related definitions, for instance:
+
+.. code:: bash
+
+	  $ mkdir -p build && cd build
+	  $ cmake -DDOUBLE_PRECISION ..
+	  $ make
