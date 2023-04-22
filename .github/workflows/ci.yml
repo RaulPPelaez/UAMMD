@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ v2.x ]
   pull_request:
-    branches: [ master ]
+    branches: [ v2.x ]
   schedule:
     # Run every Sunday at midnight
     - cron:  '0 0 * * 0'
