@@ -235,24 +235,29 @@ namespace uammd{
       auto computeThermalDrift(){
 	auto pos = pd->getPos(access::gpu, access::read);
 	const int numberParticles = pd->getNumParticles();
-	auto noise2 = detail::fillRandomVectorReal3(numberParticles, seedRFD, steps);
-	auto cit = thrust::make_counting_iterator(0);
-	auto posp = thrust::make_transform_iterator(cit,
-						    detail::SumPosAndNoise(pos.raw(),
-									   noise2.data().get(),
-									   deltaRFD*0.5));
-	auto mpw = dpstokes->Mdot(posp, noise2.data().get(), numberParticles, 0);
-	auto posm = thrust::make_transform_iterator(cit,
-						    detail::SumPosAndNoise(pos.raw(),
-									   noise2.data().get(),
-									   -deltaRFD*0.5));
-	auto mmw = dpstokes->Mdot(posm, noise2.data().get(), numberParticles, 0);
-	using namespace thrust::placeholders;
-	thrust::transform(mpw.begin(), mpw.end(),
-			  mmw.begin(),
-			  mpw.begin(),
-			  make_real3(par.dt*par.temperature/deltaRFD)*(_1 - _2));
-	return mpw;
+	if(par.temperature){
+	  auto noise2 = detail::fillRandomVectorReal3(numberParticles, seedRFD, steps);
+	  auto cit = thrust::make_counting_iterator(0);
+	  auto posp = thrust::make_transform_iterator(cit,
+						      detail::SumPosAndNoise(pos.raw(),
+									     noise2.data().get(),
+									     deltaRFD*0.5));
+	  auto mpw = dpstokes->Mdot(posp, noise2.data().get(), numberParticles, 0);
+	  auto posm = thrust::make_transform_iterator(cit,
+						      detail::SumPosAndNoise(pos.raw(),
+									     noise2.data().get(),
+									     -deltaRFD*0.5));
+	  auto mmw = dpstokes->Mdot(posm, noise2.data().get(), numberParticles, 0);
+	  using namespace thrust::placeholders;
+	  thrust::transform(mpw.begin(), mpw.end(),
+			    mmw.begin(),
+			    mpw.begin(),
+			    make_real3(par.dt*par.temperature/deltaRFD)*(_1 - _2));
+	  return mpw;
+	}
+	else{
+	  return cached_vector<real3>();
+	}
       }
 
       //Returns sqrt(2*M*temperature/dt)dW
@@ -261,12 +266,14 @@ namespace uammd{
 	const int numberParticles = pd->getNumParticles();
 	cached_vector<real3> bdw(numberParticles);
 	thrust::fill(bdw.begin(), bdw.end(), real3());
-	detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
-	auto noise = detail::fillRandomVectorReal3(numberParticles, seed, steps,
-						   sqrt(2*par.temperature/par.dt));
-	lanczos->run(dot,
-		     (real*)bdw.data().get(), (real*)noise.data().get(),
-		     par.tolerance, 3*numberParticles);
+	if(par.temperature){
+	  detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
+	  auto noise = detail::fillRandomVectorReal3(numberParticles, seed, steps,
+						     sqrt(2*par.temperature/par.dt));
+	  lanczos->run(dot,
+		       (real*)bdw.data().get(), (real*)noise.data().get(),
+		       par.tolerance, 3*numberParticles);
+	}
 	return bdw;
       }
 
