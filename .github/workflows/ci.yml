@@ -75,5 +75,5 @@ jobs:
       run: |
         conda activate uammd
         mkdir examples/build && cd examples/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_HOST_COMPILER=$CXX ..
         make
