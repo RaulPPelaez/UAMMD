@@ -71,9 +71,16 @@ jobs:
         conda activate uammd
         conda list
 
-    - name: Configure, compile, and install
+    - name: Configure and compile examples
       run: |
         conda activate uammd
         mkdir examples/build && cd examples/build
         cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_HOST_COMPILER=$CXX ..
-        make
+        make -j3
+    - name: Configure and compile tests
+      run: |
+        conda activate uammd
+        mkdir test/build && cd test/build
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_HOST_COMPILER=$CXX ..
+        make -j3
+        
