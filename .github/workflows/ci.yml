@@ -47,7 +47,7 @@ jobs:
     - name: Install Miniconda
       uses: mamba-org/provision-with-micromamba@main
       with:
-        activate-environment: ""
+        activate-environment: "uammd"
         auto-activate-base: true
         miniforge-variant: Mambaforge
 
