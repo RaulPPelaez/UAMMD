@@ -45,7 +45,7 @@ jobs:
         linux-local-args: '["--toolkit", "--override"]' 
 
     - name: Install Miniconda
-      uses: mamba-org/provision-with-micromamba
+      uses: mamba-org/provision-with-micromamba@main
       with:
         activate-environment: ""
         auto-activate-base: true
