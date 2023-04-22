@@ -1,16 +1,15 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.22)
 project(examples)
 enable_language(CUDA)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_BUILD_TYPE Release)
-#set( CMAKE_VERBOSE_MAKEFILE on )
+
 #add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
-#GoogleTest requires at least C++14
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_SEPARABLE_COMPILATION OFF)
-#cmake_policy(SET CMP0104 OLD)
 
 #add_compile_definitions(PUBLIC DOUBLE_PRECISION)
 set(UAMMD_INCLUDE ../src ../src/third_party)
