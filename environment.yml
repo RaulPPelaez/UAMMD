@@ -1,0 +1,9 @@
+channels:
+  - conda-forge
+dependencies:
+  - cmake >=3.20
+  - cudatoolkit 11.8.*
+  - gxx_linux-64 10.3.*
+  - make
+  - nvcc_linux-64 11.8
+  - sysroot_linux-64 2.17
