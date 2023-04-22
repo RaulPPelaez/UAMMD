@@ -75,12 +75,12 @@ jobs:
       run: |
         conda activate uammd
         mkdir examples/build && cd examples/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_HOST_COMPILER=$CXX ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
         make -j3
     - name: Configure and compile tests
       run: |
         conda activate uammd
         mkdir test/build && cd test/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_HOST_COMPILER=$CXX ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
         make -j3
         
