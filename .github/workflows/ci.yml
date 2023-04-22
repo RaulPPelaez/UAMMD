@@ -76,4 +76,4 @@ jobs:
         conda activate uammd
         mkdir examples/build && cd examples/build
         cmake .. 
-        
+        make
