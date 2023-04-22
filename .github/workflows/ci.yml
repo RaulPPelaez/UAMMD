@@ -74,6 +74,6 @@ jobs:
     - name: Configure, compile, and install
       run: |
         conda activate uammd
-        mkdir build && cd build
-        cmake .. \
-              -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX
+        mkdir examples/build && cd examples/build
+        cmake .. 
+        
