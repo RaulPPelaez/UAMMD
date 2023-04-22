@@ -96,11 +96,20 @@ namespace uammd{
 	return {particleVelocities, particleAngularVelocities};
       }
 
-      // compute average velocity in the x direction as a function of z
+      template<class ComplexContainer>
+      auto getZeroModeChebCoeff(const ComplexContainer &fourierChebGridData, int3 n){
+	  std::vector<complex> chebCoeff(n.z);
+	  for(int i=0;i<n.z;i++){
+		chebCoeff[i] = fourierChebGridData[(n.x/2+1)*n.y*i]/(n.x*n.y);
+	  }
+	 return chebCoeff;
+      }
+      
+      // compute average velocity in the x (0, default) or y (1) directions as a function of z
       template<class PosIterator, class ForceIterator>
       std::vector<double>
       computeAverageVelocity(PosIterator pos, ForceIterator forces,
-			     int numberParticles, cudaStream_t st = 0){
+			     int numberParticles, int direction = 0, cudaStream_t st = 0){
       	cudaDeviceSynchronize();
       	System::log<System::DEBUG2>("[DPStokes] Computing displacements");
       	auto gridData = ibm->spreadForces(pos, forces, numberParticles, st);
@@ -109,23 +118,22 @@ namespace uammd{
       	if(mode != WallMode::none){
       	  correction->correctSolution(fluid, gridForceCheb, st);
       	}
-	int nx = this->grid.cellDim.x, ny = this->grid.cellDim.y, nz = this->grid.cellDim.z;
-	// std::cout << "printing average velocity" << std::endl;
-	auto xvel = fluid.velocity.m_x;
-	std::vector<double> averageVelocity(nz);
-	std::vector<complex> chebCoeff(nz);
-	for(int i=0;i<nz;i++){
-	  chebCoeff[i] = xvel[(nx/2+1)*ny*i]/(nx*ny);
-	}
+	int3 n = this->grid.cellDim;
+	std::vector<complex> chebCoeff;
+	if(direction == 0) chebCoeff = getZeroModeChebCoeff(fluid.velocity.m_x, n);
+	else if(direction == 1)  chebCoeff = getZeroModeChebCoeff(fluid.velocity.m_y, n);
+else throw std::runtime_error("[DPStokesSlab] Can only average in direction X (0) or Y (1)");
+	
+	std::vector<double> averageVelocity(n.z);
 	// transfer to real space by direct summation
 	// Chebyshev stuff refresher
 	// f(z) = c_0+c_1T_1(z)+c_2T_2(z)+...
 	// z = (b+a)/2+(b-a)/2*cos(i*M_PI/(nz-1));
 	// arg = acos(-1+2*(z-a)/(b-a));
 	// T_j(z) = cos(j acos(-1+2*(z-a)/(b-a))) with z = (b+a)/2+(b-a)/2*cos(i*M_PI/(nz-1))
-	for(int i=0;i<nz;i++){
-	  real arg = i*M_PI/(nz-1);
-	  for(int j=0;j<nz;j++){
+	for(int i=0;i<n.z;i++){
+	  real arg = i*M_PI/(n.z-1);
+	  for(int j=0;j<n.z;j++){
 	    averageVelocity[i] += chebCoeff[j].x*cos(j*arg);
 	  }
 	}
@@ -134,6 +142,7 @@ namespace uammd{
       	return averageVelocity;
       }
 
+      
     private:
       shared_ptr<FastChebyshevTransform> fct;
       shared_ptr<Correction> correction;
