@@ -26,23 +26,32 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 enable_testing()
 
-
-
-set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 if(BLAS_FOUND)
   message("mkl environment detected")
   add_compile_definitions(PUBLIC USE_MKL)
+  link_libraries(
+    BLAS::BLAS
+  )
 else()
   unset(BLA_VENDOR)
-  find_package(BLAS REQUIRED)
   find_package(LAPACK REQUIRED)
   find_package(LAPACKE REQUIRED)
+  find_package(BLAS REQUIRED)
+  link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES})
 endif()
 
+find_path(BLAS_INCLUDE_DIRS mkl.h
+  $ENV{CONDA_PREFIX}/include
+  /usr/include
+  /usr/local/include
+  $ENV{MKLROOT}/include
+  $ENV{BLAS_HOME}/include
+)
+
+include_directories(${UAMMD_INCLUDE} ${BLAS_INCLUDE_DIRS})
 add_compile_definitions(PUBLIC DOUBLE_PRECISION)
-include_directories(${UAMMD_INCLUDE})
-link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES} ${BLAS_LIBRARIES} ${CUDA_LIBRARY} cufft cublas cusolver)
+link_libraries(${CUDA_LIBRARY} cufft cublas cusolver)
 
 add_executable(
   lanczos_test
