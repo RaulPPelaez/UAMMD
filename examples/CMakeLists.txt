@@ -20,10 +20,16 @@ find_package(BLAS)
 if(BLAS_FOUND)
   message("mkl environment detected")
   add_compile_definitions(PUBLIC USE_MKL)
+  find_path(BLAS_INCLUDE_DIRS mkl.h
+    $ENV{CONDA_PREFIX}/include
+    /usr/include
+    /usr/local/include
+    $ENV{MKLROOT}/include
+    $ENV{BLAS_HOME}/include
+  )
   link_libraries(
     BLAS::BLAS
   )
-
 else()
   unset(BLA_VENDOR)
   find_package(LAPACK REQUIRED)
