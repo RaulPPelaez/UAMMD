@@ -202,16 +202,16 @@ namespace uammd{
 	m_z.resize(newSize);
       }
 
-      void fillWithZero() const{
+      void fillWithZero(){
 	thrust::fill(m_x.begin(), m_x.end(), T());
 	thrust::fill(m_y.begin(), m_y.end(), T());
 	thrust::fill(m_z.begin(), m_z.end(), T());
       }
 
       using Iterator = T*;
-      Iterator x()const{return thrust::raw_pointer_cast(m_x.data());}
-      Iterator y()const{return thrust::raw_pointer_cast(m_y.data());}
-      Iterator z()const{return thrust::raw_pointer_cast(m_z.data());}
+      Iterator x()const{return (Iterator)m_x.data().get();}
+      Iterator y()const{return (Iterator)m_y.data().get();}
+      Iterator z()const{return (Iterator)m_z.data().get();}
 
       auto xyz() const{
 	auto zip = thrust::make_zip_iterator(thrust::make_tuple(x(), y(), z()));
@@ -292,7 +292,7 @@ namespace uammd{
       FluidPointers(){}
       template<class Container>
       FluidPointers(const Container &pressure, const DataXYZ<T> &vel):
-	pressure(thrust::raw_pointer_cast(pressure.data())),
+	pressure((T*)(pressure.data().get())),
 	velocityX(vel.x()), velocityY(vel.y()), velocityZ(vel.z()){}
       T* pressure;
       typename DataXYZ<T>::Iterator velocityX, velocityY, velocityZ;
