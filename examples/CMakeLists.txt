@@ -23,23 +23,37 @@ if(BLAS_FOUND)
   link_libraries(
     BLAS::BLAS
   )
+  find_path(BLAS_INCLUDE_DIRS mkl.h
+    $ENV{CONDA_PREFIX}/include
+    /usr/include
+    /usr/local/include
+    $ENV{MKLROOT}/include
+    $ENV{BLAS_HOME}/include
+  )
 else()
   unset(BLA_VENDOR)
   find_package(LAPACK REQUIRED)
   find_package(LAPACKE REQUIRED)
   find_package(BLAS REQUIRED)
   link_libraries(${LAPACK_LIBRARIES} ${LAPACKE_LIBRARIES})
+  find_path(BLAS_INCLUDE_DIRS cblas.h
+    $ENV{CONDA_PREFIX}/include
+    /usr/include
+    /usr/local/include
+    $ENV{MKLROOT}/include
+    $ENV{BLAS_HOME}/include
+  )
+  find_path(LAPACKE_INCLUDE_DIRS lapacke.h
+    $ENV{CONDA_PREFIX}/include
+    /usr/include
+    /usr/local/include
+    $ENV{MKLROOT}/include
+    $ENV{LAPACKE_HOME}/include
+  )
+
 endif()
 
-find_path(BLAS_INCLUDE_DIRS mkl.h
-  $ENV{CONDA_PREFIX}/include
-  /usr/include
-  /usr/local/include
-  $ENV{MKLROOT}/include
-  $ENV{BLAS_HOME}/include
-)
-
-include_directories(${UAMMD_INCLUDE} ${BLAS_INCLUDE_DIRS})
+include_directories(${UAMMD_INCLUDE} ${BLAS_INCLUDE_DIRS} ${LAPACKE_INCLUDE_DIRS})
 link_libraries(${CUDA_LIBRARY})
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr -extended-lambda")
 
