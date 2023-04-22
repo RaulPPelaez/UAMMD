@@ -1,6 +1,7 @@
 # **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 2.5**
 
 [![Documentation Status](https://readthedocs.org/projects/uammd/badge/?version=latest)](https://uammd.readthedocs.io/en/latest/?badge=latest)
+[![CI](https://github.com/RaulPPelaez/UAMMD/actions/workflows/ci.yml/badge.svg)](https://github.com/RaulPPelaez/UAMMD/actions/workflows/ci.yml)
 
 <img src="https://github.com/raulppelaez/uammd/blob/master/.res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/master/.res/shotlogo.png" width="500">  
 
