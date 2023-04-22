@@ -22,7 +22,17 @@
 
 namespace uammd{
   namespace DPStokesSlab_ns{
-
+    namespace detail{
+      template<class ComplexContainer>
+      auto getZeroModeChebCoeff(const ComplexContainer &fourierChebGridData, int3 n){
+	  std::vector<complex> chebCoeff(n.z);
+	  for(int i=0;i<n.z;i++){
+		chebCoeff[i] = fourierChebGridData[(n.x/2+1)*n.y*i]/(n.x*n.y);
+	  }
+	 return chebCoeff;
+      }   
+    }
+    
     class DPStokes{
     public:
       using Grid = chebyshev::doublyperiodic::Grid;
@@ -96,15 +106,6 @@ namespace uammd{
 	return {particleVelocities, particleAngularVelocities};
       }
 
-      template<class ComplexContainer>
-      auto getZeroModeChebCoeff(const ComplexContainer &fourierChebGridData, int3 n){
-	  std::vector<complex> chebCoeff(n.z);
-	  for(int i=0;i<n.z;i++){
-		chebCoeff[i] = fourierChebGridData[(n.x/2+1)*n.y*i]/(n.x*n.y);
-	  }
-	 return chebCoeff;
-      }
-      
       // compute average velocity in the x (0, default) or y (1) directions as a function of z
       template<class PosIterator, class ForceIterator>
       std::vector<double>
@@ -120,8 +121,8 @@ namespace uammd{
       	}
 	int3 n = this->grid.cellDim;
 	std::vector<complex> chebCoeff;
-	if(direction == 0) chebCoeff = getZeroModeChebCoeff(fluid.velocity.m_x, n);
-	else if(direction == 1)  chebCoeff = getZeroModeChebCoeff(fluid.velocity.m_y, n);
+	if(direction == 0) chebCoeff = detail::getZeroModeChebCoeff(fluid.velocity.m_x, n);
+	else if(direction == 1)  chebCoeff = detail::getZeroModeChebCoeff(fluid.velocity.m_y, n);
 else throw std::runtime_error("[DPStokesSlab] Can only average in direction X (0) or Y (1)");
 	
 	std::vector<double> averageVelocity(n.z);
