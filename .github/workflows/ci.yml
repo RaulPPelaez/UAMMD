@@ -38,16 +38,17 @@ jobs:
     - name: Check out
       uses: actions/checkout@v2
 
-    - name: Install CUDA Toolkit
-      uses: Jimver/cuda-toolkit@v0.2.10
-      with:
-        cuda: ${{ matrix.cuda }}
-        linux-local-args: '["--toolkit", "--override"]' 
+    # - name: Install CUDA Toolkit
+    #   uses: Jimver/cuda-toolkit@v0.2.10
+    #   with:
+    #     cuda: ${{ matrix.cuda }}
+    #     linux-local-args: '["--toolkit", "--override"]' 
 
-    - name: Install Miniconda
+    - name: Install Mamba
       uses: mamba-org/provision-with-micromamba@main
       with:
-        environment-name: uammd
+        environment-file: false
+        extra-specs: ""
         cache-env: true
         cache-downloads: true
 
