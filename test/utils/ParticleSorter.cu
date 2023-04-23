@@ -7,11 +7,8 @@
 #include"utils/ParticleSorter.cuh"
 #include "utils/container.h"
 #include "utils/execution_policy.cuh"
-#define USE_NVTX
-#include"utils/NVTXTools.h"
 #include <iterator>
 #include<random>
-#include<cuda_profiler_api.h>
 using namespace uammd;
 
 template<class T>
