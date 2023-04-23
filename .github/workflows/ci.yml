@@ -35,7 +35,7 @@ jobs:
             nvcc: "11.8"
 
           # Latest supported versions
-          - name: Linux (CUDA 12.1)
+          - name: Linux (CUDA 12.0)
             cuda: "12.1.0"
             gcc: "10.3.*"
             nvcc: "12.1"
