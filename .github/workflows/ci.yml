@@ -24,15 +24,13 @@ jobs:
 
           # Oldest supported versions
           - name: Linux (CUDA 10.2)
-            cuda: "10.2.89"
+            cuda: "11.3.0"
             gcc: "8.5.*"
-            nvcc: "10.2"
 
           # Latest supported versions
           - name: Linux (CUDA 11.8)
             cuda: "11.8.0"
             gcc: "10.3.*"
-            nvcc: "11.8"
 
     steps:
     - name: Check out
@@ -54,9 +52,8 @@ jobs:
 
     - name: Prepare dependencies
       run: |
-        sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda }}" \
+        sed -i -e "s/cuda-.*$/cuda-${{ matrix.cuda }}" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
-               -e "/nvcc_linux-64/c\  - nvcc_linux-64 ${{ matrix.nvcc }}" \
                environment.yml
 
     - name: Show dependency file
@@ -64,8 +61,6 @@ jobs:
 
     - name: Install dependencies
       run: micromamba env create -n uammd -f environment.yml
-      env:
-        CONDA_OVERRIDE_CUDA: ${{ matrix.nvcc }}
 
     - name: List environment
       run: |
