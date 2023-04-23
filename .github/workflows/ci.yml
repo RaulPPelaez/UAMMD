@@ -63,24 +63,24 @@ jobs:
       run: cat environment.yml
 
     - name: Install dependencies
-      run: mamba env create -n uammd -f environment.yml
+      run: micromamba env create -n uammd -f environment.yml
       env:
         CONDA_OVERRIDE_CUDA: ${{ matrix.nvcc }}
 
-    - name: List conda environment
+    - name: List environment
       run: |
-        conda activate uammd
-        conda list
+        micromamba activate uammd
+        micromamba list
 
     - name: Configure and compile examples
       run: |
-        conda activate uammd
+        micromamba activate uammd
         mkdir examples/build && cd examples/build
         cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
         make -j3
     - name: Configure and compile tests
       run: |
-        conda activate uammd
+        micromamba activate uammd
         mkdir test/build && cd test/build
         cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
         make -j3
