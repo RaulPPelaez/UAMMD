@@ -52,7 +52,7 @@ jobs:
 
     - name: Prepare dependencies
       run: |
-        sed -i -e "s/cuda-.*$/cuda-${{ matrix.cuda }}/g" \
+        sed -i -e "s+label/cuda-.*$+label/cuda-${{ matrix.cuda }}+g" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
                environment.yml
 
