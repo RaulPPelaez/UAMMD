@@ -5,6 +5,8 @@ dependencies:
   - cmake >=3.22
   - cuda-nvcc
   - cuda-libraries-dev
+  - cuda-libraries
+  - cuda-cudart-dev
   - gxx_linux-64 10.3.*
   - make
   - sysroot_linux-64 2.17
