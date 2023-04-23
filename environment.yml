@@ -1,14 +1,11 @@
 channels:
   - conda-forge
-  - nvidia/label/cuda-11.8.0
 dependencies:
   - cmake >=3.22
-  - cuda-nvcc
-  - cuda-libraries-dev
-  - cuda-libraries
-  - cuda-cudart-dev
+  - cudatoolkit 11.8.*
   - gxx_linux-64 10.3.*
   - make
+  - nvcc_linux-64 11.8
   - sysroot_linux-64 2.17
   - mkl-devel
   - pybind11
