@@ -124,13 +124,13 @@ namespace uammd{
 	  this-> prefactor = sqrt(1.0/(2.0*M_PI*width));
 	  this-> tau = -1.0/(2.0*width);
 	}
-	inline __device__ real phiX(real r) const{
+	inline __device__ real phiX(real r, real3 pos) const{
 	  return prefactor*exp(tau*r*r);
 	}
-	inline __device__ real phiY(real r) const{
+	inline __device__ real phiY(real r, real3 pos) const{
 	  return prefactor*exp(tau*r*r);
 	}
-	static constexpr inline __device__ real phiZ(real r){
+	static constexpr inline __device__ real phiZ(real r, real3 pos){
 	  return real(1.0);
 	}
 
@@ -146,13 +146,13 @@ namespace uammd{
 	  this-> prefactor = -sqrt(1.0/(2.0*M_PI*width*width));
 	  this-> tau = -1.0/(2.0*width);
 	}
-	inline __device__ real phiX(real r) const{
+	inline __device__ real phiX(real r, real3 pos) const{
 	  return prefactor*exp(tau*r*r)*(direction==0?r:real(1.0));
 	}
-	inline __device__ real phiY(real r) const{
+	inline __device__ real phiY(real r, real3 pos) const{
 	  return prefactor*exp(tau*r*r)*(direction==1?r:real(1.0));
 	}
-	inline __device__ real phiZ(real r) const{
+	inline __device__ real phiZ(real r, real3 pos) const{
 	  return real(1.0);
 	}
 
