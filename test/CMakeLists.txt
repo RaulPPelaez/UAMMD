@@ -65,6 +65,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_subdirectory(BDHI/DPStokes)
 add_subdirectory(BDHI/FCM)
+add_subdirectory(BDHI/quasi2D)
 add_subdirectory(utils)
 add_subdirectory(misc/chebyshev)
 
