@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(tests)
 enable_language(CUDA)
-#add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
+add_compile_definitions(PUBLIC MAXLOGLEVEL=1)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
