@@ -32,7 +32,6 @@ int main(int argc, char *argv[]) {
     ullint seed = 0xf31337Bada55D00dULL^time(NULL);
     sys->rng().setSeed(seed);
     auto pd = make_shared<ParticleData>(N, sys);
-    auto pg = make_shared<ParticleGroup>(pd, "All");
     Box box(std::stod(argv[2]));
     {
         auto pos = pd->getPos(access::location::cpu, access::mode::write);
@@ -61,7 +60,7 @@ int main(int argc, char *argv[]) {
     par.initialJumpSize = std::stod(argv[7]); //0.05
     par.acceptanceRatio = std::stod(argv[9]); //0.8
     par.tuneSteps = 10;
-    auto mc = make_shared<MC>(pg, pot, par);
+    auto mc = make_shared<MC>(pd, pot, par);
     sys->log<System::MESSAGE>("RUNNING!!!");
     pd->sortParticles();
     Timer tim;
