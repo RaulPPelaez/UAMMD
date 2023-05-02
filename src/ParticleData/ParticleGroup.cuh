@@ -165,11 +165,12 @@ namespace uammd{
     //A list of the particle indices and ids of the group (updated to current order)
     thrust::device_vector<int> myParticlesIndicesGPU, myParticlesIdsGPU;
     thrust::host_vector<int>   myParticlesIndicesCPU;
-    thrust::device_vector<bool> myParticlesIndexMaskGPU;
-    thrust::host_vector<bool>   myParticlesIndexMaskCPU;
+    thrust::device_vector<int> myParticlesIndexMaskGPU;
+    thrust::host_vector<int>   myParticlesIndexMaskCPU;
 
     bool updateHostVector = true;
     bool needsIndexListUpdate = false;
+    bool updateMask = true;
 
     //number of particles in group and in all system (pd)
     int numberParticles, totalParticles;
@@ -182,7 +183,6 @@ namespace uammd{
 
     //Update index list if needed
     void computeIndexList(bool forceUpdate = false);
-    void computeIndexMaskList(bool forceUpdate = false);
 
   public:
     //Defaults to all particles in group
@@ -223,7 +223,48 @@ namespace uammd{
       sys->log<System::DEBUG>("[ParticleGroup] Handling reorder signal in group %s", this->name.c_str());
       if(!allParticlesInGroup && numberParticles > 0){
 	needsIndexListUpdate = true;
+  updateMask = true;
       }
+    }
+
+    const int* getGroupIndexMaskRawPtr(access::location loc) {
+      int* ptr;
+
+      if(this->allParticlesInGroup and updateMask){
+        myParticlesIndexMaskCPU.resize(totalParticles);
+        myParticlesIndexMaskGPU.resize(totalParticles);
+        std::fill(myParticlesIndexMaskCPU.begin(),myParticlesIndexMaskCPU.end(),1);
+
+        myParticlesIndexMaskGPU  = myParticlesIndexMaskCPU;
+        updateMask = false;
+      }
+
+      if(updateMask){
+        myParticlesIndexMaskCPU.resize(totalParticles);
+        myParticlesIndexMaskGPU.resize(totalParticles);
+        std::fill(myParticlesIndexMaskCPU.begin(),myParticlesIndexMaskCPU.end(),0);
+
+        const int* indexRaw = this->getIndicesRawPtr(access::location::cpu);
+
+        fori(0,numberParticles){
+          myParticlesIndexMaskCPU[indexRaw[i]]=1;
+        }
+
+        myParticlesIndexMaskGPU  = myParticlesIndexMaskCPU;
+        updateMask = false;
+      }
+
+      switch(loc){
+        case access::location::cpu:
+          ptr = thrust::raw_pointer_cast(myParticlesIndexMaskCPU.data());
+          break;
+        case access::location::gpu:
+          ptr = thrust::raw_pointer_cast(myParticlesIndexMaskGPU.data());
+          break;
+        default:
+          ptr = nullptr;
+      }
+      return ptr;
     }
 
     //Get a raw memory pointer to the index list if it exists
@@ -241,34 +282,6 @@ namespace uammd{
 	break;
       case access::location::gpu:
 	ptr = thrust::raw_pointer_cast(myParticlesIndicesGPU.data());
-	break;
-      default:
-	ptr = nullptr;
-      }
-      return ptr;
-    }
-
-    //Get an int pointer of size pd->getNumParticles() returning 1 if the particle in that index is
-    // part of the group and 0 otherwise.
-    //loc specifies the memory location of the underlying array
-    const int * getGroupIndexMaskRawPtr(access::location loc){
-      if(this->allParticlesInGroup || numberParticles == 0 ) return nullptr;
-      auto indicesInGroupRaw = this->getIndicesRawPtr(access::gpu);
-      if(not indicesInGroupRaw)	return nullptr;
-      int totalNumberParticles = pd->getNumParticles();
-      auto perm = thrust::make_permutation_iterator(thrust::make_constant_iterator(true),
-						    indicesInGroupRaw);
-      myParticlesIndexMaskGPU.resize(totalNumberParticles);
-      thrust::copy(thrust::cuda::par,
-		   perm, perm + numberParticles, myParticlesIndexMaskGPU.begin());
-      int *ptr;
-      switch(loc){
-      case access::gpu:
-	ptr = thrust::raw_pointer_cast(myParticlesIndicesGPU.data());
-	break;
-      case access::cpu:
-	myParticlesIndexMaskCPU = myParticlesIndexMaskGPU;
-	ptr = thrust::raw_pointer_cast(myParticlesIndicesCPU.data());
 	break;
       default:
 	ptr = nullptr;
@@ -304,7 +317,7 @@ namespace uammd{
       MaskAccess(const int * masks):masks(masks){}
 
       inline __host__ __device__ bool operator()(int i) const{
-	return masks?masks[i]:true;
+	return masks[i];
       }
 
     private:
