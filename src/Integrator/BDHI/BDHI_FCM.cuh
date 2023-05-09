@@ -182,6 +182,9 @@ namespace uammd{
 	return fcm;
       }
 
+		protected:
+      auto computeHydrodynamicDisplacements();
+
     private:
       uint steps = 0;
       cudaStream_t st;
@@ -189,7 +192,6 @@ namespace uammd{
       void updateInteractors();
       void resetForces();
       void resetTorques();
-      auto computeHydrodynamicDisplacements();
       void computeCurrentForces();
     };
   }
