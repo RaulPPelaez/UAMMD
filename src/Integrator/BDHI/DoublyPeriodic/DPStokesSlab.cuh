@@ -276,7 +276,7 @@ else throw std::runtime_error("[DPStokesSlab] Can only average in direction X (0
 	System::log<System::MESSAGE>("[DPStokes] temperature: %g", par.temperature);
 	this->seed = pd->getSystem()->rng().next32();
 	this->seedRFD = pd->getSystem()->rng().next32();
-	this->deltaRFD = 1e-6*par.hydrodynamicRadius;
+	this->deltaRFD = 1e-6;
       }
 
       //Returns the thermal drift term: temperature*dt*(\partial_q \cdot M)
