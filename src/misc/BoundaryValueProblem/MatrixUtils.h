@@ -5,6 +5,7 @@
 #include "utils/cufftPrecisionAgnostic.h"
 #include<global/defines.h>
 #include<utils/exception.h>
+#include<utils/complex.cuh>
 #include<thrust/pair.h>
 #include<vector>
 #ifdef USE_MKL
@@ -70,7 +71,7 @@ namespace uammd{
     std::vector<T> invertSquareMatrix(const std::vector<T> &A, lapack_int N){
       lapack_int pivotArray[N];
       int errorHandler;
-      auto invA = A;
+      std::vector<T> invA = A;
       errorHandler = LapackeUAMMD<T>::getrf(LAPACK_ROW_MAJOR, N, N, invA.data(), N, pivotArray);
       if(errorHandler){
 	throw std::runtime_error("Lapacke getrf failed with error code: " + std::to_string(errorHandler));
@@ -82,6 +83,12 @@ namespace uammd{
       return invA;
     }
 
+    template<>
+    std::vector<complex> invertSquareMatrix<complex>(const std::vector<complex> &A, lapack_int N){
+      throw std::runtime_error("InvertSquareMatrix not implemented for complex other than "
+                               "lapack_complex_float, lapack_complex_double and cufftComplex_t");
+    }
+
     template<class T, class T2>
     std::vector<typename T::value_type> matmul(const T &A, int ncol_a, int nrow_a,
 					       const T2 &B, int ncol_b, int nrow_b){
@@ -89,7 +96,7 @@ namespace uammd{
       C.resize(ncol_b*nrow_a);
       for(int i = 0; i<nrow_a; i++){
 	for(int j = 0; j<ncol_b; j++){
-	  real tmp = 0;
+	  typename T::value_type tmp = 0;
 	  for(int k = 0; k<ncol_a; k++){
 	    tmp += A[k+ncol_a*i] * B [j+ncol_b*k];
 	  }
@@ -98,9 +105,17 @@ namespace uammd{
       }
       return C;
     }
-
+    
     //Solves the linear system A*x = b
-    //Given A as a real4 (2x2 matrix) and b as two numbers of an arbitrary type (could be complex, real...)
+    //Given A (2x2 matrix) and b as two numbers of an arbitrary type (could be complex, real...)
+    template<class T, class T2>
+    __device__ thrust::pair<T,T> solve2x2System(T2 A[4], thrust::pair<T,T> b){
+      const auto det  = A[0]*A[3] - A[1]*A[2];
+      const T c0 = (b.first*A[3] - A[1]*b.second)/det;
+      const T d0 = (b.second*A[0] - b.first*A[2])/det;
+      return thrust::make_pair(c0, d0);
+    }
+    
     template<class T>
     __device__ thrust::pair<T,T> solve2x2System(real4 A, thrust::pair<T,T> b){
       const real det  = A.x*A.w - A.y*A.z;
