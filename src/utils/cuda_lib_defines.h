@@ -8,6 +8,7 @@
 #define cusolverDnpotrf cusolverDnSpotrf
 #define cusolverDnpotrf_bufferSize cusolverDnSpotrf_bufferSize
 #define cublastrmv cublasStrmv
+#define curandgeneratenormal curandGenerateNormal
 #define cublassymv cublasSsymv
 #define cublasgemv cublasSgemv
 #define cublasnrm2 cublasSnrm2
@@ -23,7 +24,7 @@
 #define cusolverDnpotrf cusolverDnDpotrf
 #define cusolverDnpotrf_bufferSize cusolverDnDpotrf_bufferSize
 #define cublastrmv cublasDtrmv
-#define curandGenerateNormal curandGenerateNormalDouble
+#define curandgeneratenormal curandGenerateNormalDouble
 #define cublassymv cublasDsymv
 #define cublasgemv cublasDgemv
 #define cublasnrm2 cublasDnrm2
