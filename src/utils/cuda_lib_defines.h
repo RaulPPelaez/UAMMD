@@ -18,8 +18,17 @@
 #define cusolverDnsyevd cusolverDnSsyevd
 #define cusolverDnsyevd_bufferSize cusolverDnSsyevd_bufferSize
 #define cusolverDngesvd_bufferSize cusolverDnSgesvd_bufferSize
+#define cusolverDngetrf_bufferSize cusolverDnSgetrf_bufferSize
+#define cusolverDncgetrf_bufferSize cusolverDnCgetrf_bufferSize
 #define cusolverDngesvd cusolverDnSgesvd
+#define cusolverDngetrf cusolverDnSgetrf
+#define cusolverDngetrs cusolverDnSgetrs
+#define cusolverDncgetrf cusolverDnCgetrf
+#define cusolverDncgetrs cusolverDnCgetrs
 #define cublasgemm cublasSgemm
+#define cublasrgemv cublasSgemv
+#define cublascgemm cublasCgemm
+#define cublascgemv cublasCgemv
 #else
 #define cusolverDnpotrf cusolverDnDpotrf
 #define cusolverDnpotrf_bufferSize cusolverDnDpotrf_bufferSize
@@ -34,8 +43,17 @@
 #define cusolverDnsyevd cusolverDnDsyevd
 #define cusolverDnsyevd_bufferSize cusolverDnDsyevd_bufferSize
 #define cusolverDngesvd_bufferSize cusolverDnDgesvd_bufferSize
+#define cusolverDngetrf_bufferSize cusolverDnDgetrf_bufferSize
+#define cusolverDncgetrf_bufferSize cusolverDnZgetrf_bufferSize
 #define cusolverDngesvd cusolverDnDgesvd
+#define cusolverDngetrf cusolverDnDgetrf
+#define cusolverDngetrs cusolverDnDgetrs
+#define cusolverDncgetrf cusolverDnZgetrf
+#define cusolverDncgetrs cusolverDnZgetrs
 #define cublasgemm cublasDgemm
+#define cublasrgemv cublasDgemv
+#define cublascgemm cublasZgemm
+#define cublascgemv cublasZgemv
 #endif
 
 
