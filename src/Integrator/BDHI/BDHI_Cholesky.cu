@@ -116,7 +116,7 @@ namespace uammd{
       //Curand fill with gaussian numbers with mean 0 and var 1
       /*This shit is obscure, curand will only work with an even number of elements*/
       auto d_noise = thrust::raw_pointer_cast(noise.data());
-      curandGenerateNormal(curng, d_noise, 3*numberParticles + ((3*numberParticles)%2), real(0.0), real(1.0));
+      curandgeneratenormal(curng, d_noise, 3*numberParticles + ((3*numberParticles)%2), real(0.0), real(1.0));
       isMup2date = false;
     }
 
@@ -219,7 +219,7 @@ namespace uammd{
 				       3*numberParticles, d_M, 3*numberParticles, d_work, h_work_size, d_info));
       curandSetStream(curng, st);
       /*Gen new noise in BdW*/
-      curandGenerateNormal(curng,
+      curandgeneratenormal(curng,
 			   (real*) BdW,
 			   3*numberParticles + ((3*numberParticles)%2),
 			   real(0.0), real(1.0));

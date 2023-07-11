@@ -935,8 +935,8 @@ namespace uammd{
       thrust::device_vector<real> noise(30000);
       auto noise_ptr = thrust::raw_pointer_cast(noise.data());
       //Warm cuRNG
-      CurandSafeCall(curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
-      CurandSafeCall(curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
+      CurandSafeCall(curandgeneratenormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
+      CurandSafeCall(curandgeneratenormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
     }
     //Sum S·F term using the current particle positions
     void ICM::spreadParticleForces(){
@@ -993,7 +993,7 @@ namespace uammd{
       if(temperature!=real(0.0)){
 	CurandSafeCall(curandSetStream(curng, st));
 	sys->log<System::DEBUG2>("[Hydro::ICM] Generate random numbers");
-	CurandSafeCall(curandGenerateNormal(curng, thrust::raw_pointer_cast(random.data()), random.size(), 0.0, 1.0));
+	CurandSafeCall(curandgeneratenormal(curng, thrust::raw_pointer_cast(random.data()), random.size(), 0.0, 1.0));
       }
       real3* d_gridVels = (real3*)thrust::raw_pointer_cast(gridVels.data());
       real3* d_cellAdvection = (real3*)thrust::raw_pointer_cast(cellAdvection.data());

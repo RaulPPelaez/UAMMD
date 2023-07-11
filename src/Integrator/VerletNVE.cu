@@ -28,11 +28,6 @@
 
 #include"VerletNVE.cuh"
 
-
-#ifndef SINGLE_PRECISION
-#define curandGenerateNormal curandGenerateNormalDouble
-#endif
-
 namespace uammd{
 
   VerletNVE::VerletNVE(shared_ptr<ParticleGroup> pg, VerletNVE::Parameters par):
