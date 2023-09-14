@@ -17,6 +17,7 @@ namespace uammd{
       real viscosity;
       real hydrodynamicRadius = -1; //If not provided it will be taken from pd->getRadius if possible
       real tolerance = 1e-3;
+      real LanczosTol;
       real dt;
       bool is2D = false;
       Box box;
