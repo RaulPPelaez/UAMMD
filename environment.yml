@@ -1,3 +1,4 @@
+name: uammd
 channels:
   - conda-forge
 dependencies:
