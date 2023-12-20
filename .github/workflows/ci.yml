@@ -68,14 +68,14 @@ jobs:
 
     - name: Install CUDA Toolkit
       # CUDA 12 can be installed with mamba
-      if: ! ${{ matrix.cuda12 }}
+      if: ${{ matrix.cuda12 == 'false' }}
       uses: Jimver/cuda-toolkit@v0.2.10
       with:
         cuda: ${{ matrix.cuda }}
         linux-local-args: '["--toolkit", "--override"]'
 
     - name: Prepare dependencies (CUDA <12)
-      if: ! ${{ matrix.cuda12 }}
+      if: ${{ matrix.cuda12 == 'false'}}
       run: |
         sed -i -e "/cuda-version/d" \
                -e "/cuda-libraries-dev/d" \
@@ -84,7 +84,7 @@ jobs:
                environment.yml
 
     - name: Prepare dependencies (CUDA >=12)
-      if: ${{ matrix.cuda12 }}
+      if: ${{ matrix.cuda12 == 'true' }}
       run: |
         sed -i -e "/cuda-version/c\  - cuda-version ${{ matrix.cuda }}" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
