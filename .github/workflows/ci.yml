@@ -78,6 +78,7 @@ jobs:
       run: |
         sed -i -e "/cuda-version/d" \
                -e "/cuda-libraries-dev/d" \
+               -e "/cuda-nvcc/d" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
                environment.yml
 

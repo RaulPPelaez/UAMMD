@@ -5,6 +5,7 @@ dependencies:
   - cuda-version 12.*
   - gxx_linux-64 12.*
   - cuda-libraries-dev
+  - cuda-nvcc 
   - make
   - mkl-devel
   - pybind11
