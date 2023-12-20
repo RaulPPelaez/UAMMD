@@ -26,18 +26,38 @@ jobs:
           - name: Linux (CUDA 10.2)
             cuda: "10.2.89"
             gcc: "8.5.*"
-            nvcc: "10.2"
 
           # Latest supported versions
-          - name: Linux (CUDA 11.8)
-            cuda: "11.8.0"
-            gcc: "10.3.*"
-            nvcc: "11.8"
+          - name: Linux (CUDA 12.2)
+            cuda: "12.2"
+            gcc: "12.*"
 
     steps:
     - name: Check out
       uses: actions/checkout@v2
-
+    - name: Manage disk space
+      if: matrix.os == 'ubuntu'
+      run: |
+          sudo mkdir -p /opt/empty_dir || true
+          for d in \
+                   /opt/ghc \
+                   /opt/hostedtoolcache \
+                   /usr/lib/jvm \
+                   /usr/local/.ghcup \
+                   /usr/local/lib/android \
+                   /usr/local/share/powershell \
+                   /usr/share/dotnet \
+                   /usr/share/swift \
+                   ; do
+            sudo rsync --stats -a --delete /opt/empty_dir/ $d || true
+          done
+          sudo apt-get purge -y -f firefox \
+                                   google-chrome-stable \
+                                   microsoft-edge-stable
+          sudo apt-get autoremove -y >& /dev/null
+          sudo apt-get autoclean -y >& /dev/null
+          sudo docker image prune --all --force
+          df -h
     - name: Install Mamba
       uses: mamba-org/provision-with-micromamba@main
       with:
@@ -47,18 +67,26 @@ jobs:
         cache-downloads: true
 
     - name: Install CUDA Toolkit
+      if: matrix.cuda < 12 # CUDA 12 can be installed with mamba
       uses: Jimver/cuda-toolkit@v0.2.10
       with:
         cuda: ${{ matrix.cuda }}
-        linux-local-args: '["--toolkit", "--override"]' 
+        linux-local-args: '["--toolkit", "--override"]'
 
-    - name: Prepare dependencies
+    - name: Prepare dependencies (CUDA <12)
+      if: matrix.cuda < 12
       run: |
-        sed -i -e "/cudatoolkit/c\  - cudatoolkit ${{ matrix.cuda }}" \
+        sed -i -e "/cuda-version/d" \
+               -e "/cuda-libraries-dev/d" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
-               -e "/nvcc_linux-64/c\  - nvcc_linux-64 ${{ matrix.nvcc }}" \
                environment.yml
 
+    - name: Prepare dependencies (CUDA >=12)
+      if: matrix.cuda >= 12
+      run: |
+        sed -i -e "/cuda-version/c\  - cuda-version ${{ matrix.cuda }}" \
+               -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
+               environment.yml
     - name: Show dependency file
       run: cat environment.yml
 
