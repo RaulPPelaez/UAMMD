@@ -58,12 +58,6 @@ jobs:
           sudo apt-get autoclean -y >& /dev/null
           sudo docker image prune --all --force
           df -h
-    - name: Install Mamba
-      uses: mamba-org/setup-micromamba@v1
-      with:
-        environment-file: false
-        cache-environment: true
-        cache-downloads: true
 
     - name: Install CUDA Toolkit
       # CUDA 12 can be installed with mamba
@@ -90,9 +84,13 @@ jobs:
                environment.yml
     - name: Show dependency file
       run: cat environment.yml
-
-    - name: Install dependencies
-      run: micromamba env create -n uammd -f environment.yml
+      
+    - name: Install Mamba
+      uses: mamba-org/setup-micromamba@v1
+      with:
+        environment-file: environment.yml
+        cache-environment: false
+        cache-downloads: true
       env:
         CONDA_OVERRIDE_CUDA: ${{ matrix.nvcc }}
 
