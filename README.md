@@ -125,8 +125,8 @@ Raul P. Pelaez is the main developer of UAMMD.
 Other people that have contributed to UAMMD (thanks!):  
 
 Marc Melendez Schofield  
-Pablo Ibañez Freire @PabloIbannez  
-Pablo Palacios Alonso @PabloPalaciosAlonso  
+Pablo Ibañez Freire (https://github.com/PabloIbannez)  
+Pablo Palacios Alonso (http://github.com/PabloPalaciosAlonso) 
 Sergio Panzuela  
 Nerea Alcazar  
 Salvatore Assenza
