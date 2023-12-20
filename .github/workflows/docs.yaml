@@ -12,17 +12,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-
-    - name: Set up Env
-      uses: mamba-org/setup-micromamba@v1
-      with:
-        environment-file: environment.yml
-        init-shell: bash
-        generate-run-shell: true
-
     - name: Install docs dependencies
       run: |
-        pip install -vv .
         pip install -r docs/requirements.txt
       shell: bash -el {0}
       
