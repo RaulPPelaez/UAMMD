@@ -45,13 +45,34 @@ See the documentation page at https://uammd.readthedocs.io for a full list of av
 
 You can use UAMMD as a library for integration into other codes or as a standalone engine.
 
+#### DEPENDENCIES  
+
+---------------------
+Depends on:
+
+	1. CUDA 9.x+                                :   https://developer.nvidia.com/cuda-downloads
+
+Some modules make use of certain NVIDIA libraries included with CUDA:
+	
+	1. cuBLAS
+	2. cuFFT
+	
+Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
+Apart from this, any dependency is already included in the repository under the third_party	folder.  
+See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
+
+Every required dependency can be installed using conda with the environment file provided in the repository. We recommend using [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) as a replacement for conda.  
+
+```bash
+mamba env create -f environment.yml
+```
+
 ### Library mode
 
 **UAMMD does not need to be compiled separatedly (it is header only)**.  
 
 Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html).  
-Here you have a short example of how a typical UAMMD code looks like:  
-
+Here you have a short example of how a typical UAMMD code looks like, encoding a simple Brownian dynamics simulation of non interacting particles.:  
 
 ```c++
 //Ideal brownian particles
@@ -88,27 +109,6 @@ Drop by the examples folder to get started with UAMMD or go to the [wiki](https:
 The example `generic_md` includes almost every module available in UAMMD and can be configured from a parameter file. Go to `examples/generic_md` for instructions.
 
 
-## DEPENDENCIES  
-
----------------------
-Depends on:
-
-	1. CUDA 9.x+                                :   https://developer.nvidia.com/cuda-downloads
-
-Some modules make use of certain NVIDIA libraries included with CUDA:
-	
-	1. cuBLAS
-	2. cuFFT
-	
-Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
-Apart from this, any dependency is already included in the repository under the third_party	folder.  
-See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
-
-Every required dependency can be installed using conda with the environment file provided in the repository. We recommend using [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) as a replacement for conda.  
-
-```bash
-mamba env create -f environment.yml
-```
 
 ------------------------------------------
 
