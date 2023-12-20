@@ -11,6 +11,8 @@ UAMMD is header-only, so a module is compiled only when its header is included. 
 
 The newest compiler versions I have tested are g++-12.x and clang++-13.0 with cuda-12 in Fedora 37.  You can even compile a source containing UAMMD code with clang++-7+ alone, without nvcc.
 
+**These dependencies can be installed using conda with the provided environment.yaml file.**
+
 Additionally, UAMMD makes use of the following external libraries, **which are already included in the repo under third_party**. You can either compile using these or place symlinks to your preferred versions (I have seen recent versions of cub not compiling on some platforms).  
 
   * Boost Preprocessor (http://www.boost.org/ ) (Extracted using bcp, just a few headers)
