@@ -13,9 +13,6 @@
 
 -----------------  
 
-Raul P. Pelaez 2018-2022. (raul.perez(at)uam.es)  
-
-
 A C++14+ header-only fast generic multiscale CUDA Molecular Dynamics framework made with moduarity, expandability and generality in mind. UAMMD is intended to be hackable and copy pastable.  
 
 Although "Molecular Dynamics" is part of the name,the UAMMD framework allows for much more than that. To this moment multiple integrators are implemented allowing it to perform:  
@@ -45,6 +42,10 @@ See the documentation page at https://uammd.readthedocs.io for a full list of av
 ## USAGE
 
 -------------------
+
+You can use UAMMD as a library for integration into other codes or as a standalone engine.
+
+### Library mode
 
 **UAMMD does not need to be compiled separatedly (it is header only)**.  
 
@@ -81,6 +82,12 @@ int main(int argc, char * argv[]){
 
 Drop by the examples folder to get started with UAMMD or go to the [wiki](https://uammd.readthedocs.io/).  
 
+
+### Stand alone engine
+
+The example `generic_md` includes almost every module available in UAMMD and can be configured from a parameter file. Go to `examples/generic_md` for instructions.
+
+
 ## DEPENDENCIES  
 
 ---------------------
@@ -96,6 +103,12 @@ Some modules make use of certain NVIDIA libraries included with CUDA:
 Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
 Apart from this, any dependency is already included in the repository under the third_party	folder.  
 See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
+
+Every required dependency can be installed using conda with the environment file provided in the repository. We recommend using [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) as a replacement for conda.  
+
+```bash
+mamba env create -f environment.yml
+```
 
 ------------------------------------------
 
