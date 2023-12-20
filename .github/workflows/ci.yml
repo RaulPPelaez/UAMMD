@@ -26,17 +26,17 @@ jobs:
           - name: Linux (CUDA 10.2)
             cuda: "10.2.89"
             gcc: "8.5.*"
+            cuda12: false
 
           # Latest supported versions
           - name: Linux (CUDA 12.1)
             cuda: "12.1.*"
             gcc: "11.*"
-
+            cuda12: true
     steps:
     - name: Check out
       uses: actions/checkout@v2
     - name: Manage disk space
-      if: matrix.os == 'ubuntu'
       run: |
           sudo mkdir -p /opt/empty_dir || true
           for d in \
@@ -59,22 +59,23 @@ jobs:
           sudo docker image prune --all --force
           df -h
     - name: Install Mamba
-      uses: mamba-org/provision-with-micromamba@main
+      uses: mamba-org/setup-micromamba@v1
       with:
         environment-file: false
         extra-specs: ""
-        cache-env: true
+        cache-environment: true
         cache-downloads: true
 
     - name: Install CUDA Toolkit
-      if: matrix.cuda < 12 # CUDA 12 can be installed with mamba
+      # CUDA 12 can be installed with mamba
+      if: ! ${{ matrix.cuda12 }}
       uses: Jimver/cuda-toolkit@v0.2.10
       with:
         cuda: ${{ matrix.cuda }}
         linux-local-args: '["--toolkit", "--override"]'
 
     - name: Prepare dependencies (CUDA <12)
-      if: matrix.cuda < 12
+      if: ! ${{ matrix.cuda12 }}
       run: |
         sed -i -e "/cuda-version/d" \
                -e "/cuda-libraries-dev/d" \
@@ -83,7 +84,7 @@ jobs:
                environment.yml
 
     - name: Prepare dependencies (CUDA >=12)
-      if: matrix.cuda >= 12
+      if: ${{ matrix.cuda12 }}
       run: |
         sed -i -e "/cuda-version/c\  - cuda-version ${{ matrix.cuda }}" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
