@@ -62,7 +62,8 @@ FetchContent_Declare(
   GIT_TAG release-1.12.1
 )
 FetchContent_MakeAvailable(googletest)
-
+enable_testing()
+include(CTest)
 add_subdirectory(BDHI/DPStokes)
 add_subdirectory(BDHI/FCM)
 add_subdirectory(BDHI/quasi2D)
