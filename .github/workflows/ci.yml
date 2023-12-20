@@ -30,7 +30,7 @@ jobs:
           # Latest supported versions
           - name: Linux (CUDA 12.1)
             cuda: "12.1.*"
-            gcc: "12.*"
+            gcc: "11.*"
 
     steps:
     - name: Check out
