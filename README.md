@@ -9,8 +9,6 @@
 **See the wiki for more info!**  
 **You can find videos on the youtube channel**  http://bit.ly/2r5WoOn
 
-## DESCRIPTION  
-
 -----------------  
 
 A C++14+ header-only fast generic multiscale CUDA Molecular Dynamics framework made with moduarity, expandability and generality in mind. UAMMD is intended to be hackable and copy pastable.  
@@ -39,7 +37,7 @@ Hop on to the examples folder for an introduction or check the [documentation](h
 See the documentation page at https://uammd.readthedocs.io for a full list of available modules.  
 
 ----------------------
-## USAGE
+## Usage
 
 -------------------
 
@@ -101,8 +99,15 @@ int main(int argc, char * argv[]){
 
 ```
 
-Drop by the examples folder to get started with UAMMD or go to the [wiki](https://uammd.readthedocs.io/).  
+Drop by the examples folder to get started with UAMMD or go to the [documentation page for the examples](https://uammd.readthedocs.io/en/latest/Examples.html).  
 
+## Running Tests  
+
+---------------------
+
+The `tests` folder contains instructions on how to run the UAMMD correctness tests. You can also go to the [documentation page for tests](https://uammd.readthedocs.io/en/latest/Tests.html).
+
+## Dependencies  
 
 ### Stand alone engine
 
