@@ -70,6 +70,7 @@ add_subdirectory(BDHI/quasi2D)
 add_subdirectory(utils)
 add_subdirectory(misc/chebyshev)
 add_subdirectory(misc/ibm)
+add_subdirectory(misc/lanczos)
 
 IF (CMAKE_BUILD_TYPE MATCHES "Debug")
   if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
