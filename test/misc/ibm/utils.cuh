@@ -1,9 +1,10 @@
 #pragma once
 
+#include <uammd.cuh>
 #include "misc/ChevyshevUtils.cuh"
 #include "misc/IBM.cuh"
 #include <thrust/complex.h>
-#include <uammd.cuh>
+
 using namespace uammd;
 using complex = thrust::complex<real>;
 using real = uammd::real;
@@ -73,7 +74,7 @@ private:
   int nz;
   real Htot;
 };
-using Kernel = Gaussian;
+
 
 // Spreads a group of particles onto a grid.
 // The domain is such that some location r is r\in +-L
@@ -82,10 +83,10 @@ auto spreadParticles(thrust::device_vector<real3> &pos,
                      int supp, real3 L) {
   L.z *= 2;
   auto h = L / make_real3(n);
-  auto kernel = std::make_shared<Kernel>(sigma, h.x, L.z, n.z, supp);
+  auto kernel = std::make_shared<Gaussian>(sigma, h.x, L.z, n.z, supp);
   using Grid = chebyshev::doublyperiodic::Grid;
   Grid grid(Box(L), n);
-  IBM<Kernel, Grid> ibm(kernel, grid);
+  IBM<Gaussian, Grid> ibm(kernel, grid);
   auto pos_ptr = thrust::raw_pointer_cast(pos.data());
   auto values_ptr = thrust::raw_pointer_cast(values.data());
   thrust::device_vector<complex> d_fr(n.x * n.y * n.z);
@@ -104,10 +105,10 @@ auto interpolateField(thrust::device_vector<real3> &pos,
                       int supp, real3 L) {
   L.z *= 2;
   auto h = L / make_real3(n);
-  auto kernel = std::make_shared<Kernel>(sigma, h.x, L.z, n.z, supp);
+  auto kernel = std::make_shared<Gaussian>(sigma, h.x, L.z, n.z, supp);
   using Grid = chebyshev::doublyperiodic::Grid;
   Grid grid(Box(L), n);
-  IBM<Kernel, Grid> ibm(kernel, grid);
+  IBM<Gaussian, Grid> ibm(kernel, grid);
   thrust::device_vector<complex> d_values(pos.size());
   thrust::fill(d_values.begin(), d_values.end(), complex{});
   auto pos_ptr = thrust::raw_pointer_cast(pos.data());

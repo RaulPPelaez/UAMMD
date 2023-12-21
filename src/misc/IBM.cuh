@@ -54,7 +54,7 @@ REFERENCES:
 #include "IBM.cu"
 #include "IBM_utils.cuh"
 #include "utils/Grid.cuh"
-
+#include "third_party/type_names.h"
 namespace uammd{
   namespace IBM_ns{
     struct LinearIndex3D{
