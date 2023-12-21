@@ -26,13 +26,13 @@ jobs:
           - name: Linux (CUDA 10.2)
             cuda: "10.2.89"
             gcc: "8.5.*"
-            cuda12: false
+            cuda12: 'false'
 
           # Latest supported versions
           - name: Linux (CUDA 12.1)
             cuda: "12.1.*"
             gcc: "11.*"
-            cuda12: true
+            cuda12: 'true'
     steps:
     - name: Check out
       uses: actions/checkout@v2
