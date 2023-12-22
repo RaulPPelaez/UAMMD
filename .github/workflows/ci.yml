@@ -73,7 +73,7 @@ jobs:
         sed -i -e "/cuda-version/d" \
                -e "/cuda-libraries-dev/d" \
                -e "/cuda-nvcc/d" \
-               -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
+               -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}\n  - gcc_linux-64" \
                environment.yml
 
     - name: Prepare dependencies (CUDA >=12)
