@@ -3,8 +3,6 @@ In these folders you will find a lot of examples showcasing the different capabi
 
 UAMMD is presented with two distinct identities, it can work as a standalone molecular simulation GPU code (such as gromacs or hoomd) or as a library exposing GPU algorithms for you to use to accelerate your own code. Keep in mind that UAMMD is designed to be hackable and copy pastable, so feel free to take what you want and give nothing back!  
 
-The Makefile in this folder simply goes into each folder and runs the Makefiles there.  
-
 This folder is organized in the following way:  
 
 ### basic_concepts  
@@ -16,8 +14,7 @@ Stuff not covered by the basic tutorial with more complex and obscure functional
 
 ### generic_md  
 This code has almost every module that UAMMD offers in a single file that you can compile and then tweak via a data.main parameter file.  
-If you are not looking to learn how UAMMD works and how to modify it or extend it get in here.  
-You might be able to encode your simulation by tweaking the data.main.  
+If you are not looking to learn how UAMMD works and how to modify it or extend it get in here. You might be able to encode your simulation by tweaking the data.main.  
 
 ### integration_schemes  
 The basic tutorial covers only a couple of integration modules, in this folder you will find copy pastable functions to create any UAMMD Integrator. From Brownian Dynamics to Smoothed Particle Hydrodynamics.  
@@ -31,3 +28,27 @@ This family of examples shows off want you can do outside the UAMMD simulation e
 ### misc  
 Examples that do not fit in the other categories.  
 
+## Compiling the examples
+
+For convenience and learning purposes the examples can be compiled either with Make or CMake. This folder contains both a Makefile and a CMakeLists.txt.  
+
+I suggest using the CMake system, as it tends to be more robust regarding install locations of the different dependencies. When running cmake a Makefile will be generated.  
+
+To compile every example, run:  
+
+```bash
+	mkdir -p build
+	cd build
+	cmake ..
+	make -j3
+```
+
+Binaries for the examples will be available under the created `bin` folder.  
+
+Refer to [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD) for additional information if the building process fails.  
+
+You can pass to CMake any UAMMD related definitions, for instance:  
+
+```shell
+cmake -DDOUBLE_PRECISION ..
+```
