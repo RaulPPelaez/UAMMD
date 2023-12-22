@@ -102,10 +102,8 @@ jobs:
     - name: Configure and compile examples
       run: |
         micromamba activate uammd
-        export CC=/home/runner/micromamba/envs/uammd/bin/x86_64-conda-linux-gnu-cc
-        export CXX=/home/runner/micromamba/envs/uammd/bin/x86_64-conda-linux-gnu-c++
         mkdir examples/build && cd examples/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_HOST_COMPILER=/home/runner/micromamba/envs/uammd/bin/x86_64-conda-linux-gnu-c++ ..
         make -j3
     - name: Configure and compile tests
       run: |
