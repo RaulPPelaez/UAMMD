@@ -9,12 +9,7 @@
 **See the wiki for more info!**  
 **You can find videos on the youtube channel**  http://bit.ly/2r5WoOn
 
-## DESCRIPTION  
-
 -----------------  
-
-Raul P. Pelaez 2018-2022. (raul.perez(at)uam.es)  
-
 
 A C++14+ header-only fast generic multiscale CUDA Molecular Dynamics framework made with moduarity, expandability and generality in mind. UAMMD is intended to be hackable and copy pastable.  
 
@@ -42,15 +37,40 @@ Hop on to the examples folder for an introduction or check the [documentation](h
 See the documentation page at https://uammd.readthedocs.io for a full list of available modules.  
 
 ----------------------
-## USAGE
+## Usage
 
 -------------------
+
+You can use UAMMD as a library for integration into other codes or as a standalone engine.
+
+#### DEPENDENCIES  
+
+---------------------
+Depends on:
+
+	1. CUDA 9.x+                                :   https://developer.nvidia.com/cuda-downloads
+
+Some modules make use of certain NVIDIA libraries included with CUDA:
+	
+	1. cuBLAS
+	2. cuFFT
+	
+Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
+Apart from this, any dependency is already included in the repository under the third_party	folder.  
+See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
+
+Every required dependency can be installed using conda with the environment file provided in the repository. We recommend using [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) as a replacement for conda.  
+
+```bash
+mamba env create -f environment.yml
+```
+
+### Library mode
 
 **UAMMD does not need to be compiled separatedly (it is header only)**.  
 
 Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html).  
-Here you have a short example of how a typical UAMMD code looks like:  
-
+Here you have a short example of how a typical UAMMD code looks like, encoding a simple Brownian dynamics simulation of non interacting particles.:  
 
 ```c++
 //Ideal brownian particles
@@ -79,23 +99,40 @@ int main(int argc, char * argv[]){
 
 ```
 
-Drop by the examples folder to get started with UAMMD or go to the [wiki](https://uammd.readthedocs.io/).  
+Drop by the examples folder to get started with UAMMD or go to the [documentation page for the examples](https://uammd.readthedocs.io/en/latest/Examples.html).  
 
-## DEPENDENCIES  
+### Stand alone engine
+
+The example `generic_md` includes almost every module available in UAMMD and can be configured from a parameter file. Go to `examples/generic_md` for instructions.
+
+## Running Tests  
 
 ---------------------
-Depends on:
 
-	1. CUDA 9.x+                                :   https://developer.nvidia.com/cuda-downloads
+The `tests` folder contains instructions on how to run the UAMMD correctness tests. You can also go to the [documentation page for tests](https://uammd.readthedocs.io/en/latest/Tests.html).
 
-Some modules make use of certain NVIDIA libraries included with CUDA:
-	
-	1. cuBLAS
-	2. cuFFT
-	
-Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
-Apart from this, any dependency is already included in the repository under the third_party	folder.  
-See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
+
+## Repository structure  
+
+-------------------------
+
+- The `docs` folder contains the documentation source files for [](https://uammd.readthedocs.io/) and scripts to build it.
+
+- The `examples` folder contains several examples of UAMMD usage.
+
+- The `src` folder contains the source code for UAMMD. Inside it, there are the following folders:
+1. `global`: Definitions proper to the whole code.
+2. `Integrator`: Source code for the [integrators](https://uammd.readthedocs.io/en/latest/Integrators.html).
+3. `Interactor`: Source code for the [interactors](https://uammd.readthedocs.io/en/latest/Interactors.html).
+4. `misc`: Miscellaneous source code.
+5. `ParticleData`: Source code for [particle data](https://uammd.readthedocs.io/en/latest/ParticleData.html).
+6. `System`: Source code for [system](https://uammd.readthedocs.io/en/latest/System.html).
+7. `third_party`: Third party source code.
+8. `utils`: Utilities for UAMMD.
+
+- The `test` folder contains the source code for the UAMMD tests.
+
+- The `extensions` is part of the subsystem for UAMMD extensions, currently a work in progress.
 
 ------------------------------------------
 
@@ -112,7 +149,8 @@ Raul P. Pelaez is the main developer of UAMMD.
 Other people that have contributed to UAMMD (thanks!):  
 
 Marc Melendez Schofield  
+Pablo Ibañez Freire (https://github.com/PabloIbannez)  
+Pablo Palacios Alonso (http://github.com/PabloPalaciosAlonso) 
 Sergio Panzuela  
 Nerea Alcazar  
-Pablo Ibañez Freire (https://github.com/PabloIbannez)  
 Salvatore Assenza
