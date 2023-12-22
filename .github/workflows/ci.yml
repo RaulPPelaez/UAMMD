@@ -53,7 +53,7 @@ jobs:
           done
           sudo apt-get purge -y -f firefox \
                                    google-chrome-stable \
-                                   microsoft-edge-stable
+                                   microsoft-edge-stable gcc
           sudo apt-get autoremove -y >& /dev/null
           sudo apt-get autoclean -y >& /dev/null
           sudo docker image prune --all --force
