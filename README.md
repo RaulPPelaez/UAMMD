@@ -101,19 +101,38 @@ int main(int argc, char * argv[]){
 
 Drop by the examples folder to get started with UAMMD or go to the [documentation page for the examples](https://uammd.readthedocs.io/en/latest/Examples.html).  
 
+### Stand alone engine
+
+The example `generic_md` includes almost every module available in UAMMD and can be configured from a parameter file. Go to `examples/generic_md` for instructions.
+
 ## Running Tests  
 
 ---------------------
 
 The `tests` folder contains instructions on how to run the UAMMD correctness tests. You can also go to the [documentation page for tests](https://uammd.readthedocs.io/en/latest/Tests.html).
 
-## Dependencies  
 
-### Stand alone engine
+## Repository structure  
 
-The example `generic_md` includes almost every module available in UAMMD and can be configured from a parameter file. Go to `examples/generic_md` for instructions.
+-------------------------
 
+- The `docs` folder contains the documentation source files for [](https://uammd.readthedocs.io/) and scripts to build it.
 
+- The `examples` folder contains several examples of UAMMD usage.
+
+- The `src` folder contains the source code for UAMMD. Inside it, there are the following folders:
+1. `global`: Definitions proper to the whole code.
+2. `Integrator`: Source code for the [integrators](https://uammd.readthedocs.io/en/latest/Integrators.html).
+3. `Interactor`: Source code for the [interactors](https://uammd.readthedocs.io/en/latest/Interactors.html).
+4. `misc`: Miscellaneous source code.
+5. `ParticleData`: Source code for [particle data](https://uammd.readthedocs.io/en/latest/ParticleData.html).
+6. `System`: Source code for [system](https://uammd.readthedocs.io/en/latest/System.html).
+7. `third_party`: Third party source code.
+8. `utils`: Utilities for UAMMD.
+
+- The `test` folder contains the source code for the UAMMD tests.
+
+- The `extensions` is part of the subsystem for UAMMD extensions, currently a work in progress.
 
 ------------------------------------------
 
