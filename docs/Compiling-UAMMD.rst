@@ -7,14 +7,16 @@ UAMMD is header-only, so a module is compiled only when its header is included. 
 
   #. CUDA 8.0+  (https://developer.nvidia.com/cuda-downloads )  
   #. A C++ compiler with C++14 support (g++ 5+ will probably do)  
-  #. Thrust (The version shipped with the cuda release will do)  
   #. LAPACKE/CBLAS or Intel MKL (For some modules only)  
 
 The newest compiler versions I have tested are g++-12.x and clang++-13.0 with cuda-12 in Fedora 37.  You can even compile a source containing UAMMD code with clang++-7+ alone, without nvcc.
 
+**These dependencies can be installed using conda with the provided environment.yaml file.**
+
 Additionally, UAMMD makes use of the following external libraries, **which are already included in the repo under third_party**. You can either compile using these or place symlinks to your preferred versions (I have seen recent versions of cub not compiling on some platforms).  
 
-  * Boost Preprocessor (http://www.boost.org/ ) (Extracted using bcp, just a few headers)  
+  * Boost Preprocessor (http://www.boost.org/ ) (Extracted using bcp, just a few headers)
+  * Thrust (https://github.com/thrust/thrust )
   * CUB 1.5.2+ (https://github.com/NVlabs/cub ) (Currently 1.8.0 in third_party/cub_bak*)  
   * nod (https://github.com/fr00b0/nod ) (A lightweight C++11 signal/slot library)
   * SaruPRNG (http://dx.doi.org/10.1016/j.cpc.2012.12.003 ) (A parallel friendly RNG)

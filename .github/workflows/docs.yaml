@@ -1,0 +1,24 @@
+name: Build Documentation
+
+on:
+  push:
+    branches: [ master, v2.x ]
+  pull_request:
+    branches: [ master, v2.x ]
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install docs dependencies
+      run: |
+        pip install -r docs/requirements.txt
+      shell: bash -el {0}
+      
+    - name: Build Sphinx Documentation
+      run: |
+        cd docs
+        make html
+      shell: bash -el {0}

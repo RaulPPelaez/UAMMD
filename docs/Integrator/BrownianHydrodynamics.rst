@@ -989,8 +989,26 @@ In addition to the previous ones, the integrator also requires:
    Both the solver and Integrator will fail if some particle lies beyond the domain limits in the z direction.
 
 
+Computing average velocity in the plane directions
+**************************************************
+
+The class :code:`DPStokesSlab_ns::DPStokes` can also be used to compute the average velocity of a group of particles in the plane directions.
 
 
+.. cpp:function:: template<class PosIterator, class ForceIterator> std::vector<double> DPStokes::computeAverageVelocity(PosIterator pos, ForceIterator forces, int numberParticles, int direction = 0, cudaStream_t st = 0)
+
+
+   Computes the average velocity :math:`\langle v(z) \rangle_{x/y}` a group of particles in the plane directions.
+
+   :param PosIterator pos: Iterator to the positions of the particles.
+   :param ForceIterator forces: Iterator to the forces acting on the particles.
+   :param int numberParticles: Number of particles.
+   :param int direction: Direction of the average velocity. 0 for x, 1 for y.
+   :param cudaStream_t st: CUDA stream where the computation will be performed.
+   :returns: A vector with the average velocity (size n.z).
+
+
+	     
 .. rubric:: References:
 
 .. [1] An Introduction to Dynamics of Colloids. Dhont, J.K.G. 1996. https://www.elsevier.com/books/an-introduction-to-dynamics-of-colloids/dhont/978-0-444-82009-9
