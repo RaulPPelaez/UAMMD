@@ -40,7 +40,7 @@ namespace uammd{
 
     VECATTR real trace(){return xx+yy+zz;}
 
-    VECATTR tensor3 transpose(){
+    VECATTR tensor3 transpose() const {
       return tensor3(xx,yx,zx,
                      xy,yy,zy,
                      xz,yz,zz);
