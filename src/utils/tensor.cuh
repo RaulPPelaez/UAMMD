@@ -158,6 +158,22 @@ namespace uammd{
     return sub;
   }
 
+  //Define the unary minus operator
+
+  VECATTR  tensor3 operator -(const tensor3 &a){
+    tensor3 sub;
+    sub.xx = -a.xx;
+    sub.yx = -a.yx;
+    sub.zx = -a.zx;
+    sub.xy = -a.xy;
+    sub.yy = -a.yy;
+    sub.zy = -a.zy;
+    sub.xz = -a.xz;
+    sub.yz = -a.yz;
+    sub.zz = -a.zz;
+    return sub;
+  }
+
   VECATTR  void operator -=(tensor3 &a, const real &b){
     a.xx -= b;
     a.yx -= b;
