@@ -6,7 +6,7 @@
 <img src="https://github.com/raulppelaez/uammd/blob/master/.res/poster.png" width="300"><img src="https://github.com/raulppelaez/uammd/blob/master/.res/shotlogo.png" width="500">  
 
 
-**See the wiki for more info!**  
+**See the [documentation](https://uammd.readthedocs.io/en/latest/) for more info!**  
 **You can find videos on the youtube channel**  http://bit.ly/2r5WoOn
 
 -----------------  
