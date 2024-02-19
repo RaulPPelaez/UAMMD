@@ -169,7 +169,7 @@ else throw std::runtime_error("[DPStokesSlab] Can only average in direction X (0
       real gw;
       real tolerance;
       WallMode mode;
-      shared_ptr<BVP::BatchedBVPHandler> bvpSolver;
+      shared_ptr<BVP::BatchedBVPHandler<real>> bvpSolver;
 
     };
 
