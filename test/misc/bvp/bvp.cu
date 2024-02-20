@@ -202,7 +202,7 @@ auto getParameters(){
 }
 
 auto createBVP(std::vector<real> klist, Parameters par){
-  auto bvp = std::make_shared<BVP::BatchedBVPHandler> (klist,
+  auto bvp = std::make_shared<BVP::BatchedBVPHandler<real>> (klist,
 			     make_boundary_dispatcher<TopBoundaryConditions>(klist, par.H),
 			     make_boundary_dispatcher<BottomBoundaryConditions>(klist, par.H),
 			     klist.size(), par.H, par.nz);
