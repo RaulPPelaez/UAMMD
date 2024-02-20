@@ -124,16 +124,10 @@ namespace uammd{
 	KBPENTA_mod<U> pentasolve;
       public:
 
-	static_assert(
-		      std::is_same<U, float>::value  || std::is_same<U, thrust::complex<float>>::value ||
-		      std::is_same<U, double>::value || std::is_same<U, thrust::complex<double>>::value,
-		      "PentadiagonalSystemSolver is expected to work only with real numbers or thrust::complex<> numbers"
-		      );
-	
 	PentadiagonalSystemSolver(int nz, real H):
 	  nz(nz), H(H), pentasolve(nz){}
-	
-      
+
+
 	void registerRequiredStorage(StorageRegistration &memoryManager){
 	  pentasolve.registerRequiredStorage(memoryManager);
 	}
@@ -169,12 +163,6 @@ namespace uammd{
       real H;
     public:
 
-      static_assert(
-		    std::is_same<U, float>::value  || std::is_same<U, thrust::complex<float>>::value ||
-		    std::is_same<U, double>::value || std::is_same<U, thrust::complex<double>>::value,
-		    "BoundaryValueProblemSolver is expected to work only with real numbers or thrust::complex<> numbers"
-		    );
-      
       BoundaryValueProblemSolver(int nz, real H): nz(nz), H(H), sub(nz, H), pent(nz, H){}
 
       void registerRequiredStorage(StorageRegistration &mem){
@@ -221,6 +209,10 @@ namespace uammd{
 
     };
 
+    using BoundaryValueProblemSolverReal          = BoundaryValueProblemSolver<real>;
+    using BoundaryValueProblemSolverComplex       = BoundaryValueProblemSolver<thrust::complex<real>>;
+    using BoundaryValueProblemSolverComplexDouble = BoundaryValueProblemSolver<thrust::complex<double>>;
+
     template<typename U>
     class BatchedBVPHandler;
 
@@ -234,12 +226,6 @@ namespace uammd{
       BatchedBVPGPUSolver(int numberSystems, BoundaryValueProblemSolver<U> bvpSolver, char *raw):
 	numberSystems(numberSystems), bvpSolver(bvpSolver), gpuMemory(raw){}
     public:
-      
-      static_assert(
-		    std::is_same<U, float>::value  || std::is_same<U, thrust::complex<float>>::value ||
-		    std::is_same<U, double>::value || std::is_same<U, thrust::complex<double>>::value,
-		    "BatchedBVPGPUHandler is expected to work only with real numbers or thrust::complex<> numbers"
-		    );
 
       template<class T, class FnIterator, class AnIterator, class CnIterator>
       __device__ void solve(int instance,
@@ -253,18 +239,16 @@ namespace uammd{
 
     };
 
+    using BatchedBVPGPUSolverReal          = BatchedBVPGPUSolver<real>;
+    using BatchedBVPGPUSolverComplex       = BatchedBVPGPUSolver<thrust::complex<real>>;
+    using BatchedBVPGPUSolverComplexDouble = BatchedBVPGPUSolver<thrust::complex<double>>;
+
     template <typename U>
     class BatchedBVPHandler{
       int numberSystems;
       BoundaryValueProblemSolver<U> bvp;
       thrust::device_vector<char> gpuMemory;
     public:
-
-      static_assert(
-		    std::is_same<U, float>::value  || std::is_same<U, thrust::complex<float>>::value ||
-		    std::is_same<U, double>::value || std::is_same<U, thrust::complex<double>>::value,
-		    "BatchedBVPHandler is expected to work only with real numbers or thrust::complex<> numbers"
-		    );
 
       template<class WaveVectorIterator, class BatchedTopBC, class BatchedBottomBC>
       BatchedBVPHandler(const WaveVectorIterator &klist,
@@ -301,6 +285,10 @@ namespace uammd{
       }
 
     };
+
+    using BatchedBVPHandlerReal          = BatchedBVPHandler<real>;
+    using BatchedBVPHandlerComplex       = BatchedBVPHandler<thrust::complex<real>>;
+    using BatchedBVPHandlerComplexDouble = BatchedBVPHandler<thrust::complex<double>>;
 
   }
 

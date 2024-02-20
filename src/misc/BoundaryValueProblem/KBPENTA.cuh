@@ -5,18 +5,12 @@
 namespace uammd{
   namespace BVP{
 
-//Algorithm adapted from  http://dx.doi.org/10.1080/00207160802326507 for a special case of only three diagonals being non zero
+    //Algorithm adapted from  http://dx.doi.org/10.1080/00207160802326507 for a special case of only three diagonals being non zero
     template<typename U>
     class KBPENTA_mod{
       StorageHandle<U> storageHandle;
       int nz;
     public:
-
-      static_assert(
-		    std::is_same<U, float>::value  || std::is_same<U, thrust::complex<float>>::value ||
-		    std::is_same<U, double>::value || std::is_same<U, thrust::complex<double>>::value,
-		    "KBPENTA_mode is expected to work only with real numbers or thrust::complex<> numbers"
-		    );
 
       KBPENTA_mod(int nz): nz(nz){}
 
@@ -62,6 +56,10 @@ namespace uammd{
       }
 
     };
+
+    using KBPENTA_mod_real           = KBPENTA_mod<real>;
+    using KBPENTA_mod_complex        = KBPENTA_mod<thrust::complex<real>>;
+    using KBPENTA_mod_complex_double = KBPENTA_mod<thrust::complex<double>>;
 
   }
 }
