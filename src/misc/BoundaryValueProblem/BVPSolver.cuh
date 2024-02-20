@@ -63,7 +63,7 @@ namespace uammd{
 	  auto CinvA_it = memoryManager.retrieveStorage(CinvA_storage);
 	  auto CinvABmD_it = memoryManager.retrieveStorage(CinvABmD_storage);
 	  auto invA = computeInverseSecondIntegralMatrix(k, H, nz);
-	  SchurBoundaryCondition<U> bcs(nz, H);
+	  SchurBoundaryCondition_impl<U> bcs(nz, H);
 	  auto CandD = bcs.computeBoundaryConditionMatrix(top, bottom);
 	  U D[4] = {CandD[2*nz], CandD[2*nz+1], CandD[2*nz+2], CandD[2*nz+3]};
 	  auto CinvA = matmul(CandD, nz, 2, invA, nz, nz);
@@ -155,7 +155,7 @@ namespace uammd{
     }
 
     template<typename U>
-    class BoundaryValueProblemSolver{
+    class BoundaryValueProblemSolver_impl{
       detail::PentadiagonalSystemSolver<U> pent;
       detail::SubsystemSolver<U> sub;
       StorageHandle<U> waveVector;
@@ -163,7 +163,7 @@ namespace uammd{
       real H;
     public:
 
-      BoundaryValueProblemSolver(int nz, real H): nz(nz), H(H), sub(nz, H), pent(nz, H){}
+      BoundaryValueProblemSolver_impl(int nz, real H): nz(nz), H(H), sub(nz, H), pent(nz, H){}
 
       void registerRequiredStorage(StorageRegistration &mem){
 	waveVector = mem.registerStorageRequirement<U>(1);
@@ -209,21 +209,20 @@ namespace uammd{
 
     };
 
-    using BoundaryValueProblemSolverReal          = BoundaryValueProblemSolver<real>;
-    using BoundaryValueProblemSolverComplex       = BoundaryValueProblemSolver<thrust::complex<real>>;
-    using BoundaryValueProblemSolverComplexDouble = BoundaryValueProblemSolver<thrust::complex<double>>;
+    using BoundaryValueProblemSolverReal          = BoundaryValueProblemSolver_impl<real>;
+    using BoundaryValueProblemSolverComplex       = BoundaryValueProblemSolver_impl<thrust::complex<real>>;
+    
+    template<typename U>
+    class BatchedBVPHandler_impl;
 
     template<typename U>
-    class BatchedBVPHandler;
-
-    template<typename U>
-    struct BatchedBVPGPUSolver{
+    struct BatchedBVPGPUSolver_impl{
     private:
       int numberSystems;
-      BoundaryValueProblemSolver<U> bvpSolver;
+      BoundaryValueProblemSolver_impl<U> bvpSolver;
       char* gpuMemory;
-      friend class BatchedBVPHandler<U>;
-      BatchedBVPGPUSolver(int numberSystems, BoundaryValueProblemSolver<U> bvpSolver, char *raw):
+      friend class BatchedBVPHandler_impl<U>;
+      BatchedBVPGPUSolver_impl(int numberSystems, BoundaryValueProblemSolver_impl<U> bvpSolver, char *raw):
 	numberSystems(numberSystems), bvpSolver(bvpSolver), gpuMemory(raw){}
     public:
 
@@ -239,29 +238,28 @@ namespace uammd{
 
     };
 
-    using BatchedBVPGPUSolverReal          = BatchedBVPGPUSolver<real>;
-    using BatchedBVPGPUSolverComplex       = BatchedBVPGPUSolver<thrust::complex<real>>;
-    using BatchedBVPGPUSolverComplexDouble = BatchedBVPGPUSolver<thrust::complex<double>>;
-
+    using BatchedBVPGPUSolverReal          = BatchedBVPGPUSolver_impl<real>;
+    using BatchedBVPGPUSolverComplex       = BatchedBVPGPUSolver_impl<thrust::complex<real>>;
+    
     template <typename U>
-    class BatchedBVPHandler{
+    class BatchedBVPHandler_impl{
       int numberSystems;
-      BoundaryValueProblemSolver<U> bvp;
+      BoundaryValueProblemSolver_impl<U> bvp;
       thrust::device_vector<char> gpuMemory;
     public:
 
       template<class WaveVectorIterator, class BatchedTopBC, class BatchedBottomBC>
-      BatchedBVPHandler(const WaveVectorIterator &klist,
-			BatchedTopBC top, BatchedBottomBC bot,
-			int numberSystems, real H, int nz):
+      BatchedBVPHandler_impl(const WaveVectorIterator &klist,
+			     BatchedTopBC top, BatchedBottomBC bot,
+			     int numberSystems, real H, int nz):
 	numberSystems(numberSystems),
 	bvp(nz, H){
 	precompute(klist, top, bot);
       }
 
-      BatchedBVPGPUSolver<U> getGPUSolver(){
+      BatchedBVPGPUSolver_impl<U> getGPUSolver(){
 	auto raw = thrust::raw_pointer_cast(gpuMemory.data());
-	BatchedBVPGPUSolver<U> d_solver(numberSystems, bvp, raw);
+	BatchedBVPGPUSolver_impl<U> d_solver(numberSystems, bvp, raw);
 	return d_solver;
       }
 
@@ -286,10 +284,9 @@ namespace uammd{
 
     };
 
-    using BatchedBVPHandlerReal          = BatchedBVPHandler<real>;
-    using BatchedBVPHandlerComplex       = BatchedBVPHandler<thrust::complex<real>>;
-    using BatchedBVPHandlerComplexDouble = BatchedBVPHandler<thrust::complex<double>>;
-
+    using BatchedBVPHandlerReal          = BatchedBVPHandler_impl<real>;
+    using BatchedBVPHandlerComplex       = BatchedBVPHandler_impl<thrust::complex<real>>;
+    
   }
 
 }
