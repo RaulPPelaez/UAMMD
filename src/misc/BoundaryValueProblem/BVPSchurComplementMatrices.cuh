@@ -118,12 +118,12 @@ namespace uammd{
     };
 
     template <typename T>
-    class SchurBoundaryCondition{
+    class SchurBoundaryCondition_impl{
       int nz;
       real H;
       BCRows bcs;
     public:
-      SchurBoundaryCondition(int nz, real H):nz(nz), H(H), bcs(nz){}
+      SchurBoundaryCondition_impl(int nz, real H):nz(nz), H(H), bcs(nz){}
 
       template<class TopBC, class BottomBC>
       std::vector<T> computeBoundaryConditionMatrix(const TopBC &top, const BottomBC &bottom){
@@ -172,6 +172,10 @@ namespace uammd{
       }
 
     };
+
+    using SchurBoundaryConditionReal          = SchurBoundaryCondition_impl<real>;
+    using SchurBoundaryConditionComplex       = SchurBoundaryCondition_impl<thrust::complex<real>>;
+    using SchurBoundaryConditionComplexDouble = SchurBoundaryCondition_impl<thrust::complex<double>>;
 
     template<class T>
     std::vector<T> computeSecondIntegralMatrix(T k, real H, int nz){

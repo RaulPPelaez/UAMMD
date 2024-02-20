@@ -59,8 +59,7 @@ namespace uammd{
 
     using KBPENTA_mod_real           = KBPENTA_mod<real>;
     using KBPENTA_mod_complex        = KBPENTA_mod<thrust::complex<real>>;
-    using KBPENTA_mod_complex_double = KBPENTA_mod<thrust::complex<double>>;
-
+    
   }
 }
 #endif
