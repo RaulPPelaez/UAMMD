@@ -6,20 +6,27 @@ namespace uammd{
   namespace BVP{
 
 //Algorithm adapted from  http://dx.doi.org/10.1080/00207160802326507 for a special case of only three diagonals being non zero
+    template<typename U>
     class KBPENTA_mod{
-      StorageHandle<real> storageHandle;
+      StorageHandle<U> storageHandle;
       int nz;
     public:
+
+      static_assert(
+		    std::is_same<U, float>::value  || std::is_same<U, thrust::complex<float>>::value ||
+		    std::is_same<U, double>::value || std::is_same<U, thrust::complex<double>>::value,
+		    "KBPENTA_mode is expected to work only with real numbers or thrust::complex<> numbers"
+		    );
 
       KBPENTA_mod(int nz): nz(nz){}
 
       void registerRequiredStorage(StorageRegistration &memoryManager){
-	storageHandle =  memoryManager.registerStorageRequirement<real>(3*nz+2);
+	storageHandle =  memoryManager.registerStorageRequirement<U>(3*nz+2);
       }
 
-      void store(real *diagonal, real *diagonal_p2, real *diagonal_m2, StorageRetriever &memoryManager){
+      void store(U *diagonal, U *diagonal_p2, U *diagonal_m2, StorageRetriever &memoryManager){
 	auto storage = memoryManager.retrieveStorage(storageHandle);
-	std::vector<real> beta(nz+1, 0);
+	std::vector<U> beta(nz+1, 0);
 	beta[0] = 0;
 	beta[1] = diagonal[nz-nz];
 	beta[2] = diagonal[nz-(nz-1)];
