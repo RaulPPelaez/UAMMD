@@ -69,6 +69,21 @@ mamba env create -f environment.yml
 
 **UAMMD does not need to be compiled separatedly (it is header only)**.  
 
+The top-level CMakeLists.txt file will install all UAMMD headers to `$CMAKE_INSTALL_PREFIX/include/uammd`. Additionally, a cmake module file (`FindUAMMD.cmake` will be installed at `$CMAKE_INSTALL_PREFIX/share/cmake/Modules`). To install the headers, go to the root of this repo and run:
+
+```shell
+$ mkdir build && cd build
+$ cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX .. # If you wish to install the headers to the conda environment
+$ make install
+```
+
+Now other CMake scripts can find the UAMMD headers with:
+
+```cmake
+find_package(UAMMD REQUIRED)
+include_directories(${UAMMD_INCLUDE_DIR})
+```
+
 Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html).  
 Here you have a short example of how a typical UAMMD code looks like, encoding a simple Brownian dynamics simulation of non interacting particles.:  
 
