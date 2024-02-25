@@ -73,9 +73,9 @@ namespace uammd{
 	PSE(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       PSE(shared_ptr<ParticleGroup> pg, Parameters par);
-      
+
       ~PSE(){}
-      
+
       void setup_step(cudaStream_t st = 0){}
       /*Compute M·F = Mr·F + Mw·F, also includes the far field stochastic displacements*/
       void computeMF(real3* MF, cudaStream_t st){
@@ -95,13 +95,13 @@ namespace uammd{
       }
 
       void computeMFFarField(real3* MF, cudaStream_t st){
-	System::log<System::DEBUG1>("[BDHI::PSE] Computing MFFarField....");	
+	System::log<System::DEBUG1>("[BDHI::PSE] Computing MFFarField....");
 	auto pd = pg->getParticleData();
 	int numberParticles = pg->getNumberParticles();
 	auto pos = pd->getPos(access::gpu, access::read);
-	auto force = pd->getForce(access::gpu, access::read);	
+	auto force = pd->getForce(access::gpu, access::read);
 	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles,
-						   0.0, 0.0, st);
+						   temperature, 1.0/sqrt(dt), st);
       }
 
       void computeBdW(real3* BdW, cudaStream_t st){
@@ -134,15 +134,15 @@ namespace uammd{
         nearField->setShearStrain(newStrain);
 	farField->setShearStrain(newStrain);
       }
-      
+
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
       }
-      
+
       real getSelfMobility(){
-	return this->M0;	
+	return this->M0;
       }
-      
+
     private:
       shared_ptr<ParticleGroup> pg;
       real hydrodynamicRadius, M0;
