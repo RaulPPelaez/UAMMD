@@ -24,7 +24,7 @@ jobs:
 
           # Oldest supported versions
           - name: Linux (CUDA 10.2)
-            cuda: "10.2"
+            cuda: "10.*"
             gcc: "7.*"
             cuda12: 'false'
 
@@ -111,6 +111,6 @@ jobs:
         make install
         echo "#include<uammd.cuh>" > test.cu
         echo "int main(){return 0;}" >> test.cu
-        nvcc -std=c++14 -I$CONDA_PREFIX/include/uammd -I$CONDA_PREFIX/include/uammd/third_party test.cu -o /tmp/test
+        nvcc -std=c++14 -I"${CONDA_PREFIX}/include/uammd" -I"${CONDA_PREFIX}/include/uammd/third_party" test.cu -o /tmp/test
 
 
