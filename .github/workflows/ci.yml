@@ -24,7 +24,7 @@ jobs:
 
           # Oldest supported versions
           - name: Linux (CUDA 10.2)
-            cuda: "10.2.89"
+            cuda: "10.2"
             gcc: "7.*"
             cuda12: 'false'
 
@@ -58,19 +58,10 @@ jobs:
           sudo apt-get autoclean -y >& /dev/null
           sudo docker image prune --all --force
           df -h
-
-    - name: Install CUDA Toolkit
-      # CUDA 12 can be installed with mamba
-      if: ${{ matrix.cuda12 == 'false' }}
-      uses: Jimver/cuda-toolkit@v0.2.10
-      with:
-        cuda: ${{ matrix.cuda }}
-        linux-local-args: '["--toolkit", "--override"]'
-
     - name: Prepare dependencies (CUDA <12)
       if: ${{ matrix.cuda12 == 'false'}}
       run: |
-        sed -i -e "/cuda-version/d" \
+        sed -i -e "/cuda-version/c\  - cudatoolkit-dev ${{ matrix.cuda }}" \
                -e "/cuda-libraries-dev/d" \
                -e "/cuda-nvcc/d" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}\n  - gcc_linux-64" \
@@ -111,4 +102,15 @@ jobs:
         mkdir test/build && cd test/build
         cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
         make -j3
-        
+
+    - name: Check header installation
+      run: |
+        micromamba activate uammd
+        mkdir build && cd build
+        cmake -DCMAKE_INSTALL_PREFIX=yes ..
+        make install
+        echo "#include<uammd.cuh>" > test.cu
+        echo "int main(){return 0;}" >> test.cu
+        nvcc -std=c++14 -I$CONDA_PREFIX/include/uammd -I$CONDA_PREFIX/include/uammd/third_party test.cu -o /tmp/test
+
+
