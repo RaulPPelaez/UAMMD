@@ -129,8 +129,8 @@ namespace uammd{
 	thrust::device_vector<real> noise(30000);
 	auto noise_ptr = thrust::raw_pointer_cast(noise.data());
 	//Warm cuRNG
-	CurandSafeCall(curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
-	CurandSafeCall(curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
+	CurandSafeCall(curandgeneratenormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
+	CurandSafeCall(curandgeneratenormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
       }
       catch(thrust::system_error &e){
 	sys->log<System::CRITICAL>("[BDHI::FIB] Thrust could not allocate necessary arrays at initialization with error: %s", e.what());
@@ -871,7 +871,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::FIB] Random advection");
       if(temperature!=real(0.0)){
        	sys->log<System::DEBUG2>("[BDHI::FIB] Generate random numbers");
-       	CurandSafeCall(curandGenerateNormal(curng,
+       	CurandSafeCall(curandgeneratenormal(curng,
        					    thrust::raw_pointer_cast(random.data()),
        					    random.size(),
        					    0.0, 1.0));
@@ -906,7 +906,7 @@ namespace uammd{
       sys->log<System::DEBUG2>("[BDHI::FIB] Random advection");
       if(temperature!=real(0.0)){
 	sys->log<System::DEBUG2>("[BDHI::FIB] Generate random numbers");
-	CurandSafeCall(curandGenerateNormal(curng,
+	CurandSafeCall(curandgeneratenormal(curng,
 					    thrust::raw_pointer_cast(random.data()),
 					    random.size(),
 					    0.0, 1.0));
@@ -932,7 +932,7 @@ namespace uammd{
 	double dV = grid.cellSize.x*grid.cellSize.y*grid.cellSize.z;
 	real noisePrefactor = sqrt(viscosity*temperature/(dt*dV));
 	if(temperature!=real(0.0))
-	  CurandSafeCall(curandGenerateNormal(curng,
+	  CurandSafeCall(curandgeneratenormal(curng,
 					      thrust::raw_pointer_cast(random.data()),
 					      random.size(),
 					      0.0, 1.0));

@@ -29,12 +29,12 @@ std::string scheme;
 int in_numberParticles;
 bool loadParticles = true;
 
-void readParameters();
+void readParameters(std::string fileName);
 int main(int argc, char *argv[]){
   auto sys = make_shared<System>(argc, argv);
   ullint seed = 0xf31337Bada55D00dULL^time(NULL);
   sys->rng().setSeed(seed);
-  readParameters();
+  readParameters(sys->getargv()[1]);
   Box box(boxSize);
   std::shared_ptr<ParticleData> pd;
   if(loadParticles){
@@ -98,7 +98,7 @@ int main(int argc, char *argv[]){
   forj(0,nsteps){
     bdhi->forwardTime();
     if(printSteps>0 and j%printSteps==0){
-      sys->log<System::DEBUG1>("[System] Writing to disk...");   
+      sys->log<System::DEBUG1>("[System] Writing to disk...");
       auto pos = pd->getPos(access::location::cpu, access::mode::read);
       const int * sortedIndex = pd->getIdOrderedIndices(access::location::cpu);
       out<<"#"<<"\n";
@@ -121,9 +121,8 @@ int main(int argc, char *argv[]){
 
 
 
-void readParameters(shared_ptr<System> sys){
-  std::string fileName = sys->getargv()[1];
-  InputFile in(fileName, sys);
+void readParameters(std::string fileName){
+  InputFile in(fileName);
 
   in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y;
   in.getOption("cells", InputFile::Optional)>>cells.x>>cells.y;

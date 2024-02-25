@@ -239,8 +239,6 @@ namespace uammd{
 	auto d_gridVels = (real3*)thrust::raw_pointer_cast(gridVels.data());
 	IBM<Kernel> ibm(kernel, grid, IBM_ns::LinearIndex3D(nx, n.y, n.z));
 	ibm.spread(pos, force_r3, d_gridVels, numberParticles, st);
-	std::vector<real3> hvels(gridVels.size());
-	thrust::copy(gridVels.begin(), gridVels.end(), hvels.begin());
 	CudaCheckError();
 	return gridVels;
       }

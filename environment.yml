@@ -1,0 +1,13 @@
+name: uammd
+channels:
+  - conda-forge
+dependencies:
+  - cmake >=3.22
+  - cuda-version 12.*
+  - gxx_linux-64 11.*
+  - cuda-libraries-dev
+  - cuda-nvcc 
+  - make
+  - mkl-devel
+  - pybind11
+  - python 3.11.*

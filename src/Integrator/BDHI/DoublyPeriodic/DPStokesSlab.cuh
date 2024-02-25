@@ -22,6 +22,16 @@
 
 namespace uammd{
   namespace DPStokesSlab_ns{
+    namespace detail{
+      template<class ComplexContainer>
+      auto getZeroModeChebCoeff(const ComplexContainer &fourierChebGridData, int3 n){
+	  std::vector<complex> chebCoeff(n.z);
+	  for(int i=0;i<n.z;i++){
+		chebCoeff[i] = fourierChebGridData[(n.x/2+1)*n.y*i]/(n.x*n.y);
+	  }
+	 return chebCoeff;
+      }
+    }
 
     class DPStokes{
     public:
@@ -95,6 +105,44 @@ namespace uammd{
 	CudaCheckError();
 	return {particleVelocities, particleAngularVelocities};
       }
+
+      // compute average velocity in the x (0, default) or y (1) directions as a function of z
+      template<class PosIterator, class ForceIterator>
+      std::vector<double>
+      computeAverageVelocity(PosIterator pos, ForceIterator forces,
+			     int numberParticles, int direction = 0, cudaStream_t st = 0){
+      	cudaDeviceSynchronize();
+      	System::log<System::DEBUG2>("[DPStokes] Computing displacements");
+      	auto gridData = ibm->spreadForces(pos, forces, numberParticles, st);
+      	auto gridForceCheb = fct->forwardTransform(gridData, st);
+      	FluidData<complex> fluid = solveBVPVelocity(gridForceCheb, st);
+      	if(mode != WallMode::none){
+      	  correction->correctSolution(fluid, gridForceCheb, st);
+      	}
+	int3 n = this->grid.cellDim;
+	std::vector<complex> chebCoeff;
+	if(direction == 0) chebCoeff = detail::getZeroModeChebCoeff(fluid.velocity.m_x, n);
+	else if(direction == 1)  chebCoeff = detail::getZeroModeChebCoeff(fluid.velocity.m_y, n);
+else throw std::runtime_error("[DPStokesSlab] Can only average in direction X (0) or Y (1)");
+
+	std::vector<double> averageVelocity(n.z);
+	// transfer to real space by direct summation
+	// Chebyshev stuff refresher
+	// f(z) = c_0+c_1T_1(z)+c_2T_2(z)+...
+	// z = (b+a)/2+(b-a)/2*cos(i*M_PI/(nz-1));
+	// arg = acos(-1+2*(z-a)/(b-a));
+	// T_j(z) = cos(j acos(-1+2*(z-a)/(b-a))) with z = (b+a)/2+(b-a)/2*cos(i*M_PI/(nz-1))
+	for(int i=0;i<n.z;i++){
+	  real arg = i*M_PI/(n.z-1);
+	  for(int j=0;j<n.z;j++){
+	    averageVelocity[i] += chebCoeff[j].x*cos(j*arg);
+	  }
+	}
+
+      	CudaCheckError();
+      	return averageVelocity;
+      }
+
 
     private:
       shared_ptr<FastChebyshevTransform> fct;
@@ -213,6 +261,8 @@ namespace uammd{
       std::shared_ptr<lanczos::Solver> lanczos;
       thrust::device_vector<real3> previousNoise;
       real deltaRFD;
+      uint stepsRFD = 0; //How many times we have updated the RFD (for random numbers)
+      uint stepsLanczos = 0; //How many times we have updated Lanczos (for random numbers)
       public:
       template<class T> using cached_vector = cached_vector<T>;
       struct Parameters: DPStokes::Parameters{
@@ -228,15 +278,16 @@ namespace uammd{
 	System::log<System::MESSAGE>("[DPStokes] temperature: %g", par.temperature);
 	this->seed = pd->getSystem()->rng().next32();
 	this->seedRFD = pd->getSystem()->rng().next32();
-	this->deltaRFD = 1e-6*par.hydrodynamicRadius;
+	this->deltaRFD = 1e-6;
       }
 
       //Returns the thermal drift term: temperature*dt*(\partial_q \cdot M)
       auto computeThermalDrift(){
-	auto pos = pd->getPos(access::gpu, access::read);
-	const int numberParticles = pd->getNumParticles();
 	if(par.temperature){
-	  auto noise2 = detail::fillRandomVectorReal3(numberParticles, seedRFD, steps);
+	  auto pos = pd->getPos(access::gpu, access::read);
+	  const int numberParticles = pd->getNumParticles();
+	  this->stepsRFD++;
+	  auto noise2 = detail::fillRandomVectorReal3(numberParticles, seedRFD, stepsRFD);
 	  auto cit = thrust::make_counting_iterator(0);
 	  auto posp = thrust::make_transform_iterator(cit,
 						      detail::SumPosAndNoise(pos.raw(),
@@ -262,13 +313,14 @@ namespace uammd{
 
       //Returns sqrt(2*M*temperature/dt)dW
       auto computeFluctuations(){
-	auto pos = pd->getPos(access::gpu, access::read);
 	const int numberParticles = pd->getNumParticles();
 	cached_vector<real3> bdw(numberParticles);
 	thrust::fill(bdw.begin(), bdw.end(), real3());
 	if(par.temperature){
+	  this->stepsLanczos++;
+	  auto pos = pd->getPos(access::gpu, access::read);
 	  detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
-	  auto noise = detail::fillRandomVectorReal3(numberParticles, seed, steps,
+	  auto noise = detail::fillRandomVectorReal3(numberParticles, seed, stepsLanczos,
 						     sqrt(2*par.temperature/par.dt));
 	  lanczos->run(dot,
 		       (real*)bdw.data().get(), (real*)noise.data().get(),

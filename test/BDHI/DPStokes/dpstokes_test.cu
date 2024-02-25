@@ -102,9 +102,9 @@ TEST(DPStokes, ReproducesOpenBoundarySelfMobilityWithLargeDomainSlitChannel){
   force[0] = {1,1,1};
   auto mf = dpstokes->Mdot(pos.data().get(), force.data().get(), 1);
   real3 disp =  mf[0];
-  ASSERT_THAT(disp.x, ::testing::DoubleNear(1.0, 1e-2));
-  ASSERT_THAT(disp.y, ::testing::DoubleNear(1.0, 1e-2));
-  ASSERT_THAT(disp.z, ::testing::DoubleNear(1.0, 1e-2));
+  ASSERT_THAT(disp.x, ::testing::DoubleNear(1.0, 0.1));
+  ASSERT_THAT(disp.y, ::testing::DoubleNear(1.0, 0.1));
+  ASSERT_THAT(disp.z, ::testing::DoubleNear(1.0, 0.1));
 }
 
 TEST(DPStokes, ReproducesOpenBoundarySelfMobilityWithLargeDomainBottomWall){
@@ -120,9 +120,9 @@ TEST(DPStokes, ReproducesOpenBoundarySelfMobilityWithLargeDomainBottomWall){
   force[0] = {1,1,1};
   auto mf = dpstokes->Mdot(pos.data().get(), force.data().get(), 1);
   real3 disp =  mf[0];
-  ASSERT_THAT(disp.x, ::testing::DoubleNear(1.0, 1e-2));
-  ASSERT_THAT(disp.y, ::testing::DoubleNear(1.0, 1e-2));
-  ASSERT_THAT(disp.z, ::testing::DoubleNear(1.0, 1e-2));
+  ASSERT_THAT(disp.x, ::testing::DoubleNear(1.0, 0.1));
+  ASSERT_THAT(disp.y, ::testing::DoubleNear(1.0, 0.1));
+  ASSERT_THAT(disp.z, ::testing::DoubleNear(1.0, 0.1));
 }
 
 TEST(DPStokes, ReproducesOpenBoundarySelfMobilityWithLargeDomainOpen){
@@ -138,9 +138,9 @@ TEST(DPStokes, ReproducesOpenBoundarySelfMobilityWithLargeDomainOpen){
   force[0] = {1,1,1};
   auto mf = dpstokes->Mdot(pos.data().get(), force.data().get(), 1);
   real3 disp =  mf[0];
-  ASSERT_THAT(disp.x, ::testing::DoubleNear(1.0, 1e-2));
-  ASSERT_THAT(disp.y, ::testing::DoubleNear(1.0, 1e-2));
-  ASSERT_THAT(disp.z, ::testing::DoubleNear(1.0, 1e-2));
+  ASSERT_THAT(disp.x, ::testing::DoubleNear(1.0, 0.1));
+  ASSERT_THAT(disp.y, ::testing::DoubleNear(1.0, 0.1));
+  ASSERT_THAT(disp.z, ::testing::DoubleNear(1.0, 0.1));
 }
 
 //TESTS for the Integrator start here

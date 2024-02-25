@@ -167,6 +167,9 @@ namespace uammd{
       log<DEBUG2>("[System] finish");
       CudaSafeCall(cudaDeviceSynchronize());
       CudaCheckError();
+      if(get_default_resource<device_temporary_memory_resource>()->has_allocated_blocks()){
+	log<System::WARNING>("[System] System::finish was called but UAMMD-controlled resources were found. This will probably result in a crash.");
+      }
       get_default_resource<device_temporary_memory_resource>()->free_all();
       this->printFarewell();
     }

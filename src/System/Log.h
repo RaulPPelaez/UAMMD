@@ -23,7 +23,7 @@ namespace uammd{
 	{CRITICAL , std::make_tuple(stderr, "\e[101m[CRITICAL] ", "\e[0m\n")},
 	{ERROR , std::make_tuple(stderr, "\e[91m[ERROR] \e[0m", "\n")},
 	{EXCEPTION , std::make_tuple(stderr, "\e[1m\e[91m[EXCEPTION] \e[0m", "\n")},
-	{WARNING , std::make_tuple(stderr, "\e[93m[WARNING] \e[0m", "\n")},
+	{WARNING , std::make_tuple(stderr, "\e[34m[WARNING] \e[0m", "\n")},
 	{MESSAGE , std::make_tuple(stderr, "\e[92m[MESSAGE] \e[0m", "\n")},
 	{STDERR , std::make_tuple(stderr, " ", "\n")},
 	{STDOUT , std::make_tuple(stdout, " ", "\n")},

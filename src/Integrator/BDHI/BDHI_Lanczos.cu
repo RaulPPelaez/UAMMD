@@ -49,8 +49,8 @@ namespace uammd{
       thrust::device_vector<real> noise(30000);
       auto noise_ptr = thrust::raw_pointer_cast(noise.data());
       //Warm cuRNG
-      curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0);
-      curandGenerateNormal(curng, noise_ptr, noise.size(), 0.0, 1.0);
+      curandgeneratenormal(curng, noise_ptr, noise.size(), 0.0, 1.0);
+      curandgeneratenormal(curng, noise_ptr, noise.size(), 0.0, 1.0);
     }
 
     namespace Lanczos_ns{
@@ -172,7 +172,7 @@ namespace uammd{
 	Lanczos_ns::Dotctor<real3> Mdot(rpy, this->hydrodynamicRadius, radius_ptr, nbody, st);
 	//Filling V instead of an external array (for v in sqrt(M)·v) is faster
 	uninitialized_cached_vector<real3> noise(numberParticles);
-	curandGenerateNormal(curng, (real*)noise.data().get(),
+	curandgeneratenormal(curng, (real*)noise.data().get(),
 			     3*numberParticles + (3*numberParticles)%2,
 			     real(0.0), real(1.0));
 	//lanczosAlgorithm->solve(Mdot, (real*) BdW, noise, numberParticles, st);

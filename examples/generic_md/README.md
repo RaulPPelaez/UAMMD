@@ -29,10 +29,8 @@ With this components as-is one can simulate systems from a microscale LJ-liquid 
 
 
 ### USAGE  
-Compile with ```$ make```, you might have to customize the Makefile first to adapt it to your system.  
-If you are having trouble with it, start by going into [Compiling UAMMD](https://github.com/RaulPPelaez/UAMMD/wiki/Compiling-UAMMD)  
 
-Then execute ```$ ./generic```. If you have a valid CUDA environment this will generate an example data.main file and then halt.  
+After compiling, execute ```$ ./generic```. If you have a valid CUDA environment this will generate an example data.main file and then halt.  
 Modify this file as desired and then run ```$ ./generic``` again.  
 
 The default data.main will perform a LJ-liquid simulation with a VerletNVT integrator.  
@@ -50,11 +48,11 @@ If you need to create a BD integrator, you can copy paste the function createInt
 Need to read parameters from a file? just copy paste the function readParameters.  
 And so on.  
   
-If you would like a more bottom up approach to UAMMD, you can surf the examples/basic folder, which will give you through UAMMD with an increasingly complex set of example codes.  
-Additionally, you can drop by the wiki:   
-https://github.com/RaulPPelaez/UAMMD/wiki  
+If you would like a more bottom up approach to UAMMD, you can surf the `examples/basic_concepts` folder, which will give you through UAMMD with an increasingly complex set of example codes.  
+Additionally, you can drop by the docs:   
+https://uammd.readthedocs.io/  
 Which has a lot of information. From basic functionality to descriptions and references for the algorithms implemented by each module.    
 
 This code is an example on how to work inside UAMMD's simulation ecosystem, however UAMMD is not restricted to this kind of usage.  
 It is designed to be as hackable as possible and exposes a lot of the core functionality as stand alone with the intention of making it work as an external GPU accelerator in other codes.  
-See the folder examples/uammd_as_a_library for examples on how to do this.  
+See the folder `examples/uammd_as_a_library` for examples on how to do this.  

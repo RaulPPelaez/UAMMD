@@ -146,6 +146,10 @@ namespace uammd{
       return res->do_is_equal(other);
     }
 
+    bool has_allocated_blocks() const noexcept{
+      return allocated_blocks.size() > 0;
+    }
+
     void free_all(){
       for(auto &i: free_blocks) res->do_deallocate(static_cast<pointer>(i.second), i.first, 0);
       for(auto &i: allocated_blocks) res->do_deallocate(static_cast<pointer>(i.first), i.second, 0);
