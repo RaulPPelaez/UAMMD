@@ -582,7 +582,8 @@ The following parameters are available:
   * :cpp:`real dt`  Time step
   * :cpp:`real tolerance` Overall tolerance of the algorithm (FCM in the far field and Lanczos iterative solver in the near field).
   * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.
-  * :cpp:`real split` The splitting parameter of the PSE algorithm in units of inverse of length. This parameter only affects performance and must be manually tuned in a case by case basis to find the optimal (usually between 0.1/hydrodynamicRadius-1/hydrodynamicRadius).
+  * :cpp:`real psi` The splitting parameter of the PSE algorithm in units of inverse of length. This parameter only affects performance and must be manually tuned in a case by case basis to find the optimal (usually between 0.1/hydrodynamicRadius-1/hydrodynamicRadius).
+  * :cpp:`real shearStrain` The shear strain of the system. If enabled, a shear flow will be applied to the system. This parameter is optional and defaults to 0, meaning no shear flow.
 
 .. code:: c++
 
@@ -601,8 +602,9 @@ The following parameters are available:
     par.hydrodynamicRadius = 1.0;
     par.dt = 0.01;
     par.tolerance = 1e-3;
-    par.split = 0.5;
+    par.psi = 0.5;
     par.box = Box({128, 128, 128});
+    //par.shearStrain = 1.0;
     auto bdhi = std::make_shared<PSE>(pd, par);
     ...
     //Add any interactor
@@ -621,6 +623,8 @@ Here, :code:`pd` is a :ref:`ParticleData` instance.
 .. warning:: Contrary to the open boundary methods, in PSE all particles must have the same hydrodynamic radius.
 
 .. note:: As usual, any :ref:`Interactor` can be added to this :ref:`Integrator`, as long as it is able to compute forces.
+
+.. hint:: The shear strain can be dynamically updated via the :cpp:`setShearStrain` method of the :cpp:class:`PSE` class.	  
 
 
 .. _FIB:
