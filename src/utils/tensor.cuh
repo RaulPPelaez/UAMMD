@@ -36,9 +36,15 @@ namespace uammd{
       this->zz = t.zz;
     }
 
-    VECATTR real3 diag(){return {xx,yy,zz};}
+    VECATTR real3 diag() const {return {xx,yy,zz};}
 
-    VECATTR real trace(){return xx+yy+zz;}
+    VECATTR real trace() const {return xx+yy+zz;}
+
+    VECATTR tensor3 transpose() const {
+      return tensor3(xx,yx,zx,
+                     xy,yy,zy,
+                     xz,yz,zz);
+    }
 
   };
 
@@ -149,6 +155,22 @@ namespace uammd{
     sub.xz = a - b.xz;
     sub.yz = a - b.yz;
     sub.zz = a - b.zz;
+    return sub;
+  }
+
+  //Define the unary minus operator
+
+  VECATTR  tensor3 operator -(const tensor3 &a){
+    tensor3 sub;
+    sub.xx = -a.xx;
+    sub.yx = -a.yx;
+    sub.zx = -a.zx;
+    sub.xy = -a.xy;
+    sub.yy = -a.yy;
+    sub.zy = -a.zy;
+    sub.xz = -a.xz;
+    sub.yz = -a.yz;
+    sub.zz = -a.zz;
     return sub;
   }
 
