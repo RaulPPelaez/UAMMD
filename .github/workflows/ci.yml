@@ -107,7 +107,7 @@ jobs:
       run: |
         micromamba activate uammd
         mkdir build && cd build
-        cmake -DCMAKE_INSTALL_PREFIX=yes ..
+        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} ..
         make install
         echo "#include<uammd.cuh>" > test.cu
         echo "int main(){return 0;}" >> test.cu
