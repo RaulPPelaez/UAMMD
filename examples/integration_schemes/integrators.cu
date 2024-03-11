@@ -78,54 +78,35 @@ std::shared_ptr<Integrator> createIntegratorVerletNVE(UAMMD sim){
   return std::make_shared<VerletNVE>(sim.pd, par);
 }
 
-#include "Integrator/VerletNVE.cuh"
-#include "Interactor/Potential/DPD.cuh"
-#include"Interactor/PairForces.cuh"
-//DPD is handled by UAMMD as a VerletNVE integrator with a special short range interaction
+#include "Integrator/DPD.cuh"
 std::shared_ptr<Integrator> createIntegratorDPD(UAMMD sim){
-  using NVE = VerletNVE;
-  NVE::Parameters par;
-  par.dt = 1.0;
-  par.initVelocities = false;
-  auto verlet = std::make_shared<NVE>(sim.pd, par);
-  using DPD = PairForces<Potential::DPD>;
-  Potential::DPD::Parameters dpd_params;
-  dpd_params.cutOff = 1.0;
-  dpd_params.temperature = 1.0;
-  dpd_params.gamma = 1.0;
-  dpd_params.A = 1.0;
-  dpd_params.dt = 0.1;
-  auto pot = std::make_shared<Potential::DPD>(dpd_params);
-  DPD::Parameters params;
+  DPDIntegrator::Parameters par;
+  par.cutOff = 1.0;
+  par.temperature = 1.0;
+  par.gamma = 1.0;
+  par.A = 1.0;
+  par.dt = 0.1;
   real3 L = make_real3(32,32,32);
-  params.box = Box(L);
-  auto pairforces = std::make_shared<DPD>(sim.pd, params, pot);
-  verlet->addInteractor(pairforces);
-  return verlet;
+  par.box = Box(L);
+  auto dpd = std::make_shared<DPDIntegrator>(sim.pd,  par);
+  return dpd;
 }
 
-#include "Integrator/VerletNVE.cuh"
-#include "Interactor/SPH.cuh"
-//SPH is handled by UAMMD as a VerletNVE integrator with a special interaction
+#include "Integrator/SPH.cuh"
 std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim){
-  using NVE = VerletNVE;
-  NVE::Parameters par;
-  par.dt = 0.1;
-  par.initVelocities = false;
-  auto verlet = std::make_shared<NVE>(sim.pd, par);
-  SPH::Parameters params;
+  SPHIntegrator::Parameters par;
+  par.dt  = 0.1;
   real3 L = make_real3(32,32,32);
-  params.box = Box(L);
+  par.box = Box(L);
   //Pressure for a given particle "i" in SPH will be computed as gasStiffness·(density_i - restDensity)
   //Where density is computed as a function of the masses of the surroinding particles
   //Particle mass starts as 1, but you can change this in customizations.cuh
-  params.support = 2.4;   //Cut off distance for the SPH kernel
-  params.viscosity = 1.0;   //Environment viscosity
-  params.gasStiffness = 1.0;
-  params.restDensity = 1.0;
-  auto sph = std::make_shared<SPH>(sim.pd, params);
-  verlet->addInteractor(sph);
-  return verlet;
+  par.support = 2.4;   //Cut off distance for the SPH kernel
+  par.viscosity = 1.0;   //Environment viscosity
+  par.gasStiffness = 1.0;
+  par.restDensity = 1.0;
+  auto sph = std::make_shared<SPHIntegrator>(sim.pd, par);
+  return sph;
 }
 
 #include "Integrator/Hydro/ICM.cuh"
