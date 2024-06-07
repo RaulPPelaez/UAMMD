@@ -10,7 +10,7 @@
 namespace uammd{
   using exception = std::exception;
 
-  void backtrace_nested_exception(const uammd::exception& e, int level =  0){
+  inline void backtrace_nested_exception(const uammd::exception& e, int level =  0){
 
     Logging::log<Logging::EXCEPTION>(std::string(level,' ') + "level " +
 				     std::to_string(level) + " exception: " + e.what());

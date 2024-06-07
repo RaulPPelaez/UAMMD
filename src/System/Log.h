@@ -18,7 +18,7 @@ namespace uammd{
     constexpr int maxLogLevel = 6;
 #endif
 
-    ElementType getLogLevelInfo(int level){
+    inline ElementType getLogLevelInfo(int level){
       static const std::map<int, ElementType> printMap{
 	{CRITICAL , std::make_tuple(stderr, "\e[101m[CRITICAL] ", "\e[0m\n")},
 	{ERROR , std::make_tuple(stderr, "\e[91m[ERROR] \e[0m", "\n")},
