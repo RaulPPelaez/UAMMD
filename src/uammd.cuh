@@ -9,7 +9,11 @@
 #include "System/System.h"
 
 #ifdef UAMMD_EXTENSIONS
-#include "../extensions/preamble.h"
+  #ifdef UAMMD_EXTENSIONS_PREAMBLE
+    #include UAMMD_EXTENSIONS_PREAMBLE
+  #else
+    #include "../extensions/preamble.h"
+  #endif
 #endif
 
 #include "ParticleData/ParticleData.cuh"
