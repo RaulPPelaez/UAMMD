@@ -79,7 +79,7 @@ namespace uammd{
       }
     };
 
-    int clz(uint n){
+    inline int clz(uint n){
       n |= (n >>  1);
       n |= (n >>  2);
       n |= (n >>  4);

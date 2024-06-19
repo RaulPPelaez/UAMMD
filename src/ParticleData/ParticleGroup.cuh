@@ -135,7 +135,7 @@ namespace uammd{
 
   namespace ParticleGroup_ns{
     //Updates the indices of the particles in a group using pd->getIdOrderedIndices()
-    __global__ void updateGroupIndices(//An array that stores the indices of the particles in the group per id.
+    inline __global__ void updateGroupIndices(//An array that stores the indices of the particles in the group per id.
 				       const int * __restrict__ id2index,
 				       //Out: the current ParticleData indices of the particles in the group
 				       int * __restrict__ particlesIndices,
@@ -511,7 +511,8 @@ namespace uammd{
   }
 
   namespace ParticleGroup_ns{
-    __global__  void IdsFromIndices(const int *indices, const int *index2Id, int* groupParticleIds, int N){
+
+    inline __global__  void IdsFromIndices(const int *indices, const int *index2Id, int* groupParticleIds, int N){
       int tid = blockIdx.x*blockDim.x + threadIdx.x;
       if(tid>=N) return;
       int index = indices[tid];
