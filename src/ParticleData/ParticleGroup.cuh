@@ -372,7 +372,7 @@ namespace uammd{
   };
 
   template<class ParticleSelector>
-  ParticleGroup::ParticleGroup(ParticleSelector selector,
+  inline ParticleGroup::ParticleGroup(ParticleSelector selector,
 			       std::shared_ptr<ParticleData> pd, std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
     sys->log<System::MESSAGE>("[ParticleGroup] Group %s created with selector %s",
@@ -398,7 +398,7 @@ namespace uammd{
 
   //Specialization of a particle group with an All selector
   template<>
-  ParticleGroup::ParticleGroup(particle_selector::All selector,
+  inline ParticleGroup::ParticleGroup(particle_selector::All selector,
 			       std::shared_ptr<ParticleData> pd,
 			       std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
@@ -411,13 +411,13 @@ namespace uammd{
 			      name.c_str(), numberParticles);
   }
 
-  ParticleGroup::ParticleGroup(std::shared_ptr<ParticleData> pd,
+  inline ParticleGroup::ParticleGroup(std::shared_ptr<ParticleData> pd,
 			       std::string name):
     ParticleGroup(particle_selector::All(), pd, name){}
 
   //Specialization of an empty particle group
   template<>
-  ParticleGroup::ParticleGroup(particle_selector::None selector,
+  inline ParticleGroup::ParticleGroup(particle_selector::None selector,
 			       std::shared_ptr<ParticleData> pd,
 			       std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
@@ -430,7 +430,7 @@ namespace uammd{
 
   //Constructor of ParticleGroup when an ID list is provided
   template<class InputIterator>
-  ParticleGroup::ParticleGroup(InputIterator begin, InputIterator end,
+  inline ParticleGroup::ParticleGroup(InputIterator begin, InputIterator end,
 			       std::shared_ptr<ParticleData> pd,
 			       std::string name):
     pd(pd), sys(pd->getSystem()), name(name){
@@ -455,7 +455,7 @@ namespace uammd{
 
   //This is trivial with  pd->getIdOrderedIndices()!
   //Handle a reordering of the particles (which invalids the previous relation between IDs and indices)
-  void ParticleGroup::computeIndexList(bool forceUpdate){
+  inline void ParticleGroup::computeIndexList(bool forceUpdate){
     if(numberParticles==0) return;
     if(this->needsIndexListUpdate || forceUpdate){//Update only if needed
       sys->log<System::DEBUG>("[ParticleGroup] Updating group %s after last particle sorting", name.c_str());
@@ -474,7 +474,7 @@ namespace uammd{
     }
   }
   //Add particles to the group via an array with ids
-  void ParticleGroup::addParticlesById(access::location loc, const int *ids, int N){
+  inline void ParticleGroup::addParticlesById(access::location loc, const int *ids, int N){
     sys->log<System::DEBUG1>("[ParticleGroup] Adding %d particles to group %s via ids!", N, name.c_str());
     int numberParticlesPrev = numberParticles;
     numberParticles += N;
@@ -522,7 +522,7 @@ namespace uammd{
 
   }
   //Add particles to the group via an array with the current indices of the particles in pd (faster)
-  void ParticleGroup::addParticlesByCurrentIndex(access::location loc, const int *indices, int N){
+  inline void ParticleGroup::addParticlesByCurrentIndex(access::location loc, const int *indices, int N){
     sys->log<System::DEBUG1>("[ParticleGroup] Adding %d particles to group %s via indices!", N, name.c_str());
     if(N==0) return;
     int numberParticlesPrev = numberParticles;
