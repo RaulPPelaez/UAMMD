@@ -34,6 +34,7 @@ This class maintains a CellList and uses it to generate a neighbour list. It sho
 
 namespace uammd{
   namespace BasicNeighbourList_ns{
+    inline
     __global__ void fillBasicNeighbourList(CellList_ns::NeighbourContainer ni,
 			      int *neighbourList, int* numberNeighbours,
 			      int maxNeighboursPerParticle,
