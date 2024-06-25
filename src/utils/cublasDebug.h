@@ -8,7 +8,7 @@
 #define CublasSafeCall(err) __cublasSafeCall(err, __FILE__, __LINE__)
 
 
-
+inline
 const char* cublasGetErrorString(cublasStatus_t status){
   switch(status){
   case CUBLAS_STATUS_SUCCESS: return "CUBLAS_STATUS_SUCCESS";

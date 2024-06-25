@@ -41,6 +41,7 @@ namespace uammd{
 
       //Sum all values in a container using Kahan Summation, which increases floating point accuracy
       template<class Container>
+      inline
       auto kahanSum(Container &v){
 	auto c = v[0]*0;
 	auto sum = c;
@@ -55,6 +56,7 @@ namespace uammd{
 
       //Integrate the function foo(x) from x=rmin to x=rmax using the Simpson rule with Nr intervals
       template<class Foo>
+      inline
       auto integrate(Foo foo, real rmin, real rmax, int Nr){
 	using T = decltype(foo(rmin));
 	if(Nr%2 == 1) Nr++; //Need an even number of points
@@ -74,6 +76,7 @@ namespace uammd{
     }
 
     //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
+    inline
     __host__ __device__ real BM(real zz, real alpha, real beta){
       const real z = zz/alpha;
       const real z2 = z*z;
@@ -114,7 +117,7 @@ namespace uammd{
 	const real invh;
 	static constexpr int support = 3;
 	threePoint(real h):invh(1.0/h){}
-	__host__ __device__ real phi(real rr, real3 pos = real3()) const{
+	inline __host__ __device__ real phi(real rr, real3 pos = real3()) const{
 	  const real r = fabs(rr)*invh;
 	  if(r<real(0.5)){
 	    constexpr real onediv3 = real(1/3.0);

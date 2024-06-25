@@ -12,6 +12,7 @@
 #define CufftSafeCall(err) __cufftSafeCall(err, __FILE__, __LINE__)
 
 namespace uammd{
+  inline
   const char* cufftGetErrorString(cufftResult_t err){
     switch (err) {
     case CUFFT_INVALID_PLAN:   return "CUFFT_INVALID_PLAN\n";
