@@ -19,7 +19,7 @@ namespace uammd{
     };
 
     namespace detail{
-      size_t computeExtraAlignment(size_t addressOffset, size_t alignment){
+    inline size_t computeExtraAlignment(size_t addressOffset, size_t alignment){
 	size_t extraAlignment = 0;
 	bool isMissAligned = addressOffset%alignment != 0;
 	if(isMissAligned)
