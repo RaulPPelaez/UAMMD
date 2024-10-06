@@ -8,13 +8,9 @@
 #include "global/defines.h"
 #include "System/System.h"
 
-// Helper macro to handle indirect inclusion
-#define STRINGIFY(x) #x
-#define INCLUDE_FILE(x) STRINGIFY(x)
-
 #ifdef UAMMD_EXTENSIONS
   #ifdef UAMMD_EXTENSIONS_PREAMBLE
-    #include INCLUDE_FILE(UAMMD_EXTENSIONS_PREAMBLE)
+    #include UAMMD_EXTENSIONS_PREAMBLE
   #else
     #include "../extensions/preamble.h"
   #endif

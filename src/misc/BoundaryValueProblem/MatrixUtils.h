@@ -10,7 +10,7 @@
 #ifdef USE_MKL
 #include<mkl.h>
 #else
-#include<lapacke.h>
+#include<openblas/lapacke.h>
 #endif
 #include<thrust/complex.h>
 namespace uammd{
