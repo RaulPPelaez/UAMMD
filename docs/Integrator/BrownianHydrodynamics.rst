@@ -574,6 +574,9 @@ Use as the rest of the :ref:`Integrator` modules.
 
    .. warning:: Note that the temperature is provided in units of energy.
 
+   .. hint:: The tolerance roughly represents the relative error in the overall computation (being 0.1 a 10% error tolerance). The smaller the tolerance, the more accurate the computation, but the slower the algorithm.
+
+
 The following parameters are available:
 
   * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
@@ -584,7 +587,7 @@ The following parameters are available:
   * :cpp:`Box box` A :cpp:class:`Box` with the domain size information.
   * :cpp:`real psi` The splitting parameter of the PSE algorithm in units of inverse of length. This parameter only affects performance and must be manually tuned in a case by case basis to find the optimal (usually between 0.1/hydrodynamicRadius-1/hydrodynamicRadius).
   * :cpp:`real shearStrain` The shear strain of the system. If enabled, a shear flow will be applied to the system. This parameter is optional and defaults to 0, meaning no shear flow.
-
+    
 .. code:: c++
 
   #include"uammd.cuh"
