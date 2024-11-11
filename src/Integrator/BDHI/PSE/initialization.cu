@@ -6,7 +6,7 @@ Initialization
 #include"Integrator/BDHI/BDHI_PSE.cuh"
 namespace uammd{
   namespace BDHI{
-    namespace pse_ns{      
+    namespace pse_ns{
       void checkInputValidity(BDHI::PSE::Parameters par){
 	real3 L = par.box.boxSize;
 	if(L.x == real(0.0) && L.y == real(0.0) && L.z == real(0.0)){
@@ -16,10 +16,12 @@ namespace uammd{
 	if(L.x != L.y || L.y != L.z || L.x != L.z){
 	  System::log<System::WARNING>("[BDHI::PSE] Non cubic boxes are not really tested!");
 	}
-	
-	
+	if(par.tolerance > 0.1){
+	  System::log<System::EXCEPTION>("[BDHI::PSE] Tolerance too high, this will lead to numerical instability. Tolerance should be less than 0.1 (10% error).");
+	  throw std::invalid_argument("Tolerance too high");
+	}
       }
-      
+
       long double computeSelfMobility(PSE::Parameters par){
 	//O(a^8) accuracy. See Hashimoto 1959.
 	//With a Gaussian this expression has a minimum deviation from measuraments of 7e-7*rh at L=64*rh.
@@ -34,9 +36,9 @@ namespace uammd{
 	long double a6pref = 16.0l*M_PIl*M_PIl/45.0l + 630.0L*b*b;
 	return  1.0l/(6.0l*M_PIl*par.viscosity*rh)*(1.0l-c*a+(4.0l/3.0l)*M_PIl*a3-a6pref*a3*a3);
       }
-      
+
     }
-  
+
     PSE::PSE(shared_ptr<ParticleGroup> pg, Parameters par):
       pg(pg), hydrodynamicRadius(par.hydrodynamicRadius){
       System::log<System::MESSAGE>("[BDHI::PSE] Initialized");
