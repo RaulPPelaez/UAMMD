@@ -40,7 +40,7 @@ namespace uammd{
     }
 
     PSE::PSE(shared_ptr<ParticleGroup> pg, Parameters par):
-      pg(pg), hydrodynamicRadius(par.hydrodynamicRadius){
+      pg(pg), hydrodynamicRadius(par.hydrodynamicRadius), temperature(par.temperature), dt(par.dt){
       System::log<System::MESSAGE>("[BDHI::PSE] Initialized");
       this->M0 = pse_ns::computeSelfMobility(par);
       System::log<System::MESSAGE>("[BDHI::PSE] Self mobility: %f", M0);
