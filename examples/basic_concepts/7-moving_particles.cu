@@ -8,6 +8,7 @@
  */
 
 #include <iterator>
+#include<thrust/transform_reduce.h>
 #include<uammd.cuh>
 #include"Integrator/BrownianDynamics.cuh" //Each Integrator has a particular include
 #include<random>
