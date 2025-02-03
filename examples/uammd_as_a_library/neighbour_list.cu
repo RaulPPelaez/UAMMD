@@ -7,6 +7,7 @@
 #include"uammd.cuh"
 #include"Interactor/NeighbourList/BasicList/BasicListBase.cuh"
 #include<thrust/random.h>
+#include<thrust/extrema.h>
 using namespace uammd;
 template<class T>
 using gpu_container = thrust::device_vector<T>;
