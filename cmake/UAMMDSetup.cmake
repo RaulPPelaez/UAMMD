@@ -33,6 +33,20 @@ function(uammd_setup_target target_name)
   # Set include paths
   target_include_directories(${target_name} PUBLIC ${BLAS_INCLUDE_DIRS} ${LAPACKE_INCLUDE_DIRS})
   target_link_libraries(${target_name} PUBLIC ${CUDA_LIBRARY})
-  set(UAMMD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
-  target_include_directories(${target_name} PUBLIC ${UAMD_ROOT}/src  ${UAMMD_ROOT}/src/third_party)
+  if (DEFINED uammd_SOURCE_DIR)
+    set(UAMMD_INCLUDE_DIRS "${uammd_SOURCE_DIR}/src" "${uammd_SOURCE_DIR}/src/third_party")
+  else()
+    find_path(UAMMD_INCLUDE_DIR
+      NAMES uammd.h
+      PATHS ${CMAKE_INSTALL_PREFIX}/include ${CMAKE_PREFIX_PATH}/include
+      NO_DEFAULT_PATH
+    )
+    if (UAMMD_INCLUDE_DIR)
+      set(UAMMD_INCLUDE_DIRS "${UAMMD_INCLUDE_DIR}")
+    else()
+      message(FATAL_ERROR "Could not find UAMMD include directories! \
+            Make sure UAMMD is installed or fetched correctly.")
+    endif()
+  endif()
+  target_include_directories(${target_name} PUBLIC ${UAMMD_INCLUDE_DIRS})
 endfunction()
