@@ -16,23 +16,15 @@ defaults:
 jobs:
   build:
     name: ${{ matrix.name }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-
-          # Oldest supported versions
-          - name: Linux (CUDA 10.2)
-            cuda: "10.*"
-            gcc: "7.*"
-            cuda12: 'false'
-
           # Latest supported versions
           - name: Linux (CUDA 12)
             cuda: "12.*"
-            gcc: "11.*"
-            cuda12: 'true'
+            gcc: "13.*"
     steps:
     - name: Check out
       uses: actions/checkout@v2
@@ -58,18 +50,8 @@ jobs:
           sudo apt-get autoclean -y >& /dev/null
           sudo docker image prune --all --force
           df -h
-    - name: Prepare dependencies (CUDA <12)
-      if: ${{ matrix.cuda12 == 'false'}}
-      run: |
-        sed -i -e "/cuda-version/c\  - cudatoolkit-dev ${{ matrix.cuda }}" \
-               -e "/cuda-libraries-dev/d" \
-               -e "/cuda-nvcc/d" \
-               -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}\n  - gcc_linux-64" \
-               environment.yml
-        ln -s $(which cc) $CONDA_PREFIX/bin/gcc
 
-    - name: Prepare dependencies (CUDA >=12)
-      if: ${{ matrix.cuda12 == 'true' }}
+    - name: Prepare dependencies
       run: |
         sed -i -e "/cuda-version/c\  - cuda-version ${{ matrix.cuda }}" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
