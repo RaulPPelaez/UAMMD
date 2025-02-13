@@ -66,6 +66,7 @@ jobs:
                -e "/cuda-nvcc/d" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}\n  - gcc_linux-64" \
                environment.yml
+        ln -s $(which cc) $CONDA_PREFIX/bin/gcc
 
     - name: Prepare dependencies (CUDA >=12)
       if: ${{ matrix.cuda12 == 'true' }}
