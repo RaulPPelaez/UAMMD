@@ -1,6 +1,4 @@
-message(STATUS "Processing UAMMD")
 cmake_minimum_required(VERSION 3.10)
-message(STATUS "Processing UAMMD")
 project(uammd)
 # Install headers
 file(GLOB_RECURSE headers src/*)
@@ -14,7 +12,6 @@ endforeach()
 # Install FindUAMMD.cmake
 install(FILES cmake/FindUAMMD.cmake DESTINATION share/cmake/Modules)
 
-message(STATUS "Processing UAMMD")
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/UAMMDSetup.cmake)
 install(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/UAMMDSetup.cmake"

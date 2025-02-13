@@ -2,7 +2,6 @@ include_guard(GLOBAL)
 
 function(uammd_setup_target target_name)
   enable_language(CUDA)
-  enable_language(CXX)
   # Ensure the target uses C++ and CUDA standards
   set_target_properties(${target_name} PROPERTIES
     CXX_STANDARD 14
