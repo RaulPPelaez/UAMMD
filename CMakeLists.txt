@@ -11,3 +11,9 @@ endforeach()
 
 # Install FindUAMMD.cmake
 install(FILES cmake/FindUAMMD.cmake DESTINATION share/cmake/Modules)
+
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/UAMMDSetup.cmake)
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/UAMMDSetup.cmake"
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/UAMMD
+)
