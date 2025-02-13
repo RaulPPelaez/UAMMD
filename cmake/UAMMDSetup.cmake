@@ -33,7 +33,6 @@ function(uammd_setup_target target_name)
   # Set include paths
   target_include_directories(${target_name} PUBLIC ${BLAS_INCLUDE_DIRS} ${LAPACKE_INCLUDE_DIRS})
   target_link_libraries(${target_name} PUBLIC ${CUDA_LIBRARY})
-
-  # Include UAMMD sources
-  target_include_directories(${target_name} PUBLIC ${uammd_SOURCE_DIR}/src ${uammd_SOURCE_DIR}/src/third_party)
+  set(UAMMD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
+  target_include_directories(${target_name} PUBLIC ${UAMD_ROOT}/src  ${UAMMD_ROOT}/src/third_party)
 endfunction()
