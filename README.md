@@ -43,6 +43,24 @@ See the documentation page at https://uammd.readthedocs.io for a full list of av
 
 You can use UAMMD as a library for integration into other codes or as a standalone engine.
 
+### CMake integration  
+
+-------------------------
+
+UAMMD is compatible with CMake's FetchContent:
+
+```cmake
+FetchContent_Declare(
+  uammd
+  GIT_REPOSITORY https://github.com/RaulPPelaez/uammd
+  GIT_TAG        v2.5.4
+)
+FetchContent_MakeAvailable(uammd)
+add_executable(my_executable my_source.cu)
+uammd_setup_target(my_executable)
+```
+
+
 #### DEPENDENCIES  
 
 ---------------------
@@ -82,6 +100,8 @@ Now other CMake scripts can find the UAMMD headers with:
 ```cmake
 find_package(UAMMD REQUIRED)
 include_directories(${UAMMD_INCLUDE_DIR})
+# Or
+# uammd_setup_target(target_name)
 ```
 
 Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html).  
