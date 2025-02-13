@@ -12,8 +12,10 @@ endforeach()
 # Install FindUAMMD.cmake
 install(FILES cmake/FindUAMMD.cmake DESTINATION share/cmake/Modules)
 
+message("UAMMD is now being included as a subproject")
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    include(${CMAKE_CURRENT_LIST_DIR}/cmake/UAMMDSetup.cmake)
+  message("UAMMD is the main project")
+  include(${CMAKE_CURRENT_LIST_DIR}/cmake/UAMMDSetup.cmake)
 endif()
 install(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/UAMMDSetup.cmake"
