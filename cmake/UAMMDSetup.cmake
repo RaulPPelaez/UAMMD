@@ -9,13 +9,9 @@ function(uammd_setup_target target_name)
     message(FATAL_ERROR "BLAS is required but not enabled! \
 	You must call find_package(BLAS) in your main CMakeLists.txt BEFORE calling uammd_setup_target().")
   endif()
-  # Ensure the target uses C++ and CUDA standards
-  set_target_properties(${target_name} PROPERTIES
-    CXX_STANDARD 14
-    CXX_STANDARD_REQUIRED ON
-    CUDA_STANDARD 14
-    CUDA_STANDARD_REQUIRED ON
-  )
+  # Ensure the target has C++ and CUDA standards
+  target_compile_features(${target_name} PUBLIC cxx_std_14)
+  target_compile_features(${target_name} PUBLIC cuda_std_14)
 
   if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
     target_compile_options(${target_name} PRIVATE --expt-relaxed-constexpr -extended-lambda)
