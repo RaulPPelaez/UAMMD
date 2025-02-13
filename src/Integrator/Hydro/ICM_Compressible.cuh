@@ -74,6 +74,7 @@ References:
 #include "ICM_Compressible/SpatialDiscretization.cuh"
 #include"ICM_Compressible/GhostCells.cuh"
 #include <functional>
+#include <thrust/extrema.h>
 #include <memory>
 // #ifndef __CUDACC_EXTENDED_LAMBDA__
 // #error "This code requires the CUDA flag --extended-lambda to be enabled"
