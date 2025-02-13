@@ -1,4 +1,6 @@
+message(STATUS "Processing UAMMD")
 cmake_minimum_required(VERSION 3.10)
+message(STATUS "Processing UAMMD")
 project(uammd)
 # Install headers
 file(GLOB_RECURSE headers src/*)
