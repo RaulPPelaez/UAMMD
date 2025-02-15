@@ -41,7 +41,7 @@ See the documentation page at https://uammd.readthedocs.io for a full list of av
 
 -------------------
 
-You can use UAMMD as a library for integration into other codes or as a standalone engine.
+You can use UAMMD as a library for integration into other codes or as a standalone engine. Checkout the [examples folder](https://github.com/RaulPPelaez/UAMMD/tree/v2.x/examples).
 
 ### CMake integration  
 
@@ -64,23 +64,14 @@ uammd_setup_target(my_executable)
 #### DEPENDENCIES  
 
 ---------------------
-Depends on:
 
-	1. CUDA 9.x+                                :   https://developer.nvidia.com/cuda-downloads
-
-Some modules make use of certain NVIDIA libraries included with CUDA:
-	
-	1. cuBLAS
-	2. cuFFT
-	
-Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
-Apart from this, any dependency is already included in the repository under the third_party	folder.  
+CUDA is required, some modules also make use of lapacke and cblas (which can be replaced by mkl).Apart from this, any dependency is already included in the repository under the third_party	folder.  
 See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
 
-Every required dependency can be installed using conda with the environment file provided in the repository. We recommend using [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) as a replacement for conda.  
+**Every required dependency can be installed using conda** with the environment file provided in the repository.
 
 ```bash
-mamba env create -f environment.yml
+conda env create -f environment.yml
 ```
 
 ### Library mode
@@ -104,7 +95,6 @@ include_directories(${UAMMD_INCLUDE_DIR})
 # uammd_setup_target(target_name)
 ```
 
-Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html).  
 Here you have a short example of how a typical UAMMD code looks like, encoding a simple Brownian dynamics simulation of non interacting particles.:  
 
 ```c++
