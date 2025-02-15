@@ -189,3 +189,20 @@ Pablo Palacios Alonso (http://github.com/PabloPalaciosAlonso)
 Sergio Panzuela  
 Nerea Alcazar  
 Salvatore Assenza
+
+## Citation
+
+```
+@article{uammd2025,
+title = {Universally Adaptable Multiscale Molecular Dynamics (UAMMD). A native-GPU software ecosystem for complex fluids, soft matter, and beyond},
+journal = {Computer Physics Communications},
+volume = {306},
+pages = {109363},
+year = {2025},
+issn = {0010-4655},
+doi = {https://doi.org/10.1016/j.cpc.2024.109363},
+url = {https://www.sciencedirect.com/science/article/pii/S0010465524002868},
+author = {Raúl P. Peláez and Pablo Ibáñez-Freire and Pablo Palacios-Alonso and Aleksandar Donev and Rafael Delgado-Buscalioni},
+keywords = {Molecular dynamics, Hydrodynamics, C++, CUDA, Soft matter},
+}
+```
