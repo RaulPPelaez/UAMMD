@@ -30,6 +30,7 @@ namespace uammd{
       __device__ void fillSharedWeights(KernelValueType* weights, real3 pi, int3 support, int3 celli, int3 P,  Grid &grid, Kernel &kernel){
 	auto *weightsX = &weights[0];
 	const int tid = threadIdx.x;
+	const bool is2D = grid.cellDim.z==1;
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
 	  if(cellj.x>=0){
@@ -49,8 +50,12 @@ namespace uammd{
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
 	  if(cellj.z>=0){
-	    const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	    weightsZ[i] = detail::phiZ(kernel, rij, pi);
+	    if(is2D){
+	      weightsZ[i] = real(1.0);
+	    }else{
+	      const real rij = grid.distanceToCellCenter(pi, cellj).z;
+	      weightsZ[i] = detail::phiZ(kernel, rij, pi);
+	    }
 	  }
 	}
       }
