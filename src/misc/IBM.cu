@@ -119,6 +119,8 @@ namespace uammd{
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	if(cellj.x<0 or cellj.y <0 or cellj.z<0)
 	  continue;
+	if(cellj.x >= grid.cellDim.x or cellj.y >= grid.cellDim.y or cellj.z >= grid.cellDim.z)
+	  continue;
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
 	const auto weight = weightCompute(vi, kern);
@@ -193,6 +195,8 @@ namespace uammd{
 	  const int kk=is2D?0:(i/(support.x*support.y));
 	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	  if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	    continue;
+	  if(cellj.x >= grid.cellDim.x or cellj.y >= grid.cellDim.y or cellj.z >= grid.cellDim.z)
 	    continue;
 	  const real dV = qw(cellj, grid);
 	  const int jcell = cell2index(cellj);
