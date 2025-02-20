@@ -91,7 +91,11 @@ namespace uammd{
       __shared__ int3 P; //Neighbour cell offset
       __shared__ int3 support;
       using KernelValueType = decltype(detail::phiX(kernel,real(), real3()));
-      extern __shared__ KernelValueType weights[];
+      // Declaring as char is required because an "extern" declaration cannot
+      // have two different types in two different template instantiations:
+      // XREF: https://stackoverflow.com/questions/27570552/templated-cuda-kernel-with-dynamic-shared-memory
+      extern __shared__ unsigned char s_mem[];
+      KernelValueType* weights = reinterpret_cast<KernelValueType*>(s_mem);
       if(tid==0){
 	pi = make_real3(pos[id]);
 	vi = particleQuantity[id];
@@ -163,7 +167,8 @@ namespace uammd{
       __shared__ typename BlockReduce::TempStorage temp_storage;
       __shared__ int3 support;
       using KernelValueType = decltype(detail::phiX(kernel,real(), real3()));
-      extern __shared__ KernelValueType weights[];
+      extern __shared__ unsigned char s_mem[];
+      KernelValueType* weights = reinterpret_cast<KernelValueType*>(s_mem);
       if(id<numberParticles){
 	if(tid==0){
 	  pi = make_real3(pos[id]);
