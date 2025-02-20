@@ -117,11 +117,9 @@ TEST(Spreading, PeskinKernelSpread) {
       }
     }
   }
-
-  // Copy device field to host and compare.
   thrust::host_vector<real> h_field = field;
   for (int i = 0; i < fieldSize; ++i) {
-    EXPECT_NEAR(h_field[i], expected[i], 1e-4);
+    EXPECT_NEAR(h_field[i], expected[i], 1e-10);
   }
 }
 
