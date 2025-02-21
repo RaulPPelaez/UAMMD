@@ -1,7 +1,6 @@
 /*Raul P. Pelaez 2019-2021. Immersed Boundary Method (IBM).
   See IBM.cuh
  */
-#include<type_traits>
 #include<third_party/uammd_cub.cuh>
 #include "utils/atomics.cuh"
 #include "IBM_utils.cuh"
