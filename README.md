@@ -1,4 +1,4 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 2.5**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD)**
 
 [![Documentation Status](https://readthedocs.org/projects/uammd/badge/?version=latest)](https://uammd.readthedocs.io/en/latest/?badge=latest)
 [![CI](https://github.com/RaulPPelaez/UAMMD/actions/workflows/ci.yml/badge.svg)](https://github.com/RaulPPelaez/UAMMD/actions/workflows/ci.yml)
@@ -53,7 +53,7 @@ UAMMD is compatible with CMake's FetchContent:
 FetchContent_Declare(
   uammd
   GIT_REPOSITORY https://github.com/RaulPPelaez/uammd
-  GIT_TAG        v2.5.4
+  GIT_TAG        v2.7.0
 )
 FetchContent_MakeAvailable(uammd)
 add_executable(my_executable my_source.cu)
