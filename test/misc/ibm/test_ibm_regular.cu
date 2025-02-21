@@ -1,10 +1,12 @@
 #include "misc/IBM.cuh"
 #include "misc/IBM_kernels.cuh"
 #include <gtest/gtest.h>
+#include <numeric>
+#include <random>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <vector>
-#include<numeric>
+
 using namespace uammd;
 struct ConstantKernel {
   int3 support;
@@ -82,6 +84,30 @@ private:
   PeskinBase m_phiX, m_phiY, m_phiZ;
 };
 
+template <typename Container1, typename Container2>
+auto manual_spread(Container1 &pos, Container2 &quantity, int3 n, real3 L) {
+  std::vector<real> field(n.x * n.y * n.z, 0.0);
+  real3 h = L / make_real3(n);
+  for (int i = 0; i < pos.size(); ++i) {
+    real3 p = pos[i];
+    auto q = quantity[i];
+    for (int iz = 0; iz < n.z; ++iz) {
+      real z = -L.z / 2.0 + (iz + 0.5) * h.z;
+      for (int iy = 0; iy < n.y; ++iy) {
+        real y = -L.y / 2.0 + (iy + 0.5) * h.y;
+        for (int ix = 0; ix < n.x; ++ix) {
+          real x = -L.x / 2.0 + (ix + 0.5) * h.x;
+          real weight = Peskin3pt(h).phiX(x - p.x) *
+                        Peskin3pt(h).phiY(y - p.y) * Peskin3pt(h).phiZ(z - p.z);
+          int idx = ix + iy * n.x + iz * n.x * n.y;
+          field[idx] = weight * q;
+        }
+      }
+    }
+  }
+  return field;
+}
+
 TEST(Spreading, PeskinKernelSpread) {
   int n_val = 8;
   int3 n = make_int3(n_val);
@@ -100,192 +126,146 @@ TEST(Spreading, PeskinKernelSpread) {
   IBM<Peskin3pt, Grid> ibm(kernel, grid);
   ibm.spread(pos.data().get(), quantity.data().get(), field.data().get(),
              pos.size());
-
-  std::vector<real> expected(fieldSize, 0.0);
-  for (int iz = 0; iz < n.z; ++iz) {
-    real z = -L.z / 2.0 + (iz + 0.5) * h.z + h_pos[0].z;
-    for (int iy = 0; iy < n.y; ++iy) {
-      real y = -L.y / 2.0 + (iy + 0.5) * h.y + h_pos[0].y;
-      for (int ix = 0; ix < n.x; ++ix) {
-        real x = -L.x / 2.0 + (ix + 0.5) * h.x + h_pos[0].x;
-	real3 p = h_pos[0];
-        real weight = kernel->phiX(x - p.x) *
-                      kernel->phiY(y - p.y) *
-                      kernel->phiZ(z - p.z);
-        int idx = ix + iy * n.x + iz * n.x * n.y;
-        expected[idx] = weight*h_quantity[0];
-      }
-    }
-  }
   thrust::host_vector<real> h_field = field;
+  auto expected = manual_spread(h_pos, h_quantity, n, L);
   for (int i = 0; i < fieldSize; ++i) {
     EXPECT_NEAR(h_field[i], expected[i], 1e-10);
   }
 }
 
-// //---------------------------------------------------------------------
-// // Helper: numerically integrate the square of the Peskin kernel in 1D.
-// real integratePeskinSquare(const PeskinKernel &kernel, real h) {
-//   int N = 10000;
-//   real a = -1.5 * h;
-//   real b = 1.5 * h;
-//   real dx = (b - a) / (N - 1);
-//   real sum = 0.0;
-//   for (int i = 0; i < N; ++i) {
-//     real x = a + i * dx;
-//     real val = kernel.phi(x, h);
-//     sum += val * val;
-//   }
-//   return sum * dx;
-// }
+template <typename Foo> real integrate(const Foo &foo, real width) {
+  real a = -width / 2.0;
+  real b = width / 2.0;
+  int N = 10000;
+  real dx = (b - a) / (N - 1);
+  real sum = 0.0;
+  for (int i = 0; i < N; ++i) {
+    real x = a + i * dx;
+    real val = foo(x);
+    sum += val;
+  }
+  return sum * dx;
+}
 
-// //---------------------------------------------------------------------
-// // Test 2: Verify the adjoint property of spread and interpolate in 3D.
-// // A unit quantity is spread then interpolated; after dividing by the
-// // kernel-squared integral dV, we should recover 1.
-// TEST(Spreading, PeskinKernelAdjoint3D) {
-//   int numberParticles = 1;
-//   int n_val = 64;
-//   int n[3] = {n_val, n_val, n_val};
-//   real L_val = 16.0;
-//   real L_arr[3] = {L_val, L_val, L_val};
+// Verify the adjoint property of spread and interpolate in 3D.
+// A unit quantity is spread then interpolated; after dividing by the
+// kernel-squared integral dV, we should recover 1.
+// This should work regardless of the cell size in each direction
+TEST(SpreadInterp, Adjoint3DNonRegular) {
+  int numberParticles = 1;
+  int3 n = make_int3(64, 32, 7);
+  real3 L = make_real3(64.0);
+  thrust::host_vector<real3> h_pos(1);
+  h_pos[0] = make_real3(0.0, 0.0, 0.0);
+  thrust::device_vector<real3> pos = h_pos;
+  thrust::host_vector<real> h_quantity(1, 1.0);
+  thrust::device_vector<real> quantity = h_quantity;
+  thrust::device_vector<real> field(n.x * n.y * n.z, 0.0);
+  Box box(L);
+  Grid grid(box, n);
+  real3 h = L / make_real3(n);
+  auto kernel = std::make_shared<Peskin3pt>(h);
+  IBM<Peskin3pt, Grid> ibm(kernel, grid);
 
-//   // Particle at the center.
-//   thrust::host_vector<real3> h_pos(1);
-//   h_pos[0] = make_real3(0.0, 0.0, 0.0);
-//   thrust::device_vector<real3> pos = h_pos;
-//   thrust::host_vector<real> h_quantity(1, 1.0);
-//   thrust::device_vector<real> quantity = h_quantity;
+  ibm.spread(pos.begin(), quantity.begin(), field.data().get(), pos.size());
+  real dV =
+      integrate([&](real r) { return pow(kernel->phiX(r), 2.0); }, 3.0 * h.x) *
+      integrate([&](real r) { return pow(kernel->phiY(r), 2.0); }, 3.0 * h.y) *
+      integrate([&](real r) { return pow(kernel->phiZ(r), 2.0); }, 3.0 * h.z);
 
-//   int fieldSize = n[0] * n[1] * n[2];
-//   thrust::device_vector<real> field(fieldSize, 0.0);
+  thrust::device_vector<real> interp_result(1, 0.0);
+  ibm.gather(pos.data().get(), interp_result.data().get(), field.data().get(),
+             int(pos.size()));
 
-//   int3 grid_n = {n[0], n[1], n[2]};
-//   real3 grid_L = make_real3(L_arr[0], L_arr[1], L_arr[2]);
-//   Box box(make_real3(L_arr[0], L_arr[1], L_arr[2]));
-//   Grid grid(box, grid_n);
+  thrust::host_vector<real> h_interp = interp_result;
+  real quantity_reconstructed = h_interp[0] / dV;
+  EXPECT_NEAR(quantity_reconstructed, 1.0, 1e-4);
+}
 
-//   PeskinKernel peskinKernel;
-//   peskinKernel.support = {3, 3, 3};
+// A 2D adjoint test by setting the z-component to 0,
+// L[2]=0 and n[2]=1. For example:
+TEST(SpreadInterp, PeskinKernelAdjoint2D) {
+  int n_val = 8;
+  int3 n = make_int3(n_val, n_val, 1);
+  real3 L = make_real3(16.0, 16.0, 0.0);
+  thrust::host_vector<real3> h_pos(1);
+  h_pos[0] = make_real3(0.0, 0.0, 0.0);
+  thrust::device_vector<real3> pos = h_pos;
+  thrust::host_vector<real> h_quantity(1, 1.0);
+  thrust::device_vector<real> quantity = h_quantity;
+  int fieldSize = n.x * n.y * n.z;
+  thrust::device_vector<real> field(fieldSize, 0.0);
+  Box box(L);
+  Grid grid(box, n);
+  real3 h = L / make_real3(n);
+  auto kernel = std::make_shared<Peskin3pt>(h);
+  IBM<Peskin3pt, Grid> ibm(kernel, grid);
+  ibm.spread(pos.begin(), quantity.begin(), field.data().get(), pos.size());
+  thrust::device_vector<real> interp_result(1, 0.0);
+  ibm.gather(pos.data().get(), interp_result.data().get(), field.data().get(),
+             int(pos.size()));
+  real dV =
+      integrate([&](real r) { return pow(kernel->phiX(r), 2.0); }, 3.0 * h.x) *
+      integrate([&](real r) { return pow(kernel->phiY(r), 2.0); }, 3.0 * h.y);
+  thrust::host_vector<real> h_interp = interp_result;
+  real quantity_reconstructed = h_interp[0] / dV;
+  EXPECT_NEAR(quantity_reconstructed, 1.0, 1e-4);
+}
 
-//   IBM<PeskinKernel, Grid> ibm(peskinKernel, grid);
-//   ibm.spread(pos.begin(), quantity.begin(), field.data().get(), pos.size());
+template <typename Container1, typename Container2>
+auto manual_interpolate(Container1 &pos, Container2 &field, int3 n, real3 L) {
+  std::vector<real> interp_result(pos.size(), 0.0);
+  real3 h = L / make_real3(n);
+  real qw = h.x * h.y * h.z;
+  for (int i = 0; i < pos.size(); ++i) {
+    real3 p = pos[i];
+    for (int iz = 0; iz < n.z; ++iz) {
+      real z = -L.z / 2.0 + (iz + 0.5) * h.z;
+      for (int iy = 0; iy < n.y; ++iy) {
+        real y = -L.y / 2.0 + (iy + 0.5) * h.y;
+        for (int ix = 0; ix < n.x; ++ix) {
+          real x = -L.x / 2.0 + (ix + 0.5) * h.x;
+          real weight = Peskin3pt(h).phiX(x - p.x) *
+                        Peskin3pt(h).phiY(y - p.y) * Peskin3pt(h).phiZ(z - p.z);
+          int idx = ix + iy * n.x + iz * n.x * n.y;
+          interp_result[i] += weight * field[idx] * qw;
+        }
+      }
+    }
+  }
+  return interp_result;
+}
 
-//   // Compute grid spacings.
-//   real h_x = L_arr[0] / n[0];
-//   real h_y = L_arr[1] / n[1];
-//   real h_z = L_arr[2] / n[2];
-
-//   // Compute the 1D integrals (dV factors) and then the overall dV.
-//   real dV = integratePeskinSquare(peskinKernel, h_x) *
-//             integratePeskinSquare(peskinKernel, h_y) *
-//             integratePeskinSquare(peskinKernel, h_z);
-
-//   // Now interpolate from the field back to the particle position.
-//   thrust::device_vector<real> interp_result(1, 0.0);
-//   ibm.interpolate(pos.begin(), field.data().get(), interp_result.begin(),
-//                   pos.size());
-
-//   thrust::host_vector<real> h_interp = interp_result;
-//   real quantity_reconstructed = h_interp[0] / dV;
-
-//   EXPECT_NEAR(quantity_reconstructed, 1.0, 1e-4);
-// }
-
-// //---------------------------------------------------------------------
-// // Test 3: Verify that interpolating a field of ones returns ones.
-// // This test works for 3D or 2D; here we demonstrate a 3D case with
-// // multiple particles and multiple quantities per particle.
-// TEST(Spreading, PeskinKernelInterpolation) {
-//   int n_val = 8;
-//   int numberParticles = 10;
-//   int n[3] = {n_val, n_val, n_val};
-//   real L_arr[3] = {16.0, 16.0, 16.0};
-//   int nquantities = 3;
-
-//   // Generate random positions (ensuring they lie inside the domain).
-//   std::vector<real3> h_pos(numberParticles);
-//   std::mt19937 gen(123);
-//   std::uniform_real_distribution<real> dist(-L_arr[0] / 2.0 + 1.0,
-//                                             L_arr[0] / 2.0 - 1.0);
-//   for (int i = 0; i < numberParticles; ++i) {
-//     h_pos[i] = make_real3(dist(gen), dist(gen), dist(gen));
-//   }
-//   thrust::device_vector<real3> pos = h_pos;
-
-//   // Create a field of ones.
-//   int fieldSize = n[0] * n[1] * n[2] * nquantities;
-//   thrust::device_vector<real> field(fieldSize, 1.0);
-
-//   int3 grid_n = {n[0], n[1], n[2]};
-//   real3 grid_L = make_real3(L_arr[0], L_arr[1], L_arr[2]);
-//   Box box(make_real3(L_arr[0], L_arr[1], L_arr[2]));
-//   Grid grid(box, grid_n);
-
-//   PeskinKernel peskinKernel;
-//   peskinKernel.support = {3, 3, 3};
-
-//   IBM<PeskinKernel, Grid> ibm(peskinKernel, grid);
-
-//   // Interpolate: the result is expected to be a vector of size
-//   (numberParticles
-//   // * nquantities)
-//   thrust::device_vector<real> interp_result(numberParticles * nquantities,
-//   0.0); ibm.interpolate(pos.begin(), field.data().get(),
-//   interp_result.begin(),
-//                   pos.size());
-
-//   thrust::host_vector<real> h_interp = interp_result;
-//   for (int i = 0; i < numberParticles * nquantities; ++i) {
-//     EXPECT_NEAR(h_interp[i], 1.0, 1e-4);
-//   }
-// }
-
-// //---------------------------------------------------------------------
-// // You may also add a 2D adjoint test by setting the z-component to 0,
-// // L[2]=0 and n[2]=1. For example:
-// TEST(Spreading, PeskinKernelAdjoint2D) {
-//   int numberParticles = 1;
-//   int n_val = 64;
-//   int n[3] = {n_val, n_val, 1};
-//   real L_arr[3] = {16.0, 16.0, 0.0};
-
-//   // In 2D the particle lies in the x-y plane.
-//   thrust::host_vector<real3> h_pos(1);
-//   h_pos[0] = make_real3(0.0, 0.0, 0.0);
-//   thrust::device_vector<real3> pos = h_pos;
-//   thrust::host_vector<real> h_quantity(1, 1.0);
-//   thrust::device_vector<real> quantity = h_quantity;
-
-//   int fieldSize = n[0] * n[1] * n[2];
-//   thrust::device_vector<real> field(fieldSize, 0.0);
-
-//   int3 grid_n = {n[0], n[1], n[2]};
-//   // For a 2D domain, we set L[2] = 0 but provide a dummy value (e.g. 1) for
-//   the
-//   // third dimension.
-//   real3 grid_L = make_real3(L_arr[0], L_arr[1], 1.0);
-//   Box box(make_real3(L_arr[0], L_arr[1], 1.0));
-//   Grid grid(box, grid_n);
-
-//   PeskinKernel peskinKernel;
-//   // In 2D we use support {3,3,1} (only one grid cell in z).
-//   peskinKernel.support = {3, 3, 1};
-
-//   IBM<PeskinKernel, Grid> ibm(peskinKernel, grid);
-//   ibm.spread(pos.begin(), quantity.begin(), field.data().get(), pos.size());
-
-//   real h_x = L_arr[0] / n[0];
-//   real h_y = L_arr[1] / n[1];
-
-//   real dV = integratePeskinSquare(peskinKernel, h_x) *
-//             integratePeskinSquare(peskinKernel, h_y);
-
-//   thrust::device_vector<real> interp_result(1, 0.0);
-//   ibm.interpolate(pos.begin(), field.data().get(), interp_result.begin(),
-//                   pos.size());
-//   thrust::host_vector<real> h_interp = interp_result;
-//   real quantity_reconstructed = h_interp[0] / dV;
-
-//   EXPECT_NEAR(quantity_reconstructed, 1.0, 1e-4);
-// }
+TEST(Interpolation, RandomField) {
+  int n_val = 32;
+  int3 n = make_int3(n_val);
+  real3 L = make_real3(16.0);
+  real3 h = L / make_real3(n);
+  int numberParticles = 128;
+  std::vector<real3> h_pos(numberParticles);
+  std::mt19937 gen(123);
+  // Keep the particles away from the boundary to not deal with PBC in the manual_interpolation function
+  std::uniform_real_distribution<real> dist(-L.x / 2.0 + 2*h.x, L.x / 2.0 - 2*h.x);
+  for (int i = 0; i < numberParticles; ++i) {
+    h_pos[i] = make_real3(dist(gen), dist(gen), dist(gen));
+  }
+  thrust::device_vector<real3> pos = h_pos;
+  int fieldSize = n.x * n.y * n.z;
+  thrust::host_vector<real> h_field(fieldSize, 0.0);
+  for(int i = 0; i < fieldSize; ++i) {
+    h_field[i] = dist(gen);
+  }
+  thrust::device_vector<real> field = h_field;
+  Box box(L);
+  Grid grid(box, n);
+  auto kernel = std::make_shared<Peskin3pt>(h);
+  IBM<Peskin3pt, Grid> ibm(kernel, grid);
+  thrust::device_vector<real> interp_result(numberParticles, 0.0);
+  ibm.gather(pos.data().get(), interp_result.data().get(), field.data().get(),
+	     int(pos.size()));
+  thrust::host_vector<real> h_interp = interp_result;
+  auto expected = manual_interpolate(h_pos, h_field, n, L);
+  for (int i = 0; i < numberParticles; ++i) {
+    EXPECT_NEAR(h_interp[i], expected[i], 1e-10);
+  }
+}
