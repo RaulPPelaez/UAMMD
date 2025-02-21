@@ -85,7 +85,7 @@ namespace uammd{
     struct BarnettMagland{
     private:
       real computeNorm() const{
-	auto foo=[=](real r){return BM(r, alpha, beta);};
+	auto foo=[this](real r){return BM(r, alpha, beta);};
 	real norm = 2.0*detail::integrate(foo, 0, alpha, 20000);
 	return norm;
       }
