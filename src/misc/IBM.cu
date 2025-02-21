@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2021. Immersed Boundary Method (IBM).
+/*Raul P. Pelaez 2019-2025. Immersed Boundary Method (IBM).
   See IBM.cuh
  */
 #include<third_party/uammd_cub.cuh>
