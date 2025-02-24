@@ -160,8 +160,8 @@ namespace uammd{
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityOutputIterator>::value_type;
-      using BlockReduce = cub::BlockReduce<GridQuantityType, TPP>;
-      GridQuantityType result = GridQuantityType();
+      using BlockReduce = cub::BlockReduce<ParticleQuantityType, TPP>;
+      ParticleQuantityType result = ParticleQuantityType();
       __shared__ real3 pi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
@@ -204,7 +204,7 @@ namespace uammd{
 	  result += dV*weight;
 	}
       }
-      GridQuantityType total = BlockReduce(temp_storage).Sum(result);
+      ParticleQuantityType total = BlockReduce(temp_storage).Sum(result);
       if(tid==0 and id<numberParticles){
 	particleQuantity[id] += total;
       }
