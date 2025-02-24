@@ -199,7 +199,7 @@ TEST(SpreadInterp, PeskinKernelAdjoint2D) {
   Box box(L);
   Grid grid(box, n);
   real3 h = L / make_real3(n);
-  auto kernel = std::make_shared<Peskin3pt>(h);
+  auto kernel = std::make_shared<Peskin3pt>(h, n.z==1);
   IBM<Peskin3pt, Grid> ibm(kernel, grid);
   ibm.spread(pos.begin(), quantity.begin(), field.data().get(), pos.size());
   thrust::device_vector<real> interp_result(1, 0.0);
