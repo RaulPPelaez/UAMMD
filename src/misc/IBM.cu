@@ -29,7 +29,6 @@ namespace uammd{
       __device__ void fillSharedWeights(KernelValueType* weights, real3 pi, int3 support, int3 celli, int3 P,  Grid &grid, Kernel &kernel){
 	auto *weightsX = &weights[0];
 	const int tid = threadIdx.x;
-	const bool is2D = grid.cellDim.z==1;
 	for(int i = tid; i<support.x; i+=blockDim.x){
 	  const auto cellj = make_int3(grid.pbc_cell_coord<0>(celli.x + i - P.x), celli.y, celli.z);
 	  if(cellj.x>=0){
@@ -49,12 +48,8 @@ namespace uammd{
 	for(int i = tid; i<support.z; i+=blockDim.x){
 	  const auto cellj = make_int3(celli.x, celli.y, grid.pbc_cell_coord<2>(celli.z + i - P.z));
 	  if(cellj.z>=0){
-	    if(is2D){
-	      weightsZ[i] = real(1.0);
-	    }else{
-	      const real rij = grid.distanceToCellCenter(pi, cellj).z;
-	      weightsZ[i] = detail::phiZ(kernel, rij, pi);
-	    }
+	    const real rij = grid.distanceToCellCenter(pi, cellj).z;
+	    weightsZ[i] = detail::phiZ(kernel, rij, pi);
 	  }
 	}
       }
@@ -165,8 +160,8 @@ namespace uammd{
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityOutputIterator>::value_type;
-      using BlockReduce = cub::BlockReduce<GridQuantityType, TPP>;
-      GridQuantityType result = GridQuantityType();
+      using BlockReduce = cub::BlockReduce<ParticleQuantityType, TPP>;
+      ParticleQuantityType result = ParticleQuantityType();
       __shared__ real3 pi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
@@ -209,7 +204,7 @@ namespace uammd{
 	  result += dV*weight;
 	}
       }
-      GridQuantityType total = BlockReduce(temp_storage).Sum(result);
+      ParticleQuantityType total = BlockReduce(temp_storage).Sum(result);
       if(tid==0 and id<numberParticles){
 	particleQuantity[id] += total;
       }

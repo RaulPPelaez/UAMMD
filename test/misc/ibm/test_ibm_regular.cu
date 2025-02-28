@@ -66,7 +66,7 @@ TEST(Spreading, ConstantKernelCornerNonPeriodic) {
 using PeskinBase = IBM_kernels::Peskin::threePoint;
 struct Peskin3pt {
   static constexpr int support = 3;
-  Peskin3pt(real3 h) : m_phiX(h.x), m_phiY(h.y), m_phiZ(h.z) {}
+  Peskin3pt(real3 h, bool is2D = false) : m_phiX(h.x), m_phiY(h.y), m_phiZ(h.z), is2D(is2D) {}
 
   __host__ __device__ real phiX(real rr, real3 pos = real3()) const {
     return m_phiX.phi(rr, pos);
@@ -77,11 +77,12 @@ struct Peskin3pt {
   }
 
   __host__ __device__ real phiZ(real rr, real3 pos = real3()) const {
-    return m_phiZ.phi(rr, pos);
+    return is2D?real(1.0):m_phiZ.phi(rr, pos);
   }
 
 private:
   PeskinBase m_phiX, m_phiY, m_phiZ;
+  bool is2D;
 };
 
 template <typename Container1, typename Container2>
@@ -198,7 +199,7 @@ TEST(SpreadInterp, PeskinKernelAdjoint2D) {
   Box box(L);
   Grid grid(box, n);
   real3 h = L / make_real3(n);
-  auto kernel = std::make_shared<Peskin3pt>(h);
+  auto kernel = std::make_shared<Peskin3pt>(h, n.z==1);
   IBM<Peskin3pt, Grid> ibm(kernel, grid);
   ibm.spread(pos.begin(), quantity.begin(), field.data().get(), pos.size());
   thrust::device_vector<real> interp_result(1, 0.0);
