@@ -378,29 +378,78 @@ namespace uammd{
 
   namespace Poisson_ns{
 
-    struct UnZip2Real4{
+    struct UnZip2Real4 {
+      // Iterator traits
+      using value_type = real4;
+      using difference_type = int;
+      using pointer = real4*;
+      using reference = real4&;
+      using iterator_category = std::random_access_iterator_tag;
 
+      // Data members
       real4* force;
       real* energy;
       real* charges;
       int i;
 
-      UnZip2Real4(real* charges, real4* f, real* e):charges(charges),force(f), energy(e), i(-1){}
+      // Constructor
+      __device__ __host__ UnZip2Real4(real* charges, real4* f, real* e)
+	: charges(charges), force(f), energy(e), i(0) {}
 
-      __device__ UnZip2Real4 operator()(int ai){
-	this->i = ai;
-	return *this;
+      // Dereferencing
+      __device__ __host__ UnZip2Real4& operator*() { return *this; }
+      __device__ __host__ UnZip2Real4* operator->() { return this; }
+
+      // Element access for array-style syntax
+      __device__ __host__ UnZip2Real4 operator[](int offset) const {
+	UnZip2Real4 result = *this;
+	result.i = i + offset;
+	return result;
       }
 
-      __device__ void operator += (real4 fande) const{
-	if(force) force[i] += charges[i]*make_real4(fande.x, fande.y, fande.z, 0);
-	if(energy) energy[i] += charges[i]*fande.w;
+      // Assignment operation
+      __device__ __host__ void operator=(real4 fande) const {
+	if(force) force[i] = charges[i] * make_real4(fande.x, fande.y, fande.z, 0);
+	if(energy) energy[i] = charges[i] * fande.w;
       }
 
+      // Addition operation
+      __device__ __host__ void operator+=(real4 fande) const {
+	if(force) force[i] += charges[i] * make_real4(fande.x, fande.y, fande.z, 0);
+	if(energy) energy[i] += charges[i] * fande.w;
+      }
+
+      // Iterator operations
+      __device__ __host__ UnZip2Real4& operator++() { ++i; return *this; }
+      __device__ __host__ UnZip2Real4 operator++(int) { UnZip2Real4 tmp = *this; ++i; return tmp; }
+      __device__ __host__ UnZip2Real4& operator--() { --i; return *this; }
+      __device__ __host__ UnZip2Real4 operator--(int) { UnZip2Real4 tmp = *this; --i; return tmp; }
+
+      // Random access operations
+      __device__ __host__ UnZip2Real4& operator+=(int offset) { i += offset; return *this; }
+      __device__ __host__ UnZip2Real4& operator-=(int offset) { i -= offset; return *this; }
+      __device__ __host__ UnZip2Real4 operator+(int offset) const { UnZip2Real4 result = *this; result.i += offset; return result; }
+      __device__ __host__ UnZip2Real4 operator-(int offset) const { UnZip2Real4 result = *this; result.i -= offset; return result; }
+
+      // Comparison operations
+      __device__ __host__ bool operator==(const UnZip2Real4& other) const { return i == other.i; }
+      __device__ __host__ bool operator!=(const UnZip2Real4& other) const { return i != other.i; }
+      __device__ __host__ bool operator<(const UnZip2Real4& other) const { return i < other.i; }
+      __device__ __host__ bool operator>(const UnZip2Real4& other) const { return i > other.i; }
+      __device__ __host__ bool operator<=(const UnZip2Real4& other) const { return i <= other.i; }
+      __device__ __host__ bool operator>=(const UnZip2Real4& other) const { return i >= other.i; }
     };
 
-  }
+    // Free function for adding an integer to an iterator
+    __device__ __host__ UnZip2Real4 operator+(int offset, const UnZip2Real4& iter) {
+      return iter + offset;
+    }
 
+    // Free function for computing difference between iterators
+    __device__ __host__ int operator-(const UnZip2Real4& lhs, const UnZip2Real4& rhs) {
+      return lhs.i - rhs.i;
+    }
+  } // namespace Poisson_ns
   void Poisson::interpolateFields(real4* gridFieldPotential, cudaStream_t st){
     sys->log<System::DEBUG2>("[Poisson] Interpolating forces and energies");
     int numberParticles = pg->getNumberParticles();
@@ -408,12 +457,14 @@ namespace uammd{
     auto charge = pd->getCharge(access::location::gpu, access::mode::read);
     auto forces = pd->getForce(access::location::gpu, access::mode::readwrite);
     auto energy = pd->getEnergy(access::location::gpu, access::mode::readwrite);
-    auto gridData2ForceAndEnergy = Poisson_ns::UnZip2Real4(charge.begin(), forces.begin(), energy.begin());
-    auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), gridData2ForceAndEnergy);
+    // auto gridData2ForceAndEnergy = Poisson_ns::UnZip2Real4(charge.begin(), forces.begin(), energy.begin());
+    // auto f_tr = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), gridData2ForceAndEnergy);
+    auto f_tr = Poisson_ns::UnZip2Real4(charge.begin(), forces.begin(), energy.begin());
+    static_assert(std::is_same<real4, std::iterator_traits<decltype(f_tr)>::value_type>::value, "f_tr is not a real4 iterator");
     int3 n = grid.cellDim;
     IBM<Kernel> ibm(kernel, grid, IBM_ns::LinearIndex3D(2*(n.x/2+1), n.y, n.z));
     ibm.gather(pos.begin(), f_tr, gridFieldPotential, numberParticles, st);
   }
 
 
-}
+} // namespace uammd
