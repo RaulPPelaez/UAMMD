@@ -13,7 +13,6 @@ lmin=64
 lmax=304
 dl=16
 
-make poisson
 outfile=electric_field_vs_r_deviation.dat
 for r in $(seq $rmin $dr $rmax);
 do
