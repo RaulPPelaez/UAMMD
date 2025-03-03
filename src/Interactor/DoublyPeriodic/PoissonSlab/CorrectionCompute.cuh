@@ -39,8 +39,8 @@ namespace uammd{
 	EzAndPhi.y = Ai*exp(k*z) + Bi*exp(-k*z);
 	return EzAndPhi;
       }else{
-	const double et = perm.top/perm.inside;
-	cufftComplex2 EzAndPhi;
+	// const double et = perm.top/perm.inside;
+	cufftComplex2 EzAndPhi{};
 	//TODO: bottom metallic not implemented
 	//field Z
 	// EzAndPhi.x = -(k*Ai*exp(k*z) - k*+Bi*exp(-k*z));

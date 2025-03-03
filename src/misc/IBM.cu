@@ -161,7 +161,7 @@ namespace uammd{
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityOutputIterator>::value_type;
       using BlockReduce = cub::BlockReduce<ParticleQuantityType, TPP>;
-      ParticleQuantityType result = ParticleQuantityType();
+      ParticleQuantityType result = ParticleQuantityType{};
       __shared__ real3 pi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
