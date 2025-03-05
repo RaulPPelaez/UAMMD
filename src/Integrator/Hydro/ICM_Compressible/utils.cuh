@@ -110,7 +110,7 @@ namespace uammd{
 	template<class RealContainer>
 	FluidPointers(const RealContainer &dens, const DataXYZ &vel, const DataXYZ &momentum):
 	  density(reinterpret_cast<real*>(thrust::raw_pointer_cast(dens.data()))),
-	  velocityX(reinterpret_cast<real*>(vel.x())), reinterpret_cast<real*>(velocityY(vel.y())), velocityZ(reinterpret_cast<real*>(vel.z())),
+	  velocityX(reinterpret_cast<real*>(vel.x())), velocityY(reinterpret_cast<real*>(vel.y())), velocityZ(reinterpret_cast<real*>(vel.z())),
 	  momentumX(reinterpret_cast<real*>(momentum.x())), momentumY(reinterpret_cast<real*>(momentum.y())), momentumZ(reinterpret_cast<real*>(momentum.z())){}
 	real* density;
 	DataXYZ::Iterator velocityX, velocityY, velocityZ;
