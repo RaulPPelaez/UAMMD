@@ -72,6 +72,14 @@ namespace uammd{
 	if(id>=numberGhostCells) return;
 	int3 ghostCell = ghostCells[id];
 	periodifyGhostCell(fluid, ghostCell, n);
+      }
+
+      template<class Walls>
+      __global__ void updateGhostCellsWallsD(FluidPointers fluid, Walls walls, int3* ghostCells,
+					     int3 n, int numberGhostCells){
+        uint id = blockIdx.x*blockDim.x + threadIdx.x;
+	if(id>=numberGhostCells) return;
+	int3 ghostCell = ghostCells[id];
 	if(walls.isEnabled()){
 	  if(isGhostCellAtWall<wall::zbottom>(ghostCell, n)){
 	    walls.applyBoundaryConditionZBottom(fluid, ghostCell, n);
@@ -82,17 +90,6 @@ namespace uammd{
 	}
       }
 
-      // template<class Iterator>
-      // __global__ void updateGhostCellsD(Iterator field, int3* ghostCells, int3 n, int numberGhostCells){
-      //   uint id = blockIdx.x*blockDim.x + threadIdx.x;
-      // 	if(id>=numberGhostCells) return;
-      // 	int3 ghostCell = ghostCells[id];
-      // 	int3 periodicCell = computeMirrorGhostCell(ghostCell, n);
-      // 	int ighost = ghostCell.x + (ghostCell.y + ghostCell.z*(n.y+2))*(n.x+2);
-      // 	int iperiodic = periodicCell.x + (periodicCell.y + periodicCell.z*(n.y+2))*(n.x+2);
-      // 	field[ighost] = field[iperiodic];
-      // }
-
       template<class Container, class Walls>
       void callUpdateGhostCells(FluidPointers fluid, std::shared_ptr<Walls> walls, Container &ghostCells, int3 n){
 	int threads = 128;
@@ -100,16 +97,8 @@ namespace uammd{
 	int blocks = numberGhostCells/threads+1;
 	auto ghostCells_ptr = thrust::raw_pointer_cast(ghostCells.data());
 	updateGhostCellsD<<<blocks, threads>>>(fluid, *walls, ghostCells_ptr, n, numberGhostCells);
+	updateGhostCellsWallsD<<<blocks, threads>>>(fluid, *walls, ghostCells_ptr, n, numberGhostCells);
       }
-
-      // template<class Container2, class Container>
-      // void callUpdateGhostCells(Container2 field, Container &ghostCells, int3 n){
-      // 	int threads = 128;
-      // 	int numberGhostCells = ghostCells.size();
-      // 	int blocks = numberGhostCells/threads+1;
-      // 	auto ghostCells_ptr = thrust::raw_pointer_cast(ghostCells.data());
-      // 	updateGhostCellsD<<<blocks, threads>>>(field, ghostCells_ptr, n, numberGhostCells);
-      // }
 
       template<subgrid alpha, subgrid beta>
       __device__ int getFluctTensIndexGhost(int3 cell_i, int3 n){

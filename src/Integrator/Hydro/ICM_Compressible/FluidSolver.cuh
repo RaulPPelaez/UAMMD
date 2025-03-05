@@ -130,7 +130,7 @@ namespace uammd{
       // 3- a=1/3, b=2/3 and c=n+1
       template<int subStep, class EquationOfState>
       __global__ void rungeKuttaSubStepD(FluidTimePack fluid, DataXYZPtr fluidForcingAtHalfStep,
-					 real2* fluidStochasticTensor,
+					 const real2* fluidStochasticTensor,
 					 FluidParameters par, EquationOfState densityToPressure,
 					 int step,
 					 Grid grid,
