@@ -43,7 +43,6 @@ namespace uammd{
 
 	DataXYZ(int size){
 	  resize(size);
-	  fillWithZero();
 	}
 
 	void resize(int newSize){
