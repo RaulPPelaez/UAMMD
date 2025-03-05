@@ -136,9 +136,15 @@ namespace uammd{
 	  momentum.resize(newSize);
 	  velocity.resize(newSize);
 	  density.resize(newSize);
-	  thrust::fill(density.begin(), density.end(), 10000);
-	  velocity.fillWithZero();
-	  momentum.fillWithZero();
+	  thrust::fill(density.begin(), density.end(), 0);
+	  // velocity.fillWithZero();
+	  // momentum.fillWithZero();
+	  thrust::fill(velocity.m_x.begin(), velocity.m_x.end(), 10000);
+	  thrust::fill(velocity.m_y.begin(), velocity.m_y.end(), 10000);
+	  thrust::fill(velocity.m_z.begin(), velocity.m_z.end(), 10000);
+	  thrust::fill(momentum.m_x.begin(), momentum.m_x.end(), 10000);
+	  thrust::fill(momentum.m_y.begin(), momentum.m_y.end(), 10000);
+	  thrust::fill(momentum.m_z.begin(), momentum.m_z.end(), 10000);
 	}
 
 	void clear(){
