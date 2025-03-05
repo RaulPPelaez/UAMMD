@@ -72,6 +72,13 @@ namespace uammd{
 	if(id>=numberGhostCells) return;
 	int3 ghostCell = ghostCells[id];
 	periodifyGhostCell(fluid, ghostCell, n);
+      }
+      template<class Walls>
+      __global__ void updateGhostCellsWallsD(FluidPointers fluid, Walls walls, int3* ghostCells,
+					     int3 n, int numberGhostCells){
+        uint id = blockIdx.x*blockDim.x + threadIdx.x;
+	if(id>=numberGhostCells) return;
+	int3 ghostCell = ghostCells[id];
 	if(walls.isEnabled()){
 	  if(isGhostCellAtWall<wall::zbottom>(ghostCell, n)){
 	    walls.applyBoundaryConditionZBottom(fluid, ghostCell, n);
@@ -100,6 +107,7 @@ namespace uammd{
 	int blocks = numberGhostCells/threads+1;
 	auto ghostCells_ptr = thrust::raw_pointer_cast(ghostCells.data());
 	updateGhostCellsD<<<blocks, threads>>>(fluid, *walls, ghostCells_ptr, n, numberGhostCells);
+	updateGhostCellsWallsD<<<blocks, threads>>>(fluid, *walls, ghostCells_ptr, n, numberGhostCells);
       }
 
       // template<class Container2, class Container>
