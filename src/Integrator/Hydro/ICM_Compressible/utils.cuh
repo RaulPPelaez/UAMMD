@@ -108,7 +108,7 @@ namespace uammd{
       struct FluidPointers{
 	FluidPointers(){}
 	template<class RealContainer>
-	FluidPointers(const RealContainer &dens, const DataXYZ &vel, const DataXYZ &momentum):
+	FluidPointers(RealContainer &dens, DataXYZ &vel, DataXYZ &momentum):
 	  density(thrust::raw_pointer_cast(dens.data())),
 	  velocityX(vel.x()), velocityY(vel.y()), velocityZ(vel.z()),
 	  momentumX(momentum.x()), momentumY(momentum.y()), momentumZ(momentum.z()){}
