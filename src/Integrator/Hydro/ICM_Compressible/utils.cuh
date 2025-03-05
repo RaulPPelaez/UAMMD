@@ -13,8 +13,7 @@ namespace uammd{
     namespace icm_compressible{
 
       template<class T>
-      using cached_vector = thrust::device_vector<T, System::allocator_thrust<T>>;
-      //uammd::uninitialized_cached_vector<T>;
+      using cached_vector = uammd::uninitialized_cached_vector<T>;
 
       struct AoSToSoAReal3{
 	template<class VecType>
