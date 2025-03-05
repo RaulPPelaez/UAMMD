@@ -142,9 +142,9 @@ namespace uammd{
 	  thrust::fill(velocity.m_x.begin(), velocity.m_x.end(), 10000);
 	  thrust::fill(velocity.m_y.begin(), velocity.m_y.end(), 10000);
 	  thrust::fill(velocity.m_z.begin(), velocity.m_z.end(), 10000);
-	  thrust::fill(momentum.m_x.begin(), momentum.m_x.end(), 10000);
-	  thrust::fill(momentum.m_y.begin(), momentum.m_y.end(), 10000);
-	  thrust::fill(momentum.m_z.begin(), momentum.m_z.end(), 10000);
+	  thrust::fill(momentum.m_x.begin(), momentum.m_x.end(), 0);
+	  thrust::fill(momentum.m_y.begin(), momentum.m_y.end(), 0);
+	  thrust::fill(momentum.m_z.begin(), momentum.m_z.end(), 0);
 	}
 
 	void clear(){
