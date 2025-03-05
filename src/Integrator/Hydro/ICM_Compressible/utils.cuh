@@ -43,6 +43,7 @@ namespace uammd{
 
 	DataXYZ(int size){
 	  resize(size);
+	  fillWithZero();
 	}
 
 	void resize(int newSize){
@@ -117,10 +118,9 @@ namespace uammd{
       };
 
       struct FluidData{
-	FluidData(int3 n):
-	  momentum(n.x*n.y*n.z),
-	  velocity(n.x*n.y*n.z),
-	  density(n.x*n.y*n.z){}
+	FluidData(int3 n){
+	  resize(n);
+	}
 
 	FluidData(): FluidData({0,0,0}){}
 
@@ -136,6 +136,9 @@ namespace uammd{
 	  momentum.resize(newSize);
 	  velocity.resize(newSize);
 	  density.resize(newSize);
+	  thrust::fill(density.begin(), density.end(), 0);
+	  velocity.fillWithZero();
+	  momentum.fillWithZero();
 	}
 
 	void clear(){
