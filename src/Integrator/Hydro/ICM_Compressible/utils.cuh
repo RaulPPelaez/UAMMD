@@ -136,7 +136,7 @@ namespace uammd{
 	  momentum.resize(newSize);
 	  velocity.resize(newSize);
 	  density.resize(newSize);
-	  thrust::fill(density.begin(), density.end(), 0);
+	  thrust::fill(density.begin(), density.end(), 10000);
 	  velocity.fillWithZero();
 	  momentum.fillWithZero();
 	}
