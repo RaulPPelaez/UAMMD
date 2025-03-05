@@ -43,6 +43,7 @@ namespace uammd{
 
 	DataXYZ(int size){
 	  resize(size);
+	  fillWithZero();
 	}
 
 	void resize(int newSize){
@@ -108,19 +109,18 @@ namespace uammd{
 	FluidPointers(){}
 	template<class RealContainer>
 	FluidPointers(const RealContainer &dens, const DataXYZ &vel, const DataXYZ &momentum):
-	  density(thrust::raw_pointer_cast(dens.data())),
-	  velocityX(vel.x()), velocityY(vel.y()), velocityZ(vel.z()),
-	  momentumX(momentum.x()), momentumY(momentum.y()), momentumZ(momentum.z()){}
+	  density(const_cast<real*>(thrust::raw_pointer_cast(dens.data()))),
+	  velocityX(const_cast<real*>(vel.x())), velocityY(const_cast<real*>(vel.y())), velocityZ(const_cast<real*>(vel.z())),
+	  momentumX(const_cast<real*>(momentum.x())), momentumY(const_cast<real*>(momentum.y())), momentumZ(const_cast<real*>(momentum.z())){}
 	real* density;
 	DataXYZ::Iterator velocityX, velocityY, velocityZ;
 	DataXYZ::Iterator momentumX, momentumY, momentumZ;
       };
 
       struct FluidData{
-	FluidData(int3 n):
-	  momentum(n.x*n.y*n.z),
-	  velocity(n.x*n.y*n.z),
-	  density(n.x*n.y*n.z){}
+	FluidData(int3 n){
+	  resize(n);
+	}
 
 	FluidData(): FluidData({0,0,0}){}
 
