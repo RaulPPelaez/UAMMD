@@ -506,7 +506,7 @@ namespace uammd{
     }
 
     auto computeZeroModeBoundaryConditions(int nz, real H, WallMode mode){
-      BVP::SchurBoundaryCondition bcs(nz, H);
+      BVP::SchurBoundaryCondition<real> bcs(nz, H);
       if(mode == WallMode::bottom){
 	correction_ns::TopBoundaryConditions top(0, H);
 	correction_ns::BottomBoundaryConditions bot(0, H);

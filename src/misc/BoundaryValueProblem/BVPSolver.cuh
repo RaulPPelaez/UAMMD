@@ -42,39 +42,40 @@ namespace uammd{
   namespace BVP{
 
     namespace detail{
+      template <typename U>
       class SubsystemSolver{
 	int nz;
 	real H;
-	StorageHandle<real> CinvA_storage;
-	StorageHandle<real4> CinvABmD_storage;
+	StorageHandle<U> CinvA_storage;
+	StorageHandle<U> CinvABmD_storage;
 
       public:
 
 	SubsystemSolver(int nz, real H):nz(nz), H(H){}
 
 	void registerRequiredStorage(StorageRegistration &memoryManager){
-	  CinvA_storage =    memoryManager.registerStorageRequirement<real>(2*nz+2);
-	  CinvABmD_storage = memoryManager.registerStorageRequirement<real4>(1);
+	  CinvA_storage =    memoryManager.registerStorageRequirement<U>(2*nz+2);
+	  CinvABmD_storage = memoryManager.registerStorageRequirement<U>(4);
 	}
 
 	template<class TopBC, class BottomBC>
-	void precompute(real k, const TopBC &top, const BottomBC &bottom, StorageRetriever &memoryManager){
+	void precompute(U k, const TopBC &top, const BottomBC &bottom, StorageRetriever &memoryManager){
 	  auto CinvA_it = memoryManager.retrieveStorage(CinvA_storage);
 	  auto CinvABmD_it = memoryManager.retrieveStorage(CinvABmD_storage);
 	  auto invA = computeInverseSecondIntegralMatrix(k, H, nz);
-	  SchurBoundaryCondition bcs(nz, H);
+	  SchurBoundaryCondition<U> bcs(nz, H);
 	  auto CandD = bcs.computeBoundaryConditionMatrix(top, bottom);
-	  real4 D = make_real4(CandD[2*nz], CandD[2*nz+1], CandD[2*nz+2], CandD[2*nz+3]);
+	  U D[4] = {CandD[2*nz], CandD[2*nz+1], CandD[2*nz+2], CandD[2*nz+3]};
 	  auto CinvA = matmul(CandD, nz, 2, invA, nz, nz);
 	  std::copy(CinvA.begin(), CinvA.end(), CinvA_it);
-	  real4 CinvAB;
-	  real B00 = -k*k*H*H;
-	  real B11 = -k*k*H*H;
-	  CinvAB.x = CinvA[0]*B00;
-	  CinvAB.y = CinvA[1]*B11;
-	  CinvAB.z = CinvA[0+nz]*B00;
-	  CinvAB.w = CinvA[1+nz]*B11;
-	  CinvABmD_it[0] = CinvAB - D;
+	  U CinvAB[4];
+	  U B00 = -k*k*H*H;
+	  U B11 = -k*k*H*H;
+	  CinvAB[0] = CinvA[0]*B00;
+	  CinvAB[1] = CinvA[1]*B11;
+	  CinvAB[2] = CinvA[0+nz]*B00;
+	  CinvAB[3] = CinvA[1+nz]*B11;
+	  fori(0, 4) CinvABmD_it[i] = CinvAB[i] - D[i];
 	}
 
 	template<class T, class FnIterator>
@@ -83,16 +84,19 @@ namespace uammd{
 					   StorageRetriever &memoryManager){
 	  const auto CinvA = memoryManager.retrieveStorage(CinvA_storage);
 	  const auto CinvAfmab = computeRightHandSide(alpha, beta, fn, CinvA);
-	  const real4 CinvABmD = *(memoryManager.retrieveStorage(CinvABmD_storage));
+	  const auto CinvABmD_it = memoryManager.retrieveStorage(CinvABmD_storage);
+	  U CinvABmD[4] = {CinvABmD_it[0], CinvABmD_it[1],
+				       CinvABmD_it[2], CinvABmD_it[3]};
+
 	  const auto c0d0 = solveSubsystem(CinvABmD, CinvAfmab);
 	  return c0d0;
 	}
 
       private:
 
-	template<class T>
-	__device__ thrust::pair<T,T> solveSubsystem(real4 CinvABmD, thrust::pair<T,T> CinvAfmab) const{
-	  auto c0d0 = solve2x2System(CinvABmD, CinvAfmab);
+	template<class T, class T2>
+	__device__ thrust::pair<T,T> solveSubsystem(T2 CinvABmD[4], thrust::pair<T,T> CinvAfmab) const{
+	  auto c0d0 = solve2x2System<T,T2>(CinvABmD, CinvAfmab);
 	  return c0d0;
 	}
 
@@ -113,10 +117,11 @@ namespace uammd{
 
       };
 
+      template<typename U>
       class PentadiagonalSystemSolver{
 	int nz;
 	real H;
-	KBPENTA_mod pentasolve;
+	KBPENTA_mod<U> pentasolve;
       public:
 
 	PentadiagonalSystemSolver(int nz, real H):
@@ -126,12 +131,12 @@ namespace uammd{
 	  pentasolve.registerRequiredStorage(memoryManager);
 	}
 
-	void precompute(real k, StorageRetriever &memoryManager){
-	  real diagonal[nz];
-	  real diagonal_p2[nz]; diagonal_p2[nz-2] = diagonal_p2[nz-1] = 0;
-	  real diagonal_m2[nz]; diagonal_m2[0] = diagonal_m2[1] = 0;
+	void precompute(U k, StorageRetriever &memoryManager){
+	  U diagonal[nz];
+	  U diagonal_p2[nz]; diagonal_p2[nz-2] = diagonal_p2[nz-1] = 0;
+	  U diagonal_m2[nz]; diagonal_m2[0] = diagonal_m2[1] = 0;
 	  SecondIntegralMatrix sim(nz);
-	  const real kH2 = k*k*H*H;
+	  const U kH2 = k*k*H*H;
 	  for(int i = 0; i<nz; i++){
 	    diagonal[i] = 1.0 - kH2*sim.getElement(i,i);
 	    if(i<nz-2) diagonal_p2[i] = -kH2*sim.getElement(i+2, i);
@@ -148,23 +153,24 @@ namespace uammd{
       };
     }
 
+    template<typename U>
     class BoundaryValueProblemSolver{
-      detail::PentadiagonalSystemSolver pent;
-      detail::SubsystemSolver sub;
-      StorageHandle<real> waveVector;
+      detail::PentadiagonalSystemSolver<U> pent;
+      detail::SubsystemSolver<U> sub;
+      StorageHandle<U> waveVector;
       int nz;
       real H;
     public:
       BoundaryValueProblemSolver(int nz, real H): nz(nz), H(H), sub(nz, H), pent(nz, H){}
 
       void registerRequiredStorage(StorageRegistration &mem){
-	waveVector = mem.registerStorageRequirement<real>(1);
+	waveVector = mem.registerStorageRequirement<U>(1);
 	sub.registerRequiredStorage(mem);
 	pent.registerRequiredStorage(mem);
       }
 
       template<class TopBC, class BottomBC>
-      void precompute(StorageRetriever &mem, real k, const TopBC &top, const BottomBC &bot){
+      void precompute(StorageRetriever &mem, U k, const TopBC &top, const BottomBC &bot){
 	auto k_access = mem.retrieveStorage(waveVector);
 	k_access[0] = k;
 	pent.precompute(k, mem);
@@ -177,10 +183,10 @@ namespace uammd{
 			    AnIterator& an,
 			    CnIterator& cn,
 			    StorageRetriever &mem){
-        const real k = *(mem.retrieveStorage(waveVector));
+        const auto k = *(mem.retrieveStorage(waveVector));
 	T c0, d0;
 	thrust::tie(c0, d0) = sub.solve(fn, alpha, beta, mem);
-	const real kH2 = k*k*H*H;
+	const auto kH2 = k*k*H*H;
 	fn[0] += kH2*c0;
 	fn[1] += kH2*d0;
 	pent.solve(fn, an, mem);
@@ -201,15 +207,17 @@ namespace uammd{
 
     };
 
+    template<typename U>
     class BatchedBVPHandler;
 
+    template<typename U>
     struct BatchedBVPGPUSolver{
     private:
       int numberSystems;
-      BoundaryValueProblemSolver bvpSolver;
+      BoundaryValueProblemSolver<U> bvpSolver;
       char* gpuMemory;
-      friend class BatchedBVPHandler;
-      BatchedBVPGPUSolver(int numberSystems, BoundaryValueProblemSolver bvpSolver, char *raw):
+      friend class BatchedBVPHandler<U>;
+      BatchedBVPGPUSolver(int numberSystems, BoundaryValueProblemSolver<U> bvpSolver, char *raw):
 	numberSystems(numberSystems), bvpSolver(bvpSolver), gpuMemory(raw){}
     public:
 
@@ -225,9 +233,10 @@ namespace uammd{
 
     };
 
+    template <typename U>
     class BatchedBVPHandler{
       int numberSystems;
-      BoundaryValueProblemSolver bvp;
+      BoundaryValueProblemSolver<U> bvp;
       thrust::device_vector<char> gpuMemory;
     public:
 
@@ -240,9 +249,9 @@ namespace uammd{
 	precompute(klist, top, bot);
       }
 
-      BatchedBVPGPUSolver getGPUSolver(){
+      BatchedBVPGPUSolver<U> getGPUSolver(){
 	auto raw = thrust::raw_pointer_cast(gpuMemory.data());
-	BatchedBVPGPUSolver d_solver(numberSystems, bvp, raw);
+	BatchedBVPGPUSolver<U> d_solver(numberSystems, bvp, raw);
 	return d_solver;
       }
 
