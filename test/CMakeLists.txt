@@ -7,8 +7,6 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 find_package(UAMMD REQUIRED)
-find_package(BLAS REQUIRED)
-
 add_compile_definitions(PUBLIC DOUBLE_PRECISION)
 include(FetchContent)
 FetchContent_Declare(
