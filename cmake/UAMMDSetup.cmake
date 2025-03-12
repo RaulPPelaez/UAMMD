@@ -26,7 +26,7 @@ function(uammd_setup_target target_name)
       cmake_path(GET DIR PARENT_PATH BLAS_PREV)
     endif()
   endforeach()
-  set(BLAS_INCLUDE_SEARCH_PATHS ${BLAS_PREV}/include ${CMKAE_INSTALL_PREFIX}/include ${CMAKE_PREFIX_PATH}/include)
+  set(BLAS_INCLUDE_SEARCH_PATHS ${BLAS_PREV}/include ${CMAKE_INSTALL_PREFIX}/include ${CMAKE_PREFIX_PATH}/include)
   # Look for mkl in the name of the blas libraries, but not on the path, only the library names
   get_target_property(BLAS_LIBRARIES BLAS::BLAS INTERFACE_LINK_LIBRARIES)
   if(BLAS_LIBRARIES MATCHES "libmkl")
