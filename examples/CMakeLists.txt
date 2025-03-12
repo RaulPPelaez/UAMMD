@@ -5,7 +5,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../cmake/")
 set(CMAKE_BUILD_TYPE Release)
 message(${CMAKE_MODULE_PATH})
 find_package(UAMMD REQUIRED)
-find_package(BLAS REQUIRED)
+
 # #add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
 # #add_compile_definitions(PUBLIC DOUBLE_PRECISION)
 set(CMAKE_CXX_STANDARD 14)
