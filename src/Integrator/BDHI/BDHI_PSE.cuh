@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2017-2020. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
+/*Raul P. Pelaez 2017-2022. Positively Split Edwald Rotne-Prager-Yamakawa Brownian Dynamics with Hydrodynamic interactions.
 
 
   As this is a BDHI module. BDHI_PSE computes the terms M·F and B·dW in the differential equation:
@@ -73,9 +73,9 @@ namespace uammd{
 	PSE(std::make_shared<ParticleGroup>(pd, "All"), par){}
 
       PSE(shared_ptr<ParticleGroup> pg, Parameters par);
-      
+
       ~PSE(){}
-      
+
       void setup_step(cudaStream_t st = 0){}
       /*Compute M·F = Mr·F + Mw·F, also includes the far field stochastic displacements*/
       void computeMF(real3* MF, cudaStream_t st){
@@ -83,9 +83,23 @@ namespace uammd{
 	int numberParticles = pg->getNumberParticles();
 	thrust::fill(thrust::cuda::par.on(st), MF, MF+numberParticles, real3());
 	auto pd = pg->getParticleData();
-	auto pos = pd->getPos(access::gpu, access::read);
-	auto force = pd->getForce(access::gpu, access::read);	
+	computeMFFarField(MF, st);
+	computeMFNearField(MF, st);
+      }
+
+      void computeMFNearField(real3* MF, cudaStream_t st){
+	System::log<System::DEBUG1>("[BDHI::PSE] Computing MFNearField....");
+	auto pd = pg->getParticleData();
+	auto force = pd->getForce(access::location::gpu, access::mode::read);
 	nearField->Mdot(force.begin(), MF, st);
+      }
+
+      void computeMFFarField(real3* MF, cudaStream_t st){
+	System::log<System::DEBUG1>("[BDHI::PSE] Computing MFFarField....");
+	auto pd = pg->getParticleData();
+	int numberParticles = pg->getNumberParticles();
+	auto pos = pd->getPos(access::gpu, access::read);
+	auto force = pd->getForce(access::gpu, access::read);
 	farField->computeHydrodynamicDisplacements(pos.begin(), force.begin(), MF, numberParticles,
 						   temperature, 1.0/sqrt(dt), st);
       }
@@ -115,14 +129,20 @@ namespace uammd{
 						   temperature, noise_prefactor, st);
       }
 
+      void setShearStrain(real newStrain){
+	System::log<System::DEBUG>("[BDHI::PSE] Shear strain changed to %g", newStrain);
+        nearField->setShearStrain(newStrain);
+	farField->setShearStrain(newStrain);
+      }
+
       real getHydrodynamicRadius(){
 	return hydrodynamicRadius;
       }
-      
+
       real getSelfMobility(){
-	return this->M0;	
+	return this->M0;
       }
-      
+
     private:
       shared_ptr<ParticleGroup> pg;
       real hydrodynamicRadius, M0;

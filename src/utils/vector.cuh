@@ -916,6 +916,7 @@ VECATTR int2 make_int2(int3 a){return make_int2(a.x, a.y);}
 
 VECATTR int3 make_int3(int a){return make_int3(a,a,a);}
 VECATTR int3 make_int3(int2 a, int b){return make_int3(a.x,a.y,b);}
+VECATTR int3 make_int3(int3 a){return a;}
 
 VECATTR int3 operator /(int3 a, int3 b){
   return make_int3( a.x/b.x, a.y/b.y, a.z/b.z);

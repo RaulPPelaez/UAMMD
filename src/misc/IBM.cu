@@ -1,7 +1,6 @@
-/*Raul P. Pelaez 2019-2021. Immersed Boundary Method (IBM).
+/*Raul P. Pelaez 2019-2025. Immersed Boundary Method (IBM).
   See IBM.cuh
  */
-#include<type_traits>
 #include<third_party/uammd_cub.cuh>
 #include "utils/atomics.cuh"
 #include "IBM_utils.cuh"
@@ -91,7 +90,11 @@ namespace uammd{
       __shared__ int3 P; //Neighbour cell offset
       __shared__ int3 support;
       using KernelValueType = decltype(detail::phiX(kernel,real(), real3()));
-      extern __shared__ KernelValueType weights[];
+      // Declaring as char is required because an "extern" declaration cannot
+      // have two different types in two different template instantiations:
+      // XREF: https://stackoverflow.com/questions/27570552/templated-cuda-kernel-with-dynamic-shared-memory
+      extern __shared__ unsigned char s_mem[];
+      KernelValueType* weights = reinterpret_cast<KernelValueType*>(s_mem);
       if(tid==0){
 	pi = make_real3(pos[id]);
 	vi = particleQuantity[id];
@@ -114,6 +117,8 @@ namespace uammd{
 	const int kk=is2D?0:(i/(support.x*support.y));
 	const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	if(cellj.x<0 or cellj.y <0 or cellj.z<0)
+	  continue;
+	if(cellj.x >= grid.cellDim.x or cellj.y >= grid.cellDim.y or cellj.z >= grid.cellDim.z)
 	  continue;
 	const int jcell = cell2index(cellj);
 	const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
@@ -155,15 +160,16 @@ namespace uammd{
       const int tid = threadIdx.x;
       using GridQuantityType = typename std::iterator_traits<GridQuantityIterator>::value_type;
       using ParticleQuantityType = typename std::iterator_traits<ParticleQuantityOutputIterator>::value_type;
-      using BlockReduce = cub::BlockReduce<GridQuantityType, TPP>;
-      GridQuantityType result = GridQuantityType();
+      using BlockReduce = cub::BlockReduce<ParticleQuantityType, TPP>;
+      ParticleQuantityType result = ParticleQuantityType{};
       __shared__ real3 pi;
       __shared__ int3 celli;
       __shared__ int3 P; //Neighbour cell offset
       __shared__ typename BlockReduce::TempStorage temp_storage;
       __shared__ int3 support;
       using KernelValueType = decltype(detail::phiX(kernel,real(), real3()));
-      extern __shared__ KernelValueType weights[];
+      extern __shared__ unsigned char s_mem[];
+      KernelValueType* weights = reinterpret_cast<KernelValueType*>(s_mem);
       if(id<numberParticles){
 	if(tid==0){
 	  pi = make_real3(pos[id]);
@@ -189,6 +195,8 @@ namespace uammd{
 	  const int3 cellj = grid.pbc_cell(make_int3(celli.x + ii - P.x, celli.y + jj - P.y, is2D?0:(celli.z + kk - P.z)));
 	  if(cellj.x<0 or cellj.y <0 or cellj.z<0)
 	    continue;
+	  if(cellj.x >= grid.cellDim.x or cellj.y >= grid.cellDim.y or cellj.z >= grid.cellDim.z)
+	    continue;
 	  const real dV = qw(cellj, grid);
 	  const int jcell = cell2index(cellj);
 	  const auto kern = detail::computeWeightFromShared(weights, ii, jj, kk, support);
@@ -196,7 +204,7 @@ namespace uammd{
 	  result += dV*weight;
 	}
       }
-      GridQuantityType total = BlockReduce(temp_storage).Sum(result);
+      ParticleQuantityType total = BlockReduce(temp_storage).Sum(result);
       if(tid==0 and id<numberParticles){
 	particleQuantity[id] += total;
       }

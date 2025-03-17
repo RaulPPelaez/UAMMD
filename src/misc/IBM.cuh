@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2019-2020. Immersed Boundary Method (IBM).
+/*Raul P. Pelaez 2019-2025. Immersed Boundary Method (IBM).
 This class contains functions to spread marker information to a grid and
 interpolate information from a grid to some marker positions. This can be
 adapted to aid in, for example, an Immersed Boundary Method or a NUFFT method.

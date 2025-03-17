@@ -16,23 +16,15 @@ defaults:
 jobs:
   build:
     name: ${{ matrix.name }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-
-          # Oldest supported versions
-          - name: Linux (CUDA 10.2)
-            cuda: "10.2.89"
-            gcc: "7.*"
-            cuda12: 'false'
-
           # Latest supported versions
           - name: Linux (CUDA 12)
             cuda: "12.*"
-            gcc: "11.*"
-            cuda12: 'true'
+            gcc: "13.*"
     steps:
     - name: Check out
       uses: actions/checkout@v2
@@ -59,25 +51,7 @@ jobs:
           sudo docker image prune --all --force
           df -h
 
-    - name: Install CUDA Toolkit
-      # CUDA 12 can be installed with mamba
-      if: ${{ matrix.cuda12 == 'false' }}
-      uses: Jimver/cuda-toolkit@v0.2.10
-      with:
-        cuda: ${{ matrix.cuda }}
-        linux-local-args: '["--toolkit", "--override"]'
-
-    - name: Prepare dependencies (CUDA <12)
-      if: ${{ matrix.cuda12 == 'false'}}
-      run: |
-        sed -i -e "/cuda-version/d" \
-               -e "/cuda-libraries-dev/d" \
-               -e "/cuda-nvcc/d" \
-               -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}\n  - gcc_linux-64" \
-               environment.yml
-
-    - name: Prepare dependencies (CUDA >=12)
-      if: ${{ matrix.cuda12 == 'true' }}
+    - name: Prepare dependencies
       run: |
         sed -i -e "/cuda-version/c\  - cuda-version ${{ matrix.cuda }}" \
                -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
@@ -111,4 +85,15 @@ jobs:
         mkdir test/build && cd test/build
         cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
         make -j3
-        
+
+    - name: Check header installation
+      run: |
+        micromamba activate uammd
+        mkdir build && cd build
+        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} ..
+        make install
+        echo "#include<uammd.cuh>" > test.cu
+        echo "int main(){return 0;}" >> test.cu
+        nvcc -std=c++14 -I"${CONDA_PREFIX}/include/uammd" -I"${CONDA_PREFIX}/include/uammd/third_party" test.cu -o /tmp/test
+
+

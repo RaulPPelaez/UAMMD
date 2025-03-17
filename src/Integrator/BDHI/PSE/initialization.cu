@@ -16,8 +16,10 @@ namespace uammd{
 	if(L.x != L.y || L.y != L.z || L.x != L.z){
 	  System::log<System::WARNING>("[BDHI::PSE] Non cubic boxes are not really tested!");
 	}
-
-
+	if(par.tolerance > 0.1){
+	  System::log<System::EXCEPTION>("[BDHI::PSE] Tolerance too high, this will lead to numerical instability. Tolerance should be less than 0.1 (10% error).");
+	  throw std::invalid_argument("Tolerance too high");
+	}
       }
 
       long double computeSelfMobility(PSE::Parameters par){

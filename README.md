@@ -1,4 +1,4 @@
-# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD) ver 2.5**
+# **Universally Adaptable Multiscale Molecular Dynamics (UAMMD)**
 
 [![Documentation Status](https://readthedocs.org/projects/uammd/badge/?version=latest)](https://uammd.readthedocs.io/en/latest/?badge=latest)
 [![CI](https://github.com/RaulPPelaez/UAMMD/actions/workflows/ci.yml/badge.svg)](https://github.com/RaulPPelaez/UAMMD/actions/workflows/ci.yml)
@@ -41,35 +41,60 @@ See the documentation page at https://uammd.readthedocs.io for a full list of av
 
 -------------------
 
-You can use UAMMD as a library for integration into other codes or as a standalone engine.
+You can use UAMMD as a library for integration into other codes or as a standalone engine. Checkout the [examples folder](https://github.com/RaulPPelaez/UAMMD/tree/v2.x/examples).
+
+### CMake integration  
+
+-------------------------
+
+UAMMD is compatible with CMake's FetchContent:
+
+```cmake
+FetchContent_Declare(
+  uammd
+  GIT_REPOSITORY https://github.com/RaulPPelaez/uammd
+  GIT_TAG        v2.7.0
+)
+FetchContent_MakeAvailable(uammd)
+add_executable(my_executable my_source.cu)
+uammd_setup_target(my_executable)
+```
+
 
 #### DEPENDENCIES  
 
 ---------------------
-Depends on:
 
-	1. CUDA 9.x+                                :   https://developer.nvidia.com/cuda-downloads
-
-Some modules make use of certain NVIDIA libraries included with CUDA:
-	
-	1. cuBLAS
-	2. cuFFT
-	
-Some modules also make use of lapacke and cblas (which can be replaced by mkl).  
-Apart from this, any dependency is already included in the repository under the third_party	folder.  
+CUDA is required, some modules also make use of lapacke and cblas (which can be replaced by mkl).Apart from this, any dependency is already included in the repository under the third_party	folder.  
 See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
 
-Every required dependency can be installed using conda with the environment file provided in the repository. We recommend using [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html) as a replacement for conda.  
+**Every required dependency can be installed using conda** with the environment file provided in the repository.
 
 ```bash
-mamba env create -f environment.yml
+conda env create -f environment.yml
 ```
 
 ### Library mode
 
 **UAMMD does not need to be compiled separatedly (it is header only)**.  
 
-Some special flags might be needed to compile codes including with certain UAMMD headers, see [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html).  
+The top-level CMakeLists.txt file will install all UAMMD headers to `$CMAKE_INSTALL_PREFIX/include/uammd`. Additionally, a cmake module file (`FindUAMMD.cmake` will be installed at `$CMAKE_INSTALL_PREFIX/share/cmake/Modules`). To install the headers, go to the root of this repo and run:
+
+```shell
+$ mkdir build && cd build
+$ cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX .. # If you wish to install the headers to the conda environment
+$ make install
+```
+
+Now other CMake scripts can find the UAMMD headers with:
+
+```cmake
+find_package(UAMMD REQUIRED)
+include_directories(${UAMMD_INCLUDE_DIR})
+# Or
+# uammd_setup_target(target_name)
+```
+
 Here you have a short example of how a typical UAMMD code looks like, encoding a simple Brownian dynamics simulation of non interacting particles.:  
 
 ```c++
@@ -154,3 +179,20 @@ Pablo Palacios Alonso (http://github.com/PabloPalaciosAlonso)
 Sergio Panzuela  
 Nerea Alcazar  
 Salvatore Assenza
+
+## Citation
+
+```
+@article{uammd2025,
+title = {Universally Adaptable Multiscale Molecular Dynamics (UAMMD). A native-GPU software ecosystem for complex fluids, soft matter, and beyond},
+journal = {Computer Physics Communications},
+volume = {306},
+pages = {109363},
+year = {2025},
+issn = {0010-4655},
+doi = {https://doi.org/10.1016/j.cpc.2024.109363},
+url = {https://www.sciencedirect.com/science/article/pii/S0010465524002868},
+author = {Raúl P. Peláez and Pablo Ibáñez-Freire and Pablo Palacios-Alonso and Aleksandar Donev and Rafael Delgado-Buscalioni},
+keywords = {Molecular dynamics, Hydrodynamics, C++, CUDA, Soft matter},
+}
+```

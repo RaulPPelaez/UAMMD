@@ -9,9 +9,9 @@ UAMMD is header-only, so a module is compiled only when its header is included. 
   #. A C++ compiler with C++14 support (g++ 5+ will probably do)  
   #. LAPACKE/CBLAS or Intel MKL (For some modules only)  
 
-The newest compiler versions I have tested are g++-12.x and clang++-13.0 with cuda-12 in Fedora 37.  You can even compile a source containing UAMMD code with clang++-7+ alone, without nvcc.
+The newest compiler versions I have tested are g++-14.x and clang++-19.0 with cuda-12 in Fedora 41.
 
-**These dependencies can be installed using conda with the provided environment.yaml file.**
+**These dependencies can be installed using conda with the provided environment.yml file.**
 
 Additionally, UAMMD makes use of the following external libraries, **which are already included in the repo under third_party**. You can either compile using these or place symlinks to your preferred versions (I have seen recent versions of cub not compiling on some platforms).  
 
@@ -110,6 +110,8 @@ https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-
 
 Which will provide you with a set of flags, for instance: :code:`-L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl`
 
+**UAMMD's CMake files will autodetect your lapack installation**
+
 Compiling with CMake
 .........................
 
@@ -122,3 +124,35 @@ When a CMakeLists.txt file is present you can compile its target by running:
 	  $ mkdir -p build && cd build
 	  $ cmake ..
 	  $ make
+
+The top-level CMakeLists.txt can be used to install UAMMDs headers to your system:
+
+.. code:: bash
+	  
+	  $ cd /path/to/uammd
+	  $ mkdir -p build && cd build
+	  $ cmake -DCMAKE_INSTALL_PREFIX=/path/to/install ..
+	  $ make install
+
+Integration with CMake's find_package
+........................................
+
+UAMMD can be integrated with CMake's find_package mechanism. To do this, you need to install UAMMD in your system and call find_package(UAMMD) in your CMakeLists.txt file.
+
+Integration with CMake's FetchContent
+........................................
+
+If you don't want to install UAMMD in your system, you can use CMake's FetchContent mechanism to download UAMMD and compile it as part of your project build process:
+
+.. code:: cmake
+
+   FetchContent_Declare(
+	  uammd
+	  GIT_REPOSITORY https://github.com/RaulPPelaez/uammd
+	  GIT_TAG        v2.5.4
+   )
+   FetchContent_MakeAvailable(uammd)
+   add_library(my_target my_target.cpp)
+   uammd_setup_target(my_target)
+
+
