@@ -4,8 +4,8 @@
 #ifdef USE_MKL
 #include<mkl.h>
 #else
-#include<openblas/lapacke.h>
-#include<openblas/cblas.h>
+#include<lapacke.h>
+#include<cblas.h>
 #endif
 #ifdef SINGLE_PRECISION
 #define LAPACKE_steqr LAPACKE_ssteqr
