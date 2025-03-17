@@ -8,7 +8,3 @@ target_link_libraries(
   GTest::gmock_main
 )
 gtest_discover_tests(test_bvp)
-
-add_executable(bvp bvp.cu)
-uammd_setup_target(bvp)
-set_target_properties(bvp PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
