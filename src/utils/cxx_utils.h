@@ -27,7 +27,7 @@ namespace uammd{
   }
   namespace printUtils{
     //Transform size in bytes to a pretty string in B, KB, MB...
-    inline std::string prettySize(size_t size) {
+    std::string prettySize(size_t size) {
       static const char *SIZES[] = { "B", "KB", "MB", "GB" };
       uint div = 0;
       size_t rem = 0;

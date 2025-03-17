@@ -68,8 +68,8 @@ namespace uammd{
     SystemParameters sysPar;
     Timer tim;
 
-    inline void printWelcome();
-    inline void printFarewell();
+    void printWelcome();
+    void printFarewell();
 
     int m_argc = 0;
     char ** m_argv = nullptr;
@@ -202,7 +202,7 @@ namespace uammd{
 
   };
 
-  inline void System::printWelcome(){
+  void System::printWelcome(){
     std::string separator;
     fori(0,60) separator += "━";
     separator += "┓";
@@ -223,7 +223,7 @@ namespace uammd{
     log<System::MESSAGE>("Computation started at %s", std::ctime(&time));
   }
 
-  inline void System::printFarewell(){
+  void System::printFarewell(){
     cudaDeviceSynchronize();
     std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     log<System::MESSAGE>("Computation finished at %s",std::ctime(&time));
