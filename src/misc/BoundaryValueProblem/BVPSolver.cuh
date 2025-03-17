@@ -211,7 +211,7 @@ namespace uammd{
 
     using BoundaryValueProblemSolverReal          = BoundaryValueProblemSolver_impl<real>;
     using BoundaryValueProblemSolverComplex       = BoundaryValueProblemSolver_impl<thrust::complex<real>>;
-    
+
     template<typename U>
     class BatchedBVPHandler_impl;
 
@@ -230,8 +230,8 @@ namespace uammd{
       __device__ void solve(int instance,
 			    const FnIterator& fn,
 			    T alpha, T beta,
-			    AnIterator& an,
-			    CnIterator& cn){
+			    const AnIterator& an,
+			    const CnIterator& cn){
 	StorageRetriever memoryAccess(numberSystems, instance, gpuMemory);
 	bvpSolver.solve(fn, alpha, beta, an, cn, memoryAccess);
       }
@@ -240,7 +240,7 @@ namespace uammd{
 
     using BatchedBVPGPUSolverReal          = BatchedBVPGPUSolver_impl<real>;
     using BatchedBVPGPUSolverComplex       = BatchedBVPGPUSolver_impl<thrust::complex<real>>;
-    
+
     template <typename U>
     class BatchedBVPHandler_impl{
       int numberSystems;
@@ -286,7 +286,7 @@ namespace uammd{
 
     using BatchedBVPHandlerReal          = BatchedBVPHandler_impl<real>;
     using BatchedBVPHandlerComplex       = BatchedBVPHandler_impl<thrust::complex<real>>;
-    
+
   }
 
 }
