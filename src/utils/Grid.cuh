@@ -123,7 +123,7 @@ namespace uammd{
   };
 
   //Looks for the closest (equal or greater) number of nodes of the form 2^a*3^b*5^c*7^d*11^e
-  inline int3 nextFFTWiseSize3D(int3 size){
+  int3 nextFFTWiseSize3D(int3 size){
     int* cdim = &size.x;
     using integral = uint64_t;
     integral max_dim = std::max({size.x, size.y, size.z});

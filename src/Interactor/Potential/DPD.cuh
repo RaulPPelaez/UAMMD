@@ -168,13 +168,11 @@ namespace uammd{
     };
 
     template<>
-    inline
     void DPD_impl<DefaultDissipation>::printGamma(){
       System::log<System::MESSAGE>("[Potential::DPD] gamma: %f", gamma.gamma);
     }
 
     template<class T>
-    inline
     void DPD_impl<T>::printGamma(){
       System::log<System::MESSAGE>("[Potential::DPD] Using %s for dissipation", type_name<T>().c_str());
     }

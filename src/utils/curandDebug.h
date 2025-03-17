@@ -8,7 +8,6 @@
 
 #define CurandSafeCall(err) __curandSafeCall(err, __FILE__, __LINE__)
 
-inline
 const char* curandGetErrorString(curandStatus_t err){
   switch (err) {
   case CURAND_STATUS_VERSION_MISMATCH:    return "CURAND_STATUS_VERSION_MISMATCH";

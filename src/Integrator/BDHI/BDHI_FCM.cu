@@ -4,7 +4,6 @@
 #include"BDHI_FCM.cuh"
 namespace uammd{
   namespace BDHI{
-    inline
     auto FCMIntegrator::computeHydrodynamicDisplacements(){
       auto pos = pd->getPos(access::location::gpu, access::mode::read);
       auto force = pd->getForce(access::location::gpu, access::mode::read);
@@ -16,7 +15,6 @@ namespace uammd{
 						   temperature, 1.0/sqrt(dt), st);
     }
 
-    inline
     void FCMIntegrator::updateInteractors(){
       for(auto forceComp: interactors) forceComp->updateSimulationTime(steps*dt);
       if(steps==1){
@@ -28,7 +26,6 @@ namespace uammd{
       }
     }
 
-    inline
     void FCMIntegrator::resetForces(){
       int numberParticles = pg->getNumberParticles();
       auto force = pd->getForce(access::location::gpu, access::mode::write);
@@ -37,7 +34,6 @@ namespace uammd{
       CudaCheckError();
     }
 
-    inline
     void FCMIntegrator::resetTorques(){
       int numberParticles = pg->getNumberParticles();
       auto torque = pd->getTorque(access::location::gpu, access::mode::write);
@@ -46,7 +42,6 @@ namespace uammd{
       CudaCheckError();
     }
 
-    inline
     void FCMIntegrator::computeCurrentForces(){
       resetForces();
       if (pd->isDirAllocated()) resetTorques();
@@ -61,7 +56,6 @@ namespace uammd{
       /*With all the terms computed, update the positions*/
       /*T=0 case is templated*/
       template<class IndexIterator>
-      inline
       __global__ void integrateEulerMaruyamaD(real4* pos,
 					      real4* dir,
 					      IndexIterator indexIterator,
@@ -81,7 +75,7 @@ namespace uammd{
 	/*Write to global memory*/
 	pos[i] = make_real4(p,c);
 	/*Update the orientation*/
-	if(dir){
+	if(dir){ 
 	  Quat dirc = dir[i];
 	  //printf("W %f %f %f\n", angularV[id].x, angularV[id].y, angularV[id].z);
 	  //printf("V %f %f %f\n", linearV[id].x, linearV[id].y, linearV[id].z);
@@ -92,7 +86,6 @@ namespace uammd{
       }
     }
 
-    inline
     void FCMIntegrator::forwardTime(){
       steps++;
       sys->log<System::DEBUG1>("[BDHI::FCM] Performing integration step %d", steps);
@@ -104,12 +97,12 @@ namespace uammd{
       auto angularVelocities = disp.second;
       auto indexIter = pg->getIndexIterator(access::location::gpu);
       auto pos = pd->getPos(access::location::gpu, access::mode::readwrite);
-      auto dir = pd->getDirIfAllocated(access::location::gpu, access::mode::readwrite);
+      auto dir = pd->getDirIfAllocated(access::location::gpu, access::mode::readwrite);      
       real3* d_linearV = thrust::raw_pointer_cast(linearVelocities.data());
       real3* d_angularV = dir.raw()?thrust::raw_pointer_cast(angularVelocities.data()):nullptr;
       int BLOCKSIZE = 128; /*threads per block*/
       int nthreads = BLOCKSIZE<numberParticles?BLOCKSIZE:numberParticles;
-      int nblocks = numberParticles/nthreads + ((numberParticles%nthreads!=0)?1:0);
+      int nblocks = numberParticles/nthreads + ((numberParticles%nthreads!=0)?1:0);      
       FCM_ns::integrateEulerMaruyamaD<<<nblocks, nthreads, 0, st>>>(pos.raw(),
 								    dir.raw(),
 								    indexIter,

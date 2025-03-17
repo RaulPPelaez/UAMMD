@@ -224,7 +224,6 @@ namespace uammd{
       };
 
       template<class IterPos, class IterForce, class Kernel>
-      inline
       cached_vector<real3> spreadForces(IterPos& pos, IterForce& force,
 					int numberParticles,
 					std::shared_ptr<Kernel> kernel,
@@ -249,7 +248,6 @@ namespace uammd{
       };
 
       template<class T, class T3, class Container>
-      inline
       auto getCoordinateVector(Container &v, int coord){
 	cached_vector<T> v_a(v.size());
 	T* ptr= (T*)thrust::raw_pointer_cast(v.data());
@@ -266,9 +264,7 @@ namespace uammd{
 	  return {thrust::get<0>(a), thrust::get<1>(a),thrust::get<2>(a)};
 	}
       };
-
       template<class T3, class Container>
-      inline
       auto interleave(Container &a, Container &b, Container &c){
 	auto zip = thrust::make_zip_iterator(thrust::make_tuple(a.begin(), b.begin(), c.begin()));
 	cached_vector<T3> res(a.size());
@@ -276,7 +272,6 @@ namespace uammd{
 	return res;
       }
 
-      inline
       cached_vector<complex3> forwardTransform(cached_vector<real3>& gridReal,
 						    int3 n,
 						    cufftHandle plan, cudaStream_t st){
@@ -291,7 +286,6 @@ namespace uammd{
       }
 
 
-      inline
       __global__ void addTorqueCurl(complex3 *gridTorquesFourier, complex3* gridVelsFourier, Grid grid){
 	int id = blockDim.x*blockIdx.x + threadIdx.x;
 	const int3 nk = grid.cellDim;
@@ -313,7 +307,6 @@ namespace uammd{
 
 
       template<class IterPos, class IterTorque, class Kernel>
-      inline
       void addSpreadTorquesFourier(IterPos& pos, IterTorque& torque, int numberParticles,
 				   Grid grid,
 				   std::shared_ptr<Kernel> kernel,
@@ -346,7 +339,6 @@ namespace uammd{
 	 Output:gridVels = B·FFTf·S·F -> B \propto (I-k^k/|k|^2)
        */
       /*A thread per fourier node*/
-      inline
       __global__ void forceFourier2Vel(const complex3 * gridForces, /*Input array*/
 				       complex3 * gridVels, /*Output array, can be the same as input*/
 				       real vis,
@@ -369,7 +361,6 @@ namespace uammd{
         gridVels[id] = projectFourier(k2, dk, factor)*(B/real(ncells.x*ncells.y*ncells.z));
       }
 
-      inline
       void convolveFourier(cached_vector<complex3>& gridVelsFourier, real viscosity, Grid grid, cudaStream_t st){
 	System::log<System::DEBUG2>("[BDHI::FCM] Wave space velocity scaling");
 	/*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
@@ -388,7 +379,6 @@ namespace uammd{
 	This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds 1/√σ·√B(k)·dWw.
 	Keeping special care that v_k = v*_{N-k}, which implies that dWw_k = dWw*_{N-k}
       */
-      inline
       __global__ void fourierBrownianNoise(complex3 * gridVelsFourier,
 					   Grid grid,
 					   real prefactor,/* sqrt(2·T/dt)*/
@@ -461,7 +451,6 @@ namespace uammd{
 	}
 }
 
-      inline
       void addBrownianNoise(cached_vector<complex3>& gridVelsFourier,
 			    real temperature, real viscosity, real prefactor,
 			    uint seed,
@@ -498,7 +487,6 @@ namespace uammd{
 	}
       }
 
-      inline
       cached_vector<real3> inverseTransform(cached_vector<complex3>& gridFourier,
 					    int3 n, cufftHandle plan, cudaStream_t st){
 	int nx = 2*(n.x/2+1);
@@ -513,7 +501,6 @@ namespace uammd{
       }
 
       template<class IterPos, class Kernel>
-      inline
       cached_vector<real3> interpolateVelocity(IterPos& pos, cached_vector<real3>& gridVels,
 					       Grid grid, std::shared_ptr<Kernel> kernel,
 					       int numberParticles, cudaStream_t st){
@@ -537,7 +524,6 @@ namespace uammd{
       // = 0.5( i*k_y*V_z - i*k_z(V_y), i*k_z(V_x) - i*k_x*V_z, i*k_x*V_y - i*k_y*V_x)
       //Overwrite the output vector with the angular velocities in Fourier space
       //The input velocity vector is overwritten
-      inline
       __global__ void computeVelocityCurlFourier(const complex3 *gridVelsFourier,
 						 complex3* gridAngVelsFourier,
 						 Grid grid){
@@ -563,7 +549,6 @@ namespace uammd{
 	gridAngVelsFourier[id] = gridAng;
       }
 
-      inline
       cached_vector<complex3> computeGridAngularVelocityFourier(cached_vector<complex3>& gridVelsFourier,
 								Grid grid,  cudaStream_t st){
 	const int3 n = grid.cellDim;
@@ -580,7 +565,6 @@ namespace uammd{
       }
 
       template<class IterPos, class Kernel>
-      inline
       cached_vector<real3> interpolateAngularVelocity(IterPos& pos,
 						      cached_vector<real3>& gridAngVels,
 						      Grid grid,
@@ -600,7 +584,6 @@ namespace uammd{
     }
 
     template<class Kernel, class KernelTorque>
-    inline
     std::pair<cached_vector<real3>, cached_vector<real3>>
     FCM_impl<Kernel, KernelTorque>::computeHydrodynamicDisplacements(real4* pos,
 								     real4* force, real4* torque,

@@ -30,7 +30,6 @@
 
 namespace uammd{
 
-  inline
   VerletNVE::VerletNVE(shared_ptr<ParticleGroup> pg, VerletNVE::Parameters par):
     Integrator(pg, "VerletNVE"),
     dt(par.dt), energy(par.energy), is2D(par.is2D),
@@ -57,7 +56,6 @@ namespace uammd{
     CudaSafeCall(cudaStreamCreate(&stream));
   }
 
-  inline
   VerletNVE::~VerletNVE(){
     cudaStreamDestroy(stream);
   }
@@ -90,7 +88,6 @@ namespace uammd{
       }
   }
 
-  inline
   void VerletNVE::initializeVelocities(){
     //In the first step, compute energy in the system
     //in order to adapt the initial kinetic energy to match the input total energy
@@ -134,7 +131,6 @@ namespace uammd{
   }
 
   template<int step>
-  inline
   void VerletNVE::callIntegrate(){
     int numberParticles = pg->getNumberParticles();
     int Nthreads = 128;
@@ -156,7 +152,6 @@ namespace uammd{
 								       numberParticles, dt, is2D);
   }
 
-  inline
   void VerletNVE::resetForces(){
     int numberParticles = pg->getNumberParticles();
     auto force = pd->getForce(access::location::gpu, access::mode::write);
@@ -164,7 +159,6 @@ namespace uammd{
     thrust::fill(thrust::cuda::par.on(stream), force_gr, force_gr + numberParticles, real4());
   }
 
-  inline
   void VerletNVE::firstStepPreparation(){
     if(initVelocities){
       initializeVelocities();
@@ -179,7 +173,6 @@ namespace uammd{
   }
 
   //Move the particles in my group 1 dt in time.
-  inline
   void VerletNVE::forwardTime(){
     steps++;
     sys->log<System::DEBUG1>("[VerletNVE] Performing integration step %d", steps);
@@ -198,7 +191,6 @@ namespace uammd{
 
   namespace verletnve_ns{
     template<class VelocityIterator, class MassIterator, class EnergyIterator>
-    inline
     __global__ void sumKineticEnergy(const VelocityIterator vel,
 				     EnergyIterator energy,
 				     const MassIterator mass,
@@ -211,7 +203,6 @@ namespace uammd{
   };
 
 
-  inline
   real VerletNVE::sumEnergy(){
     int numberParticles = pg->getNumberParticles();
     auto vel_gr = pg->getPropertyIterator(pd->getVel(access::location::gpu, access::mode::read));

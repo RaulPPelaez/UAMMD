@@ -316,7 +316,7 @@ namespace uammd{
 #define INIT_PROPERTIES_T(NAME, name) ,  name(BOOST_PP_STRINGIZE(NAME), sys)
 #define INIT_PROPERTIES(r,data, tuple) INIT_PROPERTIES_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
 
-  inline ParticleData::ParticleData(int numberParticles, shared_ptr<System> sys):
+  ParticleData::ParticleData(int numberParticles, shared_ptr<System> sys):
     numberParticles(numberParticles),
     originalOrderIndexCPUNeedsUpdate(true),
     sys(sys)
@@ -334,7 +334,7 @@ namespace uammd{
   }
 
   //Sort the particles to improve data locality
-  inline void ParticleData::sortParticles(cudaStream_t st=0){
+  void ParticleData::sortParticles(cudaStream_t st=0){
     sys->log<System::DEBUG>("[ParticleData] Sorting particles...");
 
     {
@@ -364,7 +364,7 @@ namespace uammd{
 
 
 
-  inline void ParticleData::changeNumParticles(int Nnew){
+  void ParticleData::changeNumParticles(int Nnew){
     sys->log<System::CRITICAL>("[ParticleData] CHANGE PARTICLES FUNCTIONALITY NOT IMPLEMENTED YET!!!");
     sys->log<System::DEBUG>("[ParticleData] Adding/Removing particles...");
     this->numberParticles = Nnew;

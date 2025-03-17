@@ -193,19 +193,16 @@ namespace uammd{
       };
     }
 
-    inline
     Solver::Solver():
       check_convergence_steps(3){
       //Init cuBLAS for Lanczos process
       CublasSafeCall(cublasCreate_v2(&cublas_handle));
     }
 
-    inline
     Solver::~Solver(){
       CublasSafeCall(cublasDestroy(cublas_handle));
     }
 
-    inline
     real Solver::runIterations(MatrixDot *dot, real *Bz, const real*z, int numberIterations, int N){
       oldBz.resize((N+1), real());
       /*Lanczos iterations for Krylov decomposition*/
@@ -224,7 +221,6 @@ namespace uammd{
       return currentResidual;
     }
 
-    inline
     int Solver::run(MatrixDot *dot, real *Bz, const real*z, real tolerance, int N, cudaStream_t st){
       oldBz.resize((N+1));
       detail::device_fill(oldBz.begin(), oldBz.end(), real());
@@ -251,7 +247,6 @@ namespace uammd{
       throw std::runtime_error("[Lanczos] Could not converge");
     }
 
-    inline
     real Solver::computeError(real *Bz, int N, int iter){
       /*Compute error as in eq 27 in [1]
 	Error = ||Bz_i - Bz_{i-1}||_2 / ||Bz_{i-1}||_2
@@ -277,7 +272,6 @@ namespace uammd{
       return Error;
     }
 
-    inline
     void Solver::registerRequiredStepsForConverge(int steps_needed){
       this->lastRunRequiredSteps = steps_needed;
       if(steps_needed-2 > check_convergence_steps){

@@ -22,7 +22,6 @@ namespace uammd{
       using complex = cufftComplex_t<real>;
       using complex3 = cufftComplex3_t<real>;
 
-      inline
       __device__ int3 indexToWaveNumber(int i, int3 nk){
 	int ikx = i%(nk.x/2+1);
 	int iky = (i/(nk.x/2+1))%nk.y;
@@ -33,12 +32,10 @@ namespace uammd{
 	return make_int3(ikx, iky, ikz);
       }
 
-      inline
       __device__ real3 waveNumberToWaveVector(int3 ik, real3 L){
 	return (real(2.0)*real(M_PI)/L)*make_real3(ik.x, ik.y, ik.z);
       }
 
-      inline
       __device__ real3 getGradientFourier(int3 ik, int3 nk, real3 L){
 	const bool isUnpairedX = ik.x == (nk.x - ik.x);
 	const bool isUnpairedY = ik.y == (nk.y - ik.y);
@@ -58,7 +55,6 @@ namespace uammd{
 	  unpaired modes set to zero
 	fr is the factor to project
       */
-      inline
       __device__ real3 projectFourier(real k2, real3 dk, real3 fr){
 	const real invk2 = real(1.0)/k2;
 	real3 vr = fr - dk*dot(fr, dk*invk2);
@@ -72,7 +68,6 @@ namespace uammd{
 	  unpaired modes set to zero
 	fr is the factor to project
       */
-      inline
       __device__ complex3 projectFourier(real k2, real3 dk, complex3 factor){
 	real3 re = projectFourier(k2, dk, make_real3(factor.x.x, factor.y.x, factor.z.x));
 	real3 imag = projectFourier(k2, dk, make_real3(factor.x.y, factor.y.y, factor.z.y));
@@ -82,7 +77,6 @@ namespace uammd{
 
       /*Compute gaussian complex noise dW, std = prefactor -> ||z||^2 = <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
       /*A complex random number for each direction*/
-      inline
       __device__ complex3 generateNoise(real prefactor, uint id, uint seed1, uint seed2){	  //Uncomment to use uniform numbers instead of gaussian
 	Saru saru(id, seed1, seed2);
 	complex3 noise;
@@ -97,7 +91,6 @@ namespace uammd{
 	return noise;
       }
 
-      inline
       __device__ bool isNyquistWaveNumber(int3 cell, int3 ncells){
 	/*Beware of nyquist points! They only appear with even cell dimensions
 	  There are 8 nyquist points at most (cell=0,0,0 is excluded at the start of the kernel)
