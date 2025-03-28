@@ -19,8 +19,7 @@ With the boundary conditions:
 
 Being :math:`\alpha_n,\beta_n` some arbitrary parameters. These parameters can take any value (including zero) as long as the resulting BVP remains well defined. For instance, making  :math:`\alpha_1,\beta_1` equal to zero at the same time results in a system with no unique solution.
 
-Both :math:`y(z)` and :math:`f(z)` can be complex-valued. In the main branches of the UAMMD repository only :math:`\alpha_2,\beta_2` can be complex numbers (the rest of the parameters, including :math:`k`, must be real valued). The branch complex_bvp contains an adaptation of the solver that allows every parameter to be complex. As a side note, should the need arise in the future, it would be fairly easy to modify the solver as to make the type of the parameters a template argument.
-
+Both :math:`y(z)` and :math:`f(z)` can be real or complex-valued as well as :math:`\alpha_2,\beta_2,k` and any other parameter.
 .. hint::
 
    Initialization of the batched BVP solver requires inverting a dense matrix for each value of :math:`k`, which can become quite expensive. The solver tries to mitigate this cost by inverting these matrices in parallel, but experience suggests that letting it use more than 4 cores is counter-productive.
@@ -37,10 +36,9 @@ Usage
 ------
 
 Every function and class in the BVP solver source code lies under the :cpp:`uammd::BVP` namespace.
-The BVP solver library exposes two main classes:
+The BVP solver library exposes two main template classes , designed to manage both real and complex-valued numbers. To ensure consistent behavior and avoid unexpected results, it is recommended to use the complex number types defined in the Thrust library, specifically thrust::complex<real>, when working with complex numbers.
 
-
-.. cpp:class:: BatchedBVPHandler
+.. cpp:class:: template<class T> BatchedBVPHandler<T>
 
    Used to initialize and hold the information for a group of boundary value problems. Each subproblem can have different parameters (mainly :math:`\alpha_n,\beta_n,k` in the above equations.
    This class cannot be used in device code, its only used for initialization. See :cpp:any:`BatchedBVPGPUSolver`.
@@ -56,14 +54,14 @@ The BVP solver library exposes two main classes:
 		  :param H: The location of the boundary conditions (goes from -H to H).
 		  :param nz: Number of elements of a subproblem (all subproblems must have the same size).
 
-   .. cpp:function::  BatchedBVPGPUSolver getGPUSolver();
+   .. cpp:function::  template<class T> BatchedBVPGPUSolver_impl<T> getGPUSolver();
 
       Provides an instance of the solver to be used in the GPU.
 
-.. cpp:class:: BatchedBVPGPUSolver
+.. cpp:class:: template<class T> BatchedBVPGPUSolver<T>
 
-   While :cpp:any:`BatchedBVPHandler` is used to initialize and store the different subproblems, this class is used to actually solve the subproblems in a CUDA kernel.
-   This class has no public constructors, the only way to get an instance to it is via :cpp:any:`BatchedBVPHandler::getGPUSolver`.
+   While :cpp:any:`BatchedBVPHandler<T>` is used to initialize and store the different subproblems, this class is used to actually solve the subproblems in a CUDA kernel.
+   This class has no public constructors, the only way to get an instance to it is via :cpp:any:`BatchedBVPHandler<T>::getGPUSolver`.
 
    .. cpp:function:: template<class T, class FnIterator, class AnIterator, class CnIterator>   __device__ void solve(int instance,		    const FnIterator& fn,			    T alpha_2, T beta_2,			    AnIterator& an,			    CnIterator& cn);
 
@@ -93,6 +91,20 @@ Initialization requires an iterator to a special type of functor that provides t
 
       Returns :math:`\alpha_1` or :math:`\beta_1`, depending on which BC this class represents.
 
+Aliases for Real and Complex Types
+----------------------------------
+
+To facilitate the use of the BVP solver with real and complex numbers, the following aliases are defined:
+
+.. code-block:: cpp
+
+    using BatchedBVPHandlerReal     = BatchedBVPHandler_impl<real>;
+    using BatchedBVPHandlerrComplex = BatchedBVPHandler_impl<thrust::complex<real>>;
+
+    using BatchedBVPGPUSolverReal    = BatchedBVPGPUSolver_impl<real>;
+    using BatchedBVPGPUSolverComplex = BatchedBVPGPUSolver_impl<thrust::complex<real>>;
+
+These aliases allow for a more intuitive and type-safe way to work with the BVP solver for different numerical types.
 
 Example
 ++++++++

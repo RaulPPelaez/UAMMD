@@ -117,16 +117,17 @@ namespace uammd{
       }
     };
 
-    class SchurBoundaryCondition{
+    template <typename T>
+    class SchurBoundaryCondition_impl{
       int nz;
       real H;
       BCRows bcs;
     public:
-      SchurBoundaryCondition(int nz, real H):nz(nz), H(H), bcs(nz){}
+      SchurBoundaryCondition_impl(int nz, real H):nz(nz), H(H), bcs(nz){}
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeBoundaryConditionMatrix(const TopBC &top, const BottomBC &bottom){
-	std::vector<real> CandD(2*nz+4, 0);
+      std::vector<T> computeBoundaryConditionMatrix(const TopBC &top, const BottomBC &bottom){
+	std::vector<T> CandD(2*nz+4, 0);
 	auto topRow = computeTopRow(top, bottom);
 	auto bottomRow = computeBottomRow(top, bottom);
 	std::copy(topRow.begin(), topRow.end()-2, CandD.begin());
@@ -141,8 +142,8 @@ namespace uammd{
     private:
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeTopRow(const TopBC &top, const BottomBC &bottom){
-	std::vector<real> topRow(nz+2, 0);
+      std::vector<T> computeTopRow(const TopBC &top, const BottomBC &bottom){
+	std::vector<T> topRow(nz+2, 0);
 	auto tfi = bcs.topFirstIntegral();
 	auto tsi = bcs.topSecondIntegral();
 	auto tfiFactor = top.getFirstIntegralFactor();
@@ -156,8 +157,8 @@ namespace uammd{
       }
 
       template<class TopBC, class BottomBC>
-      std::vector<real> computeBottomRow(const TopBC &top, const BottomBC &bottom){
-	std::vector<real> bottomRow(nz+2, 0);
+      std::vector<T> computeBottomRow(const TopBC &top, const BottomBC &bottom){
+	std::vector<T> bottomRow(nz+2, 0);
 	auto bfi = bcs.bottomFirstIntegral();
 	auto bsi = bcs.bottomSecondIntegral();
 	auto bfiFactor = bottom.getFirstIntegralFactor();
@@ -172,10 +173,15 @@ namespace uammd{
 
     };
 
-    std::vector<real> computeSecondIntegralMatrix(real k, real H, int nz){
-      std::vector<real> A(nz*nz, 0);
+    using SchurBoundaryConditionReal          = SchurBoundaryCondition_impl<real>;
+    using SchurBoundaryConditionComplex       = SchurBoundaryCondition_impl<thrust::complex<real>>;
+    using SchurBoundaryConditionComplexDouble = SchurBoundaryCondition_impl<thrust::complex<double>>;
+
+    template<class T>
+    std::vector<T> computeSecondIntegralMatrix(T k, real H, int nz){
+      std::vector<T> A(nz*nz, 0);
       SecondIntegralMatrix sim(nz);
-      real kH2 = k*k*H*H;
+      T kH2 = k*k*H*H;
       fori(0, nz){
 	forj(0,nz){
 	  A[i+nz*j] = (i==j) - kH2*sim.getElement(i, j);
@@ -184,9 +190,10 @@ namespace uammd{
       return std::move(A);
     }
 
-    std::vector<real> computeInverseSecondIntegralMatrix(real k, real H, int nz){
+    template<class T>
+    std::vector<T> computeInverseSecondIntegralMatrix(T k, real H, int nz){
       if(k==0){
-	std::vector<real> invA(nz*nz, 0);
+	std::vector<T> invA(nz*nz, 0);
 	fori(0, nz){
 	  invA[i+nz*i] = 1;
 	}

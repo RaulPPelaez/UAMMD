@@ -90,7 +90,7 @@ namespace uammd{
     }
 
     class BVPPoissonSlab{
-      std::shared_ptr<BVP::BatchedBVPHandler> bvpSolver;
+      std::shared_ptr<BVP::BatchedBVPHandlerReal> bvpSolver;
       real2 Lxy;
       real H;
       int3 cellDim;
@@ -150,7 +150,7 @@ namespace uammd{
 						   BoundaryConditionsDispatch<BottomBoundaryConditions, decltype(klist)>(klist, H));
 
 	int numberSystems = (nk.x/2+1)*nk.y;
-	this->bvpSolver = std::make_shared<BVP::BatchedBVPHandler>(klist, topBC, bottomBC, numberSystems, H, cellDim.z);
+	this->bvpSolver = std::make_shared<BVP::BatchedBVPHandlerReal>(klist, topBC, bottomBC, numberSystems, H, cellDim.z);
 	CudaCheckError();
       }
     };

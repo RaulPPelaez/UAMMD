@@ -144,7 +144,7 @@ namespace uammd{
       auto botBC = thrust::make_transform_iterator(thrust::make_counting_iterator<int>(0), botdispatch);
       int numberSystems = (nk.x/2+1)*nk.y;
       int nz = grid.cellDim.z;
-      this->bvpSolver = std::make_shared<BVP::BatchedBVPHandler>(klist, topBC, botBC, numberSystems, halfH, nz);
+      this->bvpSolver = std::make_shared<BVP::BatchedBVPHandlerReal>(klist, topBC, botBC, numberSystems, halfH, nz);
       CudaCheckError();
     }
 

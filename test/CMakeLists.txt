@@ -26,6 +26,7 @@ add_subdirectory(Potentials/Poisson/TriplyPeriodic)
 add_subdirectory(utils)
 add_subdirectory(misc/chebyshev)
 add_subdirectory(misc/ibm)
+add_subdirectory(misc/bvp)
 add_subdirectory(misc/lanczos)
 
 IF (CMAKE_BUILD_TYPE MATCHES "Debug")
