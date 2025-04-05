@@ -46,7 +46,7 @@ Need to read parameters from a file? just copy paste the function readParameters
 And so on.
 
 If you would like a more bottom up approach to UAMMD, you can surf the examples/basic folder, which will give you through UAMMD with an increasingly complex set of example codes.
-Additionally, you can drop by the wiki: 
+Additionally, you can drop by the wiki:
 https://github.com/RaulPPelaez/UAMMD/wiki
 Which has a lot of information. From basic functionality to descriptions and references for the algorithms implemented by each module.
 */
@@ -247,10 +247,9 @@ auto createIntegratorDPD(UAMMD sim){
   auto verlet = std::make_shared<NVE>(sim.pd, par);
   using DPD = PairForces<Potential::DPD, NeighbourList>;
   Potential::DPD::Parameters dpd_params;
+  auto gamma = std::make_shared<Potential::DefaultDissipation>(sim.par.A_dpd, sim.par.gamma_dpd, sim.par.temperature, sim.par.dt);
   dpd_params.cutOff = sim.par.cutOff_dpd;
-  dpd_params.temperature = sim.par.temperature;
-  dpd_params.gamma = sim.par.gamma_dpd;
-  dpd_params.A = sim.par.A_dpd;
+  dpd_params.gamma = gamma;
   dpd_params.dt = par.dt;
   auto pot = std::make_shared<Potential::DPD>(dpd_params);
   DPD::Parameters params;
@@ -483,7 +482,7 @@ void writeSimulation(UAMMD sim){
   out<<"#Lx="<<L.x*0.5<<";Ly="<<L.y*0.5<<";Lz="<<L.z*0.5<<";\n";
   auto pos = sim.pd->getPos(access::location::cpu, access::mode::read);
   auto vel = sim.pd->getVelIfAllocated(access::location::cpu, access::mode::read);
-  
+
   auto energy = sim.pd->getEnergyIfAllocated(access::location::cpu, access::mode::read);
   fori(0, sim.par.numberParticles){
     //real3 p = box.apply_pbc(make_real3(pos[id2index[i]]));
@@ -578,7 +577,7 @@ void writeDefaultDatamain(std::string datamain){
   out<<"hydrodynamicRadius 1.0"<<std::endl;
   out<<"#################################################################"<<std::endl;
   out<<"#Environment parameters"<<std::endl;
-  out<<"viscosity 1"<<std::endl;  
+  out<<"viscosity 1"<<std::endl;
   out<<"friction 1 #Used in VerletNVT"<<std::endl;
   out<<"temperature 0.1"<<std::endl;
   out<<"##################################################################"<<std::endl;
@@ -665,14 +664,14 @@ Parameters readParameters(std::string datamain){
   in.getOption("printSteps", InputFile::Required)>>par.printSteps;
   in.getOption("relaxSteps", InputFile::Required)>>par.relaxSteps;
   in.getOption("dt", InputFile::Required)>>par.dt;
-  in.getOption("temperature", InputFile::Required)>>par.temperature;  
+  in.getOption("temperature", InputFile::Required)>>par.temperature;
   in.getOption("outfile", InputFile::Required)>>par.outfile;
   in.getOption("outfileVelocities", InputFile::Optional)>>par.outfileVelocities;
   in.getOption("outfileEnergy", InputFile::Optional)>>par.outfileEnergy;
   in.getOption("epsilon", InputFile::Required)>>par.epsilon;
   in.getOption("sigma", InputFile::Required)>>par.sigma;
   in.getOption("cutOff", InputFile::Required)>>par.cutOff;
-  in.getOption("readFile", InputFile::Optional)>>par.readFile;  
+  in.getOption("readFile", InputFile::Optional)>>par.readFile;
   in.getOption("bondFile", InputFile::Optional)>>par.bondFile;
   in.getOption("angularBondFile", InputFile::Optional)>>par.angularBondFile;
   in.getOption("torsionalBondFile", InputFile::Optional)>>par.torsionalBondFile;
@@ -686,7 +685,7 @@ Parameters readParameters(std::string datamain){
   if(par.integrator.compare("DPD")==0){
     in.getOption("A_dpd", InputFile::Required)>>par.A_dpd;
     in.getOption("gamma_dpd", InputFile::Required)>>par.gamma_dpd;
-    in.getOption("cutOff_dpd", InputFile::Required)>>par.cutOff_dpd;    
+    in.getOption("cutOff_dpd", InputFile::Required)>>par.cutOff_dpd;
   }
   if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0 or
      par.integrator.compare("FIB")==0 or par.integrator.compare("ICM")==0){
@@ -702,15 +701,12 @@ Parameters readParameters(std::string datamain){
     in.getOption("gaussianWidth", InputFile::Required)>>par.gaussianWidth;
     in.getOption("chargeReadFile", InputFile::Optional)>>par.chargeReadFile;
   }
-  
+
   if(in.getOption("enableGravity", InputFile::Optional)){
     par.enableGravity = true;
     in.getOption("gravity", InputFile::Required)>>par.gravity;
     in.getOption("kwall", InputFile::Required)>>par.kwall;
-  }  
+  }
   readCustomParameters(in, par);
   return par;
 }
-
-
-
