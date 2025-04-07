@@ -93,9 +93,10 @@ auto createIntegratorDPD(UAMMD sim){
   real A = 1.0;
   real gamma = 1.0;
   real temperature = 1.0;
-  auto gamma = std::make_shared<Potential::DefaultDissipation>(A, gamma, temperature, par.dt);
+  auto g = std::make_shared<Potential::DefaultDissipation>(A, gamma, temperature, par.dt);
   dpd_params.cutOff = 1.0;
   dpd_params.dt = par.dt;
+  dpd_params.gamma = g;
   auto pot = std::make_shared<Potential::DPD>(dpd_params);
   DPD::Parameters params;
   real3 L = make_real3(32,32,32);
