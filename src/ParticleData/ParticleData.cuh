@@ -294,7 +294,9 @@ public:
     return particle_sorter->getSortedIndexArray(numberParticles);
   }
 
-  void changeNumParticles(int Nnew);
+  void resize(int Nnew);
+
+  int size const (){ return this->numberParticles; }
 
   int getNumParticles() { return this->numberParticles; }
 
@@ -384,9 +386,7 @@ void ParticleData::sortParticles(cudaStream_t st = 0) {
   this->emitReorder();
 }
 
-void ParticleData::changeNumParticles(int Nnew) {
-  sys->log<System::CRITICAL>(
-      "[ParticleData] CHANGE PARTICLES FUNCTIONALITY NOT IMPLEMENTED YET!!!");
+void ParticleData::resize(int Nnew) {
   sys->log<System::DEBUG>("[ParticleData] Adding/Removing particles...");
   this->numberParticles = Nnew;
   pos.resize(Nnew);
