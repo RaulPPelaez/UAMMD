@@ -133,7 +133,7 @@ namespace uammd{
     void updateSortedPositions(PositionIterator pos, int numberParticles, cudaStream_t st = 0){
       sortPos.resize(numberParticles);
       auto listData = nl.getBasicNeighbourList();
-      auto pos_real4 = thrust::make_transform_iterator(transform_it, CellList_ns::detail::ToReal4());
+      auto pos_real4 = thrust::make_transform_iterator(pos, CellList_ns::detail::ToReal4());
       auto reorderIt = thrust::make_permutation_iterator(pos_real4, listData.groupIndex);
       thrust::copy(thrust::cuda::par.on(st), reorderIt, reorderIt + numberParticles, sortPos.begin());
     }
