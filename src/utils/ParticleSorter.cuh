@@ -60,7 +60,8 @@ namespace uammd{
 	return encodeMorton(cell.x) | (encodeMorton(cell.y) << 1) | (encodeMorton(cell.z) << 2);
       }
 
-      inline __host__ __device__ uint operator()(real4 pos) const{
+      template<class VectorType>
+      inline __host__ __device__ uint operator()(VectorType pos) const{
 	const int3 cell = grid.getCell(pos);
 	return hash(cell);
       }
@@ -73,7 +74,9 @@ namespace uammd{
       inline __device__ __host__ uint hash(int3 cell) const{
 	return grid.getCellIndex(cell);
       }
-      inline __host__ __device__ uint operator()(real4 pos) const{
+
+      template<class VectorType>
+      inline __host__ __device__ uint operator()(VectorType pos) const{
 	const int3 cell = grid.getCell(pos);
 	return hash(cell);
       }
