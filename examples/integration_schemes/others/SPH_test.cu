@@ -14,7 +14,7 @@ You can visualize the reuslts with superpunto
 #include"uammd.cuh"
 //The rest can be included depending on the used modules
 #include"Integrator/VerletNVE.cuh"
-#include"Interactor/SPH.cuh"
+#include"Integrator/SPH.cuh"
 #include"Interactor/ExternalForces.cuh"
 #include "utils/ForceEnergyVirial.cuh"
 #include"utils/InitialConditions.cuh"
@@ -95,30 +95,28 @@ int main(int argc, char *argv[]){
     auto vel = pd->getVel(access::location::gpu, access::mode::write);
     thrust::fill(thrust::cuda::par, vel.begin(), vel.end(), real3());
   }
-  VerletNVE::Parameters par;
+  //VerletNVE with SPH interactor
+  SPHIntegrator::Parameters par;
   par.dt = dt;
   //If set to true (default), VerletNVE will compute Energy at step 0 and modify the velocities accordingly
   par.initVelocities = false;
-  auto verlet = make_shared<VerletNVE>(pg, par);
+  par.box = box;  //Box to work on
+  //These are the default parameters,
+  //if any parameter is not present, it will revert to the default in the .cuh
+  par.support      = support;
+  par.viscosity    = viscosity;
+  par.gasStiffness = gasStiffness;
+  par.restDensity  = restDensity;
+  auto sph_verlet  = make_shared<SPHIntegrator>(pg, par);
   {
     //Harmonic walls acting on different particle groups
     //This two interactors will cause particles in group pg2 to stick to a wall in -Lz/4
     //And the ones in pg3 to +Lz/4
     auto extForces = make_shared<ExternalForces<Wall>>(pg, make_shared<Wall>(box.boxSize));
-    //Add interactors to integrator.
-    verlet->addInteractor(extForces);
+    //Add interactors to integrator (any other interactor can be added).
+    sph_verlet->addInteractor(extForces);
   }
-  SPH::Parameters params;
-  params.box = box;  //Box to work on
-  //These are the default parameters,
-  //if any parameter is not present, it will revert to the default in the .cuh
-  params.support = support;
-  params.viscosity = viscosity;
-  params.gasStiffness = gasStiffness;
-  params.restDensity = restDensity;
-  auto sph = make_shared<SPH>(pg, params);
-  //You can add as many modules as necessary
-  verlet->addInteractor(sph);
+  
   //You can issue a logging event like this, a wide variety of log levels exists (see System.cuh).
   //A maximum log level is set in System.cuh, every logging event with a level superior to the max will result in
   // absolutely no overhead, so dont be afraid to write System::DEBUGX log calls.
@@ -136,7 +134,7 @@ int main(int argc, char *argv[]){
   forj(0,nsteps){
     //This will instruct the integrator to take the simulation to the next time step,
     //whatever that may mean for the particular integrator (i.e compute forces and update positions once)
-    verlet->forwardTime();
+    sph_verlet->forwardTime();
     //Write results
     if(printSteps and j%printSteps==0)
     {
