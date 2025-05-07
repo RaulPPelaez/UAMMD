@@ -85,7 +85,7 @@ namespace uammd{
       }
     };
 
-    using CountingIterator = cub::CountingInputIterator<int>;
+    using CountingIterator = thrust::counting_iterator<int>;
     using StrideIterator = cub::TransformInputIterator<int, NeighbourListOffsetFunctor, CountingIterator>;
 
     Grid createUpdateGrid(Box box, real cutOff){
@@ -194,4 +194,3 @@ namespace uammd{
 
 }
 #endif
-
