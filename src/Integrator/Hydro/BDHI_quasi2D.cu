@@ -488,7 +488,7 @@ namespace uammd{
     }
 
     namespace BDHI2D_ns{
-      class euler_functor: public thrust::binary_function<real2, real4, real4>{
+      class euler_functor{
 	real dt;
       public:
 	euler_functor(real _dt) : dt(_dt) {}
