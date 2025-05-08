@@ -24,7 +24,7 @@ jobs:
           # Latest supported versions
           - name: Linux (CUDA 12)
             cuda: "12.*"
-            gcc: "14.*"
+            gcc: "13.*"
     steps:
     - name: Check out
       uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
     - name: Prepare dependencies
       run: |
         sed -i -e "/cuda-version/c\  - cuda-version ${{ matrix.cuda }}" \
-               -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
+               -e "/gxx/c\  - gxx ${{ matrix.gcc }}" \
                environment.yml
     - name: Show dependency file
       run: cat environment.yml
