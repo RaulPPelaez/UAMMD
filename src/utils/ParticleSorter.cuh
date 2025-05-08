@@ -37,6 +37,7 @@ REFERENCES:
 #include<thrust/sequence.h>
 #include<thrust/iterator/transform_iterator.h>
 #include<thrust/iterator/permutation_iterator.h>
+#include<thrust/iterator/counting_iterator.h>
 #include<third_party/uammd_cub.cuh>
 namespace uammd{
 
@@ -210,7 +211,7 @@ namespace uammd{
       index_alt.resize(N);
       hash.resize(N);
       hash_alt.resize(N);
-      cub::CountingInputIterator<int> ci(0);
+      thrust::counting_iterator<int> ci(0);
       thrust::sequence(uammd::cached_device_execution_policy.on(st),
 		       original_index.begin(), original_index.end(), 0);
       int* d_hash = (int*)thrust::raw_pointer_cast(hash.data());
@@ -257,7 +258,7 @@ namespace uammd{
     int * tryToGetSortedIndexArray(int N){
       int lastN = index.size();
       if(lastN != N){
-	cub::CountingInputIterator<int> ci(lastN);
+	thrust::counting_iterator<int> ci(lastN);
         index.resize(N);
 	thrust::copy(thrust::cuda::par, ci, ci+(N-lastN), index.begin()+lastN);
       }
