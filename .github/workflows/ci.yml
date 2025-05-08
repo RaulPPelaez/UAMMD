@@ -24,7 +24,7 @@ jobs:
           # Latest supported versions
           - name: Linux (CUDA 12)
             cuda: "12.*"
-            gcc: "13.*"
+            gcc: "14.*"
     steps:
     - name: Check out
       uses: actions/checkout@v2
@@ -77,20 +77,20 @@ jobs:
       run: |
         micromamba activate uammd
         mkdir examples/build && cd examples/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF..
         make -j3
     - name: Configure and compile tests
       run: |
         micromamba activate uammd
         mkdir test/build && cd test/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF ..
         make -j3
 
     - name: Check header installation
       run: |
         micromamba activate uammd
         mkdir build && cd build
-        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} ..
+        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} -DCMAKE_CUDA_ARCHITECTURES=OFF ..
         make install
         echo "#include<uammd.cuh>" > test.cu
         echo "int main(){return 0;}" >> test.cu
