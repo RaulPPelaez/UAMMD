@@ -77,7 +77,7 @@ jobs:
       run: |
         micromamba activate uammd
         mkdir examples/build && cd examples/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF ..
         make -j3
     - name: Configure and compile tests
       run: |
