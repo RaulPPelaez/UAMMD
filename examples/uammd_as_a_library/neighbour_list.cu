@@ -1,7 +1,7 @@
 /*Raul P. Pelaez 2021. An example on how to use a neighbour list outside the UAMMD ecosystem
   You can copy paste parts of this example to accelerate your code.
 
-  This example will generate some random positions inside a cubic periodic box, 
+  This example will generate some random positions inside a cubic periodic box,
     then create a neighbour list with them and finally traverse that list.
  */
 #include"uammd.cuh"
@@ -26,7 +26,7 @@ struct RNG{
   }
 };
 
-//Creates and returns a vector with random positions inside a cubic box of side L (always the same random positions) 
+//Creates and returns a vector with random positions inside a cubic box of side L (always the same random positions)
 gpu_container<real4> generateRandomPositions(real L, int numberParticles){
   gpu_container<real4> positions(numberParticles);
   auto it = thrust::make_counting_iterator<int>(0);
@@ -127,10 +127,11 @@ NlistCPU downloadList(int numberParticles, NeighbourList nl){
   thrust::for_each(cit, cit + numberParticles,
 		   [=] __device__ (int tid){
   		     int nneigh = nl.numberNeighbours[tid];
-		     int offset = nl.particleStride[tid];
+		     int stride_i = nl.particleStride[tid];
 		     int i = nl.groupIndex[tid];
 		     for(int j = 0; j<nneigh; j++){
-		       int index_j = nl.groupIndex[nl.neighbourList[offset + j]];
+		       //We are using the internal format of the BasicList, which stores the neighbors like this
+		       int index_j = nl.groupIndex[nl.neighbourList[stride_i*j + tid]];
 		       d_list_ptr[stride*i + j] = index_j;
 		     }
 		   });
@@ -152,10 +153,10 @@ int main(int argc, char* argv[]){
   Box box({L,L,L});
   //You can make the box aperiodic in some direction with this:
   //box.setPeriodicity(0,0,0); //Completely aperiodic box
-  //Update/create the neighbour list  
+  //Update/create the neighbour list
   nl.update(positions.begin(), numberParticles, box, rcut);
   //Fetch the list (with the positions given at the last update)
-  auto listDataGPU = nl.getBasicNeighbourList();  
+  auto listDataGPU = nl.getBasicNeighbourList();
   //Use the list by writing a CUDA kernel, currently it just does nothing.
   useListWithCUDAKernel(positions, listDataGPU);
   //Use the list with thrust, without the need to write a CUDA kernel

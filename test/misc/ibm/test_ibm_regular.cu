@@ -153,7 +153,6 @@ template <typename Foo> real integrate(const Foo &foo, real width) {
 // kernel-squared integral dV, we should recover 1.
 // This should work regardless of the cell size in each direction
 TEST(SpreadInterp, Adjoint3DNonRegular) {
-  int numberParticles = 1;
   int3 n = make_int3(64, 32, 7);
   real3 L = make_real3(64.0);
   thrust::host_vector<real3> h_pos(1);

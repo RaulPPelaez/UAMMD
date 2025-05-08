@@ -55,6 +55,15 @@ References:
 
 namespace uammd{
   namespace CellList_ns{
+    namespace detail{
+      struct ToReal4{
+	template<typename T>
+	__device__ real4 operator()(const T &v) const{
+	  return make_real4(v);
+	}
+      };
+    }
+
     template<class InputIterator>
     __global__ void fillCellList(InputIterator sortPos,
 				 uint *cellStart, int *cellEnd,
@@ -216,7 +225,8 @@ namespace uammd{
       ps.updateOrderByCellHash<Sorter::MortonHash>(pos, numberParticles, grid.box, grid.cellDim, st);
       CudaCheckError();
       sortPos.resize(numberParticles);
-      ps.applyCurrentOrder(pos, thrust::raw_pointer_cast(sortPos.data()), numberParticles, st);
+      auto transform_it = thrust::make_transform_iterator(pos, CellList_ns::detail::ToReal4());
+      ps.applyCurrentOrder(transform_it, sortPos.begin(), numberParticles, st);
       CudaCheckError();
     }
 

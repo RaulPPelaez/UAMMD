@@ -27,34 +27,12 @@ jobs:
             gcc: "13.*"
     steps:
     - name: Check out
-      uses: actions/checkout@v2
-    - name: Manage disk space
-      run: |
-          sudo mkdir -p /opt/empty_dir || true
-          for d in \
-                   /opt/ghc \
-                   /opt/hostedtoolcache \
-                   /usr/lib/jvm \
-                   /usr/local/.ghcup \
-                   /usr/local/lib/android \
-                   /usr/local/share/powershell \
-                   /usr/share/dotnet \
-                   /usr/share/swift \
-                   ; do
-            sudo rsync --stats -a --delete /opt/empty_dir/ $d || true
-          done
-          sudo apt-get purge -y -f firefox \
-                                   google-chrome-stable \
-                                   microsoft-edge-stable gcc
-          sudo apt-get autoremove -y >& /dev/null
-          sudo apt-get autoclean -y >& /dev/null
-          sudo docker image prune --all --force
-          df -h
+      uses: actions/checkout@v4
 
     - name: Prepare dependencies
       run: |
         sed -i -e "/cuda-version/c\  - cuda-version ${{ matrix.cuda }}" \
-               -e "/gxx_linux-64/c\  - gxx_linux-64 ${{ matrix.gcc }}" \
+               -e "/gxx/c\  - gxx ${{ matrix.gcc }}" \
                environment.yml
     - name: Show dependency file
       run: cat environment.yml
@@ -77,20 +55,20 @@ jobs:
       run: |
         micromamba activate uammd
         mkdir examples/build && cd examples/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF ..
         make -j3
     - name: Configure and compile tests
       run: |
         micromamba activate uammd
         mkdir test/build && cd test/build
-        cmake -DCMAKE_VERBOSE_MAKEFILE=yes ..
+        cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF ..
         make -j3
 
     - name: Check header installation
       run: |
         micromamba activate uammd
         mkdir build && cd build
-        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} ..
+        cmake -DCMAKE_INSTALL_PREFIX=${CONDA_PREFIX} -DCMAKE_CUDA_ARCHITECTURES=OFF ..
         make install
         echo "#include<uammd.cuh>" > test.cu
         echo "int main(){return 0;}" >> test.cu
