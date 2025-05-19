@@ -242,6 +242,15 @@ auto createIntegratorDPD(UAMMD sim){
   NVE::Parameters par;
   par.dt = sim.par.dt;
   par.initVelocities = false;
+  {
+    // Set all velocities to random numbers with the boltzmann distribution
+    auto vel = sim.pd->getVel(access::location::cpu, access::mode::write);
+    std::mt19937 gen(sim.pd->getSystem()->rng().next());
+    real mean = 0;
+    real stdev = sqrt(3*sim.par.temperature);
+    std::normal_distribution<real> dis(mean, stdev);
+    std::generate(vel.begin(), vel.end(), [&](){return make_real3(dis(gen),dis(gen),dis(gen));});
+  }
   auto verlet = std::make_shared<NVE>(sim.pd, par);
   using DPD = PairForces<Potential::DPD, NeighbourList>;
   Potential::DPD::Parameters dpd_params;
@@ -253,6 +262,37 @@ auto createIntegratorDPD(UAMMD sim){
   DPD::Parameters params;
   params.box = Box(sim.par.L);
   auto pairforces = std::make_shared<DPD>(sim.pd, params, pot);
+  verlet->addInteractor(pairforces);
+  return verlet;
+}
+
+auto createIntegratorTransversalDPD(UAMMD sim){
+  using NVE = VerletNVE;
+  NVE::Parameters par;
+  par.dt = sim.par.dt;
+  par.initVelocities = false;
+  // Set all velocities to zero
+  {
+    // Set all velocities to random numbers with the boltzmann distribution
+    auto vel = sim.pd->getVel(access::location::cpu, access::mode::write);
+    std::mt19937 gen(sim.pd->getSystem()->rng().next());
+    real mean = 0;
+    real stdev = sqrt(3*sim.par.temperature);
+    std::normal_distribution<real> dis(mean, stdev);
+    std::generate(vel.begin(), vel.end(), [&](){return make_real3(dis(gen),dis(gen),dis(gen));});
+  }
+  auto verlet = std::make_shared<NVE>(sim.pd, par);
+  using DPD = Potential::DPD_impl<Potential::TransversalDissipation>;
+  using DPDPF = PairForces<DPD, NeighbourList>;
+  DPD::Parameters dpd_params;
+  auto gamma = std::make_shared<Potential::TransversalDissipation>(sim.par.gamma_par_dpd, sim.par.gamma_perp_dpd, sim.par.temperature, sim.par.dt);
+  dpd_params.cutOff = sim.par.cutOff_dpd;
+  dpd_params.gamma = gamma;
+  dpd_params.dt = par.dt;
+  auto pot = std::make_shared<DPD>(dpd_params);
+  DPDPF::Parameters params;
+  params.box = Box(sim.par.L);
+  auto pairforces = std::make_shared<DPDPF>(sim.pd, params, pot);
   verlet->addInteractor(pairforces);
   return verlet;
 }
@@ -360,6 +400,9 @@ auto createIntegrator(UAMMD sim){
   }
   else if(sim.par.integrator.compare("DPD") == 0){
     integrator = createIntegratorDPD(sim);
+  }
+  else if(sim.par.integrator.compare("TransversalDPD") == 0){
+    integrator = createIntegratorTransversalDPD(sim);
   }
   else if(sim.par.integrator.compare("SPH") == 0){
     integrator = createIntegratorSPH(sim);
@@ -683,6 +726,11 @@ Parameters readParameters(std::string datamain){
   if(par.integrator.compare("DPD")==0){
     in.getOption("A_dpd", InputFile::Required)>>par.A_dpd;
     in.getOption("gamma_dpd", InputFile::Required)>>par.gamma_dpd;
+    in.getOption("cutOff_dpd", InputFile::Required)>>par.cutOff_dpd;
+  }
+  if(par.integrator.compare("TransversalDPD")==0){
+    in.getOption("gamma_par_dpd", InputFile::Required)>>par.gamma_par_dpd;
+    in.getOption("gamma_perp_dpd", InputFile::Required)>>par.gamma_perp_dpd;
     in.getOption("cutOff_dpd", InputFile::Required)>>par.cutOff_dpd;
   }
   if(par.integrator.compare("BD")==0 or par.integrator.compare("BDHI")==0 or

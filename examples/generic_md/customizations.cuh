@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2021
+/*Raul P. Pelaez 2021-2025
   Customizations for generic_simulation.cu
   You can modify this file to tweak the different interactions available there.
 
@@ -6,22 +6,14 @@
   Compile generic_simulation.cu (use the Makefile) and run it.
   This will generate a data.main file with information about what this code can do.
   When you run the program again, data.main will be read and the simulation it describes will take place.
-  A lot of systems can be simulated just by modifying data.main, without having to code anything. 
+  A lot of systems can be simulated just by modifying data.main, without having to code anything.
   The auto generated data.main will describe a LJ liquid MD simulation.
   If you need anything that cannot be done via the data.main, such as using a potential different from LJ you can encode it in this file.
   Down below you will encounter a few functions and classes, inspect the comments above each one to learn more about what part of the simulation each one affects and instructions on how to modify them.
-  I recommend to use some sort of code folding capability to glance at this code for the first time, since you will be able to fit every function and class, including their accompanying comments, inside a single screen.
-  Then you can quickly see where each thing is.
-  If by ay chance you are using emacs, you can fold the code by enabling hs mode:
-    M-x hs-minor-mode
-  And then running:
-    M-x hs-hide-level
-  You can then unfold each section by placing the cursor on top of it and running:
-    M-x hs-show-block
 
     Note that in order to understand this file, some knowledge of C++ and CUDA is needed.
     The most important thing to take into account is that a function marked by __device__ is a function that runs on the GPU.
-     __device__ functions  must abide to a series of restrictions and special rules which explanation is outside the scope of this header. 
+     __device__ functions  must abide to a series of restrictions and special rules which explanation is outside the scope of this header.
      Mainly, keep in mind that device functions cannot read global variables and can only read memory allocated for the gpu (so do not try to read a pointer allocated with malloc or an std::vector).
      If this is not something you are familiar with it is highly advisable that you go through a basic CUDA tutorial before attempting to make heavy modifications to this file.
  */
@@ -35,11 +27,11 @@ using namespace uammd;
 struct Parameters{
   int numberParticles;
   real3 L;
-  int numberSteps, printSteps, relaxSteps;  
+  int numberSteps, printSteps, relaxSteps;
   real dt, viscosity, hydrodynamicRadius;
   real friction; //Friction coefficient for VerletNVT
   real temperature;
-  real  sigma, epsilon, cutOff;  
+  real  sigma, epsilon, cutOff;
   std::string readFile, chargeReadFile;
   std::string bondFile, angularBondFile, torsionalBondFile;
   std::string outfile, outfileVelocities, outfileEnergy;
@@ -50,6 +42,7 @@ struct Parameters{
   real gaussianWidth;
   //DPD
   real gamma_dpd, A_dpd, cutOff_dpd;
+  real gamma_par_dpd, gamma_perp_dpd;
   //SPH
   real support_sph;
   real gasStiffness_sph;
@@ -60,7 +53,7 @@ struct Parameters{
   real kwall;
   //Imagine you need an additional parameter
   //real myCustomParameter;
-  
+
 };
 
 //All members in the default Parameters struct (defined above) are read from data.main elsewhere.
@@ -180,8 +173,8 @@ struct ShortRangePotential{
       //Note that a particle is considered to be a neighbour of itself
       if(r2>0 and r2< rc*rc){
 	real3 f;
-	real v, e;        
-	f = (force or virial)?ep/s*lj_force(r2/(s*s))*rij:real3();	
+	real v, e;
+	f = (force or virial)?ep/s*lj_force(r2/(s*s))*rij:real3();
 	v = virial?dot(f, rij):0;
 	e = energy?(ep/s*(lj_energy(r2/(s*s))-lj_energy(rc*rc/(s*s)))):real(0.0);
 	return {f,e,v};
@@ -248,13 +241,13 @@ struct GravityAndWall{
   }
 
   auto getArrays(ParticleData* pd){
-    auto pos = pd->getPos(access::gpu, access::read);    
+    auto pos = pd->getPos(access::gpu, access::read);
     return pos.begin();
     //If more than one property is needed this would be the way to do it:
     //auto mass = pd->getMass(access::gpu, access::read);
     //return std::make_tuple(pos.begin(), mass.begin());
   }
-  
+
 };
 
 //Harmonic bond, a good example on how to implement a bonded force
@@ -276,7 +269,7 @@ struct HarmonicBond{
   //comp: computable targets (wether force, energy and or virial are needed).
   //bi: bond information for the current bond (as returned by readBond)
   inline __device__ real sq (real a){ return a*a;}
-  
+
   inline __device__ ComputeType compute(int bond_index, int ids[2], real3 pos[2], Interactor::Computables comp, BondInfo bi){
     real3 r12 = pos[1]-pos[0];
     real r2 = dot(r12, r12);
@@ -290,7 +283,7 @@ struct HarmonicBond{
   }
 
   //This function will be called for each bond in the bond file and read the information of a bond
-  //It must use the stream that is handed to it to construct a BondInfo.  
+  //It must use the stream that is handed to it to construct a BondInfo.
   static __host__ BondInfo readBond(std::istream &in){
     /*BondedForces will read i j, readBond has to read the rest of the line*/
     BondInfo bi;
@@ -321,7 +314,7 @@ struct Angular{
   //bi: bond information for the current bond (as returned by readBond)
   inline __device__ ComputeType compute(int bond_index, int ids[3], real3 pos[3], Interactor::Computables comp, BondInfo bi){
     const real ang0 = bi.ang0;
-    const real kspring = bi.k;    
+    const real kspring = bi.k;
     //         i -------- j -------- k
     //             rij->     rjk ->
     //Compute distances and vectors
@@ -374,12 +367,12 @@ struct Angular{
   }
 
   //This function will be called for each bond in the bond file and read the information of a bond
-  //It must use the stream that is handed to it to construct a BondInfo.  
+  //It must use the stream that is handed to it to construct a BondInfo.
   static BondInfo readBond(std::istream &in){
     BondInfo bi;
     in>>bi.k>>bi.ang0;
     return bi;
-  }  
+  }
 };
 
 // //This torsional potential is similar to the HarmonicBond above, the difference is that
