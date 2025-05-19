@@ -11,42 +11,40 @@ systems. Leimkuhler and Shang 2015. https://doi.org/10.1016/j.jcp.2014.09.008
 
  */
 
+#include "Interactor/Interactor.cuh"
 #include "ParticleData/ParticleData.cuh"
 #include "System/System.h"
 #include "misc/ParameterUpdatable.h"
 #include "third_party/saruprng.cuh"
 #include "third_party/type_names.h"
 #include "utils/Box.cuh"
-#include "utils/TransverserUtils.cuh"
 
 namespace uammd {
 namespace Potential {
 struct DefaultDissipation : public ParameterUpdatable {
   real A;
   real gamma;
-  real sigma; // Random force strength, must be such as sigma =
-              // sqrt(2*kT*gamma)/sqrt(dt)
+  real sigma; // Random force strength
   real temperature, dt;
-  __device__ __host__ DefaultDissipation(real A, real gamma, real temperature,
-                                         real dt)
-      : A(A), gamma(gamma) {
-    this->temperature = temperature;
-    this->dt = dt;
-    this->sigma = sqrt(2.0 * temperature) / sqrt(dt);
+  DefaultDissipation(real A, real gamma, real temperature, real dt)
+      : A(A), gamma(gamma), temperature(temperature), dt(dt) {
+    this->sigma = sqrt(2.0 * temperature / dt);
+    System::log<System::MESSAGE>("[Potential::DPD] Created with A: %f, gamma: "
+                                 "%f, temperature: %f, dt: %f",
+                                 A, gamma, temperature, dt);
   }
 
-  __device__ __host__ auto operator()(int i, int j, real3 rij, real3 vij, real cutoff,
-                                      Saru &rng) const {
+  __device__ auto operator()(int i, int j, real3 rij, real3 vij, real cutoff,
+                             Saru &rng) const {
     const real rmod = sqrt(dot(rij, rij));
-    const real invrmod = real(1.0)/rmod;
-    const auto g = -gamma * invrmod * invrmod * dot(rij, vij);
-    const real wr =
-        real(1.0) -
-        rmod /cutoff; // This weight function is arbitrary as long as wd = wr*wr
+    const real invrmod = real(1.0) / rmod;
+    const auto g = gamma;
+    // This weight function is arbitrary as long as wd = wr*wr
+    const real wr = real(1.0) - rmod / cutoff;
     const real Fc = A * wr * invrmod;
     const real wd = wr * wr; // Wd must be such as wd = wr^2 to ensure
                              // fluctuation dissipation balance
-    const auto Fd = g * wd;
+    const auto Fd = -g * wd * invrmod * invrmod * dot(rij, vij);
     const real Fr = rng.gf(real(0.0), sigma * sqrt(g) * wr * invrmod).x;
     return (Fc + Fd + Fr) * rij;
   }
@@ -67,18 +65,19 @@ struct TransversalDissipation : public ParameterUpdatable {
   real sigma; // Random force strength, must be such as sigma =
               // sqrt(2*kT*gamma)/sqrt(dt)
   real temperature, dt;
-  __device__ __host__ TransversalDissipation(real g_par, real g_perp, real temperature, real dt)
-    : g_par(g_par), g_perp(g_perp) {
+  __device__ __host__ TransversalDissipation(real g_par, real g_perp,
+                                             real temperature, real dt)
+      : g_par(g_par), g_perp(g_perp) {
     this->temperature = temperature;
     this->dt = dt;
     this->sigma = sqrt(2.0 * temperature) / sqrt(dt);
   }
 
-  __device__ __host__ auto operator()(int i, int j, real3 rij, real3 vij, real cutoff,
-                                      Saru &rng) const {
-    const real rmod = sqrt(dot(rij,rij));
-    const real wr = real(1.0) - rmod/cutoff;
-    const auto Fc = wr /rmod;
+  __device__ __host__ auto operator()(int i, int j, real3 rij, real3 vij,
+                                      real cutoff, Saru &rng) const {
+    const real rmod = sqrt(dot(rij, rij));
+    const real wr = real(1.0) - rmod / cutoff;
+    const auto Fc = wr / rmod;
     const auto Fd = this->dissipative(rij, vij);
     const auto Fr = this->fluctuation(rij, rng);
     return (Fc + Fd + Fr) * rij;
@@ -115,10 +114,10 @@ struct TransversalDissipation : public ParameterUpdatable {
                 (noiseY.x + noiseX.y) * e.x + (noiseY.y + noiseY.y) * e.y +
                     (noiseY.z + noiseZ.y) * e.z,
                 (noiseZ.x + noiseX.z) * e.x + (noiseZ.y + noiseY.z) * e.y +
-		(noiseZ.z + noiseZ.z) * e.z)) - trNoise*e;
+                    (noiseZ.z + noiseZ.z) * e.z)) -
+        trNoise * e;
     const auto noiseB = trNoise * e;
-    const auto fluc = sigma *
-                      (Atil * noiseA + Btil * noiseB);
+    const auto fluc = sigma * (Atil * noiseA + Btil * noiseB);
     return fluc;
   }
   virtual void updateTemperature(real newTemp) override {
@@ -135,7 +134,7 @@ struct TransversalDissipation : public ParameterUpdatable {
 template <class DissipativeStrength = DefaultDissipation>
 class DPD_impl : public ParameterUpdatable {
 protected:
-  int step;
+  uint step;
   real rcut;
   std::shared_ptr<DissipativeStrength> gamma; // Dissipative force strength
   real dt;
@@ -152,7 +151,7 @@ public:
   DPD_impl(Parameters par) : DPD_impl(nullptr, par) {}
 
   DPD_impl(shared_ptr<System> sys, Parameters par)
-      : rcut(par.cutOff), dt(par.dt), gamma(par.gamma){
+      : rcut(par.cutOff), dt(par.dt), gamma(par.gamma) {
     System::log<System::MESSAGE>("[Potential::DPD] Created");
     step = 0;
     System::log<System::MESSAGE>("[Potential::DPD] Cut off: %f", rcut);
@@ -174,25 +173,15 @@ public:
   }
 
   struct ForceTransverser {
-  private:
     real4 *pos;
     real3 *vel;
     real4 *force;
     Box box;
-    ullint seed; // A random seed
-    ullint step; // Current time step
-    int N;
+    uint seed; // A random seed
+    uint step; // Current time step
+    uint N;
     real cutoff;
-    // DPD force parameters
     DissipativeStrength gamma;
-    real sigma;
-
-  public:
-    ForceTransverser(real4 *pos, real3 *vel, real4 *force, ullint seed,
-                     ullint step, Box box, int N, real cutoff,
-                     DissipativeStrength gamma)
-        : pos(pos), vel(vel), force(force), step(step), seed(seed), box(box),
-          N(N), cutoff(cutoff), gamma(gamma) {}
 
     using returnInfo = real3;
 
@@ -207,18 +196,16 @@ public:
       real3 vij = make_real3(infoi.vel) - make_real3(infoj.vel);
       // The random force must be such as Frij = Frji, we achieve this by
       // seeding the RNG the same for pairs ij and ji
-      int i = infoi.id;
-      int j = infoj.id;
+      uint i = infoi.id;
+      uint j = infoj.id;
       if (i > j)
         thrust::swap(i, j);
-      const int ij = i + N * j;
+      const uint ij = i + N * j;
       Saru rng(ij, seed, step);
-      const real rmod = sqrt(dot(rij, rij));
+      const real r2 = dot(rij, rij);
       // There is an indetermination at r=0
-      if (rmod == real(0))
-        return make_real3(0);
       // The force is 0 beyond rcut
-      if (rmod <= rcut)
+      if (r2 == real(0) || r2 >= cutoff * cutoff)
         return make_real3(0);
       return gamma(i, j, rij, vij, cutoff, rng);
     }
@@ -230,25 +217,21 @@ public:
     }
   };
 
-  ForceTransverser getForceTransverser(Box box, shared_ptr<ParticleData> pd) {
+  ForceTransverser getTransverser(Interactor::Computables comp, Box box,
+                                  shared_ptr<ParticleData> pd) {
+    if (comp.energy || comp.stress || comp.virial) {
+      System::log<System::EXCEPTION>(
+          "[DPD] This Potential can only compute forces");
+      throw std::runtime_error("DPD: This Potential can only compute forces");
+    }
     auto pos = pd->getPos(access::location::gpu, access::mode::read);
     auto vel = pd->getVel(access::location::gpu, access::mode::read);
     auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
-    static auto seed = pd->getSystem()->rng().next();
+    static uint seed = pd->getSystem()->rng().next32();
     step++;
-    int N = pd->getNumParticles();
-    return ForceTransverser(pos.raw(), vel.raw(), force.raw(), seed, step, box,
-                            N, rcut, *gamma);
-  }
-  // Notice that no getEnergyTransverser is present, this is not a problem as
-  // modules using this potential will fall back to a BasicNullTransverser when
-  // the method getEnergyTransverser is not found and the energy will not be
-  // computed altogether.
-
-  BasicNullTransverser getForceEnergyTransverser(Box box,
-                                                 shared_ptr<ParticleData> pd) {
-    System::log<System::CRITICAL>("[DPD] No way of measuring energy in DPD");
-    return BasicNullTransverser();
+    const uint N = pd->getNumParticles();
+    return ForceTransverser{pos.raw(), vel.raw(), force.raw(), box,   seed,
+                            step,      N,         rcut,        *gamma};
   }
 };
 
