@@ -41,7 +41,7 @@ jobs:
       uses: mamba-org/setup-micromamba@v1
       with:
         environment-file: environment.yml
-        cache-environment: false
+        cache-environment: true
         cache-downloads: true
       env:
         CONDA_OVERRIDE_CUDA: ${{ matrix.nvcc }}
