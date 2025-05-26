@@ -28,6 +28,7 @@ namespace uammd{
     if(val.y) newval.y = atomicAdd(&(*address).y, val.y);
     return newval;
   }
+#endif
 
   inline __device__ double2 atomicAdd(double2* address, double2 val){
     double2 newval;
@@ -35,7 +36,7 @@ namespace uammd{
     if(val.y) newval.y = atomicAdd(&(*address).y, val.y);
     return newval;
   }
-#endif
+
   inline __device__ real4 atomicAdd(real4* address, real4 val){
     real4 newval;
     if(val.x) newval.x = atomicAdd(&(*address).x, val.x);
