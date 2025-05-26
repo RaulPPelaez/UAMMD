@@ -6,7 +6,7 @@
 References:
 [1] On the numerical treatment of dissipative particle dynamics and related systems. Leimkuhler and Shang 2015. https://doi.org/10.1016/j.jcp.2014.09.008
  */
-
+#pragma once
 #include "System/System.h"
 #include "ParticleData/ParticleData.cuh"
 #include "misc/ParameterUpdatable.h"
