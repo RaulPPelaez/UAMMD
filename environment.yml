@@ -8,6 +8,8 @@ dependencies:
   - cuda-libraries-dev
   - cuda-nvcc 
   - make
-  - mkl-devel
+  - blas-devel
+  - liblapacke
+  - libblas
   - pybind11
   - python 3.11.*

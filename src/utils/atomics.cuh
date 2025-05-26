@@ -21,13 +21,14 @@ namespace uammd{
     return __longlong_as_double(old);
   }
 #endif
-
+#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ < 900
     inline __device__ float2 atomicAdd(float2* address, float2 val){
     float2 newval;
     if(val.x) newval.x = atomicAdd(&(*address).x, val.x);
     if(val.y) newval.y = atomicAdd(&(*address).y, val.y);
     return newval;
   }
+#endif
 
   inline __device__ double2 atomicAdd(double2* address, double2 val){
     double2 newval;
@@ -52,7 +53,7 @@ namespace uammd{
     if(val.z) newval.z = atomicAdd(&(*address).z, val.z);
     return newval;
   }
-  
+
   template<class T, class T2>
   inline __device__ T2 atomicAdd(T &ref, T2 val){
     return atomicAdd(&ref, val);
