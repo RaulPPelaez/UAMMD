@@ -2,8 +2,11 @@
 #include "Interactor/NeighbourList/VerletList.cuh"
 #include "Interactor/PairForces.cuh"
 #include "Interactor/Potential/DPD.cuh"
+#include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <gtest/gtest.h>
+#include <numeric>
 #include <random>
 #include <vector>
 
@@ -83,6 +86,19 @@ auto createIntegratorDPD(std::shared_ptr<ParticleData> pd,
 }
 
 enum class DissipationType { Default, Transversal };
+
+std::string
+DissipationTypeToString(::testing::TestParamInfo<DissipationType> utype) {
+  DissipationType type = utype.param;
+  switch (type) {
+  case DissipationType::Default:
+    return "Default";
+  case DissipationType::Transversal:
+    return "Transversal";
+  default:
+    return "Unknown";
+  }
+}
 
 std::shared_ptr<Integrator> createIntegrator(std::shared_ptr<ParticleData> pd,
                                              const Parameters &ipar,
@@ -221,18 +237,74 @@ TEST_P(DPDTest, TemperatureTest) {
       << ", measured temperature: " << temperature;
 }
 
-std::string
-DissipationTypeToString(const ::testing::TestParamInfo<DissipationType> &info) {
-  switch (info.param) {
-  case DissipationType::Default:
-    return "Default";
-  case DissipationType::Transversal:
-    return "Transversal";
-  default:
-    return "Unknown";
+std::vector<double>
+computeVACF(const std::vector<std::vector<real3>> &velocities) {
+  int Nsteps = velocities.size();
+  int Nparticles = velocities[0].size();
+  std::vector<double> vacf(Nsteps, 0.0);
+
+  // Compute VACF(t) = ⟨v_i(t) · v_i(0)⟩ averaged over all i
+  for (int t = 0; t < Nsteps; ++t) {
+    double sum = 0.0;
+    for (int i = 0; i < Nparticles; ++i) {
+      sum += dot(velocities[t][i], velocities[0][i]);
+    }
+    vacf[t] = sum / Nparticles;
   }
+
+  return vacf;
 }
 
+TEST_P(DPDTest, VelocityAutocorrelationTest) {
+  Parameters ipar;
+  ipar.L = 32.0;
+  ipar.cutOff_dpd = 2.0;
+  ipar.A_dpd = 25.0;
+  ipar.gamma_dpd = 17.0;
+  ipar.gamma_par_dpd = 17.0;
+  ipar.gamma_perp_dpd = 17.0;
+  ipar.temperature = 0.9213;
+
+  real boltzmannVelocityAmplitude = sqrt(ipar.temperature);
+  real charTime = ipar.cutOff_dpd / boltzmannVelocityAmplitude;
+  ipar.dt = 0.005 * charTime;
+
+  int N = 10000;
+  auto pd = make_shared<ParticleData>(N);
+  setPositionsInCubicBox(pd, ipar.L);
+  auto dpd = createIntegratorDPD(pd, ipar);
+
+  // Equilibrate system
+  const int equilibrationSteps = 100 * charTime / ipar.dt;
+  for (int i = 0; i < equilibrationSteps; ++i)
+    dpd->forwardTime();
+
+  // Record velocities over time
+  const int nsteps = 100 * charTime / ipar.dt;
+  std::vector<std::vector<real3>> velocities;
+  for (int step = 0; step < nsteps; ++step) {
+    dpd->forwardTime();
+    {
+      auto vel = pd->getVel(access::cpu, access::read);
+      velocities.emplace_back();
+      velocities.back().reserve(N);
+      for (const auto &v : vel) {
+        velocities.back().push_back(make_real3(v));
+      }
+    }
+  }
+
+  // Compute VACF
+  std::vector<double> vacf = computeVACF(velocities);
+  // VACF should start at 3 and decrease or fluctuate around 0
+  EXPECT_NEAR(vacf[0], 3.0 * ipar.temperature, 0.1)
+      << "VACF at t=0 should be close to 3.0";
+  // Average the VACF over the last 10% of the steps
+  double avgVACF = std::accumulate(vacf.end() - nsteps / 10, vacf.end(), 0.0) /
+                   (nsteps / 10);
+  // Check if the average VACF is close to 0
+  EXPECT_NEAR(avgVACF, 0.0, 0.1) << "Average VACF should be close to 0.0";
+}
 INSTANTIATE_TEST_SUITE_P(DissipationModes, DPDTest,
                          ::testing::Values(DissipationType::Default,
                                            DissipationType::Transversal),
