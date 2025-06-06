@@ -84,7 +84,7 @@ namespace uammd{
       }
 
 
-      struct ForceTransverser{
+      struct Transverser{
       private:
 	real4* pos;
 	real3 * vel;
@@ -100,19 +100,19 @@ namespace uammd{
 	real A;
 
       public:
-	ForceTransverser(real4* pos, real3 *vel, real4* force,
-			 ullint seed, ullint step,
-			 Box box,
-			 int N,
-			 real rcut,
-			 DissipativeStrength gamma, real sigma, real A):
+	Transverser(real4* pos, real3 *vel, real4* force,
+		    ullint seed, ullint step,
+		    Box box,
+		    int N,
+		    real rcut,
+		    DissipativeStrength gamma, real sigma, real A):
 	  pos(pos), vel(vel), force(force),
 	  step(step), seed(seed),
 	  box(box),
 	  N(N),
 	  invrcut(1.0/rcut), gamma(gamma), sigma(sigma), A(A){}
 
-	using returnInfo = real3;
+	using returnInfo = ForceEnergyVirial;
 
 	struct Info{
 	  real3 vel;
@@ -130,41 +130,43 @@ namespace uammd{
 	  Saru rng(ij, seed, step);
 	  const real rmod = sqrt(dot(rij,rij));
 	  //There is an indetermination at r=0
-	  if(rmod == real(0)) return make_real3(0);
+	  if(rmod == real(0)) return {};
 	  const real invrmod = real(1.0)/rmod;
 	  //The force is 0 beyond rcut
-	  if(invrmod<=invrcut) return make_real3(0);
+	  if(invrmod<=invrcut) return {};
 	  const real wr = real(1.0) - rmod*invrcut; //This weight function is arbitrary as long as wd = wr*wr
 	  const real Fc = A*wr*invrmod;
 	  const real wd = wr*wr; //Wd must be such as wd = wr^2 to ensure fluctuation dissipation balance
 	  const real g = gamma.dissipativeStrength(i, j, pi, pj, infoi.vel, infoj.vel);
 	  const real Fd = -g*wd*invrmod*invrmod*dot(rij, vij);
 	  const real Fr = rng.gf(real(0.0), sigma*sqrt(g)*wr*invrmod).x;
-	  return (Fc+Fd+Fr)*rij;
+	  returnInfo fev;
+	  fev.force = (Fc+Fd+Fr)*rij;
+	  return fev;
 	}
 
 	inline __device__ Info getInfo(int pi){return  {vel[pi], pi};}
 
-	inline __device__ void set(uint pi, const returnInfo &total){ force[pi] += make_real4(total);}
+	inline __device__ void set(uint pi, const returnInfo &total){ force[pi] += make_real4(total.force);}
 
       };
 
-      ForceTransverser getForceTransverser(Box box, shared_ptr<ParticleData> pd){
-	auto pos = pd->getPos(access::location::gpu, access::mode::read);
-	auto vel = pd->getVel(access::location::gpu, access::mode::read);
-	auto force = pd->getForce(access::location::gpu, access::mode::readwrite);
-	static auto seed = pd->getSystem()->rng().next();
-	step++;
-	int N = pd->getNumParticles();
-	return ForceTransverser(pos.raw(), vel.raw(), force.raw(), seed, step, box, N, rcut, gamma, sigma, A);
-      }
-      //Notice that no getEnergyTransverser is present, this is not a problem as modules using this potential will fall back to a BasicNullTransverser when the method getEnergyTransverser is not found and the energy will not be computed altogether.
-
-      BasicNullTransverser getForceEnergyTransverser(Box box, shared_ptr<ParticleData> pd){
+      Transverser getTransverser(Interactor::Computables comp, Box box, std::shared_ptr<ParticleData> pd){
+      if (comp.energy){
 	System::log<System::CRITICAL>("[DPD] No way of measuring energy in DPD");
-	return BasicNullTransverser();
       }
 
+      if (comp.virial){
+	System::log<System::CRITICAL>("[DPD] No way of measuring virial in DPD");
+      }
+      auto pos = pd->getPos(access::location::gpu, access::mode::read).raw();
+      auto vel = pd->getVel(access::location::gpu, access::mode::read).raw();
+      auto force = pd->getForce(access::location::gpu, access::mode::readwrite).raw();
+      static auto seed = pd->getSystem()->rng().next();
+      step++;
+      int N = pd->getNumParticles();
+      return Transverser(pos, vel, force, seed, step, box, N, rcut, gamma, sigma, A);
+      }
     };
 
     template<>

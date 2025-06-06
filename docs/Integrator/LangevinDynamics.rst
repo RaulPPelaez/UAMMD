@@ -284,40 +284,41 @@ where :math:`\nu` is a provided viscosity, and :math:`\vec{v}_{ij} = \vec{v}_j -
 Usage
 -------------
 
-We couple an SPH :ref:`Interactor` with a :ref:`VerletNVE`  :ref:`Integrator`.
+For simplicity, an :ref:`Integrator` is defined that couples the SPH :ref:Interactor with a :ref:`VerletNVE`  :ref:`Integrator`.
 
-The following parameters are available for the SPH :ref:`Interactor`:
+The following parameters are available for the SPH :ref:`Integrator`, they are a combination of the parameters of the SPH :ref:`Interactor` and VerletNVE :ref:`Integrator`:
  * :cpp:`real support`. The length scale :math:`h`.
  * :cpp:`real viscosity`. The prefactor for the artificial viscosity, :math:`\mu`.
  * :cpp:`real gasStiffness`. The prefactor for the ideal gas equation of state, :math:`K`.
  * :cpp:`real restDensity`. The rest density in the equation of state, :math:`\rho_0`.
  * :cpp:`Box box`. A :cpp:any:`Box` with the simulation domain information.
-  
+ * :cpp:`real dt` The time step.
+ * :cpp:`bool initVelocities=true` Modify starting velocities to ensure the target temperature from the start. When :cpp:`false` the velocities of the particles are left untouched at initialization. The default is true and sets particle velocities following the botzmann distribution.
+ * :code:`bool is2D = false` Set to true if the system is 2D  
+ * :cpp:`real energy` Target energy per particle, can be omitted if :cpp:`initVelocities=false`.
+ * :cpp:`real mass = -1` Mass of all the particles. If >0 all particles will have this mass, otherwise the mass for each particle in :ref:`ParticleData` will be used. If masses have not been set in :ref:`ParticleData` the default mass is 1 for all particles.  
 .. code:: c++
 	  
   #include "Integrator/VerletNVE.cuh"
   #include "Interactor/SPH.cuh"
   using namespace uammd;
-  //SPH is handled by UAMMD as a VerletNVE integrator with a special interaction
+  //SPHIntegrator combines a VerletNVE integrator with a special interaction encoding SPH
   std::shared_ptr<Integrator> createIntegratorSPH(std::shared_ptr<ParticleData> pd){
-    using NVE = VerletNVE;
-    NVE::Parameters par;
+    SPHIntegrator::Parameters par;
     par.dt = 0.1;
     par.initVelocities = false;
-    auto verlet = std::make_shared<NVE>(pd, par);
-    SPH::Parameters params;
+    
     real3 L = make_real3(32,32,32);
-    params.box = Box(L);
+    par.box = Box(L);
     //Pressure for a given particle "i" in SPH will be computed as gasStiffness·(density_i - restDensity)
     //Where density is computed as a function of the masses of the surroinding particles
     //Particle mass starts as 1, but you can change this in customizations.cuh
-    params.support = 2.4;   //Cut off distance for the SPH kernel
-    params.viscosity = 1.0;   //Environment viscosity
-    params.gasStiffness = 1.0;
-    params.restDensity = 1.0;
-    auto sph = std::make_shared<SPH>(pd, params);
-    verlet->addInteractor(sph);
-    return verlet;
+    par.support = 2.4;   //Cut off distance for the SPH kernel
+    par.viscosity = 1.0;   //Environment viscosity
+    par.gasStiffness = 1.0;
+    par.restDensity = 1.0;
+    auto sph_verlet = std::make_shared<SPHIntegrator>(pd, par);
+    return sph_verlet;
   }
 	  
 
