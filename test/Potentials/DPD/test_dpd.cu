@@ -50,7 +50,8 @@ auto createIntegratorTransversalDPD(std::shared_ptr<ParticleData> pd,
   using DPDPF = PairForces<DPD, NeighbourList>;
   DPD::Parameters dpd_params;
   auto gamma = std::make_shared<Potential::TransversalDissipation>(
-      ipar.gamma_par_dpd, ipar.gamma_perp_dpd, ipar.temperature, ipar.dt);
+      ipar.gamma_par_dpd, ipar.gamma_perp_dpd, ipar.A_dpd, ipar.temperature,
+      ipar.dt);
   dpd_params.cutOff = ipar.cutOff_dpd;
   dpd_params.gamma = gamma;
   dpd_params.dt = par.dt;
