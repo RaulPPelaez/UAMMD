@@ -163,17 +163,20 @@ TEST_P(DPDTest, SingleSimulationTest) {
 TEST_P(DPDTest, MomentumIsConservedTest) {
   Parameters ipar;
 
-  ipar.L = 32.0;          // Box size
-  ipar.cutOff_dpd = 1.0;  // Cut-off distance for DPD interactions
-  ipar.A_dpd = 25.0;      // Amplitude of the DPD force
-  ipar.gamma_dpd = 1.0;   // Damping coefficient for DPD
+  ipar.L = 32.0;            // Box size
+  ipar.cutOff_dpd = 1.0;    // Cut-off distance for DPD interactions
+  ipar.A_dpd = 25.0;        // Amplitude of the DPD force
+  ipar.gamma_dpd = 1.0;     // Damping coefficient for DPD
+  ipar.gamma_par_dpd = 1.0; // Parallel damping coefficient for transversal DPD
+  ipar.gamma_perp_dpd =
+      0.000000000001; // Perpendicular damping coefficient for transversal DPD
   ipar.temperature = 1.0; // Temperature for the system
   real boltzmannVelocityAmplitude = sqrt(3 * ipar.temperature);
   ipar.dt = 0.01 * ipar.cutOff_dpd / boltzmannVelocityAmplitude;
   int N = 10000;
   auto pd = make_shared<ParticleData>(N);
   setPositionsInCubicBox(pd, ipar.L);
-  auto dpd = createIntegratorDPD(pd, ipar);
+  auto dpd = createIntegrator(pd, ipar, DPD_PARAM);
   int nsteps = 100;
   for (int i = 0; i < nsteps; ++i) {
     dpd->forwardTime();
@@ -195,20 +198,20 @@ TEST_P(DPDTest, TemperatureTest) {
   ipar.L = 32.0;             // Box size
   ipar.cutOff_dpd = 2.0;     // Cut-off distance for DPD interactions
   ipar.A_dpd = 25.0;         // Amplitude of the DPD force
-  ipar.gamma_dpd = 17.0;     // Damping coefficient for DPD
-  ipar.gamma_par_dpd = 17.0; // Parallel damping coefficient for transversal DPD
+  ipar.gamma_dpd = 1.0;     // Damping coefficient for DPD
+  ipar.gamma_par_dpd = ipar.gamma_dpd; // Parallel damping coefficient for transversal DPD
   ipar.gamma_perp_dpd =
-      17.0; // Perpendicular damping coefficient for transversal DPD
+      0.000000001; // Perpendicular damping coefficient for transversal DPD
   ipar.temperature = 0.921321; // Temperature for the system
   real boltzmannVelocityAmplitude = sqrt(ipar.temperature);
   real charTime = ipar.cutOff_dpd / boltzmannVelocityAmplitude;
   ipar.dt =
-      0.005 *
+      0.001 *
       charTime; // Set the time step to be a fraction of the characteristic time
   int N = 10000;
   auto pd = make_shared<ParticleData>(N);
   setPositionsInCubicBox(pd, ipar.L);
-  auto dpd = createIntegratorDPD(pd, ipar);
+  auto dpd = createIntegrator(pd, ipar, DPD_PARAM);
   int isteps =
       100 * charTime / ipar.dt; // Run for a few characteristic times to
   // allow the system to equilibrate
