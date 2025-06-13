@@ -158,6 +158,7 @@ TEST_P(DPDTest, SingleSimulationTest) {
   real r = 1.0; // Distance between particles
   real4 pos0 = runSimulation(ipar, r);
 }
+#define DPD_PARAM GetParam()
 
 TEST_P(DPDTest, MomentumIsConservedTest) {
   Parameters ipar;
