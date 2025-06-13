@@ -88,8 +88,8 @@ struct TransversalDissipation : public ParameterUpdatable {
     const real wr = real(1.0) - rmod / cutoff;
     const auto eij = rij / rmod;
     const auto Fc = A * wr * eij;
-    const auto g_par_r = g_par * wr * wr / (rmod * rmod);
-    const auto g_perp_r = g_perp * wr * wr / (rmod * rmod);
+    const auto g_par_r = g_par * wr * wr;
+    const auto g_perp_r = g_perp * wr * wr;
     const auto Fd = this->dissipative(eij, vij, g_par_r, g_perp_r);
     const auto Fr = this->fluctuation(eij, rng, g_par_r, g_perp_r);
     return Fc + Fd + Fr;
