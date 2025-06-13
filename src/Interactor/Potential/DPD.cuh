@@ -65,39 +65,50 @@ struct TransversalDissipation : public ParameterUpdatable {
   real sigma; // Random force strength, must be such as sigma =
               // sqrt(2*kT*gamma)/sqrt(dt)
   real temperature, dt;
-  __device__ __host__ TransversalDissipation(real g_par, real g_perp,
-                                             real temperature, real dt)
-      : g_par(g_par), g_perp(g_perp) {
-    this->temperature = temperature;
-    this->dt = dt;
+  real A;
+  TransversalDissipation(real g_par, real g_perp, real A, real temperature,
+                         real dt)
+      : g_par(g_par), g_perp(g_perp), temperature(temperature), dt(dt), A(A) {
     this->sigma = sqrt(2.0 * temperature) / sqrt(dt);
+    if (g_par < (4.0 / 3.0) * g_perp) {
+      throw std::runtime_error("[TransversalDissipation] g_par must be greater "
+                               "than 4/3 * g_perp, found g_par: " +
+                               std::to_string(g_par) +
+                               " g_perp: " + std::to_string(g_perp));
+    }
+    if (g_perp < 0) {
+      throw std::runtime_error(
+          "[TransversalDissipation] g_perp must be non-negative");
+    }
   }
 
   __device__ __host__ auto operator()(int i, int j, real3 rij, real3 vij,
                                       real cutoff, Saru &rng) const {
     const real rmod = sqrt(dot(rij, rij));
     const real wr = real(1.0) - rmod / cutoff;
-    const auto Fc = wr / rmod;
-    const auto Fd = this->dissipative(rij, vij);
-    const auto Fr = this->fluctuation(rij, rng);
-    return (Fc + Fd + Fr) * rij;
+    const auto eij = rij / rmod;
+    const auto Fc = A * wr * eij;
+    const auto g_par_r = g_par * wr * wr / (rmod * rmod);
+    const auto g_perp_r = g_perp * wr * wr / (rmod * rmod);
+    const auto Fd = this->dissipative(eij, vij, g_par_r, g_perp_r);
+    const auto Fr = this->fluctuation(eij, rng, g_par_r, g_perp_r);
+    return Fc + Fd + Fr;
   }
 
-  __device__ __host__ real3 dissipative(real3 rij, real3 vij) const {
-    const auto r = sqrt(dot(rij, rij));
-    const auto e = rij / r;
-    const auto vee =
-        make_real3(vij.x * e.x * e.x + vij.y * e.x * e.y + vij.z * e.x * e.z,
-                   vij.x * e.y * e.x + vij.y * e.y * e.y + vij.z * e.y * e.z,
-                   vij.x * e.z * e.x + vij.y * e.z * e.y + vij.z * e.z * e.z);
-    const auto vmvee = vij - vee;
-    const auto gv = g_par * vee + g_perp * vmvee;
-    return gv;
+  __device__ __host__ real3 dissipative(real3 eij, real3 vij, real g_par,
+                                        real g_perp) const {
+    // (eij\dyadic eij )\dot vij
+    const auto vdyadic = make_real3(
+        vij.x * eij.x * eij.x + vij.y * eij.x * eij.y + vij.z * eij.x * eij.z,
+        vij.x * eij.y * eij.x + vij.y * eij.y * eij.y + vij.z * eij.y * eij.z,
+        vij.x * eij.z * eij.x + vij.y * eij.z * eij.y + vij.z * eij.z * eij.z);
+    const auto videntity = vij;
+    const auto gv = g_perp * videntity + (g_par - g_perp) * vdyadic;
+    return -gv;
   }
 
-  __device__ __host__ real3 fluctuation(real3 rij, Saru &rng) const {
-    const auto r = sqrt(dot(rij, rij));
-    const auto e = rij / r;
+  __device__ __host__ real3 fluctuation(real3 eij, Saru &rng, real g_par,
+                                        real g_perp) const {
     const auto A = g_perp;
     const auto B = g_par - g_perp;
     const auto Atil = sqrt(2 * A);
@@ -109,14 +120,14 @@ struct TransversalDissipation : public ParameterUpdatable {
     const auto noiseA =
         real(0.5) *
             (make_real3(
-                (noiseX.x + noiseX.x) * e.x + (noiseX.y + noiseY.x) * e.y +
-                    (noiseX.z + noiseZ.x) * e.z,
-                (noiseY.x + noiseX.y) * e.x + (noiseY.y + noiseY.y) * e.y +
-                    (noiseY.z + noiseZ.y) * e.z,
-                (noiseZ.x + noiseX.z) * e.x + (noiseZ.y + noiseY.z) * e.y +
-                    (noiseZ.z + noiseZ.z) * e.z)) -
-        trNoise * e;
-    const auto noiseB = trNoise * e;
+                (noiseX.x + noiseX.x) * eij.x + (noiseX.y + noiseY.x) * eij.y +
+                    (noiseX.z + noiseZ.x) * eij.z,
+                (noiseY.x + noiseX.y) * eij.x + (noiseY.y + noiseY.y) * eij.y +
+                    (noiseY.z + noiseZ.y) * eij.z,
+                (noiseZ.x + noiseX.z) * eij.x + (noiseZ.y + noiseY.z) * eij.y +
+                    (noiseZ.z + noiseZ.z) * eij.z)) -
+        trNoise * eij;
+    const auto noiseB = trNoise * eij;
     const auto fluc = sigma * (Atil * noiseA + Btil * noiseB);
     return fluc;
   }
