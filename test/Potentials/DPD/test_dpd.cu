@@ -198,11 +198,12 @@ TEST_P(DPDTest, TemperatureTest) {
   // Measure the temperature of a system and check if it is close to the
   // expected value.
   Parameters ipar;
-  ipar.L = 32.0;             // Box size
-  ipar.cutOff_dpd = 2.0;     // Cut-off distance for DPD interactions
-  ipar.A_dpd = 25.0;         // Amplitude of the DPD force
-  ipar.gamma_dpd = 1.0;     // Damping coefficient for DPD
-  ipar.gamma_par_dpd = ipar.gamma_dpd; // Parallel damping coefficient for transversal DPD
+  ipar.L = 32.0;         // Box size
+  ipar.cutOff_dpd = 2.0; // Cut-off distance for DPD interactions
+  ipar.A_dpd = 25.0;     // Amplitude of the DPD force
+  ipar.gamma_dpd = 1.0;  // Damping coefficient for DPD
+  ipar.gamma_par_dpd =
+      ipar.gamma_dpd; // Parallel damping coefficient for transversal DPD
   ipar.gamma_perp_dpd =
       0.000000001; // Perpendicular damping coefficient for transversal DPD
   ipar.temperature = 0.921321; // Temperature for the system
@@ -215,8 +216,7 @@ TEST_P(DPDTest, TemperatureTest) {
   auto pd = make_shared<ParticleData>(N);
   setPositionsInCubicBox(pd, ipar.L);
   auto dpd = createIntegrator(pd, ipar, DPD_PARAM);
-  int isteps =
-      100 * charTime / ipar.dt; // Run for a few characteristic times to
+  int isteps = 10 * charTime / ipar.dt; // Run for a few characteristic times to
   // allow the system to equilibrate
   auto computeTemperature = [&pd]() {
     auto vel = pd->getVel(access::cpu, access::read);
@@ -229,7 +229,9 @@ TEST_P(DPDTest, TemperatureTest) {
   for (int i = 0; i < isteps; ++i) {
     dpd->forwardTime();
   }
-  int nsteps = 100 * charTime / ipar.dt;
+  int nsteps = std::max(int(1 * charTime / ipar.dt), 1000);
+  int nprint = nsteps / 1000;
+  nsteps = (nsteps / nprint) * nprint; // Ensure nsteps is a multiple of nprint
   std::vector<double> temperatures;
   for (int i = 0; i < nsteps; ++i) {
     dpd->forwardTime();
@@ -272,6 +274,41 @@ computeVACF(const std::vector<std::vector<real3>> &velocities) {
   return vacf;
 }
 
+auto fit_exponential_decay(std::span<double> vacf) {
+  // We assume the form: A * exp(-t / tau)
+  // Linearize: log(VACF) = log(A) - t / tau
+  if (vacf.size() < 2) {
+    throw std::invalid_argument("Not enough data points to fit an exponential");
+  }
+  std::vector<double> t;
+  std::vector<double> y;
+  for (size_t i = 0; i < vacf.size(); ++i) {
+    if (vacf[i] <= 0.0)
+      continue; // skip non-positive values to avoid log issues
+    t.push_back(static_cast<double>(i));
+    y.push_back(std::log(vacf[i]));
+  }
+
+  if (t.size() < 2) {
+    throw std::runtime_error("Not enough positive VACF values to perform fit");
+  }
+  double mean_t = std::accumulate(t.begin(), t.end(), 0.0) / t.size();
+  double mean_y = std::accumulate(y.begin(), y.end(), 0.0) / y.size();
+  double numerator = 0.0;
+  double denominator = 0.0;
+  for (size_t i = 0; i < t.size(); ++i) {
+    double dt = t[i] - mean_t;
+    double dy = y[i] - mean_y;
+    numerator += dt * dy;
+    denominator += dt * dt;
+  }
+  double slope = numerator / denominator;
+  double intercept = mean_y - slope * mean_t;
+  double tau = -1.0 / slope;
+  double A = std::exp(intercept);
+  return std::make_pair(A, tau); // return as (A, tau)
+}
+
 TEST_P(DPDTest, VelocityAutocorrelationTest) {
   Parameters ipar;
   ipar.L = 32.0;
@@ -283,11 +320,10 @@ TEST_P(DPDTest, VelocityAutocorrelationTest) {
   // ipar.temperature must be much larger than pow(ipar.gamma_dpd/3.0, 2) for
   // the VACF to be a single exponential decay
   ipar.temperature = 100.0 * pow(ipar.gamma_dpd / 3.0, 2);
-
   real time_thermal = ipar.cutOff_dpd / sqrt(ipar.temperature);
   real decay_t = 3.0 / (ipar.gamma_dpd);
   real charTime = std::min(time_thermal, decay_t);
-  ipar.dt = 0.001 * charTime;
+  ipar.dt = 0.005 * charTime;
 
   int N = 10000;
   auto pd = make_shared<ParticleData>(N);
@@ -295,13 +331,13 @@ TEST_P(DPDTest, VelocityAutocorrelationTest) {
   auto dpd = createIntegrator(pd, ipar, DPD_PARAM);
 
   // Equilibrate system
-  const int equilibrationSteps = 10 * charTime / ipar.dt;
+  const int equilibrationSteps = 1 * charTime / ipar.dt;
   for (int i = 0; i < equilibrationSteps; ++i)
     dpd->forwardTime();
 
   // Record velocities over time
-  int nsteps = std::max(int(1 * decay_t / ipar.dt), 5000);
-  int nprint = nsteps / 5000;          // Print 1000 steps in total
+  int nsteps = std::max(int(2 * decay_t / ipar.dt), 1500);
+  int nprint = nsteps / 1500;
   nsteps = (nsteps / nprint) * nprint; // Ensure nsteps is a multiple of nprint
   std::vector<std::vector<real3>> velocities;
   for (int step = 0; step < nsteps; ++step) {
@@ -318,28 +354,36 @@ TEST_P(DPDTest, VelocityAutocorrelationTest) {
     }
   }
 
-  // Compute VACF
   std::vector<double> vacf = computeVACF(velocities);
-  {
-    // Write to a file
-    std::string name =
-        GetParam() == DissipationType::Default ? "default" : "transversal";
-    std::ofstream vacf_file("vacf" + name + ".dat");
-    std::cerr << "dt is " << ipar.dt << std::endl;
-    for (int t = 0; t < vacf.size(); ++t) {
-      vacf_file << t * ipar.dt * nprint / decay_t << " "
-                << vacf[t] / (3.0 * ipar.temperature) << endl;
-    }
-  }
+  // {
+  //   // Write to a file
+  //   std::string name =
+  //       GetParam() == DissipationType::Default ? "default" : "transversal";
+  //   std::ofstream vacf_file("vacf" + name + ".dat");
+  //   std::cerr << "dt is " << ipar.dt << std::endl;
+  //   for (int t = 0; t < vacf.size(); ++t) {
+  //     vacf_file << t * ipar.dt * nprint / decay_t << " "
+  //               << vacf[t] / (3.0 * ipar.temperature) << endl;
+  //   }
+  // }
 
-  // VACF should start at 3 and decrease or fluctuate around 0
   EXPECT_NEAR(vacf[0], 3.0 * ipar.temperature, 0.1)
       << "VACF at t=0 should be close to 3.0";
-  // Average the VACF over the last 10% of the steps
-  double avgVACF = std::accumulate(vacf.end() - nsteps / 10, vacf.end(), 0.0) /
-                   (nsteps / 10);
-  // Check if the average VACF is close to 0
-  EXPECT_NEAR(avgVACF, 0.0, 0.1) << "Average VACF should be close to 0.0";
+
+  // Get the values until the vacf drops to 0.8
+  auto it = std::find_if(vacf.begin(), vacf.end(), [&](double v) {
+    return v < 0.8 * 3.0 * ipar.temperature;
+  });
+  if (it == vacf.end()) {
+    FAIL() << "VACF did not drop below 0.8 * 3.0 * temperature";
+  }
+  int t_end = std::distance(vacf.begin(), it);
+  // Fit to an exponential decay
+  std::span vacf_span(vacf.begin(), t_end);
+  auto [pref, tau] = fit_exponential_decay(vacf_span);
+  auto theory_tau = decay_t / (ipar.dt * nprint);
+  EXPECT_NEAR(tau, theory_tau, 0.1 * theory_tau)
+      << "Fitted decay time should be close to the theoretical value";
 }
 
 std::vector<double>
@@ -377,6 +421,7 @@ template <typename T> T fit_to_line(std::span<T> vec) {
   T slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
   return slope;
 }
+
 TEST_P(DPDTest, DiffusionCoefficientTest) {
   Parameters ipar;
   ipar.L = 32.0;
@@ -388,19 +433,19 @@ TEST_P(DPDTest, DiffusionCoefficientTest) {
   ipar.temperature = 0.921321;
   real boltzmannVelocityAmplitude = sqrt(ipar.temperature);
   real charTime = ipar.cutOff_dpd / boltzmannVelocityAmplitude;
-  ipar.dt = 0.001 * charTime;
+  ipar.dt = 0.005 * charTime;
   int N = 10000;
   auto pd = make_shared<ParticleData>(N);
   setPositionsInCubicBox(pd, ipar.L);
   auto dpd = createIntegrator(pd, ipar, DPD_PARAM);
 
   // Equilibrate
-  int isteps = 500 * charTime / ipar.dt; // Equilibration steps
+  int isteps = 5 * charTime / ipar.dt; // Equilibration steps
   for (int i = 0; i < isteps; ++i)
     dpd->forwardTime();
 
   // Record positions over time
-  int nsteps = 100 * charTime / ipar.dt; // Total steps to record
+  int nsteps = 300 * charTime / ipar.dt; // Total steps to record
   int nprint = nsteps / 3000;            // Print every 100th step
   nsteps = (nsteps / nprint) * nprint; // Ensure nsteps is a multiple of nprint
   std::vector<double> positions; // Stores position such that particle i, time t
@@ -428,13 +473,12 @@ TEST_P(DPDTest, DiffusionCoefficientTest) {
   }
   ASSERT_EQ(iprint, ntimes)
       << "Number of printed steps does not match expected number";
-  // std::vector<double> msd = computeMSD(positions);
   auto msd = msd::mean_square_displacement(std::span(positions),
                                            msd::device::cpu, N, ntimes, 3);
   // Estimate D from slope of MSD in linear regime
-  // Use last 25% of steps (can refine later)
-  int t_start = 3 / 4.0 * ntimes;
-  int t_end = ntimes;
+  // Start at 10*charTime and go up to 100*charTime
+  int t_start = 10 * charTime / ipar.dt / nprint;
+  int t_end = 100 * charTime / ipar.dt / nprint;
   std::span msd_x(msd);
   msd_x = msd_x.subspan(t_start, t_end - t_start);
   double slopex = fit_to_line(msd_x);
@@ -444,24 +488,34 @@ TEST_P(DPDTest, DiffusionCoefficientTest) {
   std::span msd_z(msd.begin() + 2 * ntimes, ntimes);
   msd_z = msd_z.subspan(t_start, t_end - t_start);
   double slopez = fit_to_line(msd_z);
-  real3 D = make_real3(slopex, slopey, slopez) / 6.0;
-  std::cout << "Estimated diffusion coefficient: D = " << D << std::endl;
-  // Write MSD to file for analysis
-  std::string name =
-      GetParam() == DissipationType::Default ? "default" : "transversal";
-  std::ofstream msd_file("msd" + name + ".dat");
-  for (int t = 0; t < ntimes; ++t) {
-    msd_file << t * ipar.dt * nprint;
-    for (int i = 0; i < 3; ++i) {
-      msd_file << " " << msd[t + ntimes * i];
-    }
-    msd_file << endl;
-  }
-  msd_file.close();
-
+  // MSD(t) = 2 * D * t // In each dimension
+  real3 D = make_real3(slopex, slopey, slopez) / (2.0 * ipar.dt * nprint);
+  // Check that all three are similar
+  EXPECT_NEAR(D.x, D.y, 0.1 * D.x)
+      << "Diffusion coefficients in x and y should be similar";
+  EXPECT_NEAR(D.x, D.z, 0.1 * D.x)
+      << "Diffusion coefficients in x and z should be similar";
+  // // Write MSD to file for analysis
+  // std::string name =
+  //     GetParam() == DissipationType::Default ? "default" : "transversal";
+  // std::ofstream msd_file("msd" + name + ".dat");
+  // for (int t = 0; t < ntimes; ++t) {
+  //   msd_file << t * ipar.dt * nprint;
+  //   for (int i = 0; i < 3; ++i) {
+  //     msd_file << " " << msd[t + ntimes * i];
+  //   }
+  //   msd_file << endl;
+  // }
+  // msd_file.close();
   EXPECT_GT(D.x, 0.0);
   EXPECT_GT(D.y, 0.0);
   EXPECT_GT(D.z, 0.0);
+
+  real Dtot = (D.x + D.y + D.z) / 3.0;
+  real Dtheo = ipar.temperature / (3.0 * ipar.gamma_dpd);
+  std::cerr << "Dtot = " << Dtot << ", Dtheo = " << Dtheo << std::endl;
+  EXPECT_NEAR(Dtot, Dtheo, 0.1 * Dtheo)
+      << "Diffusion coefficient should be close to the theoretical value";
 }
 
 struct SinusoidalForce {
@@ -500,7 +554,8 @@ TEST_P(DPDTest, ShearViscosityTest) {
   ipar.temperature = 0.0; // Temperature for the system
   real charTime = 1.0 / ipar.gamma_dpd;
   ipar.dt = 0.005 * charTime; // Set the time step to be a fraction of the
-  int N = 10000;
+  const real density = 0.3;
+  int N = pow(ipar.L, 3.0) / density;
   auto pd = make_shared<ParticleData>(N);
   setPositionsInCubicBox(pd, ipar.L);
   auto dpd = createIntegrator(pd, ipar, DPD_PARAM);
@@ -510,20 +565,20 @@ TEST_P(DPDTest, ShearViscosityTest) {
   auto ext = std::make_shared<ExternalForces<SinusoidalForce>>(pd, gr);
   dpd->addInteractor(ext);
   // Equilibrate the system
-  int isteps = 400 * charTime / ipar.dt; // Equilibration steps
+  int isteps = 20 * charTime / ipar.dt; // Equilibration steps
   for (int i = 0; i < isteps; ++i)
     dpd->forwardTime();
   // Get velocities and average them in the Z and Y directions
-  int nsim = 100 * charTime / ipar.dt; // Number of steps to average over
-  int navg = nsim / 1000;              // Average 100 steps in total
-  nsim = (nsim / navg) * navg;         // Ensure nsim is a multiple of navg
+  int nsim = std::max(int(2 * charTime / ipar.dt), 1000); // Number of steps to average over
+  int nprint = nsim / 1000;
+  nsim = (nsim / nprint) * nprint;       // Ensure nsim is a multiple of navg
   // Make an histogram of velocities in the x-direction
-  int n_bins = 200;
+  int n_bins = 300;
   std::vector<real> vel_avg(n_bins, 0.0);
   std::vector<int> bin_count(n_bins, 0);
   for (int i = 0; i < nsim; ++i) {
     dpd->forwardTime();
-    if (i % navg != 0)
+    if (i % nprint != 0)
       continue;
     auto vel = pd->getVel(access::cpu, access::read);
     auto pos = pd->getPos(access::cpu, access::read);
@@ -550,6 +605,18 @@ TEST_P(DPDTest, ShearViscosityTest) {
     }
     vel_file << i * ipar.L / n_bins << " " << vel_avg[i] << endl;
   }
+
+  constexpr real s = 2.0; // Exponent of the DPD dissipative kernel
+  real vis_theo =
+      2 * M_PI * ipar.gamma_dpd * density * density * pow(ipar.cutOff_dpd, 5) /
+      15 *
+      (1 / (s + 1) - 4 / (s + 2) + 6 / (s + 3) - 4 / (s + 4) + 1 / (s + 5));
+  real v_amp = (*std::max_element(vel_avg.begin(), vel_avg.end()) -
+		*std::min_element(vel_avg.begin(), vel_avg.end())) * 0.5;
+  real viscosity_measured =
+    density * ipar.L / (pow(2 * M_PI, 2) * v_amp);
+  EXPECT_NEAR(viscosity_measured, vis_theo, 0.1 * vis_theo)
+      << "Shear viscosity should be close to the theoretical value";
 }
 
 INSTANTIATE_TEST_SUITE_P(DissipationModes, DPDTest,
