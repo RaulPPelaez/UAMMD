@@ -35,7 +35,6 @@ jobs:
           fi          
 
       - name: Comment on PR if formatting issues found
-      # Runs if the previous step found unformatted files
         if:  steps.format_check.outputs.files != ''
         uses: peter-evans/create-or-update-comment@v4
         with:
@@ -49,3 +48,10 @@ jobs:
             ```
             Please run `clang-format -i` on these files and commit the changes  before merging.
             
+
+      - name: Fail job if formatting issues found
+        if: steps.format_check.outputs.files != ''
+        run: |
+          echo "Formatting issues detected. Failing the job."
+          exit 1
+       
