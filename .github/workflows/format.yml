@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format-17
+        run: sudo apt-get update && sudo apt-get install -y clang-format
 
       - name: Find unformatted files
         id: format_check
@@ -22,21 +22,25 @@ jobs:
           FILE_LIST="unformatted_files.txt"
           find src ! -path 'src/third_party/*' \
             -regex '.*\.\(cpp\|hpp\|h\|c\|cc\|cu\|cuh\)' \
-            -exec bash -c 'clang-format-17 -style=file -output-replacements-xml "$0" | grep -q "<replacement " && echo "$0"' {} \; > "$FILE_LIST"
+            -exec bash -c 'clang-format -style=file -output-replacements-xml "$0" | grep -q "<replacement " && echo "$0"' {} \; > "$FILE_LIST"
           cat "$FILE_LIST"
-          echo "file_list=$FILE_LIST" >> "$GITHUB_OUTPUT"
+          FILES="$(cat $FILE_LIST)"
+          echo "files='$FILES'" >> "$GITHUB_OUTPUT"
           if [ -s "$FILE_LIST" ]; then
             exit 1
           fi
 
       - name: Comment on PR if formatting issues found
         if: steps.format_check.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Posting comment with formatting errors..."
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          FILE_LIST=$(cat ${{ steps.format_check.outputs.file_list }})
-          gh pr comment "$PR_NUMBER" --body "$(
-            echo -e "⚠️ **Clang-format check failed**\n\nThe following files are not correctly formatted:\n\n\`\`\`\n$FILE_LIST\n\`\`\`\n\nPlease run \`clang-format -i\` on these files before merging."
-          )"
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ⚠️ **Clang-format check failed**
+            
+            The following files are not correctly formatted:
+            ```
+            "${{ steps.format_check.outputs.files }}"
+            ```
+            Please run `clang-format -i` on these files and commit the changes  before merging.
+            
