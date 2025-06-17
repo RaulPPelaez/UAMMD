@@ -7,12 +7,12 @@
 #ifndef POTENTIALBASE_CUH
 #define POTENTIALBASE_CUH
 
-namespace uammd{
+namespace uammd {
 
-  namespace Potential{
-    //The three different modes a Potential can work on
-    enum class Mode{FORCE, ENERGY, VIRIAL};
+namespace Potential {
+// The three different modes a Potential can work on
+enum class Mode { FORCE, ENERGY, VIRIAL };
 
-  }
-}
+} // namespace Potential
+} // namespace uammd
 #endif

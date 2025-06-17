@@ -1,6 +1,7 @@
 /*Raul P. Pelaez 2017-2021. NBody submodule.
 
-  An NBody is a very lightweight object than can be used to process Transversers with an all-with-all nbody interaction O(N^2).
+  An NBody is a very lightweight object than can be used to process Transversers
+with an all-with-all nbody interaction O(N^2).
 
 USAGE:
 
@@ -21,34 +22,33 @@ For use outside the UAMMD ecosystem, see NBodyBase.cuh
 */
 #ifndef NBODY_CUH
 #define NBODY_CUH
-#include"global/defines.h"
-#include"ParticleData/ParticleGroup.cuh"
-#include"Interactor/NBodyBase.cuh"
-namespace uammd{
-  class NBody{
-    shared_ptr<ParticleGroup> pg;
-    NBodyBase nb;
-  public:
-    NBody(shared_ptr<ParticleGroup> pg): pg(pg){
-      System::log<System::DEBUG>("[NBody] Created");
-    }
+#include "Interactor/NBodyBase.cuh"
+#include "ParticleData/ParticleGroup.cuh"
+#include "global/defines.h"
+namespace uammd {
+class NBody {
+  shared_ptr<ParticleGroup> pg;
+  NBodyBase nb;
 
-    NBody(shared_ptr<ParticleData> pd):
-      NBody(std::make_shared<ParticleGroup>(pd, "All")){
-    }
+public:
+  NBody(shared_ptr<ParticleGroup> pg) : pg(pg) {
+    System::log<System::DEBUG>("[NBody] Created");
+  }
 
-    template<class Transverser>
-    inline void transverse(Transverser &a_tr, cudaStream_t st = 0){
-      int N = pg->getNumberParticles();
-      auto groupIterator = pg->getIndexIterator(access::location::gpu);
-      auto pd = pg->getParticleData();
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      SFINAE::TransverserAdaptor<Transverser>::prepare(a_tr, pd);
-      nb.transverse(pos.begin(), groupIterator, a_tr, N, st);
-    }
-  };
+  NBody(shared_ptr<ParticleData> pd)
+      : NBody(std::make_shared<ParticleGroup>(pd, "All")) {}
 
-}
+  template <class Transverser>
+  inline void transverse(Transverser &a_tr, cudaStream_t st = 0) {
+    int N = pg->getNumberParticles();
+    auto groupIterator = pg->getIndexIterator(access::location::gpu);
+    auto pd = pg->getParticleData();
+    auto pos = pd->getPos(access::location::gpu, access::mode::read);
+    SFINAE::TransverserAdaptor<Transverser>::prepare(a_tr, pd);
+    nb.transverse(pos.begin(), groupIterator, a_tr, N, st);
+  }
+};
 
+} // namespace uammd
 
 #endif
