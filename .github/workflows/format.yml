@@ -1,0 +1,42 @@
+name: clang-format check with comment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  clang-format-check:
+    name: Check formatting and comment on PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: Find unformatted files
+        id: format_check
+        run: |
+          UNFORMATTED=$(find src ! -path 'src/third_party/*' -regex '.*\.\(cpp\|hpp\|h\|c\|cc\|cu\|cuh\)' -exec bash -c 'clang-format -style=file -output-replacements-xml "$0" | grep -q "<replacement " && echo "$0"' {} \;)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "Unformatted files:"
+            echo "$UNFORMATTED"
+            echo "files=$UNFORMATTED" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Comment on PR if formatting issues found
+        if: failure()
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ⚠️ **Clang-format check failed**
+            
+            The following files are not correctly formatted:
+            ```
+            ${{ steps.format_check.outputs.files }}
+            ```
+            Please run `clang-format -i` on these files before merging.
