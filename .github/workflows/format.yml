@@ -1,4 +1,4 @@
-name: clang-format check with comment
+name: Clang-Format Lint Check
 
 on:
   pull_request:
