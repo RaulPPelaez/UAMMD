@@ -24,17 +24,19 @@ jobs:
             -regex '.*\.\(cpp\|hpp\|h\|c\|cc\|cu\|cuh\)' \
             -exec bash -c 'clang-format-19 -style=file -output-replacements-xml "$0" | grep -q "<replacement " && echo "$0"' {} \; > "$FILE_LIST"
           cat "$FILE_LIST"
-          {
-            echo 'files<<EOF'
-            cat "$FILE_LIST"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"          
           if [ -s "$FILE_LIST" ]; then
-            exit 1
-          fi
+            {
+              echo 'files<<EOF'
+              cat "$FILE_LIST"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo 'files=' >> "$GITHUB_OUTPUT"
+          fi          
 
       - name: Comment on PR if formatting issues found
-        if: steps.format_check.outcome == 'failure'
+      # Runs if the previous step found unformatted files
+        if:  steps.format_check.outputs.files != ''
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
