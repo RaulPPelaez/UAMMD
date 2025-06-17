@@ -66,7 +66,8 @@ TEST(Spreading, ConstantKernelCornerNonPeriodic) {
 using PeskinBase = IBM_kernels::Peskin::threePoint;
 struct Peskin3pt {
   static constexpr int support = 3;
-  Peskin3pt(real3 h, bool is2D = false) : m_phiX(h.x), m_phiY(h.y), m_phiZ(h.z), is2D(is2D) {}
+  Peskin3pt(real3 h, bool is2D = false)
+      : m_phiX(h.x), m_phiY(h.y), m_phiZ(h.z), is2D(is2D) {}
 
   __host__ __device__ real phiX(real rr, real3 pos = real3()) const {
     return m_phiX.phi(rr, pos);
@@ -77,7 +78,7 @@ struct Peskin3pt {
   }
 
   __host__ __device__ real phiZ(real rr, real3 pos = real3()) const {
-    return is2D?real(1.0):m_phiZ.phi(rr, pos);
+    return is2D ? real(1.0) : m_phiZ.phi(rr, pos);
   }
 
 private:
@@ -198,7 +199,7 @@ TEST(SpreadInterp, PeskinKernelAdjoint2D) {
   Box box(L);
   Grid grid(box, n);
   real3 h = L / make_real3(n);
-  auto kernel = std::make_shared<Peskin3pt>(h, n.z==1);
+  auto kernel = std::make_shared<Peskin3pt>(h, n.z == 1);
   IBM<Peskin3pt, Grid> ibm(kernel, grid);
   ibm.spread(pos.begin(), quantity.begin(), field.data().get(), pos.size());
   thrust::device_vector<real> interp_result(1, 0.0);
@@ -244,15 +245,17 @@ TEST(Interpolation, RandomField) {
   int numberParticles = 128;
   std::vector<real3> h_pos(numberParticles);
   std::mt19937 gen(123);
-  // Keep the particles away from the boundary to not deal with PBC in the manual_interpolation function
-  std::uniform_real_distribution<real> dist(-L.x / 2.0 + 2*h.x, L.x / 2.0 - 2*h.x);
+  // Keep the particles away from the boundary to not deal with PBC in the
+  // manual_interpolation function
+  std::uniform_real_distribution<real> dist(-L.x / 2.0 + 2 * h.x,
+                                            L.x / 2.0 - 2 * h.x);
   for (int i = 0; i < numberParticles; ++i) {
     h_pos[i] = make_real3(dist(gen), dist(gen), dist(gen));
   }
   thrust::device_vector<real3> pos = h_pos;
   int fieldSize = n.x * n.y * n.z;
   thrust::host_vector<real> h_field(fieldSize, 0.0);
-  for(int i = 0; i < fieldSize; ++i) {
+  for (int i = 0; i < fieldSize; ++i) {
     h_field[i] = dist(gen);
   }
   thrust::device_vector<real> field = h_field;
@@ -262,7 +265,7 @@ TEST(Interpolation, RandomField) {
   IBM<Peskin3pt, Grid> ibm(kernel, grid);
   thrust::device_vector<real> interp_result(numberParticles, 0.0);
   ibm.gather(pos.data().get(), interp_result.data().get(), field.data().get(),
-	     int(pos.size()));
+             int(pos.size()));
   thrust::host_vector<real> h_interp = interp_result;
   auto expected = manual_interpolate(h_pos, h_field, n, L);
   for (int i = 0; i < numberParticles; ++i) {
