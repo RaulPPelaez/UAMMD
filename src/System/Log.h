@@ -74,6 +74,6 @@ template <int level> static inline void log(const std::string &msg) {
   log<level>("%s", msg.c_str());
 }
 
-} // namespace
+} // namespace Logging
 } // namespace uammd
 #endif
