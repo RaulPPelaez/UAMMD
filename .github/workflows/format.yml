@@ -39,4 +39,4 @@ jobs:
             ```
             ${{ steps.format_check.outputs.files }}
             ```
-            Please run `clang-format -i` on these files before merging.
+            Please run `clang-format -i` on these files and commit the changes  before merging.
