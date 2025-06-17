@@ -20,7 +20,9 @@ jobs:
         id: format_check
         run: |
           FILE_LIST="unformatted_files.txt"
-          find src ! -path 'src/third_party/*' -regex '.*\.\(cpp\|hpp\|h\|c\|cc\|cu\|cuh\)' -exec bash -c 'clang-format -style=file -output-replacements-xml "$0" | grep -q "<replacement " && echo "$0"' {} \ > $FILE_LIST
+          find src ! -path 'src/third_party/*' \
+            -regex '.*\.\(cpp\|hpp\|h\|c\|cc\|cu\|cuh\)' \
+            -exec bash -c 'clang-format -style=file -output-replacements-xml "$0" | grep -q "<replacement " && echo "$0"' {} \; > "$FILE_LIST"
           cat "$FILE_LIST"
           echo "file_list=$FILE_LIST" >> "$GITHUB_OUTPUT"
           if [ -s "$FILE_LIST" ]; then
