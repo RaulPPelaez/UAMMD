@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <map>
+#include <string>
 #include <tuple>
 namespace uammd {
 namespace Logging {
