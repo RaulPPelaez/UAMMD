@@ -2,24 +2,25 @@
 
    Inherits thrust::cuda::par_t, allowing to specify a cuda stream.
 
-   When used on a thrust algorithm this policy will make thrust leverage UAMMD's cached allocator
-    meachanism.
-   This is useful, for instance, when calling algorithms that require memory allocation such as thrust::sort
+   When used on a thrust algorithm this policy will make thrust leverage UAMMD's
+   cached allocator meachanism. This is useful, for instance, when calling
+   algorithms that require memory allocation such as thrust::sort
 
  */
 #ifndef UAMMDEXECUTIONPOLICY_CUH
 #define UAMMDEXECUTIONPOLICY_CUH
 
-#include<System/System.h>
+#include <System/System.h>
 #include <memory>
 #include <thrust/execution_policy.h>
-namespace uammd{
+namespace uammd {
 
-  namespace detail{
-    static const auto cached_device_execution_policy = thrust::device(System::allocator_thrust<char>());
-  }
-
-  using detail::cached_device_execution_policy;
-
+namespace detail {
+static const auto cached_device_execution_policy =
+    thrust::device(System::allocator_thrust<char>());
 }
+
+using detail::cached_device_execution_policy;
+
+} // namespace uammd
 #endif

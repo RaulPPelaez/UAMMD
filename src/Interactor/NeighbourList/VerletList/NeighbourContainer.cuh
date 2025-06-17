@@ -3,12 +3,12 @@
  */
 #ifndef VERLETLISTBASENEIGHBOURCONTAINER_CUH
 #define VERLETLISTBASENEIGHBOURCONTAINER_CUH
-#include"Interactor/NeighbourList/BasicList/NeighbourContainer.cuh"
+#include "Interactor/NeighbourList/BasicList/NeighbourContainer.cuh"
 
-namespace uammd{
-  namespace VerletListBase_ns{
-    using NeighbourContainer = BasicNeighbourList_ns::NeighbourContainer;
-  }
+namespace uammd {
+namespace VerletListBase_ns {
+using NeighbourContainer = BasicNeighbourList_ns::NeighbourContainer;
 }
+} // namespace uammd
 
 #endif

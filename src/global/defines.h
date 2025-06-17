@@ -3,30 +3,28 @@
  */
 #ifndef UAMMD_DEFINES_H
 #define UAMMD_DEFINES_H
-#include"cuda_runtime.h"
+#include "cuda_runtime.h"
 #define UAMMD_VERSION "2.5"
-
 
 #ifndef DOUBLE_PRECISION
 #define SINGLE_PRECISION
 #endif
 
-
-#define fori(x,y) for(int i=x; i<int(y); i++)
-#define forj(x,y) for(int j=x; j<int(y); j++)
-namespace uammd{
+#define fori(x, y) for (int i = x; i < int(y); i++)
+#define forj(x, y) for (int j = x; j < int(y); j++)
+namespace uammd {
 
 #if defined SINGLE_PRECISION
-using  real  = float;
-using  real2 = float2;
-using  real3 = float3;
-using  real4 = float4;
+using real = float;
+using real2 = float2;
+using real3 = float3;
+using real4 = float4;
 #else
-using  real  = double;
-using  real2 = double2;
-using  real3 = double3;
-using  real4 = double4;
+using real = double;
+using real2 = double2;
+using real3 = double3;
+using real4 = double4;
 
 #endif
-}
+} // namespace uammd
 #endif

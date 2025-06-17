@@ -329,7 +329,7 @@ public:
     real4 *d_gridForcesEnergies =
         (real4 *)thrust::raw_pointer_cast(gridFieldPotential.data());
     auto f_tr = FieldPotential2ForceEnergy(forces.begin(), energies.begin(),
-					   charge.begin(), fieldAtParticles);
+                                           charge.begin(), fieldAtParticles);
     int3 n = grid.cellDim;
     IBM<Kernel, Grid> ibm(kernel, grid,
                           IBM_ns::LinearIndex3D(2 * (n.x / 2 + 1), n.y, n.z));
