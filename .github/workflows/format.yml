@@ -6,7 +6,6 @@ on:
 
 jobs:
   clang-format-check:
-    name: Check formatting and comment on PR
     runs-on: ubuntu-latest
 
     steps:
