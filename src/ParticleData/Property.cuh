@@ -19,15 +19,38 @@
 #include <thrust/iterator/iterator_adaptor.h>
 
 namespace uammd {
+
+/**
+ * @brief Access modes for memory resources.
+ *
+ * This struct defines the different access modes for memory resources in UAMMD.
+ * It includes locations (CPU, GPU, managed) and modes (read, write,
+ * read/write).
+ */
+struct access {
+  enum location { cpu, gpu, managed, nodevice }; ///< Memory locations
+  enum mode { read, write, readwrite, nomode };  ///< Access modes
+};
+
 // Forward declaration for friend attribute
 class ParticleData;
 template <class T> struct Property;
 
+/**
+ * @brief A random-access iterator over a property array.
+ *
+ * This class is a thin wrapper around a raw pointer to an array of elements of
+ * type `T`. It behaves like a Thrust-compatible iterator, enabling use in both
+ * host and device code. Additionally, it tracks ownership and access metadata
+ * to help coordinate memory operations, especially in CUDA environments.
+ *
+ * @tparam T The type of the elements the pointer refers to.
+ */
 template <class T>
 class property_ptr : public thrust::iterator_adaptor<property_ptr<T>, T *> {
 
 public:
-  using Iterator = T *;
+  using Iterator = T *; ///< Type of the underlying iterator (raw pointer to T).
   using super_t = thrust::iterator_adaptor<property_ptr<T>, Iterator>;
 
 private:
@@ -87,21 +110,39 @@ public:
 #endif
   }
 
+  /**
+   * @brief Get the raw pointer to the underlying data.
+   * @return A raw pointer to the data.
+   */
   __host__ __device__ T *raw() const { return ptr; }
 
   __host__ __device__ T *get() const { return raw(); }
-
+  /**
+   * @brief Returns an iterator to the end of the data.
+   * @return Iterator pointing past the last element.
+   */
   __host__ __device__ Iterator end() const {
     if (ptr)
       return begin() + size();
     else
       return nullptr;
   }
-
+  /**
+   * @brief Returns an iterator to the beginning of the data.
+   * @return Iterator pointing to the first element.
+   */
   __host__ __device__ Iterator begin() const { return get(); }
 
+  /**
+   * @brief Get the number of elements in the property.
+   * @return The number of elements.
+   */
   __host__ __device__ size_t size() const { return m_size; }
 
+  /**
+   * @brief Get the location of the data (host or device).
+   * @return The access::location value.
+   */
   access::location location() const { return device; }
 };
 

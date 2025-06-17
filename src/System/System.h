@@ -23,11 +23,6 @@ namespace uammd {
 using std::shared_ptr;
 using std::string;
 
-struct access {
-  enum location { cpu, gpu, managed, nodevice };
-  enum mode { read, write, readwrite, nomode };
-};
-
 struct SystemParameters {
   int device = -1;
   int cuda_arch = 0;

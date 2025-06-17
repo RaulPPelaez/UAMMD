@@ -7,76 +7,67 @@ Interactor encapsulates the concept of a group of particles interacting, either 
 An Interactor can be issued to compute, for each particle, the forces, energies and/or virial due to a certain interaction.
 To do so it can access the current state of the particles (like positions, velocities, etc) via :ref:`ParticleData`.
 
-The Interactor interface exposes the following functions:
+The Interactor interface class has the following API:
 
-.. cpp:class:: Interactor
+..
+   .. cpp:class:: Interactor
 
-   .. cpp:function:: Interactor(std::shared_ptr<ParticleData> pd, std::string name = "noName");
-		    
-      Constructor
-	       
-   .. cpp:function:: virtual void sum(Interactor::Computables comp, cudaStream_t st = 0) = 0;
+      .. cpp:function:: Interactor(std::shared_ptr<ParticleData> pd, std::string name = "noName");
 
-     Computes the forces, energies and/or virials on each particle according to the interaction. Adds the results to the relevant arrays in the :ref:`ParticleData` instance that was provided to it at creation.
-     
-     :param comp: An interactor is expected to update the properties of the particles in :ref:`ParticleData` for the members of :cpp:any:`Interactor::Computables` that are true.
-     :param st: (Optional) A CUDA stream.
-	      
-   .. cpp:function:: std::string getName();
+	 Constructor
 
-     Returns the given name of the Interactor.
+      .. cpp:function:: virtual void sum(Interactor::Computables comp, cudaStream_t st = 0) = 0;
+
+	Computes the forces, energies and/or virials on each particle according to the interaction. Adds the results to the relevant arrays in the :ref:`ParticleData` instance that was provided to it at creation.
+
+	:param comp: An interactor is expected to update the properties of the particles in :ref:`ParticleData` for the members of :cpp:any:`Interactor::Computables` that are true.
+	:param st: (Optional) A CUDA stream.
+
+      .. cpp:function:: std::string getName();
+
+	Returns the given name of the Interactor.
 
 
-     
-   .. cpp:type:: Computables
 
-      A POD structure containing a series of booleans like :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
-      New computables can be added at compile time by populating the :code:`EXTRA_COMPUTABLES` preprocessor macro. See below
+      .. cpp:type:: Computables
 
-      .. cpp:member:: bool force
+	 A POD structure containing a series of booleans like :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
+	 New computables can be added at compile time by populating the :code:`EXTRA_COMPUTABLES` preprocessor macro. See below
 
-		   Defaults to :cpp:`false`.
+	 .. cpp:member:: bool force
+
+		      Defaults to :cpp:`false`.
+
+
+	 .. cpp:member:: bool energy
+
+		      Defaults to :cpp:`false`.
+
+
+	 .. cpp:member:: bool virial
+
+		      Defaults to :cpp:`false`.
+
+	 .. cpp:member:: bool stress
+
+		      Defaults to :cpp:`false`.
 		   
+.. doxygenclass:: uammd::Interactor
+   :project: uammd
+   :protected-members:	     
+   :members:
 
-      .. cpp:member:: bool energy
+      
+.. hint:: Interactors can subscribe to the :ref:`ParameterUpdatable` interface, which :ref:`Integrator` will use to communicate changes in parameters (such as the current simulation time).
 
-		   Defaults to :cpp:`false`.
-		   
-				   
-      .. cpp:member:: bool virial
+Adding new computables:
+-----------------------
 
-		   Defaults to :cpp:`false`.
-		   
-      .. cpp:member:: bool stress
+.. doxygendefine:: EXTRA_COMPUTABLES
+   :project: uammd		   
+		 
 
-		   Defaults to :cpp:`false`.
-		   
 
-**Adding new computables:**
-In the compilation line, or before including uammd.cuh, you can define the :code:`EXTRA_COMPUTABLES` macro with a list of new computables that will be available to the rest of the code. For instance:
-
-.. code:: cpp
-	  
-   //Before including uammd.cuh:
-   #define EXTRA_COMPUTABLES (mycomputable1)(mycomputable2)
-   //Alternatively, you can compile with something like: $ nvcc -DEXTRA_COMPUTABLES=(mycomputable1)(mycomputable2) ...
-   //... Later in the sum function of an Interactor:
-     void sum(Interactor::Computables comp, cudaStream_t st = 0) override{
-       if(comp.mycomputable1){
-         //Do something
-       }
-     }
-
-     
-Additionally, the following members are available as private members for any class inheriting Interactor:
-  * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.
-  * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :cpp:any:`ParticleData::getSystem`.
-
-After calling :code:`sum` on a given Interactor the relevant particle properties will be updated and can be accessed via :ref:`ParticleData`.  
-
-The CUDA stream argument can be ignored and the default stream used instead. However, launching GPU kernels in a different stream to the one provided can be dangerous if some particle property is modified. In that case there is no guarantee that no other Interactor is also modifying that property and a race condition might occur.   
-
-Furthermore, Interactors can subscribe to the :ref:`ParameterUpdatable` interface, which :ref:`Integrator` will use to communicate changes in parameters (such as the current simulation time).
 
 
 Using an already available Interactor:

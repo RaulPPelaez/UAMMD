@@ -11,47 +11,10 @@ C++ wise, Integrator is a pure virtual class.
 
 The Integrator interface exposes the following functions:
 
-.. cpp:class:: Integrator
 
- .. cpp:function:: Integrator(std::shared_ptr<ParticleData> pd, std::string name = "noName")
-
-    Constructor
-
-
- .. cpp:function:: void addInteractor(std::shared_ptr<Interactor> some_interactor)
-
-     Adds an :ref:`Interactor` to the integrator.
-
-     :param some_interactor: Some :ref:`Interactor`
-
-
- .. cpp:function:: void addUpdatable(std::shared_ptr<ParameterUpdatable> an_updatable)
-
-     Adds a :cpp:any:`ParameterUpdatable` to the integrator.
-
-     :param an_updatable: Some :cpp:any:`ParameterUpdatable`
-
-
- .. cpp:function:: virtual void forwardTime() = 0;
-
-     Takes the simulation to the next time step
-
-
-
- .. cpp:function:: virtual void sumEnergy();
-
-     Adds to each particle (via :cpp:any:`ParticleData`::getEnergy) the energy due to the Integrator (typically the kinetic energy). Defaults to doing nothing.
-
-
-
- .. cpp:function::  std::vector<std::shared_ptr<Interactor>> getInteractors();
-
-     Returns a list of all the interactors in the Integrator
-
-
- .. cpp:function:: std::vector<std::shared_ptr<ParameterUpdatable>> getUpdatables();
-
-     Returns a list of all the updatables in the Integrator (includes all Interactors)
+.. doxygenclass:: uammd::Integrator
+   :project: uammd
+   :members:	     
 
 
 Additionally, the following members are available as private members for any class inheriting Integrator:
