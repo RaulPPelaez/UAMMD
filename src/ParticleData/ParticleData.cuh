@@ -102,7 +102,7 @@ each particle
 #define PROPTYPE(tuple) BOOST_PP_TUPLE_ELEM(3, 2, tuple)
 // This macro iterates through all properties applying some macro
 #define PROPERTY_LOOP(macro)                                                   \
-  BOOST_PP_SEQ_FOR_EACH(macro, _, ALL_PROPERTIES_LIST);
+  BOOST_PP_SEQ_FOR_EACH(macro, _, ALL_PROPERTIES_LIST)
 
 namespace uammd {
 
