@@ -546,7 +546,7 @@ void ParticleData::changeNumParticles(int Nnew) {
 // #undef PROPNAME_CAPS
 // #undef PROPNAME
 // #undef PROPTYPE
-#undef PROPERTY_LOOP
+// #undef PROPERTY_LOOP
 #undef DECLARE_PROPERTIES_T
 #undef DECLARE_PROPERTIES
 #undef DECLARE_SIGNAL_PROPERTIES_T
