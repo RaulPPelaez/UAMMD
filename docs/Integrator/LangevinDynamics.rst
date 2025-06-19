@@ -135,56 +135,56 @@ The equations of motion in DPD have the same functional form as LD and can be in
 
    m\vec{a} = \vec{F^c} + \vec{F^d} + \vec{F^r}.
    
-Where the three forces are traditionally expressed as,
+How each term is defined depends on the DPD variant used. In UAMMD, this is abstracted via a :cpp:any:`uammd::dpd::DissipationKernel`. For instance, the default DPD dissipation kernel is defined as
 
-.. math::
+.. doxygenstruct:: uammd::dpd::DefaultDissipation
+   :project: uammd
+   :members:
 
-   \vec{F^c}_{ij} &=\omega(r_{ij})\hat{\vec{\ppos}}_{ij}\\
-    \vec{F^d}_{ij} &=-\xi\omega^2(r_{ij})(\vec{\pvel}_{ij}\cdot\vec{\ppos}_{ij})\hat{\vec{\ppos}}_{ij}\\
-    \vec{F^r}_{ij} &=\sqrt{2\xi\kT}\omega(r_{ij})\widetilde{W}_{ij}\hat{\vec{\ppos}}_{ij}    
+	  
 
-Where :math:`\vec{\pvel}_{ij} = \vec{\pvel}_j - \vec{\pvel}_i` is the relative velocity between particles :math:`i` and :math:`j`. Here :math:`\xi` represents a friction coefficient and is related to the random force strength via fluctuation-dissipation balance in a familiar way [2]_. In general :math:`\xi` can be considered to be a tensorial quantity and even derived from atomistic simulations using dynamic coarse graining theory. The factor :math:`\widetilde{W}_{ij}` is different from the one in LD in that it affects pairs of particles (instead of each individual one), it also represents a Gaussian random number with zero mean and unit standard deviation, but must be chosen independently for each pair while ensuring symmetry so that :math:`\widetilde{W}_{ij} = \widetilde{W}_{ji}`.
-The weight function :math:`\omega(r)` is a soft repulsive force usually defined as
-
-.. math::
-
-   \omega(r) =  \begin{cases}
-    \alpha\left(1-\dfrac{r}{r_{c}}\right) & r<r_{c}\\
-    0 & r\ge r_{c}
-    \end{cases}
-    
-Where :math:`r_{c}` is a cut-off distance. The strength parameter, :math:`\alpha`, can in principle be different for each pair of particles, :math:`i` - :math:`j`, but for simplicity we will assume it is the same for every pair.
-
-.. note:: The code is easily generalized for a different per-particle strength and/or friction.
+.. note:: The code is easily generalized for a different per-particle strength and/or friction. See :cpp:any:`uammd::dpd::DissipationKernel`.
 
 Being an SDE where the forces depend on the velocities, numerical integration of the DPD equations is tricky. A simple modification can be made, sacrificing stability, by approximating the velocity to just first order in the Gronbech-Jensen update rule, so that the velocity depends only on the force for the current step. Unfortunately, this leads to artifacts in the transport properties and unacceptable temperature drifts. There are several strategies in the literature trying to overcome this, usually presented as modifications of the velocity Verlet algorithm.
 
 All of these methods improve the accuracy of the predicted transport properties and response functions in exchange for increased computational cost. 
 One popular approach is to simply use the energy-conserving velocity Verlet (see :ref:`Molecular Dynamics`)  with the DPD forces. This yields "poor" stability and presents certain artifacts due to the mistreatment of the derivative of the noise term incurred by treating the DPD equations as an ordinary differential equation instead of a proper SDE. However, it is often good enough and while it might require a smaller time step to recover measurables to an acceptable tolerance it is the fastest approach and trivial to implement in a code already providing the velocity Verlet algorithm.
 
-This is the approach used in UAMMD, where DPD is encoded as a :ref:`Molecular Dynamics`  :ref:`Integrator` coupled with a :ref:`PairForces`  :ref:`Interactor` encoding the DPD forces.
+.. hint:: This is the approach used in UAMMD, where DPD is encoded as a :ref:`Molecular Dynamics`  :ref:`Integrator` coupled with a :ref:`PairForces`  :ref:`Interactor` encoding the DPD forces.
 
-.. note:: The force-computing code for this module is located in the source code :code:`Interactor/Potential/DPD.cuh`
 
 Usage
 -----
 
-.. doxygenclass:: uammd::VerletDPD
+.. doxygenclass:: uammd::dpd::Verlet
    :project: uammd
    :members:	     
 
+.. doxygenconcept:: uammd::dpd::DissipationKernel      
+   :project: uammd
 
-.. sidebar::
+Available dissipation kernels
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. doxygenstruct:: uammd::dpd::DefaultDissipation
+   :project: uammd
+   :no-link:
+   :outline:
 
-   .. warning:: Note that the temperature is provided in units of energy.
+.. note:: See :cpp:any:`uammd::dpd::DefaultDissipation` for more information.      
 
+.. doxygenstruct:: uammd::dpd::TransversalDissipation
+   :project: uammd
+   :members:		    
+..
+   The following parameters are available for the DPD :ref:`Potential`:
+     * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
+     * :cpp:`real cutOff` The cut off, :math:`r_c`, for the weight function.
+     * :cpp:`real gamma`  The friction coefficient, :math:`\xi`.
+     * :cpp:`real A`  The strength of the weight function, :math:`\alpha`.
+     * :cpp:`real dt` The time step. Be sure to pass the same time step to DPD and the Integrator.
 
-The following parameters are available for the DPD :ref:`Potential`:
-  * :cpp:`real temperature` Temperature of the solvent in units of energy. This is :math:`\kT` in the formulas.
-  * :cpp:`real cutOff` The cut off, :math:`r_c`, for the weight function.
-  * :cpp:`real gamma`  The friction coefficient, :math:`\xi`.
-  * :cpp:`real A`  The strength of the weight function, :math:`\alpha`.
-  * :cpp:`real dt` The time step. Be sure to pass the same time step to DPD and the Integrator.
+Example
+~~~~~~~
 
 .. code:: cpp
 
@@ -332,6 +332,5 @@ The following parameters are available for the SPH :ref:`Interactor`:
 .. rubric:: References
 
 .. [1] A simple and effective Verlet-type algorithm for simulating Langevin dynamics. Niels   Grønbech-Jensen  and  Oded   Farago 2013. https://doi.org/10.1080/00268976.2012.760055
-.. [2] Statistical Mechanics of Dissipative Particle Dynamics. P Español and P Warren 1995. https://doi.org/10.1209/0295-5075/30/4/001
 
 .. [3] Smoothed particle hydrodynamics. JJ Monaghan. Rep. Prog. Phys. 68 (2005) 1703–1759 https://doi.org/10.1088/0034-4885/68/8/R01  
