@@ -153,9 +153,9 @@ TEST(PSE, SelfDiffusionIsCorrectUpToToleranceHydroDisp) {
     dx2 += dx * dx;
   }
   auto diffusion = dx2 / (ntest);
-  ASSERT_THAT(diffusion.x, ::testing::DoubleNear(2.0*temperature*m0, 1e-2));
-  ASSERT_THAT(diffusion.y, ::testing::DoubleNear(2.0*temperature*m0, 1e-2));
-  ASSERT_THAT(diffusion.z, ::testing::DoubleNear(2.0*temperature*m0, 1e-2));
+  ASSERT_THAT(diffusion.x, ::testing::DoubleNear(2.0 * temperature * m0, 1e-2));
+  ASSERT_THAT(diffusion.y, ::testing::DoubleNear(2.0 * temperature * m0, 1e-2));
+  ASSERT_THAT(diffusion.z, ::testing::DoubleNear(2.0 * temperature * m0, 1e-2));
 }
 
 TEST(PSE, SelfDiffusionIsCorrectUpToToleranceComputeMF) {
@@ -194,12 +194,12 @@ TEST(PSE, SelfDiffusionIsCorrectUpToToleranceComputeMF) {
     pse->computeBdW(BdW.data().get(), 0);
     // Sum MF to BdW
     thrust::transform(thrust::cuda::par, BdW.begin(), BdW.end(), MF.begin(),
-		      BdW.begin(), thrust::plus<real3>());
+                      BdW.begin(), thrust::plus<real3>());
     real3 dx = BdW[0];
     dx2 += dx * dx;
   }
-  auto diffusion = dx2 / (ntest*par.dt);
-  ASSERT_THAT(diffusion.x, ::testing::DoubleNear(2.0*temperature*m0, 1e-2));
-  ASSERT_THAT(diffusion.y, ::testing::DoubleNear(2.0*temperature*m0, 1e-2));
-  ASSERT_THAT(diffusion.z, ::testing::DoubleNear(2.0*temperature*m0, 1e-2));
+  auto diffusion = dx2 / (ntest * par.dt);
+  ASSERT_THAT(diffusion.x, ::testing::DoubleNear(2.0 * temperature * m0, 1e-2));
+  ASSERT_THAT(diffusion.y, ::testing::DoubleNear(2.0 * temperature * m0, 1e-2));
+  ASSERT_THAT(diffusion.z, ::testing::DoubleNear(2.0 * temperature * m0, 1e-2));
 }

@@ -1,7 +1,7 @@
 /*Raul P. Pelaez 2020. Doubly periodic Poisson example.
-Computes the electric field between two opposite charges placed in a doubly periodic box (periodic in XY, open in Z).
-See the wiki page for more information on the Doubly Periodic Poisson module.
-USAGE:
+Computes the electric field between two opposite charges placed in a doubly
+periodic box (periodic in XY, open in Z). See the wiki page for more information
+on the Doubly Periodic Poisson module. USAGE:
 ./poisson [L] [r] [gw]
 
 gw: Gaussian width of the charges
@@ -13,18 +13,17 @@ Ex =  exp(-r**2/(4.0*gw**2))/(4*pi**1.5*gw*r) - erf(r/(2.0*gw))/(4*pi*r**2);
 
 */
 
-//This include contains the basic needs for an uammd project
-#include"uammd.cuh"
-#include"Interactor/DoublyPeriodic/DPPoissonSlab.cuh"
-#include<fstream>
+// This include contains the basic needs for an uammd project
+#include "Interactor/DoublyPeriodic/DPPoissonSlab.cuh"
+#include "uammd.cuh"
+#include <fstream>
 
 using namespace uammd;
-using std::make_shared;
 using std::endl;
+using std::make_shared;
 
-
-DPPoissonSlab::Parameters createDPPoissonSlabParameters(real Lxy, real gw){  
-  DPPoissonSlab::Parameters par;    
+DPPoissonSlab::Parameters createDPPoissonSlabParameters(real Lxy, real gw) {
+  DPPoissonSlab::Parameters par;
   par.Lxy = make_real2(Lxy);
   par.H = 50;
   DPPoissonSlab::Permitivity perm;
@@ -33,11 +32,11 @@ DPPoissonSlab::Parameters createDPPoissonSlabParameters(real Lxy, real gw){
   perm.bottom = 1;
   par.permitivity = perm;
   par.gw = gw;
-  par.split = gw*0.1;
+  par.split = gw * 0.1;
   return par;
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[]) {
   int N = 2;
   real gw = std::stod(argv[3]);
   real L = std::stod(argv[1]);
@@ -47,8 +46,8 @@ int main(int argc, char *argv[]){
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::write);
     auto charge = pd->getCharge(access::location::cpu, access::mode::write);
-    pos[0] = make_real4(-r*0.5,0,0,0);
-    pos[1] = make_real4( r*0.5,0,0,0);
+    pos[0] = make_real4(-r * 0.5, 0, 0, 0);
+    pos[1] = make_real4(r * 0.5, 0, 0, 0);
     charge[0] = 1;
     charge[1] = -1;
   }
@@ -58,21 +57,20 @@ int main(int argc, char *argv[]){
     auto force = pd->getForce(access::location::gpu, access::mode::write);
     thrust::fill(thrust::cuda::par, force.begin(), force.end(), real4());
   }
-  poisson->sum({.force=true, .energy=true, .virial=false});
+  poisson->sum({.force = true, .energy = true, .virial = false});
   {
     auto pos = pd->getPos(access::location::cpu, access::mode::read);
     auto force = pd->getForce(access::location::cpu, access::mode::read);
     auto charge = pd->getCharge(access::location::cpu, access::mode::read);
     real3 p;
-    fori(0,N){
+    fori(0, N) {
       real4 pc = pos[i];
       p = make_real3(pc);
       int type = charge[i];
-      std::cout<<std::setprecision(15)<<p<<" q: "<<charge[i]<<" F: "<<force[i]<<endl;
+      std::cout << std::setprecision(15) << p << " q: " << charge[i]
+                << " F: " << force[i] << endl;
     }
   }
   sys->finish();
   return 0;
 }
-
-

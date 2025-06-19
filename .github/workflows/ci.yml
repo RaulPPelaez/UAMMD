@@ -41,7 +41,7 @@ jobs:
       uses: mamba-org/setup-micromamba@v1
       with:
         environment-file: environment.yml
-        cache-environment: false
+        cache-environment: true
         cache-downloads: true
       env:
         CONDA_OVERRIDE_CUDA: ${{ matrix.nvcc }}
@@ -56,13 +56,13 @@ jobs:
         micromamba activate uammd
         mkdir examples/build && cd examples/build
         cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF ..
-        make -j3
+        make -j4
     - name: Configure and compile tests
       run: |
         micromamba activate uammd
         mkdir test/build && cd test/build
         cmake -DCMAKE_VERBOSE_MAKEFILE=yes -DCMAKE_CUDA_ARCHITECTURES=OFF ..
-        make -j3
+        make -j4
 
     - name: Check header installation
       run: |

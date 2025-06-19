@@ -1,7 +1,8 @@
 /*Raul P. Pelaez 2017-2021. Verlet NVT Integrator module.
 
-  This module integrates the dynamic of the particles using a two step velocity verlet MD algorithm
-  that conserves the temperature, volume and number of particles.
+  This module integrates the dynamic of the particles using a two step velocity
+verlet MD algorithm that conserves the temperature, volume and number of
+particles.
 
   The Langevin ecuation solved by this module can be writen as:
 
@@ -26,9 +27,12 @@
      par.friction = 1.0;
      par.is2D = false;
      //If set to false particle velocities will not be initialized by the module
-     //The default is true and sets particle velocities following the botzmann distribution.
+     //The default is true and sets particle velocities following the botzmann
+distribution.
      //par.initVelocities = false;
-     //If mass is specified all particles will be assumed to have this mass. If unspecified pd::getMass will be used, if it has not been requested, all particles are assumed to have mass=1.
+     //If mass is specified all particles will be assumed to have this mass. If
+unspecified pd::getMass will be used, if it has not been requested, all
+particles are assumed to have mass=1.
      //par.mass = 1.0;
     auto verlet = make_shared<NVT>(pd, par);
 
@@ -54,72 +58,71 @@ http://dx.doi.org/10.1080/00268976.2012.760055
 
 #include "Integrator/Integrator.cuh"
 
-namespace uammd{
-  namespace VerletNVT{
-    class Basic: public Integrator{
-    public:
-      struct Parameters{
-	real temperature = 0;
-	real dt = 0;
-	real friction = 1.0;
-	bool is2D = false;
-	bool initVelocities = true;
-	real mass = -1.0;
-      };
-    private:
-      template<int step> void callIntegrate();
-    protected:
-      real noiseAmplitude;
-      uint seed;
-      real dt, temperature, friction;
-      real defaultMass;
-      bool is2D;
+namespace uammd {
+namespace VerletNVT {
+class Basic : public Integrator {
+public:
+  struct Parameters {
+    real temperature = 0;
+    real dt = 0;
+    real friction = 1.0;
+    bool is2D = false;
+    bool initVelocities = true;
+    real mass = -1.0;
+  };
 
-      cudaStream_t stream;
-      int steps;
+private:
+  template <int step> void callIntegrate();
 
-      void initVelocities();
-      void resetForces();
-      real sumKineticEnergy();
-      //Constructor for derived classes
-      Basic(shared_ptr<ParticleGroup> pg,	    
-	    Parameters par,
-	    std::string name);
-    public:
-      Basic(shared_ptr<ParticleGroup> pg, Parameters par);
-      Basic(shared_ptr<ParticleData> pd, Parameters par):
-	Basic(std::make_shared<ParticleGroup>(pd, "All"), par){}
+protected:
+  real noiseAmplitude;
+  uint seed;
+  real dt, temperature, friction;
+  real defaultMass;
+  bool is2D;
 
-      virtual ~Basic();
+  cudaStream_t stream;
+  int steps;
 
-      virtual void forwardTime() override;
-      virtual real sumEnergy() override{ return sumKineticEnergy();};
-    };
+  void initVelocities();
+  void resetForces();
+  real sumKineticEnergy();
+  // Constructor for derived classes
+  Basic(shared_ptr<ParticleGroup> pg, Parameters par, std::string name);
 
+public:
+  Basic(shared_ptr<ParticleGroup> pg, Parameters par);
+  Basic(shared_ptr<ParticleData> pd, Parameters par)
+      : Basic(std::make_shared<ParticleGroup>(pd, "All"), par) {}
 
-    class GronbechJensen final: public Basic{
-    public:
-      GronbechJensen(shared_ptr<ParticleData> pd,
-		     Basic::Parameters par):
-	Basic(std::make_shared<ParticleGroup>(pd, "All"), par, "VerletNVT::GronbechJensen"){}
+  virtual ~Basic();
 
-      GronbechJensen(shared_ptr<ParticleGroup> pg,
-		     Basic::Parameters par):
-	GronbechJensen(pg->getParticleData(), par){}
+  virtual void forwardTime() override;
+  virtual real sumEnergy() override { return sumKineticEnergy(); };
+};
 
-      ~GronbechJensen(){}
+class GronbechJensen final : public Basic {
+public:
+  GronbechJensen(shared_ptr<ParticleData> pd, Basic::Parameters par)
+      : Basic(std::make_shared<ParticleGroup>(pd, "All"), par,
+              "VerletNVT::GronbechJensen") {}
 
-      using Parameters = Basic::Parameters;
+  GronbechJensen(shared_ptr<ParticleGroup> pg, Basic::Parameters par)
+      : GronbechJensen(pg->getParticleData(), par) {}
 
-      virtual void forwardTime() override;
-    private:
-      template<int step> void callIntegrate();
-    };
+  ~GronbechJensen() {}
 
+  using Parameters = Basic::Parameters;
 
-  }
-}
+  virtual void forwardTime() override;
 
-#include"VerletNVT/Basic.cu"
-#include"VerletNVT/GronbechJensen.cu"
+private:
+  template <int step> void callIntegrate();
+};
+
+} // namespace VerletNVT
+} // namespace uammd
+
+#include "VerletNVT/Basic.cu"
+#include "VerletNVT/GronbechJensen.cu"
 #endif

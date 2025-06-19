@@ -1,9 +1,9 @@
 #pragma once
 
-#include <uammd.cuh>
 #include "misc/ChevyshevUtils.cuh"
 #include "misc/IBM.cuh"
 #include <thrust/complex.h>
+#include <uammd.cuh>
 
 using namespace uammd;
 using complex = thrust::complex<real>;
@@ -74,7 +74,6 @@ private:
   int nz;
   real Htot;
 };
-
 
 // Spreads a group of particles onto a grid.
 // The domain is such that some location r is r\in +-L

@@ -1,19 +1,19 @@
 /*Raul P. Pelaez 2019. The Deserno potential.
   runs a BD simulation using the Deserno Potential
 */
-#include"uammd.cuh"
-#include"Integrator/BrownianDynamics.cuh"
-#include"Integrator/BDHI/BDHI_EulerMaruyama.cuh"
-#include"Integrator/BDHI/BDHI_FCM.cuh"
-#include"misc/Deserno.cuh"
-#include<fstream>
-#include"utils/InputFile.h"
-#include<vector>
+#include "Integrator/BDHI/BDHI_EulerMaruyama.cuh"
+#include "Integrator/BDHI/BDHI_FCM.cuh"
+#include "Integrator/BrownianDynamics.cuh"
+#include "misc/Deserno.cuh"
+#include "uammd.cuh"
+#include "utils/InputFile.h"
+#include <fstream>
+#include <vector>
 
 using namespace std;
 using namespace uammd;
 
-ullint seed = 0xf31337Bada55D00dULL^time(NULL);
+ullint seed = 0xf31337Bada55D00dULL ^ time(NULL);
 real3 boxSize;
 
 std::string outfile;
@@ -30,45 +30,44 @@ real wc;
 bool hydro;
 void readParameters(shared_ptr<System> sys);
 
-int main(int argc, char * argv[]){
+int main(int argc, char *argv[]) {
   auto sys = make_shared<System>(argc, argv);
   sys->rng().setSeed(seed);
   readParameters(sys);
   ifstream in(init_posfile);
   int N;
-  if(!in) sys->log<System::CRITICAL>("Could not read %s!", init_posfile.c_str());
-  in>>N;
+  if (!in)
+    sys->log<System::CRITICAL>("Could not read %s!", init_posfile.c_str());
+  in >> N;
   auto pd = make_shared<ParticleData>(N, sys);
   vector<int> types(N);
   {
     auto ps = pd->getPos(access::location::cpu, access::mode::write);
-    real4 * pos = ps.raw();
+    real4 *pos = ps.raw();
 
-    fori(0,N){
-      in>>pos[i].x>>pos[i].y>>pos[i].z>>pos[i].w;
+    fori(0, N) {
+      in >> pos[i].x >> pos[i].y >> pos[i].z >> pos[i].w;
       types[i] = pos[i].w;
     }
   }
 
-
   Box box(boxSize);
 
-  //using BD = BD::EulerMaruyama;
+  // using BD = BD::EulerMaruyama;
   shared_ptr<Integrator> bd;
 
-  if(hydro){
+  if (hydro) {
     using BD = BDHI::EulerMaruyama<BDHI::FCM>;
     BD::Parameters par;
     par.temperature = temperature;
     par.viscosity = viscosity;
     par.hydrodynamicRadius = hydrodynamicRadius;
-    par.tolerance=1e-6;
+    par.tolerance = 1e-6;
     par.dt = dt;
     par.box = Box(boxSize);
     auto pg = make_shared<ParticleGroup>(pd, sys);
     bd = make_shared<BD>(pd, pg, sys, par);
-  }
-  else{
+  } else {
     using BD = BD::EulerMaruyama;
     BD::Parameters par;
     par.temperature = temperature;
@@ -77,7 +76,6 @@ int main(int argc, char * argv[]){
     par.dt = dt;
     auto pg = make_shared<ParticleGroup>(pd, sys);
     bd = make_shared<BD>(pd, pg, sys, par);
-
   }
   {
     Deserno::Parameters params;
@@ -91,50 +89,44 @@ int main(int argc, char * argv[]){
   }
   ofstream out(outfile);
 
-  forj(0,relaxSteps)  bd->forwardTime();
+  forj(0, relaxSteps) bd->forwardTime();
 
-  forj(0,nsteps){
+  forj(0, nsteps) {
 
     bd->forwardTime();
-    if(j%printSteps==0){
-    auto ps = pd->getPos(access::location::cpu, access::mode::read);
-    real4 * pos = ps.raw();
+    if (j % printSteps == 0) {
+      auto ps = pd->getPos(access::location::cpu, access::mode::read);
+      real4 *pos = ps.raw();
 
-    out<<"#"<<endl;
-    fori(0,N){
-      //real3 pi = box.apply_pbc(make_real3(pos[i]));
-      real3 pi = make_real3(pos[i]);
-      out<<pi<<" 0.5 "<<types[i]<<"\n";
-    }
+      out << "#" << endl;
+      fori(0, N) {
+        // real3 pi = box.apply_pbc(make_real3(pos[i]));
+        real3 pi = make_real3(pos[i]);
+        out << pi << " 0.5 " << types[i] << "\n";
+      }
     }
   }
-
-
 
   return 0;
 }
 
-
-
-
-
-
-void readParameters(shared_ptr<System> sys){
+void readParameters(shared_ptr<System> sys) {
   InputFile in("data.main", sys);
-  in.getOption("boxSize", InputFile::Required)>>boxSize.x>>boxSize.y>>boxSize.z;
-  in.getOption("outfile", InputFile::Required)>>outfile;
-  in.getOption("init_posfile", InputFile::Required)>>init_posfile;
-  in.getOption("harmonicbonds", InputFile::Required)>>harmonicbonds;
-  in.getOption("FENEbonds", InputFile::Required)>>FENEbonds;
-  in.getOption("temperature", InputFile::Required)>>temperature;
-  in.getOption("viscosity", InputFile::Required)>>viscosity;
-  in.getOption("dt", InputFile::Required)>>dt;
-  in.getOption("hydrodynamicRadius", InputFile::Required)>>hydrodynamicRadius;
-  in.getOption("tolerance", InputFile::Optional)>>tolerance;
-  in.getOption("nsteps", InputFile::Required)>>nsteps;
-  in.getOption("relaxSteps", InputFile::Required)>>relaxSteps;
-  in.getOption("printSteps", InputFile::Required)>>printSteps;
-  in.getOption("seed", InputFile::Optional)>>seed;
-  in.getOption("hydro", InputFile::Required)>>hydro;
-  in.getOption("wc", InputFile::Required)>>wc;
+  in.getOption("boxSize", InputFile::Required) >> boxSize.x >> boxSize.y >>
+      boxSize.z;
+  in.getOption("outfile", InputFile::Required) >> outfile;
+  in.getOption("init_posfile", InputFile::Required) >> init_posfile;
+  in.getOption("harmonicbonds", InputFile::Required) >> harmonicbonds;
+  in.getOption("FENEbonds", InputFile::Required) >> FENEbonds;
+  in.getOption("temperature", InputFile::Required) >> temperature;
+  in.getOption("viscosity", InputFile::Required) >> viscosity;
+  in.getOption("dt", InputFile::Required) >> dt;
+  in.getOption("hydrodynamicRadius", InputFile::Required) >> hydrodynamicRadius;
+  in.getOption("tolerance", InputFile::Optional) >> tolerance;
+  in.getOption("nsteps", InputFile::Required) >> nsteps;
+  in.getOption("relaxSteps", InputFile::Required) >> relaxSteps;
+  in.getOption("printSteps", InputFile::Required) >> printSteps;
+  in.getOption("seed", InputFile::Optional) >> seed;
+  in.getOption("hydro", InputFile::Required) >> hydro;
+  in.getOption("wc", InputFile::Required) >> wc;
 }

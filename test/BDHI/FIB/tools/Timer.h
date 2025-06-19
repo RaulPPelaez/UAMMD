@@ -1,17 +1,16 @@
 #ifndef TIMER_H
 #define TIMER_H
-//#include<chrono>
-#include<sys/time.h>
+// #include<chrono>
+#include <sys/time.h>
 
-
-
-class Timer{
+class Timer {
 public:
-  Timer(){}
+  Timer() {}
   void tic();
   float toc();
+
 private:
-  //std::chrono::time_point<std::chrono::system_clock> t;
+  // std::chrono::time_point<std::chrono::system_clock> t;
   struct timeval start, end;
 };
 
