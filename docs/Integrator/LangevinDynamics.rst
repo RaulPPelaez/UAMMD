@@ -167,9 +167,12 @@ This is the approach used in UAMMD, where DPD is encoded as a :ref:`Molecular Dy
 .. note:: The force-computing code for this module is located in the source code :code:`Interactor/Potential/DPD.cuh`
 
 Usage
-----------
+-----
 
-A DPD :ref:`Integrator` is created by coupling a :code:`VerletNVE`  :ref:`Molecular Dynamics`  :ref:`Integrator`  with a :code:`DPD`  :ref:`Potential` (the Potential is supplied to a :ref:`PairForces`  :ref:`Interactor` that can be then added to the Integrator).
+.. doxygenclass:: uammd::VerletDPD
+   :project: uammd
+   :members:	     
+
 
 .. sidebar::
 
@@ -218,7 +221,7 @@ The following parameters are available for the DPD :ref:`Potential`:
 
 .. note:: The :code:`UAMMD` structure in this example is taken from the :code:`example/` folders in the repository, containing, for convenience, an instance of :ref:`ParticleData` and a set of parameters
 
-
+      
 .. _sph:
 
 Smoothed Particle Hydrodynamics
