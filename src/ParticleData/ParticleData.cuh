@@ -176,7 +176,7 @@ private:
   DECLARE_PROPERTIES_T(PROPTYPE(tuple), PROPNAME(tuple))
 
   // Declare all property containers
-  PROPERTY_LOOP(DECLARE_PROPERTIES)
+  PROPERTY_LOOP(DECLARE_PROPERTIES);
 
   int numberParticles;
   shared_ptr<signal<void(void)>> reorderSignal =
@@ -270,7 +270,7 @@ public:
 #define IS_ALLOCATED(r, data, tuple)                                           \
   IS_ALLOCATED_T(PROPNAME_CAPS(tuple), PROPNAME(tuple))
 
-  PROPERTY_LOOP(IS_ALLOCATED)
+  PROPERTY_LOOP(IS_ALLOCATED);
 
   // Trigger a particle sort, which assigns an spatial hash to each particle
   // and then reorders them in memory, you can access the original order via
