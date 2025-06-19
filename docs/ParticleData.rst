@@ -1,36 +1,18 @@
 ParticleData
 =============
 
-One of the basic assumptions in UAMMD is that simulations are based on the state of "particles". ParticleData is the class in UAMMD that stores the properties of all the particles in the system.
-
-This class takes care of allocating the necessary memory and providing accesses to any property in either the GPU or CPU.
-
-Most UAMMD modules will need to be provided with a reference to a ParticleData instance.  
-
-ParticleData handles and stores all properties a particle can have (however, they are only initialized when they are asked for the first time). It offers several ways to access these properties. See USAGE.  
-
-ParticleData can change the size of the properties, shuffle the particles indices or change the container of a particular property at any given time. The relevant changes are announced using signals, so code using ParticleData should handle these events as needed, see Connecting to a signal.  
-
-*****
-
-Creation
-----------
-
-.. cpp:class:: ParticleData
-
-   .. cpp:function:: ParticleData(int numberParticles, std::shared_ptr<System> sys = nullptr)
-	       
-		     ParticleData only needs a number of particles at creation. Optionally, a :ref:`System` instance can also be provided as a second argument. If not provided, ParticleData will handle System initialization.
-
-   .. cpp:function:: std::shared_ptr<System> getSystem();
-		  
-   Returns the instance of :ref:`System` used by this ParticleData instance.
+.. doxygenfile:: ParticleData/ParticleData.cuh
+   :project: uammd
+   :sections: briefdescription
 
 
+ParticleData exposes the following API:
 
-.. note:: Typically, UAMMD modules will require a shared_ptr to an instance of ParticleData:
-
-
+.. doxygenclass:: uammd::ParticleData
+   :project: uammd
+   :members:
+   
+	     
 **Example: creating a ParticleData instance**
    
 .. code:: c++
@@ -41,69 +23,29 @@ Creation
 Getting a handle get a certain property
 ------------------------------------------
 
-You can access a property via ParticleData in GPU or CPU memory. You must specify the kind of access (read, write, readwrite).
-
-
-.. cpp:function:: property_ptr<type> ParticleData::getProperty(access::location loc, access::mode mode);
-
-		  Returns a :cpp:type:`property_ptr` with the type of the property called Property. Note that a different function will be generated for each available property. Do not call :cpp:`getProperty`, rather :cpp:`getPos`, :cpp:`getForce`, etc. A list of properties is available below and in :code:`ParticleData/ParticleData.cuh`.
-		  
-		  :param loc: Access location specifier.
-		  :param mode: Access read/write mode specifier.
-		  :return: Reference to the property.
-
+You can access a property via :cpp:any:`ParticleData` in GPU or CPU memory. You must specify the kind of access (read, write, readwrite).
 			   
-.. cpp:enum:: access::location
-
-	      .. cpp:enumerator:: access::location::gpu
-				  
-	      .. cpp:enumerator:: access::location::cpu
-	      
-
-				  
-.. cpp:enum:: access::mode
-
-	      .. cpp:enumerator:: access::mode::read
-				  
-	      .. cpp:enumerator:: access::mode::write
-	      
-	      .. cpp:enumerator:: access::mode::readwrite
-				  
+.. doxygenstruct:: uammd::access
+   :project: uammd
+   :members:
+   :undoc-members:
 
 .. note:: The enumerators :cpp:enum:`access::location` and  :cpp:enum:`access::mode` can be used without the second scope. In other words, you can write :cpp:any:`access::gpu` instead of :cpp:any:`access::location::gpu`.
-	  
+
+	
 The type returned by :cpp:any:`ParticleData::getProperty` is a lightweight standard-library-like pseudo-container defined as
 
+.. doxygenclass:: uammd::property_ptr
+   :project: uammd
+   :members:
 
-.. cpp:class:: template<class T> property_ptr<T>
-
-	   A pseudo-container that signals ParticleData when it is destroyed.
-
-	   .. cpp:function:: T* property_ptr::begin()
-
-			     An iterator to the first element of the property data.
-	       
-	   .. cpp:function:: T* property_ptr::raw()
-
-			     A raw pointer to the first element of the property data.
-
-	   .. cpp:function:: T* property_ptr::end()
-
-			     An iterator to the last element of the property data (simply :cpp:expr:`T*`)
-			     
-	   .. cpp:function:: int property_ptr::size()
-
-			     The size of the container, i.e the number of particles.
-
-	   .. cpp:function:: access::location property_ptr::location()
-
-			     The location of the data in the property_ptr, such as :cpp:any:`access::gpu` or :cpp:any:`access::cpu` 
-
+      
 Example
 ~~~~~~~~~
 
 .. code:: cpp
-	  
+
+  auto pd = std::make_shared<ParticleData>(numberParticles);
   auto radius = pd->getRadius(access::gpu, access::write);
   thrust::fill(thrust::cuda::par, radius.begin(), radius.end(), 1.0); 
   auto force = pd->getForce(access::cpu, access::write);
@@ -115,17 +57,17 @@ If the mode is set to write, the handle will gain exclusivity and no one else wi
 
 .. note:: There is no real difference between :cpp:any:`access::write` and :cpp:any:`access::readwrite` (at the moment) beyond informing the reader of the intention of modifying the contents (readwrite) vs ignoring the current contents and overwriting (write).	  
 
-.. warning:: UAMMD cannot write to a property that is currently being read and cannot read from a property that is currently being written to.
-	     For this **it is important to control the scope of the property handles**, deleting them as soon as possible and never storing them (store a pointer to ParticleData instead).  
-Handles are compatible with std and thrust algorithms and can be considered c++ iterators for all porpoises.  
+.. warning:: UAMMD cannot write to a property that is currently being read and cannot read from a property that is currently being written to. **It is important to control the scope of the property handles**, deleting them as soon as possible and never storing them (store a pointer to :cpp:any:`ParticleData` instead).  
+
+Handles are compatible with std and thrust algorithms and can be considered c++ iterators for all intents and purposes.
 
 .. _list-of-available-properties:
 
 List of available properties
 -----------------------------
 
-The beginning of ParticleData.cuh contains a list of available per particle properties (such as positons, velocities, forces...).  
-You can see a list of all the available ones and add more properties by appending to the macro ALL_PROPERTIES_LIST.  
+The beginning of ParticleData.cuh contains a list of available per particle properties (such as positons, velocities, forces...).
+You can see a list of all the available ones and add more properties by appending to the macro :cpp:any:`ALL_PROPERTIES_LIST`.  
 A family of access functions will be autogenerated for each property inside this macro (such as get[Name] (), [Name]WrittenSignal(), ...).   
 
 For instance, ParticleData holds the positions of the particles in :cpp:type:`real4` variables in an array named "pos". Thus, the function :cpp:`property_ptr<real4> ParticleData::getPos()` is available.
@@ -141,12 +83,8 @@ Basic properties include (type name):
   * :cpp:`real charge`
   * And more defined in ParticleData.cuh
 
-
-You can add new properties in :code:`ALL_PROPERTIES_LIST`. Alternatively, you can populate the :code:`EXTRA_PARTICLE_PROPERTIES` macro without modifying :code:`ParticleData.cuh`. For instance by defining the macro before including :code:`uammd.cuh` or at the compilation line. The format of this macro is a list of properties like :code:`((PropertyName, propertyName, TYPE))`. For instance:
-
-.. code:: cpp
-
-   #define EXTRA_PARTICLE_PROPERTIES ((MyProp1, myprop1, real))((MyProp2, myprop2, real3))
+.. doxygendefine:: ALL_PROPERTIES_LIST
+   :project: uammd
 
    
 .. _particle_id_assignation:
@@ -201,40 +139,11 @@ Thrust offers a permutation_iterator that can be used to mask this behavior to a
 Advanced usage
 ---------------
 
-ParticleData allocates properties the first time they are requested. Sometimes one would like to know if a certain property has been previously requested to decide upon a fall back behavior.
-For example, one would like to use the mass of each particle for a certain algorithm. If mass has not been set for each particle independently one would like to assume that all particles have the same mass, equal to some default value. There are two ways to obtain this information:
-
-.. cpp:function:: bool ParticleData::isPropertyAllocated(access::location loc, access::mode mode);
-
-		  Returns true if the property called "Property" has been previously requested via :cpp:any:`ParticleData::getProperty` and false otherwise. A different function is autodefined for each existing property, so do not call :cpp:any:`isPropertyAllocated`, rather :cpp:any:`isPosAllocated`, :cpp:any:`isMassAllocated` and so on and so forth.
-
-.. cpp:function:: property_ptr<type> ParticleData::getPropertyIfAllocated(access::location loc, access::mode mode);
-
-		  Returns a :cpp:type:`property_ptr` with the type of the property called Property. If the property has not been requested before via :cpp:`ParticleData::getProperty` the returned pointer is null.
-		  
-		  :param loc: Access location specifier.
-		  :param mode: Access read/write mode specifier.
-		  :return: Reference to the property.
-
-.. code:: cpp
-	  
-  bool isMassAllocated = pd->isMassAllocated();
-  auto mass = pd->getMassIfAllocated(access::gpu, access::read);
-  //mass.raw() and mass.begin() will be nullptr if mass has not been asked for before (either in GPU or CPU). 
-  //Note that this call will never allocate the property
-
-
   
 Triggering a sorting
 ~~~~~~~~~~~~~~~~~~~~~~
 
-
-.. cpp:function:: void ParticleData::sortParticles();
-
-   ParticleData can sort the particles to increase spatial locality of the data, which might be beneficial for some algorithms.
-   Use this function to force a sorting.
-
-ParticleData uses its own internal heuristic to spatially order the particles. This heuristic can be influenced by providing some information to ParticleData about the simulation domain and the typical range of the interactions in the simulation.
+One can trigger a global sorting of the particles in ParticleData by calling :cpp:`ParticleData::sortParticles()`. This will reorder the particles in the internal containers and update the indices accordingly.
 
 .. cpp:function:: void ParticleData::hintSortByHash(Box box, real3 typicalDistance)
 
@@ -285,32 +194,7 @@ UAMMD uses the :cpp:type:`signal`/:cpp:type:`connection` classes from `fr00b0/no
 
 		   
 
-List of available signals
-%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
-.. cpp:function:: std::shared_ptr<signal<void(int)>> ParticleData::getNumParticlesChangedSignal();
-
-        Returns a handle to the signal emitted when the number of particles changes.
-	This signal is triggered when the total number of particles changes
-	Broadcasts an :code:`int` with the new number of particles.
-
-		 
-.. cpp:function:: std::shared_ptr<signal<void()>> ParticleData::getReorderSignal();
-		  
-        Returns a handle to the signal emitted when global particle sorting occurs.
-	This signal is triggered when the global sorting of particles changes.
-	Does not broadcasts any value.
-
-      
-.. cpp:function:: std::shared_ptr<signal<void()>> getPropertyWrittenSignal();
-
-		  Triggered when property named Property has been requested with the write or readwrite flag. Notice that the signal is emitted at requesting of the property, so the requester has writing rights. These are auto generated for all properties (pos, vel, mass...) . One should use this callback merely for setting a flag for later work.
-		  Does not broadcast any value.
-		  Note that a different function is defined for each property. So do not call :code:`getPropertyWrittenSignal`, rather :code:`getPosWrittenSignal`, :code:`getMassWrittenSignal`, etc. 
-		 
-      
+A list of available signals is available in the :cpp:any:`ParticleData` class documentation.
 
 Saving and restoring from a file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

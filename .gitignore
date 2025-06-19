@@ -41,3 +41,4 @@ __pycache__
 examples/build
 .cache
 compile_commands.json
+!Doxyfile
