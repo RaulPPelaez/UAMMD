@@ -1,35 +1,31 @@
 Integrator
 ------------
-
-Integrator is a :doc:`base module <../index>` of UAMMD. It is defined in :cpp:`Integrator/Integrator.cuh`.
-
-An Integrator has the ability to move the simulation one step forward in time.
-For that, it can use any number of :ref:`Interactors <Interactor>`, which are added using the :cpp:`Integrator::addInteractor` method.
-Additionally, Integrators can hold objects derived from the :doc:`../ParameterUpdatable` interface in order to inform them when a certain parameter changes (for instance the simulation time).
-C++ wise, Integrator is a pure virtual class.
+		   
+.. doxygenfile:: Integrator/Integrator.cuh
+   :project: uammd
+   :sections: briefdescription detaileddescription
+		
 
 
-The Integrator interface exposes the following functions:
+The Integrator interface exposes the following API:
 
 
 .. doxygenclass:: uammd::Integrator
    :project: uammd
    :members:	     
+   :protected-members:
 
-
-Additionally, the following members are available as private members for any class inheriting Integrator:
-  * :code:`pd`: A shared_ptr to the :ref:`ParticleData` assigned to the Interactor.
-  * :code:`sys`: A shared_ptr to :ref:`System`. This is just a convenience member, since the same instance can be accessed via :cpp:any:`ParticleData::getSystem`.
-
-After calling :code:`Integrator::forwardTime()` on a given Integrator the relevant particle properties (i.e. positions, velocities...) will be updated and can be accessed via :ref:`ParticleData`.
+.. cpp:namespace:: uammd
+		   
+After calling :cpp:any:`Integrator::forwardTime()` on a given Integrator the relevant particle properties (i.e. positions, velocities...) will be updated and can be accessed via :ref:`ParticleData`.
 
 
 Usage
 =========
 
 This is just a base class that cannot be used by its own.
-Childs of this class are instanced in a :doc:`code using UAMMD <../SimulationFile>` and :ref:`Interactors <Interactor>` are added to it to configure a simulation.
-The simulation is then advanced by calling the method :cpp:`void forwardTime` any number of times.
+Children of this class are instanced in a :doc:`code using UAMMD <../SimulationFile>` and :ref:`Interactors <Interactor>` are added to it to configure a simulation.
+The simulation is then advanced by calling the method :cpp:any:`Integrator::forwardTime()` any number of times.
 
 Creation
 ~~~~~~~~

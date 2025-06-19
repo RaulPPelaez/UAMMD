@@ -8,65 +8,25 @@ An Interactor can be issued to compute, for each particle, the forces, energies 
 To do so it can access the current state of the particles (like positions, velocities, etc) via :ref:`ParticleData`.
 
 The Interactor interface class has the following API:
-
-..
-   .. cpp:class:: Interactor
-
-      .. cpp:function:: Interactor(std::shared_ptr<ParticleData> pd, std::string name = "noName");
-
-	 Constructor
-
-      .. cpp:function:: virtual void sum(Interactor::Computables comp, cudaStream_t st = 0) = 0;
-
-	Computes the forces, energies and/or virials on each particle according to the interaction. Adds the results to the relevant arrays in the :ref:`ParticleData` instance that was provided to it at creation.
-
-	:param comp: An interactor is expected to update the properties of the particles in :ref:`ParticleData` for the members of :cpp:any:`Interactor::Computables` that are true.
-	:param st: (Optional) A CUDA stream.
-
-      .. cpp:function:: std::string getName();
-
-	Returns the given name of the Interactor.
-
-
-
-      .. cpp:type:: Computables
-
-	 A POD structure containing a series of booleans like :cpp:`force`, :cpp:`energy` and :cpp:`virial`. Used to denote computation requirements for a function across UAMMD. For instance, the function :cpp:any:`Interactor::sum` takes a Computables as argument to inform about what the Interactor is supposed to compute.
-	 New computables can be added at compile time by populating the :code:`EXTRA_COMPUTABLES` preprocessor macro. See below
-
-	 .. cpp:member:: bool force
-
-		      Defaults to :cpp:`false`.
-
-
-	 .. cpp:member:: bool energy
-
-		      Defaults to :cpp:`false`.
-
-
-	 .. cpp:member:: bool virial
-
-		      Defaults to :cpp:`false`.
-
-	 .. cpp:member:: bool stress
-
-		      Defaults to :cpp:`false`.
 		   
 .. doxygenclass:: uammd::Interactor
    :project: uammd
    :protected-members:	     
    :members:
 
-      
+
+
 .. hint:: Interactors can subscribe to the :ref:`ParameterUpdatable` interface, which :ref:`Integrator` will use to communicate changes in parameters (such as the current simulation time).
 
+
+.. warning:: Interactors should throw an exception if an unsatisfiable Computable is requested (for instance, due to a lack of implementation).
+	     
 Adding new computables:
 -----------------------
-
+			
 .. doxygendefine:: EXTRA_COMPUTABLES
    :project: uammd		   
 		 
-
 
 
 
@@ -150,13 +110,12 @@ A minimal example of an Interactor:
       }
     }
   };
-  
 
-The Computables type in the :code:`sum` function simply contains a list of boolean values describing the needs of the caller (which will typically be an Integrator). As of today, an Interactor can be asked to compute only forces, energies and or virials acting on the particles. The Computables structure exists also to facilitate the future inclusion of additional quantities to the Interactor responsibilities.
+.. cpp:namespace:: uammd
 
-Note that Interactor is what is called a pure-virtual class in C++ (and programming in general). This means that Interactor is not a class that can be used by itself (such as, for instance, ParticleData). It is a conceptual base class that must be inherited
+Note that :cpp:any:`Interactor` is what is a pure-virtual class. This means that Interactor is not a class that can be used by itself (such as, for instance, :cpp:any:`ParticleData`). It is a conceptual base class that must be inherited from.
 
-Any class inheriting from Interactor will have access to an instance of :ref:`System` with the name :code:`sys`, that can be used to query properties of the GPU and log messages, and a :ref:`ParticleData` instance with the name :code:`pd`.
+.. hint:: Any class inheriting from :cpp:any:`Interactor` will have access to an instance of :cpp:any:`System` with the name :code:`sys`, that can be used to query properties of the GPU and log messages, and a :cpp:any:`ParticleData` instance with the name :code:`pd`.
 
 Available Interactors
 ----------------------

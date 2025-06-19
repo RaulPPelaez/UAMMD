@@ -1,44 +1,15 @@
-/* Raul P. Pelaez 2017-2021. Integrator Base class
-   Integrator is an UAMMD base module,
-   to create an Integrator module inherit from Integrator and overload the
-   virtual methods. An Integrator has the ability to move the simulation one
-   step forward in time.
-
-   For that, it can use any number of Interactors.
-
-   Integrator can also hold a list of references to ParameterUpdatable derived
-   objects. Adding an Interactor via addInteractor() will also add it as a
-   ParameterUpdatable.
-
-   See the related wiki page for more information.
-
-   USAGE:
-   //Say "integrator" is an instance of an Integrator derived class (such as
-   BD::EulerMaruyama or VerletNVE).
-
-   //Forward the simulation to the next time step:
-   integrator.forwardTime();
-
-   //Add an Interactor derived object (as a shared_ptr) to the integrator:
-   integrator.addInteractor(an_interactor);
-   //Add a ParameterUpdatable derived object (asa shared_ptr) to the integrator:
-   //Note that interactors are automatically added as updatables as well, so
-   there is no need to manually add them as updatables.
-   integrator.addUpdatable(an_updatable);
-
-   //Get a list of Interactors that have been added to the Integrator:
-   auto interactors = integrator.getInteractors();
-   //Get a list of ParameterUpdatables that have been added to the Integrator
-   (note that this includes Interactors): auto updatables =
-   integrator.getUpdatables();
-   //Note that calling any "update" method for both the interactors and
-   updatables lists will duplicate calls to the update methods of the
-   interactors.
-   //If the Integrator needs to update parameters it should do so using only the
-   list provided by addUpdatables().
-
-
-
+// Raul P. Pelaez 2017-2025.
+/**
+ * @file Integrator.cuh
+ * @brief Integrator is one of the base modules of UAMMD.
+ *
+ * An Integrator has the ability to move the simulation one step forward in
+ * time. For that, it can use any number of @ref Interactor, which are added
+ * using the `addInteractor` method. Additionally, Integrators can hold objects
+ * derived from the ParameterUpdatable interface in order to inform them when a
+ * certain parameter changes (for instance the simulation time). C++ wise,
+ * Integrator is a pure virtual class.
+ *
  */
 #pragma once
 #include "Interactor/Interactor.cuh"
@@ -64,8 +35,11 @@ protected:
   std::string name;                 ///< Name of the integrator
   std::shared_ptr<ParticleData> pd; ///< Shared pointer to the particle data
   std::shared_ptr<ParticleGroup>
-      pg;                      ///< Group of particles the integrator acts on
-  std::shared_ptr<System> sys; ///< Simulation system
+      pg; ///< Group of particles the integrator acts on
+  std::shared_ptr<System>
+      sys; ///< Access to the simulation System instance. This is just a
+           ///< convenience member, since the same instance can be accessed via
+           ///< ParticleData::getSystem.
   std::vector<std::shared_ptr<Interactor>>
       interactors; ///< List of interactors added to the integrator
   std::set<std::shared_ptr<ParameterUpdatable>>

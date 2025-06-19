@@ -9,11 +9,11 @@
  *
  * This macro allows the user to extend the set of quantities that an
  * Interactor can compute by defining additional fields in the
- * Interactor::Computables structure.
+ * @ref uammd::Interactor::Computables "Computables" structure.
  *
  * It should be defined as a Boost.Preprocessor sequence of identifiers.
- * These identifiers will be expanded into boolean flags in the `Computables`
- * struct.
+ * These identifiers will be expanded into boolean flags in the @ref
+ * uammd::Interactor::Computables "Computables" struct.
  *
  * @warning This macro must be defined before including any uammd headers.
  *
@@ -21,6 +21,8 @@
  * @code
  * #define EXTRA_COMPUTABLES (myComputable1)(myComputable2)
  * #include "uammd.cuh"
+ * // Now the Interactor::Computables struct passed down to sum() will have
+ * // additional boolean fields myComputable1 and myComputable2.
  * @endcode
  */
 #ifndef EXTRA_COMPUTABLES
@@ -53,13 +55,13 @@ namespace uammd {
 
 class Interactor : public virtual ParameterUpdatable {
 protected:
-  string name;
+  string name;                  ///< Name of the interactor, mainly used for logging
   shared_ptr<ParticleData> pd;  ///< Shared pointer to the particle data
   shared_ptr<ParticleGroup> pg; ///< Group of particles the interactor acts on
   shared_ptr<System>
       sys; ///< Access to the simulation System instance. This is just a
            ///< convenience member, since the same instance can be accessed via
-           ///< ParticleData::getSystem.
+           ///< @ref ::ParticleData::getSystem .
   virtual ~Interactor() {
     sys->log<System::DEBUG>("[Interactor] %s Destroyed", name.c_str());
   }

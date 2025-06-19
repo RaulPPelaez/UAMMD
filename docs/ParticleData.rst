@@ -1,7 +1,9 @@
 ParticleData
 =============
 
-One of the basic assumptions in UAMMD is that simulations are based on the state of "particles". ParticleData is the class in UAMMD that stores the properties of all the particles in the system.
+.. doxygenfile:: ParticleData/ParticleData.cuh
+   :project: uammd
+   :sections: briefdescription
 
 
 ParticleData exposes the following API:

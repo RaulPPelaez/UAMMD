@@ -1,39 +1,23 @@
 System
 =======
 
-System is the fundamental UAMMD module, any other module or submodule needs a reference to a System instance (although this references is not often needed to be provided explicitly).
-
-System contains information about the machine UAMMD is running on and offers a series of utilities like a CPU random number generator and a logging infrastructure. Furthermore, System handles initializing and deleting the CUDA  environment (i.e selecting a GPU to run on).  
-
-
-Creation
-~~~~~~~~~
+.. doxygenfile:: System/System.h
+   :project: uammd
+   :sections: briefdescription detaileddescription
 
 
-.. cpp:class:: System
+.. doxygenclass:: uammd::System
+   :project: uammd
+   :members:
 
-	   .. cpp:function:: System()
+.. doxygenstruct:: uammd::SystemParameters
+   :project: uammd
+   :members:
 
-			     Default Constructor.
-			     
-	   .. cpp:function:: System(int argc, char* argv[])
 
-			     System can take in the command line arguments and understands :ref:`some options <System options>` for them.
-			     
+.. hint:: System (or :ref:`ParticleData`) should be the first thing to create in a :ref:`UAMMD simulation code <Simulation file>`, see any of the examples in examples folder.
 
-Most of the time you do not need to handle the creation of System. :ref:`ParticleData` will auto initialize it for you if you do not provide one.
-
-You can request ParticleData for a reference to System like this:
-
-.. code:: cpp
-
-  auto sys = pd->getSystem();	  
-
-System should be created explicitly if the user wants to provide System with the command line arguments (see :ref:`below <System options>` on why you would want this).
-
-System (or :ref:`ParticleData`) should be the first thing to create in a :ref:`UAMMD simulation code <Simulation file>`, see any of the examples in examples folder.
-
-A System instance can be initialized like this:
+**Example: creating a System instance**
 
 .. code:: cpp
 	  
@@ -79,18 +63,18 @@ You can access a Xorshift128plus random generator from System. This generator sh
   //Get a gaussian number with mean a and std b
   double Zg = sys->rng().gaussian(a,b);
   ...
-  
+
+.. _logging-doc:
+
 Logging
 ********
 
-System provides a logging engine with several levels of relevance for the message. The available levels are in the System::level enum in System.h. You can see the following in this example:
+System provides a logging engine with several levels of relevance for the message via the :cpp:any:`System::log` method. The log level is set at compile time via the preprocessor macro :cpp:expr:`MAXLOGLEVEL`, which can be set to any value between 0 and 13. The higher the value, the more verbose the logging will be. See :ref:`Compiling UAMMD`. The levels are:
 
-.. cpp:function:: template<class LogLevel> \
-		  static void System::log(const char * format, ...);
+.. doxygenenum:: uammd::System::LogLevel
+   :project: uammd
 
-	Log messages with a printf-like interface. Requires a log level (see below).
-		  
-             
+**Example:**
 
 .. code:: cpp
 	  
@@ -106,8 +90,8 @@ System provides a logging engine with several levels of relevance for the messag
   System::log<System::DEBUG7>("There are 7 levels of debug!");
 
 
-The maximum level of logging that will be processed will be the compile constant maxLogLevel in Log.h. Anything below this level will not even be compiled, so do not be worried about performance when writing debug logs. The highest level of logging that will print DEBUG messages is maxLogLevel = 6. maxLoglevel=13 will print up to DEBUG7, while maxLogLevel=0 will only print CRITICAL errors. However, the max log level should be set via a preprocessor macro at compilation, see :ref:`Compiling UAMMD`
-
+.. _memory-management-doc:
+   
 Cached memory allocation
 **************************
 
@@ -166,27 +150,7 @@ Usage example:
     sys->finish();
     return 0;
   }
-  
-
-
-Other methods
-~~~~~~~~~~~~~~
-
-
- .. cpp:function:: int System::getargc();
-
-    Returns the number of arguments provided at creation.
-
- .. cpp:function:: char** System::getargv();
-
-    Returns the list of arguments provided at creation.
-		   		   		  
- .. cpp:function:: void System::finish();
-
-    Finishes all UAMMD-related operations and frees any memory allocated by UAMMD. After a call to :code:`finish()` all UAMMD modules are left in an invalid state. This function should be called after every other UAMMD object has been destroyed.
-		   		   		  
-
-
+ 
 
 System options
 ~~~~~~~~~~~~~~~

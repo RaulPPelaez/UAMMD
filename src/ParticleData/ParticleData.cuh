@@ -1,96 +1,10 @@
-/*Raul P. Pelaez 2019-2022. ParticleData.
-  Handles and stores all properties a particle can have.
-  However they are only initialized when they are asked for the first time.
-  Offers a way to access this properties.
-
-  Can change in size and periodically sorts the particles to increase spatial
-  locality.
-
-  All changes in the particle data are announced using boost signals.
-  You can suscribe to this signals by asking for them with get*Signal()
-
-
-  Entities using this class must take into account that the addresses of the
-  properties and the order/number of the particles can change at any point. The
-  former is solved by asking ParticleData for the address of a property each
-  time it is going to be used, the latter are informed through signals so any
-  needed computation can be performed.
-
-
-  CREATION:
-
-  auto pd = make_shared<ParticleData>(numberParticles, system);
-  //System can be ommited if a handle to it is not needed.
-  //It will be auto created by ParticleData.
-  auto pd = make_shared<ParticleData>(numberParticles);
-
-  USAGE:
-
-  To get a certain property:
-
-  You can get a property both in GPU or CPU memory
-  and must specify the kind of access (read, write, readwrite)
-
-  If the mode is set to write, the handle will gain exclusivity and no one else
-  will be able to access it until it is realeased (the handle is deleted). You
-  cannot write to an array that is currently being read. For this it is
-  important to control the scope of the property handles.
-
-  //Get a handle to it
-  auto pos_handle = pd->getPos(access::location::cpu, access::mode::read);
-  //Get a raw memory pointer if needed
-  real4* pos_ptr = pos_handle.raw();
-
-  To get the indices of particles in the original order (ordered by ID):
-  int * originalOrder = pd->getIdOrderedIndices(access::location::cpu);
-  particle zero would be: pos.raw()[originalOrder[0]];
-
-  //To get a property only if it has been asked for before (i.e if the mass has
-  been set) auto mass = pd->getMassIfAllocated(access::location::gpu,
-  access::mode::read);
-  //mass.raw() will be nullptr if mass has not been asked for before.
-  //Note that this call will never allocate the property
-
-  CONNECT TO A SIGNAL:
-
-  When the particles are reordered, or the number of them changes a signal will
-  be thrown. In order to hear this signals a user class must:
-
-  class User{
-    connection reorderConnection, numParticlesChangedConnection;
-    public:
-     User(std::shared_ptr<ParticleData> pd){
-       reorderConnection = pd->getReorderSignal()->
-         connect([this](){this->handle_reorder();});
-
-       numParticlesChangedConnection = pd->getNumParticlesChangedSignal()->
-         connect([this](int Nnew){this->handle_numChanged(Nnew);});
-     }
-     ~User(){
-     //Remember to disconnect when the signal is not needed anymore!
-       reorderConnection.disconnect();
-       numParticlesChangedConnection.disconnect();
-     }
-     void handle_reorder(){
-       std::cout<<"A reorder occured!!"<std::endl;
-     }
-     void handle_numChanged(int Nnew){
-       std::cout<<"Particle number changed, now it is: "<<Nnew<<std::endl;
-     }
-  };
-
-  LIST OF SIGNALS:
-
-  numParticlesChangedSignal() -> int : Triggered when the total number of
-  particles changes reorderSignal() -> void : Triggered when the global sorting
-  of particles changes [PROPERTY]WriteRequestedSignal() -> void: Triggered when
-  PROPERTY has been requested with the write or readwrite flag (notice that the
-  signal is emitted at requesting of the property, so the requester has writing
-  rights
-
+/**
+ * @file ParticleData.cuh
+ * @brief One of the basic assumptions in UAMMD is that simulations are based on the state of "particles". ParticleData is the class in UAMMD that stores the properties of all the particles in the system.
+ * @author Raul P. Pelaez
+ * @date 2017-2025
 */
-#ifndef PARTICLEDATA_CUH
-#define PARTICLEDATA_CUH
+#pragma once
 #include "System/System.h"
 
 #include "ParticleData/Property.cuh"
@@ -137,7 +51,7 @@
 // clang-format on
 
 /**
- * @brief List of all properties available in @ref ParticleData .
+ * @brief List of all properties available in @ref uammd::ParticleData "ParticleData".
  *
  * This macro is used to generate the list of all properties available in
  * ParticleData. It is used to generate getter functions and other related
@@ -300,7 +214,11 @@ public:
 
   ~ParticleData() { sys->log<System::DEBUG>("[ParticleData] Destroyed"); }
 
-  // Return the System instance used by this instance of ParticleData
+  /**
+   * @brief Get the System instance associated with this ParticleData.
+   *
+   * @return A shared pointer to the System instance.
+   */
   auto getSystem() { return this->sys; }
 
   // Generate getters for all properties except ID
@@ -646,5 +564,3 @@ void ParticleData::changeNumParticles(int Nnew) {
 #undef APPLY_CURRENT_ORDER_R
 #undef RESIZE_PROPERTY_R
 #undef RESIZE_PROPERTY
-
-#endif
