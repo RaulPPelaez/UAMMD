@@ -1,9 +1,11 @@
 /**
  * @file ParticleData.cuh
- * @brief One of the basic assumptions in UAMMD is that simulations are based on the state of "particles". ParticleData is the class in UAMMD that stores the properties of all the particles in the system.
+ * @brief One of the basic assumptions in UAMMD is that simulations are based on
+ * the state of "particles". ParticleData is the class in UAMMD that stores the
+ * properties of all the particles in the system.
  * @author Raul P. Pelaez
  * @date 2017-2025
-*/
+ */
 #pragma once
 #include "System/System.h"
 
@@ -51,7 +53,8 @@
 // clang-format on
 
 /**
- * @brief List of all properties available in @ref uammd::ParticleData "ParticleData".
+ * @brief List of all properties available in @ref uammd::ParticleData
+"ParticleData".
  *
  * This macro is used to generate the list of all properties available in
  * ParticleData. It is used to generate getter functions and other related

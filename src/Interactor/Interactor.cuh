@@ -55,7 +55,7 @@ namespace uammd {
 
 class Interactor : public virtual ParameterUpdatable {
 protected:
-  string name;                  ///< Name of the interactor, mainly used for logging
+  string name; ///< Name of the interactor, mainly used for logging
   shared_ptr<ParticleData> pd;  ///< Shared pointer to the particle data
   shared_ptr<ParticleGroup> pg; ///< Group of particles the interactor acts on
   shared_ptr<System>
