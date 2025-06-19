@@ -18,6 +18,13 @@ sys.path.insert(0, os.path.abspath("../src/"))
 sys.path.insert(0, os.path.abspath("."))
 
 
+# Call doxygen Doxyfile to generate the XML files before building the docs.
+def setup(app):
+    import subprocess
+
+    subprocess.call(["doxygen", "Doxyfile"])
+
+
 # -- Project information -----------------------------------------------------
 
 project = "UAMMD"
@@ -42,7 +49,7 @@ extensions = [
     "sphinxcontrib.inkscapeconverter",
     "sphinx.ext.todo",
 ]
-
+cpp_namespace = ["uammd"]
 imgmath_image_format = "svg"
 imgmath_use_preview = True
 
@@ -51,7 +58,6 @@ imgmath_use_preview = True
 breathe_projects = {"uammd": "doxygen/xml"}
 breathe_default_project = "uammd"
 breathe_show_include = True
-
 
 todo_include_todos = True
 
