@@ -1,5 +1,5 @@
 
-sphinx<=7.2.6
+sphinx<=8.2.3
 sphinx_rtd_theme
 sphinxcontrib-svg2pdfconverter
 breathe
