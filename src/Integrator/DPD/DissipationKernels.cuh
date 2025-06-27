@@ -4,6 +4,38 @@
 #include "uammd.cuh"
 namespace uammd {
 namespace dpd {
+/**
+ * @brief Concept for Dissipation Kernels in DPD simulations.
+ *
+ * This concept defines the requirements for any object that can act as a force
+ * functor in DPD.
+ *
+ * The functor must be callable from device code with the following signature:
+ *
+ * @code
+ * __device__ real3 operator()(int i, int j, real3 rij, real3 vij, real cutoff,
+ * Saru& rng);
+ * @endcode
+ *
+ * where:
+ * - `i`, `j`: particle indices.
+ * - `rij`: relative position vector between particles `i` and `j`,
+ * - `vij`: relative velocity vector between particles `i` and `j`,
+ * - `cutoff`: cutoff radius for interactions,
+ * - `rng`: a Saru random number generator instance, seeded identically for the
+ * (i,j) and (j,i) pairs
+ *
+ * The call must return a @ref real3 representing the total force vector applied
+ * to particle `i` due to particle `j`.
+ *
+ * @tparam T The type to be checked for compatibility as a force functor.
+ */
+template <typename T>
+concept DissipationKernel = requires(const T &dk, int i, int j, real3 rij,
+                                     real3 vij, real cutoff, Saru &rng) {
+  { dk(i, j, rij, vij, cutoff, rng) } -> std::convertible_to<real3>;
+};
+
 // clang-format off
 /**
  * @brief Default implementation of a DissipationKernel for DPD simulations.
@@ -95,13 +127,27 @@ struct DefaultDissipation : public ParameterUpdatable {
     const real Fr = rng.gf(real(0.0), sigma * sqrt(g) * wr * invrmod).x;
     return (Fc + Fd + Fr) * rij;
   }
-
-private:
+  /**
+   * @brief Updates the temperature of the dissipative force.
+   *
+   * This method recalculates the random force strength based on the new
+   * temperature and the current time step.
+   *
+   * @param newTemp The new temperature in energy units kT.
+   */
   virtual void updateTemperature(real newTemp) override {
     temperature = newTemp;
     sigma = sqrt(2.0 * temperature) / sqrt(dt);
   }
 
+  /**
+   * @brief Updates the time step for the dissipative force.
+   *
+   * This method recalculates the random force strength based on the current
+   * temperature and the new time step.
+   *
+   * @param newdt The new time step for the simulation.
+   */
   virtual void updateTimeStep(real newdt) override {
     dt = newdt;
     sigma = sqrt(2.0 * temperature) / sqrt(dt);
@@ -223,6 +269,32 @@ struct TransversalDissipation : public ParameterUpdatable {
     return Fc + Fd + Fr;
   }
 
+  /**
+   * @brief Updates the temperature of the dissipative force.
+   *
+   * This method recalculates the random force strength based on the new
+   * temperature and the current time step.
+   *
+   * @param newTemp The new temperature in energy units kT.
+   */
+  virtual void updateTemperature(real newTemp) override {
+    temperature = newTemp;
+    sigma = sqrt(2.0 * temperature) / sqrt(dt);
+  }
+
+  /**
+   * @brief Updates the time step for the dissipative force.
+   *
+   * This method recalculates the random force strength based on the current
+   * temperature and the new time step.
+   *
+   * @param newdt The new time step for the simulation.
+   */
+  virtual void updateTimeStep(real newdt) override {
+    dt = newdt;
+    sigma = sqrt(2.0 * temperature) / sqrt(dt);
+  }
+
 private:
   __device__ __host__ real3 dissipative(real3 eij, real3 vij, real g_par,
                                         real g_perp) const {
@@ -260,15 +332,6 @@ private:
     const auto noiseB = trNoise * eij;
     const auto fluc = sigma * (Atil * noiseA + Btil * noiseB);
     return fluc;
-  }
-  virtual void updateTemperature(real newTemp) override {
-    temperature = newTemp;
-    sigma = sqrt(2.0 * temperature) / sqrt(dt);
-  }
-
-  virtual void updateTimeStep(real newdt) override {
-    dt = newdt;
-    sigma = sqrt(2.0 * temperature) / sqrt(dt);
   }
 };
 

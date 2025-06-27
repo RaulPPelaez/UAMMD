@@ -1,41 +1,9 @@
 #pragma once
 // Raul P. Pelaez 2025. Verlet DPD Integrator module.
-#include "Integrator/Integrator.cuh"
 #include "Integrator/DPD/DissipationKernels.cuh"
+#include "Integrator/Integrator.cuh"
 namespace uammd {
 namespace dpd {
-/**
- * @brief Concept for Dissipation Kernels in DPD simulations.
- *
- * This concept defines the requirements for any object that can act as a force
- * functor in DPD.
- *
- * The functor must be callable from device code with the following signature:
- *
- * @code
- * __device__ real3 operator()(int i, int j, real3 rij, real3 vij, real cutoff,
- * Saru& rng);
- * @endcode
- *
- * where:
- * - `i`, `j`: particle indices.
- * - `rij`: relative position vector between particles `i` and `j`,
- * - `vij`: relative velocity vector between particles `i` and `j`,
- * - `cutoff`: cutoff radius for interactions,
- * - `rng`: a Saru random number generator instance, seeded identically for the
- * (i,j) and (j,i) pairs
- *
- * The call must return a @ref real3 representing the total force vector applied
- * to particle `i` due to particle `j`.
- *
- * @tparam T The type to be checked for compatibility as a force functor.
- */
-template <typename T>
-concept DissipationKernel = requires(const T &dk, int i, int j, real3 rij,
-                                     real3 vij, real cutoff, Saru &rng) {
-  { dk(i, j, rij, vij, cutoff, rng) } -> std::convertible_to<real3>;
-};
-// clang-format off
 
 // clang-format off
 /**
@@ -46,11 +14,11 @@ concept DissipationKernel = requires(const T &dk, int i, int j, real3 rij,
  * on the velocity. The modified algorithm proceeds as follows:
  *
  * @f[
- * &\mathbf{v}_{i}^{n+1/2} = \mathbf{v}_{i}^{n} + \frac{\Delta t}{2} \mathbf{a}_{i}^{n} \\
- * &\mathbf{r}_{i}^{n+1}   = \mathbf{r}_{i}^{n} + \Delta t \mathbf{v}_{i}^{n+1/2} \\
- * &\widetilde{\mathbf{v}}_{i}^{n+1/2} = \mathbf{v}_{i}^{n} + \lambda \frac{\Delta t}{2} \mathbf{a}_{i}^{n+1} \\
- * &\mathbf{a}_{i}^{n+1} = m_i^{-1}\sum_{j\in\mathcal{N}}\mathbf{f}\left(\mathbf{r}_{ij}^{n+1}, \widetilde{\mathbf{v}}^{n+1/2}_{ij}\right) \\
- * &\mathbf{v}_{i}^{n+1} = \mathbf{v}_{i}^{n+1/2} + \frac{\Delta t}{2} \mathbf{a}_{i}^{n+1}
+ * &\mathbf{v}_{i}^{n+\frac{1}{2}} = \mathbf{v}_{i}^{n} + \frac{\Delta t}{2} \mathbf{a}_{i}^{n} \\
+ * &\mathbf{r}_{i}^{n+1}   = \mathbf{r}_{i}^{n} + \Delta t \mathbf{v}_{i}^{n+\frac{1}{2}} \\
+ * &\widetilde{\mathbf{v}}_{i}^{n+\frac{1}{2}} = \mathbf{v}_{i}^{n} + \lambda \Delta t \mathbf{a}_{i}^{n} \\
+ * &\mathbf{a}_{i}^{n+1} = m_i^{-1}\sum_{j\in\mathcal{N}}\mathbf{f}\left(\mathbf{r}_{ij}^{n+1}, \widetilde{\mathbf{v}}^{n+\frac{1}{2}}_{ij}\right) \\
+ * &\mathbf{v}_{i}^{n+1} = \mathbf{v}_{i}^{n+\frac{1}{2}} + \frac{\Delta t}{2} \mathbf{a}_{i}^{n+1}
  * @f]
  *
  * where @f$\mathbf{r}_{i}^{n}@f$ and @f$\mathbf{v}_{i}^{n}@f$ are the positions and velocities
@@ -77,6 +45,14 @@ concept DissipationKernel = requires(const T &dk, int i, int j, real3 rij,
  */
 // clang-format on
 template <DissipationKernel Kernel> class Verlet : public Integrator {
+  real dt;
+  real lambda;
+  bool is2D;
+  real mass;
+  std::shared_ptr<Kernel> dissipation;
+  uint64_t step = 0; ///< Current simulation step
+  cudaStream_t stream;
+
 public:
   /**
    * @brief Parameters for the Verlet integrator.
@@ -101,9 +77,16 @@ public:
      * that the mass for each particle will be taken from the particle data.
      */
     real mass = -1;
-    real temperature = 1.0; ///< Temperature of the solvent in units of energy.
-                            ///< This is @f$k_BT@f$ in the formulas.
-    std::shared_ptr<Kernel> dissipation; ///< Dissipation kernel to be used in the simulation.
+    std::shared_ptr<Kernel>
+        dissipation; ///< Dissipation kernel to be used in the simulation.
+    real rcut;       ///< Cutoff radius for the interaction potential.
+    Box box;         ///< Simulation box dimensions and periodicity.
+    /**
+     * @brief Temperature (in units of energy) for velocity initialization.
+     *
+     * If negative, the velocity is not initialized.
+     */
+    real temperature = -1.0;
   };
 
   Verlet(shared_ptr<ParticleData> pd, Parameters par)
@@ -116,6 +99,8 @@ public:
    * @param par Parameters for the Verlet integrator.
    */
   Verlet(shared_ptr<ParticleGroup> pg, Parameters par);
+
+  ~Verlet();
 
   /**
    * @brief Advance the simulation to the next time step.
@@ -130,6 +115,9 @@ public:
    * @return Energy contribution as a real number.
    */
   real sumEnergy() override;
+
+private:
+  void computeCurrentForces();
 };
 } // namespace dpd
 } // namespace uammd
