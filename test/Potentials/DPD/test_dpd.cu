@@ -1,8 +1,5 @@
-#include "Integrator/VerletNVE.cuh"
+#include "Integrator/VerletDPD.cuh"
 #include "Interactor/ExternalForces.cuh"
-#include "Interactor/NeighbourList/VerletList.cuh"
-#include "Interactor/PairForces.cuh"
-#include "Interactor/Potential/DPD.cuh"
 #include "msd/msd.hpp"
 #include <algorithm>
 #include <cmath>
@@ -16,7 +13,6 @@
 using namespace uammd;
 using std::endl;
 using std::make_shared;
-using NeighbourList = VerletList;
 
 struct Parameters {
   real dt = 0.01;           // Time step
@@ -43,49 +39,37 @@ void initVelocities(std::shared_ptr<ParticleData> pd, real temperature) {
 
 auto createIntegratorTransversalDPD(std::shared_ptr<ParticleData> pd,
                                     const Parameters &ipar) {
-  using NVE = VerletNVE;
-  NVE::Parameters par;
+  using Verlet = dpd::Verlet<dpd::TransversalDissipation>;
+  Verlet::Parameters par;
   par.dt = ipar.dt;
-  par.initVelocities = false;
-  initVelocities(pd, ipar.temperature);
-  auto verlet = std::make_shared<NVE>(pd, par);
-  using DPD = Potential::DPD_impl<Potential::TransversalDissipation>;
-  using DPDPF = PairForces<DPD, NeighbourList>;
-  DPD::Parameters dpd_params;
-  auto gamma = std::make_shared<Potential::TransversalDissipation>(
+  par.is2D = false;
+  par.mass = 1;
+  par.dissipation = std::make_shared<dpd::TransversalDissipation>(
       ipar.gamma_par_dpd, ipar.gamma_perp_dpd, ipar.A_dpd, ipar.temperature,
       ipar.dt);
-  dpd_params.cutOff = ipar.cutOff_dpd;
-  dpd_params.gamma = gamma;
-  dpd_params.dt = par.dt;
-  auto pot = std::make_shared<DPD>(dpd_params);
-  DPDPF::Parameters params;
-  params.box = Box(ipar.L);
-  auto pairforces = std::make_shared<DPDPF>(pd, params, pot);
-  verlet->addInteractor(pairforces);
+  par.rcut = ipar.cutOff_dpd;
+  par.box = Box(ipar.L);
+  par.temperature = ipar.temperature;
+  par.lambda = 0.65;
+  auto verlet = std::make_shared<Verlet>(pd, par);
   return verlet;
 }
 
 auto createIntegratorDPD(std::shared_ptr<ParticleData> pd,
                          const Parameters &ipar) {
-  using NVE = VerletNVE;
-  NVE::Parameters par;
+  using Verlet = dpd::Verlet<dpd::DefaultDissipation>;
+  Verlet::Parameters par;
   par.dt = ipar.dt;
-  par.initVelocities = false;
-  initVelocities(pd, ipar.temperature);
-  auto verlet = std::make_shared<NVE>(pd, par);
-  using DPD = PairForces<Potential::DPD, NeighbourList>;
-  Potential::DPD::Parameters dpd_params;
-  auto gamma = std::make_shared<Potential::DefaultDissipation>(
+  par.is2D = false;
+  par.mass = 1;
+  par.temperature = ipar.temperature;
+  par.dissipation = std::make_shared<dpd::DefaultDissipation>(
       ipar.A_dpd, ipar.gamma_dpd, ipar.temperature, ipar.dt);
-  dpd_params.cutOff = ipar.cutOff_dpd;
-  dpd_params.gamma = gamma;
-  dpd_params.dt = par.dt;
-  auto pot = std::make_shared<Potential::DPD>(dpd_params);
-  DPD::Parameters params;
-  params.box = Box(ipar.L);
-  auto pairforces = std::make_shared<DPD>(pd, params, pot);
-  verlet->addInteractor(pairforces);
+  par.rcut = ipar.cutOff_dpd;
+  par.box = Box(ipar.L);
+  par.lambda = 0.65;
+  auto verlet = std::make_shared<Verlet>(pd, par);
+
   return verlet;
 }
 
@@ -569,9 +553,10 @@ TEST_P(DPDTest, ShearViscosityTest) {
   for (int i = 0; i < isteps; ++i)
     dpd->forwardTime();
   // Get velocities and average them in the Z and Y directions
-  int nsim = std::max(int(2 * charTime / ipar.dt), 1000); // Number of steps to average over
+  int nsim = std::max(int(2 * charTime / ipar.dt),
+                      1000); // Number of steps to average over
   int nprint = nsim / 1000;
-  nsim = (nsim / nprint) * nprint;       // Ensure nsim is a multiple of navg
+  nsim = (nsim / nprint) * nprint; // Ensure nsim is a multiple of navg
   // Make an histogram of velocities in the x-direction
   int n_bins = 300;
   std::vector<real> vel_avg(n_bins, 0.0);
@@ -612,9 +597,9 @@ TEST_P(DPDTest, ShearViscosityTest) {
       15 *
       (1 / (s + 1) - 4 / (s + 2) + 6 / (s + 3) - 4 / (s + 4) + 1 / (s + 5));
   real v_amp = (*std::max_element(vel_avg.begin(), vel_avg.end()) -
-		*std::min_element(vel_avg.begin(), vel_avg.end())) * 0.5;
-  real viscosity_measured =
-    density * ipar.L / (pow(2 * M_PI, 2) * v_amp);
+                *std::min_element(vel_avg.begin(), vel_avg.end())) *
+               0.5;
+  real viscosity_measured = density * ipar.L / (pow(2 * M_PI, 2) * v_amp);
   EXPECT_NEAR(viscosity_measured, vis_theo, 0.1 * vis_theo)
       << "Shear viscosity should be close to the theoretical value";
 }
