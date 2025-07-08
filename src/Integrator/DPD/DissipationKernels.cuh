@@ -313,8 +313,8 @@ private:
                                         real g_perp) const {
     const auto A = g_perp;
     const auto B = g_par - g_perp;
-    const auto Atil = sqrt(2 * A);
-    const auto Btil = sqrt(3 * B - A);
+    const auto Atil = sqrt(real(2.0) * A);
+    const auto Btil = sqrt(real(3.0) * B - A);
     const auto noiseX = make_real3(rng.gf(0, 1), rng.gf(0, 1).x);
     const auto noiseY = make_real3(rng.gf(0, 1), rng.gf(0, 1).x);
     const auto noiseZ = make_real3(rng.gf(0, 1), rng.gf(0, 1).x);

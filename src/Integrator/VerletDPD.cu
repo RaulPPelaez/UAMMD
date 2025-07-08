@@ -97,6 +97,7 @@ template <DissipationKernel Kernel> void Verlet<Kernel>::forwardTime() {
     const real mass = this->mass;
     const real dt = this->dt;
     const real lambda = this->lambda;
+    const bool is2D = this->is2D;
     thrust::for_each_n(thrust::cuda::par.on(stream), cit,
                        pg->getNumberParticles(), [=] __device__(const auto &i) {
                          real3 p = make_real3(g_pos[i]);
@@ -109,6 +110,10 @@ template <DissipationKernel Kernel> void Verlet<Kernel>::forwardTime() {
                              make_real4(p + half_step_vel * dt, g_pos[i].w);
                          g_vel[i] = vel_prediction;
                          velocityHalfStep_ptr[i] = half_step_vel;
+                         if (is2D) {
+                           g_pos[i].z = 0.0; // Ensure z is zero for 2D
+                           g_vel[i].z = 0.0; // Ensure z velocity is zero for 2D
+                         }
                        });
   }
   computeCurrentForces();
@@ -140,11 +145,15 @@ template <DissipationKernel Kernel> real Verlet<Kernel>::sumEnergy() {
     bool has_mass = pd->isMassAllocated();
     auto cit = thrust::make_counting_iterator(0);
     const auto mass = this->mass;
+    const bool is2D = this->is2D;
     kineticEnergy = thrust::transform_reduce(
         thrust::cuda::par.on(stream), cit, cit + pg->getNumberParticles(),
         [=] __device__(const auto &i) -> real {
           real3 v = make_real3(g_vel[i]);
           real m = has_mass ? g_mass[i] : mass;
+          if (is2D) {
+	    v.z = 0.0; // Ensure z velocity is zero for 2D
+	  }
           return 0.5 * m * dot(v, v);
         },
         real(0), thrust::plus<real>());

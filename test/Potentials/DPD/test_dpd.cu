@@ -50,7 +50,7 @@ auto createIntegratorTransversalDPD(std::shared_ptr<ParticleData> pd,
   par.rcut = ipar.cutOff_dpd;
   par.box = Box(ipar.L);
   par.temperature = ipar.temperature;
-  par.lambda = 0.65;
+  par.lambda = 0.5;
   auto verlet = std::make_shared<Verlet>(pd, par);
   return verlet;
 }
@@ -67,7 +67,7 @@ auto createIntegratorDPD(std::shared_ptr<ParticleData> pd,
       ipar.A_dpd, ipar.gamma_dpd, ipar.temperature, ipar.dt);
   par.rcut = ipar.cutOff_dpd;
   par.box = Box(ipar.L);
-  par.lambda = 0.65;
+  par.lambda = 0.5;
   auto verlet = std::make_shared<Verlet>(pd, par);
 
   return verlet;
@@ -429,8 +429,8 @@ TEST_P(DPDTest, DiffusionCoefficientTest) {
     dpd->forwardTime();
 
   // Record positions over time
-  int nsteps = 300 * charTime / ipar.dt; // Total steps to record
-  int nprint = nsteps / 3000;            // Print every 100th step
+  int nsteps = 400 * charTime / ipar.dt;
+  int nprint = nsteps / 4000;
   nsteps = (nsteps / nprint) * nprint; // Ensure nsteps is a multiple of nprint
   std::vector<double> positions; // Stores position such that particle i, time t
   // and dimension j is located at
@@ -461,8 +461,8 @@ TEST_P(DPDTest, DiffusionCoefficientTest) {
                                            msd::device::cpu, N, ntimes, 3);
   // Estimate D from slope of MSD in linear regime
   // Start at 10*charTime and go up to 100*charTime
-  int t_start = 10 * charTime / ipar.dt / nprint;
-  int t_end = 100 * charTime / ipar.dt / nprint;
+  int t_start = 5 * charTime / ipar.dt / nprint;
+  int t_end = 30 * charTime / ipar.dt / nprint;
   std::span msd_x(msd);
   msd_x = msd_x.subspan(t_start, t_end - t_start);
   double slopex = fit_to_line(msd_x);
@@ -479,18 +479,18 @@ TEST_P(DPDTest, DiffusionCoefficientTest) {
       << "Diffusion coefficients in x and y should be similar";
   EXPECT_NEAR(D.x, D.z, 0.1 * D.x)
       << "Diffusion coefficients in x and z should be similar";
-  // // Write MSD to file for analysis
-  // std::string name =
-  //     GetParam() == DissipationType::Default ? "default" : "transversal";
-  // std::ofstream msd_file("msd" + name + ".dat");
-  // for (int t = 0; t < ntimes; ++t) {
-  //   msd_file << t * ipar.dt * nprint;
-  //   for (int i = 0; i < 3; ++i) {
-  //     msd_file << " " << msd[t + ntimes * i];
-  //   }
-  //   msd_file << endl;
-  // }
-  // msd_file.close();
+  // Write MSD to file for analysis
+  std::string name =
+      GetParam() == DissipationType::Default ? "default" : "transversal";
+  std::ofstream msd_file("msd" + name + ".dat");
+  for (int t = 0; t < ntimes; ++t) {
+    msd_file << t * ipar.dt * nprint;
+    for (int i = 0; i < 3; ++i) {
+      msd_file << " " << msd[t + ntimes * i];
+    }
+    msd_file << endl;
+  }
+  msd_file.close();
   EXPECT_GT(D.x, 0.0);
   EXPECT_GT(D.y, 0.0);
   EXPECT_GT(D.z, 0.0);
