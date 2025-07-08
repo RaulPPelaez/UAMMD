@@ -102,7 +102,7 @@ Poisson::Poisson(shared_ptr<ParticleGroup> pg, Parameters par)
     long double E = 1;
     long double r = farFieldGaussianWidth;
     while (abs(E) > par.tolerance) {
-      r += 0.001l;
+      r += 0.001l*gw;
       E = Poisson_ns::greensFunction(r * r, gw, split, epsilon);
     }
     nearFieldCutOff = r;
