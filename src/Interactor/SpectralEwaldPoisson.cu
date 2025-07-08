@@ -98,7 +98,7 @@ Poisson::Poisson(shared_ptr<ParticleGroup> pg, Parameters par)
     throw std::invalid_argument("[Poisson] Kernel support is too large");
   }
   kernel->support = std::min(kernel->support, grid.cellDim.x / 2 - 2);
-  if (split > 0) {
+  if (par.split > 0) {
     long double E = 1;
     long double r = farFieldGaussianWidth;
     while (abs(E) > par.tolerance) {
@@ -131,7 +131,7 @@ Poisson::Poisson(shared_ptr<ParticleGroup> pg, Parameters par)
                               nearFieldCutOff);
   }
   initCuFFT();
-  if (split) {
+  if (par.split > 0) {
     // TODO: I need a better heuristic to select the table size
     int Ntable = std::max(
         4096, std::min(1 << 16, int(nearFieldCutOff / (gw * tolerance * 1e3))));
@@ -142,7 +142,7 @@ Poisson::Poisson(shared_ptr<ParticleGroup> pg, Parameters par)
     nearFieldGreensFunction = std::make_shared<TabulatedFunction<real>>(
         ptr, Ntable, 0, nearFieldCutOff, [*this](real r) {
           return Poisson_ns::greensFunctionField(r, gw, split, epsilon);
-        });
+    });
     nearFieldPotentialGreensFunctionTable.resize(Ntable);
     ptr =
         thrust::raw_pointer_cast(nearFieldPotentialGreensFunctionTable.data());
