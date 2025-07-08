@@ -22,32 +22,32 @@ BaseBrownianIntegrator::BaseBrownianIntegrator(shared_ptr<ParticleGroup> pg,
     this->hydrodynamicRadius = par.hydrodynamicRadius;
     if (pd->isRadiusAllocated()) {
       sys->log<System::WARNING>("[BD::BaseBrownianIntegrator] Assuming all "
-                                "particles have hydrodynamic radius %f",
+                                "particles have hydrodynamic radius %g",
                                 par.hydrodynamicRadius);
     } else {
       sys->log<System::MESSAGE>(
-          "[BD::BaseBrownianIntegrator] Hydrodynamic radius: %f",
+          "[BD::BaseBrownianIntegrator] Hydrodynamic radius: %g",
           par.hydrodynamicRadius);
     }
-    sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Self Mobility: %f",
+    sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Self Mobility: %g",
                               selfMobility);
   } else if (pd->isRadiusAllocated()) {
     sys->log<System::MESSAGE>(
         "[BD::BaseBrownianIntegrator] Hydrodynamic radius: particleRadius");
     sys->log<System::MESSAGE>(
-        "[BD::BaseBrownianIntegrator] Self Mobility: %f/particleRadius",
+        "[BD::BaseBrownianIntegrator] Self Mobility: %g/particleRadius",
         selfMobility);
   } else {
     this->hydrodynamicRadius = real(1.0);
     sys->log<System::MESSAGE>(
-        "[BD::BaseBrownianIntegrator] Hydrodynamic radius: %f",
+        "[BD::BaseBrownianIntegrator] Hydrodynamic radius: %g",
         hydrodynamicRadius);
-    sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Self Mobility: %f",
+    sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Self Mobility: %g",
                               selfMobility);
   }
-  sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Temperature: %f",
+  sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Temperature: %g",
                             temperature);
-  sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] dt: %f", dt);
+  sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] dt: %g", dt);
   if (par.K.size() == 3) {
     int numberNonZero = std::count_if(par.K.begin(), par.K.end(), [](real3 k) {
       return k.x != 0 or k.y != 0 or k.z != 0;
@@ -57,7 +57,7 @@ BaseBrownianIntegrator::BaseBrownianIntegrator(shared_ptr<ParticleGroup> pg,
       Ky = par.K[1];
       Kz = par.K[2];
       sys->log<System::MESSAGE>("[BD::BaseBrownianIntegrator] Shear Matrix: [ "
-                                "%f %f %f; %f %f %f; %f %f %f ]",
+                                "%g %g %g; %g %g %g; %g %g %g ]",
                                 Kx.x, Kx.y, Kx.z, Ky.x, Ky.y, Ky.z, Kz.x, Kz.y,
                                 Kz.z);
     }
