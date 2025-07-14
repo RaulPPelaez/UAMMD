@@ -102,7 +102,7 @@ Poisson::Poisson(shared_ptr<ParticleGroup> pg, Parameters par)
     long double E = 1;
     long double r = farFieldGaussianWidth;
     while (abs(E) > par.tolerance) {
-      r += 0.001l*gw;
+      r += 0.001l * gw;
       E = Poisson_ns::greensFunction(r * r, gw, split, epsilon);
     }
     nearFieldCutOff = r;
@@ -142,7 +142,7 @@ Poisson::Poisson(shared_ptr<ParticleGroup> pg, Parameters par)
     nearFieldGreensFunction = std::make_shared<TabulatedFunction<real>>(
         ptr, Ntable, 0, nearFieldCutOff, [*this](real r) {
           return Poisson_ns::greensFunctionField(r, gw, split, epsilon);
-    });
+        });
     nearFieldPotentialGreensFunctionTable.resize(Ntable);
     ptr =
         thrust::raw_pointer_cast(nearFieldPotentialGreensFunctionTable.data());
