@@ -29,6 +29,19 @@ inline __device__ float2 atomicAdd(float2 *address, float2 val) {
     newval.y = atomicAdd(&(*address).y, val.y);
   return newval;
 }
+
+inline __device__ float4 atomicAdd(float4 *address, float4 val) {
+  float4 newval;
+  if (val.x)
+    newval.x = atomicAdd(&(*address).x, val.x);
+  if (val.y)
+    newval.y = atomicAdd(&(*address).y, val.y);
+  if (val.z)
+    newval.z = atomicAdd(&(*address).z, val.z);
+  if (val.w)
+    newval.z = atomicAdd(&(*address).w, val.w);
+  return newval;
+}
 #endif
 
 inline __device__ double2 atomicAdd(double2 *address, double2 val) {
@@ -40,19 +53,6 @@ inline __device__ double2 atomicAdd(double2 *address, double2 val) {
   return newval;
 }
 
-inline __device__ real4 atomicAdd(real4 *address, real4 val) {
-  real4 newval;
-  if (val.x)
-    newval.x = atomicAdd(&(*address).x, val.x);
-  if (val.y)
-    newval.y = atomicAdd(&(*address).y, val.y);
-  if (val.z)
-    newval.z = atomicAdd(&(*address).z, val.z);
-  if (val.w)
-    newval.z = atomicAdd(&(*address).w, val.w);
-  return newval;
-}
-
 inline __device__ real3 atomicAdd(real3 *address, real3 val) {
   real3 newval;
   if (val.x)
@@ -61,6 +61,19 @@ inline __device__ real3 atomicAdd(real3 *address, real3 val) {
     newval.y = atomicAdd(&(*address).y, val.y);
   if (val.z)
     newval.z = atomicAdd(&(*address).z, val.z);
+  return newval;
+}
+
+inline __device__ double4 atomicAdd(double4 *address, double4 val) {
+  double4 newval;
+  if (val.x)
+    newval.x = atomicAdd(&(*address).x, val.x);
+  if (val.y)
+    newval.y = atomicAdd(&(*address).y, val.y);
+  if (val.z)
+    newval.z = atomicAdd(&(*address).z, val.z);
+  if (val.w)
+    newval.z = atomicAdd(&(*address).w, val.w);
   return newval;
 }
 
