@@ -137,7 +137,7 @@ void NearField::initializeTabulatedGreensFunctions() {
   greensFunctionsTableData.resize(Ntable);
   real2 *ptr = thrust::raw_pointer_cast(greensFunctionsTableData.data());
   greenTables = std::make_shared<TabulatedFunction<real2>>(
-      ptr, Ntable, 0, rcut * rcut, [=](real r2) {
+      ptr, Ntable, 0, rcut * rcut, [=, this](real r2) {
         real Gpotential = nearField_ns::GreensFunctionNearPotential(
             r2, par.split, par.gw, par.permitivity.inside);
         real Gfield = nearField_ns::GreensFunctionNearField(
