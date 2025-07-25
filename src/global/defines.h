@@ -4,7 +4,7 @@
 #ifndef UAMMD_DEFINES_H
 #define UAMMD_DEFINES_H
 #include "cuda_runtime.h"
-#define UAMMD_VERSION "2.5"
+#define UAMMD_VERSION "2.9.0"
 
 #ifndef DOUBLE_PRECISION
 #define SINGLE_PRECISION
