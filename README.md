@@ -43,23 +43,7 @@ See the documentation page at https://uammd.readthedocs.io for a full list of av
 
 You can use UAMMD as a library for integration into other codes or as a standalone engine. Checkout the [examples folder](https://github.com/RaulPPelaez/UAMMD/tree/v2.x/examples).
 
-### CMake integration  
-
--------------------------
-
-UAMMD is compatible with CMake's FetchContent:
-
-```cmake
-FetchContent_Declare(
-  uammd
-  GIT_REPOSITORY https://github.com/RaulPPelaez/uammd
-  GIT_TAG        v2.7.0
-)
-FetchContent_MakeAvailable(uammd)
-add_executable(my_executable my_source.cu)
-uammd_setup_target(my_executable)
-```
-
+See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.html) in the documentation for more information.  
 
 #### DEPENDENCIES  
 
@@ -71,7 +55,7 @@ See [Compiling UAMMD](https://uammd.readthedocs.io/en/latest/Compiling-UAMMD.htm
 **Every required dependency can be installed using conda** with the environment file provided in the repository.
 
 ```bash
-conda env create -f environment.yml
+conda env create -f environment.yml -n uammd
 ```
 
 ### Library mode
@@ -82,7 +66,7 @@ The top-level CMakeLists.txt file will install all UAMMD headers to `$CMAKE_INST
 
 ```shell
 $ mkdir build && cd build
-$ cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX .. # If you wish to install the headers to the conda environment
+$ cmake -DCMAKE_INSTALL_PREFIX=$CONDA_PREFIX .. # If you wish to install the headers to a conda environment
 $ make install
 ```
 
@@ -90,9 +74,7 @@ Now other CMake scripts can find the UAMMD headers with:
 
 ```cmake
 find_package(UAMMD REQUIRED)
-include_directories(${UAMMD_INCLUDE_DIR})
-# Or
-# uammd_setup_target(target_name)
+uammd_setup_target(target_name)
 ```
 
 Here you have a short example of how a typical UAMMD code looks like, encoding a simple Brownian dynamics simulation of non interacting particles.:  
