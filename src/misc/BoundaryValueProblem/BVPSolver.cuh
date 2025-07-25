@@ -35,8 +35,12 @@
 #include "misc/BoundaryValueProblem/BVPSchurComplementMatrices.cuh"
 #include "misc/BoundaryValueProblem/KBPENTA.cuh"
 #include "misc/BoundaryValueProblem/MatrixUtils.h"
+#include <algorithm>
 #include <thrust/device_vector.h>
+#include <thrust/execution_policy.h>
 #include <thrust/pair.h>
+#include <thrust/system/omp/execution_policy.h>
+
 #include <utils/exception.h>
 #include <vector>
 namespace uammd {
@@ -261,10 +265,17 @@ private:
                   BatchedBottomBC &bot) {
     auto allocationSize = countRequiredMemory();
     std::vector<char> cpuMemory(allocationSize);
-    for (int i = 0; i < numberSystems; i++) {
+    auto cit = thrust::make_counting_iterator(0);
+#if THRUST_DEVICE_COMPILER_IS_OMP_CAPABLE == THRUST_TRUE
+    auto policy = thrust::omp::par;
+#else
+    // This policy seems to be sequential in practice
+    auto policy = thrust::cpp::par;
+#endif
+    thrust::for_each_n(policy, cit, numberSystems, [&, this](int i) {
       StorageRetriever memoryAccess(numberSystems, i, cpuMemory.data());
       bvp.precompute(memoryAccess, klist[i], top[i], bot[i]);
-    }
+    });
     gpuMemory = cpuMemory;
   }
 
