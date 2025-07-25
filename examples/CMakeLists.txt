@@ -8,8 +8,6 @@ find_package(UAMMD REQUIRED)
 
 # #add_compile_definitions(PUBLIC MAXLOGLEVEL=15)
 # #add_compile_definitions(PUBLIC DOUBLE_PRECISION)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CUDA_STANDARD 14)
 add_subdirectory(generic_md)
 add_subdirectory(advanced)
 add_subdirectory(basic_concepts)
