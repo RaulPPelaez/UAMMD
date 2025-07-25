@@ -12,9 +12,8 @@ function(uammd_setup_target target_name)
     find_package(LAPACK REQUIRED)
   endif()
   # Ensure the target has C++ and CUDA standards
-  target_compile_features(${target_name} PRIVATE cxx_std_14)
-  target_compile_features(${target_name} PRIVATE cuda_std_14)
-
+  target_compile_features(${target_name} PRIVATE cxx_std_20)
+  target_compile_features(${target_name} PRIVATE cuda_std_20)
   if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
     target_compile_options(${target_name} PRIVATE --expt-relaxed-constexpr -extended-lambda)
   endif()
