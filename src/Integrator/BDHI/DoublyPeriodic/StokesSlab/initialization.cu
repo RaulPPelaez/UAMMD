@@ -77,14 +77,9 @@ void DPStokes::setUpGrid(Parameters par) {
 void DPStokes::printStartingMessages(Parameters par) {
   System::log<System::MESSAGE>("[DPStokes] tolerance: %g", par.tolerance);
   System::log<System::MESSAGE>("[DPStokes] viscosity: %g", viscosity);
-  // System::log<System::MESSAGE>("[DPStokes] Gaussian source width: %g",
-  // par.gw);
   System::log<System::MESSAGE>("[DPStokes] cells: %d %d %d", grid.cellDim.x,
                                grid.cellDim.y, grid.cellDim.z);
   System::log<System::MESSAGE>("[DPStokes] box size: %g %g %g", Lx, Ly, H);
-  if (Lx != Ly)
-    System::log<System::WARNING>(
-        "[DPStokes] Domains with Lx=Ly are largely untested");
 }
 
 namespace detail {

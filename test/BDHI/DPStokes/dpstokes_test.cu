@@ -35,23 +35,30 @@ TEST(DPStokes, CanBeCreated) {
 }
 
 // Paramters for a support of w=6
-auto getDPStokesParamtersOnlyForce(real Lxy, real H, real viscosity,
+auto getDPStokesParamtersOnlyForce(real Lx, real Ly, real H, real viscosity,
                                    real hydrodynamicRadius) {
   real h = hydrodynamicRadius / 1.554;
-  int nxy = int(Lxy / h + 0.5);
+  int nx = int(Lx / h + 0.5);
+  int ny = int(Ly / h + 0.5);
   DPStokes::Parameters par;
-  par.nx = nxy;
-  par.ny = par.nx;
+  par.nx = nx;
+  par.ny = ny;
   par.nz = int(M_PI * H / (2 * h));
   par.w = 6;
   par.beta = 1.714 * par.w;
   par.alpha = par.w * 0.5;
   par.mode = DPStokes::WallMode::slit;
   par.viscosity = viscosity;
-  par.Lx = par.Ly = Lxy;
+  par.Lx = Lx;
+  par.Ly = Ly;
   par.H = H;
   par.tolerance = 1e-4;
   return par;
+}
+auto getDPStokesParamtersOnlyForce(real Lxy, real H, real viscosity,
+                                   real hydrodynamicRadius) {
+  return getDPStokesParamtersOnlyForce(Lxy, Lxy, H, viscosity,
+                                       hydrodynamicRadius);
 }
 
 // Check that a force pulling from a single particle only moves it in that
@@ -260,5 +267,123 @@ TEST(DPStokesIntegrator, ObeysFluctuationDissipationBalanceAtEveryHeight) {
     ASSERT_LE(err.x, 0.05);
     ASSERT_LE(err.y, 0.05);
     ASSERT_LE(err.z, 0.05);
+  }
+}
+
+namespace duplicate {
+
+auto genPositions(int N, real Lx, real Ly, real H) {
+  std::mt19937 gen(42);
+  std::uniform_real_distribution<real> posDist(-0.5, 0.5);
+  cached_vector<real3> pos(N);
+  cached_vector<real3> force(N);
+  for (int i = 0; i < N; ++i) {
+    pos[i] = {posDist(gen) * Lx, posDist(gen) * Ly, posDist(gen) * H * 0.8};
+    force[i] = {posDist(gen), posDist(gen), posDist(gen)};
+  }
+  // center forces
+  real3 meanF{0, 0, 0};
+  for (int i = 0; i < N; ++i) {
+    real3 f = force[i];
+    meanF.x += f.x;
+    meanF.y += f.y;
+    meanF.z += f.z;
+  }
+  meanF.x /= N;
+  meanF.y /= N;
+  meanF.z /= N;
+  for (int i = 0; i < N; ++i) {
+    real3 f = force[i];
+    f.x -= meanF.x;
+    f.y -= meanF.y;
+    f.z -= meanF.z;
+    force[i] = f;
+  }
+
+  return std::make_tuple(pos, force);
+}
+
+auto duplicatePositions(const auto &pos, const auto &force, real Lx, real Ly) {
+  int N = pos.size();
+  cached_vector<real3> force2(2 * N);
+  cached_vector<real3> pos2(2 * N);
+  for (int i = 0; i < N; ++i) {
+    pos2[i] = pos[i];
+    real3 p2 = pos[i];
+    real3 f2 = force[i];
+    p2.x += Lx;
+    p2.y += Ly;
+    pos2[i + N] = p2;
+    force2[i] = f2;
+    force2[i + N] = f2;
+  }
+  return std::make_tuple(pos2, force2);
+}
+auto computeWithDPStokes(real Lx, real Ly, auto pos, auto force) {
+  const real H = 16.0; // zmax - zmin = 15 - (-1) = 16
+  const real viscosity = 1.0 / (6.0 * M_PI);
+  const real hydrodynamicRadius = 1.0;
+  auto par =
+      getDPStokesParamtersOnlyForce(Lx, Ly, H, viscosity, hydrodynamicRadius);
+  par.mode = DPStokes::WallMode::slit;
+  auto dpstokes = std::make_shared<DPStokes>(par);
+  auto mf = dpstokes->Mdot(pos.data().get(), force.data().get(), pos.size());
+  return mf;
+}
+} // namespace duplicate
+
+// ----------------------------------------------------------------------------
+// Verify that doubling the box in X (and repeating particles) gives
+// the same mobilities (within rtol/atol) as the original cubic box.
+// ----------------------------------------------------------------------------
+TEST(DPStokes, PeriodicityDoubleBoxSizeXMatchesSingle) {
+  using namespace duplicate;
+  const real Lx = 16.0;
+  const real Ly = 16.0;
+  const int N = 100;
+  auto [pos, force] = genPositions(N, Lx, Ly, 16.0);
+  auto mf_single = computeWithDPStokes(Lx, Ly, pos, force);
+  auto [pos2, force2] = duplicatePositions(pos, force, Lx, 0);
+  auto mf2 = computeWithDPStokes(2 * Lx, Ly, pos2, force2);
+
+  // compare first N entries
+  for (int i = 0; i < N; ++i) {
+    real3 ref = mf_single[i];
+    real3 dbl = mf2[i];
+    real tol = 1e-3;
+    EXPECT_NEAR(dbl.x, ref.x, tol)
+        << "particle " << i << " X‐component mismatch";
+    EXPECT_NEAR(dbl.y, ref.y, tol)
+        << "particle " << i << " Y‐component mismatch";
+    EXPECT_NEAR(dbl.z, ref.z, tol)
+        << "particle " << i << " Z‐component mismatch";
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Doubling the box in Y (and repeating the particles) should reproduce
+// the same mobilities as the original 16×16 slab, within rtol+atol.
+// ----------------------------------------------------------------------------
+TEST(DPStokes, PeriodicityDoubleBoxSizeYMatchesSingle) {
+  using namespace duplicate;
+  const real Lx = 16.0;
+  const real Ly = 16.0;
+  const int N = 100;
+  auto [pos, force] = genPositions(N, Lx, Ly, 16.0);
+  auto mf_single = computeWithDPStokes(Lx, Ly, pos, force);
+  auto [pos2, force2] = duplicatePositions(pos, force, 0, Ly);
+  auto mf2 = computeWithDPStokes(Lx, Ly * 2, pos2, force2);
+
+  // compare first N entries
+  for (int i = 0; i < N; ++i) {
+    real3 ref = mf_single[i];
+    real3 dbl = mf2[i];
+    real tol = 1e-3;
+    EXPECT_NEAR(dbl.x, ref.x, tol)
+        << "particle " << i << " X‐component mismatch";
+    EXPECT_NEAR(dbl.y, ref.y, tol)
+        << "particle " << i << " Y‐component mismatch";
+    EXPECT_NEAR(dbl.z, ref.z, tol)
+        << "particle " << i << " Z‐component mismatch";
   }
 }
