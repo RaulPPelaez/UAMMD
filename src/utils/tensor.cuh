@@ -1,4 +1,4 @@
-/*Pablo Ibañez 2022. Tensor types and related algebra.
+/*Pablo Ibanez 2022. Tensor types and related algebra.
 
  */
 #ifndef TENSOR_CUH

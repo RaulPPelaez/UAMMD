@@ -33,7 +33,7 @@ TODO:
 
 References:
 [1] Smoothed particle hydrodynamics. JJ Monaghan. Rep. Prog. Phys. 68 (2005)
-1703–1759 doi:10.1088/0034-4885/68/8/R01
+1703-1759 doi:10.1088/0034-4885/68/8/R01
 
  */
 #include "SPH.cuh"

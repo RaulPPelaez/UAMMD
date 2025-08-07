@@ -22,18 +22,19 @@ h is the size of a cell.
 
 This rules result in the values assigned to a cell sometimes being defined in
 strange places. The sketch below represents all the values owning to a certain
-cell, \vec{i} (with center defined at ○). Unintuitively, some quantities asigned
+cell, \vec{i} (with center defined at O). Unintuitively, some quantities asigned
 to cell \vec{i} lie in the neighbouring cells (represented below is also cell
 \vec{i} + (1,0,0)).
 
             <------h---->
-+-----⬒-----▽-----------+  | ○: p (Cell center, at \vec{r}_\vec{i})
-|      	    |	       	|    ◨: v^x
-|      	    |	       	|  | ⬒: v^y
-|     ○	    ◨  	  △    	|
-| 	    |  	       	|  | △: E^{xx}
-|      	    |		|    ▽: E^{xy}
-+-----------+-----------+  |
++-----[ ]------v-----------+  | O: p (Cell center, at \vec{r}_\vec{i})
+|              |           |    # : v^x
+|              |           |  | [ ]: v^y
+|     O        #     ^     |
+|              |           |  | ^: E^{xx}
+|              |           |    v: E^{xy}
++-------------+-----------+  |
+
 
 Naturally, this discretisation requires special handling of the discretized
 versions of the (differential) operators.
