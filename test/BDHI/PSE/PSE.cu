@@ -90,7 +90,7 @@ bool selfMobility_pullForce_test() {
     std::ofstream velout("selfMobility_pullForce.psi" +
                          std::to_string(psi * rh) + ".test");
     velout.precision(2 * sizeof(real));
-    velout << "#L  v/(F·M0)" << endl;
+    velout << "#L  v/(F*M0)" << endl;
     fori(0, NL) {
       real L = L_min + i * ((L_max - L_min) / (real)(NL - 1));
       try {
@@ -130,7 +130,7 @@ double pullForce_pairMobility_measureMobility(real L, real psi, real F) {
   real vel;
   std::ofstream out("pairMobility_pullForce.psi" + std::to_string(psi * rh) +
                     ".test");
-  out << "#distance   M0/(F·v)" << endl;
+  out << "#distance   M0/(F*v)" << endl;
   real minr = 0.01;
   real maxr = L * 0.5;
   int nPoints = 2000;
@@ -163,7 +163,7 @@ double pullForce_pairMobility_measureMobility(real L, real psi, real F) {
 bool deterministicPairMobility_test() {
   int Npsi = 10;
   std::vector<real2> velocities(Npsi);
-  // Keep psi·a constant
+  // Keep psi*a constant
   real psi_min = 0.1 / rh;
   real psi_max = 1.0 / rh;
   real F = 1;
@@ -281,7 +281,7 @@ double3 singleParticleNoise(real T, real L, real psi) {
       abs(variance.y - 2 * T * selfMobility) > tol or
       abs(variance.z - 2 * T * selfMobility) > tol) {
     sys->log<System::ERROR>("[noiseVariance] Incorrect noise correlation for "
-                            "psi = %f; noiseCorr=%.5e %.5e %.5e, kT·M0=%.5e",
+                            "psi = %f; noiseCorr=%.5e %.5e %.5e, kT*M0=%.5e",
                             psi, variance.x, variance.y, variance.z,
                             T * selfMobility);
   }

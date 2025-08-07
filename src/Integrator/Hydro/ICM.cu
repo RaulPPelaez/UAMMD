@@ -82,7 +82,7 @@ int3 nextFFTWiseSize3D(int3 size) {
   }
   return size;
 }
-// Computes S·F and adds it to gridVels
+// Computes S*F and adds it to gridVels
 template <class Kernel = IBM_kernels::Peskin::threePoint>
 __global__ void spreadParticleForces(real4 *pos, real4 *force, real3 *gridData,
                                      Grid grid, int numberParticles,
@@ -157,7 +157,7 @@ using cufftComplex3 = ICM::cufftComplex3;
 
 // Computes thermal drift term using RFD
 // kbT/\delta [ S(q^n + \delta/2\hat{W}^n) - S(q^n - \delta/2\hat{W}^n) ]
-// ·\hat{W}^n See eq. 32 and 33 in [3]
+// *\hat{W}^n See eq. 32 and 33 in [3]
 template <class Kernel>
 __global__ void addThermalDrift(real4 *pos, real3 *gridVels, Grid grid,
                                 real driftPrefactor, // kbT/deltaRDF
@@ -292,8 +292,8 @@ inline __device__ vec3 cellToWaveNumber(const int3 &cell, const int3 &cellDim,
 }
 
 /*Apply the divergence free projection operator, P, to a wave number with a
-  certain complex factor. res = (I-k^k)·factor -> k is unitary See i.e below eq.
-  45 [2]. P = I-G(DG)^-1 D = I-D*(DD*)^-1 D = I-D*L^-1 D = I-k·k^T/|k|^2
+  certain complex factor. res = (I-k^k)*factor -> k is unitary See i.e below eq.
+  45 [2]. P = I-G(DG)^-1 D = I-D*(DD*)^-1 D = I-D*L^-1 D = I-k*k^T/|k|^2
 */
 inline __device__ cufftComplex3 projectFourier(const real3 &k,
                                                const cufftComplex3 &factor) {
@@ -393,7 +393,7 @@ __global__ void solveStokesFourier(const cufftComplex3 *fluidForcing, // input
   cufftComplex3 vk =
       shiftVelocity(fluidForcing[icell], cosk, real(-1.0) * sink);
   {
-    // Apply (\rho/dt·I-\eta/2·L) operator and project into divergence free
+    // Apply (\rho/dt*I-\eta/2*L) operator and project into divergence free
     // space.
     real prefactor = real(1.0);
     if (!projectOnly) {
@@ -436,7 +436,7 @@ __global__ void midPointStep(real4 *pos, real4 *posOld, const real3 *gridVels,
   constexpr int supportCells = Kernel::support;
   constexpr int numberNeighbourCells =
       supportCells * supportCells * supportCells;
-  // J^T = dV·S
+  // J^T = dV*S
   const real dV = grid.cellSize.x * grid.cellSize.y * grid.cellSize.z;
   // Pos prediction
   real3 pnew = make_real3(0);
@@ -454,7 +454,7 @@ __global__ void midPointStep(real4 *pos, real4 *posOld, const real3 *gridVels,
       // Distance from particle i to center of cell j
       const real3 rijx =
           posCurrent - make_real3(celljx) * grid.cellSize - cellPosOffset;
-      // p += J·v = dV·\delta(p_x_i-cell_x_j)·v_x_j
+      // p += J*v = dV*\delta(p_x_i-cell_x_j)*v_x_j
       real v_jx = gridVels[jcellx].x;
       auto r = grid.box.apply_pbc(
           {rijx.x - real(0.5) * grid.cellSize.y, rijx.y, rijx.z});
@@ -503,7 +503,7 @@ struct Direction {
   static constexpr int XX = 0, YY = 1, ZZ = 2, XY = 3, XZ = 4, YZ = 5;
 };
 
-// Computes the term sqrt(2·T·\eta/(dV dt)) D·W.
+// Computes the term sqrt(2*T*\eta/(dV dt)) D*W.
 __device__ real3 computeNoiseDivergence(
     int3 cell, int icell,
     const real3 *gridVels, // Real space velocities of each cell, defined at the
@@ -517,7 +517,7 @@ __device__ real3 computeNoiseDivergence(
   const int ncells = grid.getNumberCells();
   // I will draw 6 random numbers for each cell
   real3 DW = make_real3(0);
-  //(\nabla·W)_\alpha^i = \nabla^i·(W_{\alpha x}, W_{\alpha y}, W_{\alpha z}) ->
+  //(\nabla*W)_\alpha^i = \nabla^i*(W_{\alpha x}, W_{\alpha y}, W_{\alpha z}) ->
   // -> \partial_\alpha^i W_{\alpha\beta} = 1/d\alpha
   // (W^{\alpha\beta}_{i+\alpha/2} - W^{\alpha\beta}_{i-\alpha/2})
   constexpr real sqrt2 = real(1.41421356237310);
@@ -608,7 +608,7 @@ __device__ real3 computeNoiseDivergence(
   return DW * noisePrefactor;
 }
 
-// Computes the Laplacian of the velocity: L·v^n
+// Computes the Laplacian of the velocity: L*v^n
 __device__ real3 computeVelLaplacian(int3 cell, int icell,
                                      const real3 *gridVels, Grid grid) {
   real vx = gridVels[icell].x;
@@ -673,7 +673,7 @@ __device__ real3 computeVelLaplacian(int3 cell, int icell,
   return velocityLaplacian;
 }
 
-// Computes D·(\rho\vec{v}·\vec{v}^T)^n
+// Computes D*(\rho\vec{v}*\vec{v}^T)^n
 __device__ real3 computeAdvection(int3 cell, int icell, const real3 *gridVels,
                                   Grid grid, real density) {
   real vx = gridVels[icell].x;
@@ -872,7 +872,7 @@ void ICM::initializeGrid(Parameters par) {
                                  "radius or the number of cells!");
     real hgrid = par.hydrodynamicRadius / 0.91;
     cellDim = make_int3(box.boxSize / hgrid);
-    /*FFT likes a number of cells as cellDim.i = 2^n·3^l·5^m */
+    /*FFT likes a number of cells as cellDim.i = 2^n*3^l*5^m */
     cellDim = ICM_ns::nextFFTWiseSize3D(cellDim);
   }
   if (par.cells.x > 0)
@@ -1035,7 +1035,7 @@ void ICM::initCuRAND() {
   CurandSafeCall(
       curandgeneratenormal(curng, noise_ptr, noise.size(), 0.0, 1.0));
 }
-// Sum S·F term using the current particle positions
+// Sum S*F term using the current particle positions
 void ICM::spreadParticleForces() {
   if (interactors.size() == 0)
     return;
@@ -1209,7 +1209,7 @@ void ICM::forwardTime() {
   // Compute unperturbed fluid forcing \vec{g}
   unperturbedFluidForcing();
   spreadParticleForces(); // Sum SF
-  thermalDrift();         // Sum kT·dS/dq(q)
+  thermalDrift();         // Sum kT*dS/dq(q)
   // Compute \vec{\tilde{v}}^{n+1} from \vec{g}
   applyStokesSolutionOperator();
   // Given that m_e = 0, \vec{v}^{n+1} = \vec{\tilde{v}}^{n+1}

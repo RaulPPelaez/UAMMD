@@ -4,7 +4,7 @@
 (i.e VerletNVE).
 
   Computes a force on each particle as:
-  Fi = sum_j[  mj·(Pj/rhoj^2 + Pi/rhoi^2 + visij)·grad_i(Wij) ]
+  Fi = sum_j[  mj*(Pj/rhoj^2 + Pi/rhoi^2 + visij)*grad_i(Wij) ]
 
   Where:
     j: The neighbours of i (within a distance given by the support of Wij)
@@ -18,13 +18,13 @@
 See SPH_ns::Kernel
 
   The density on a given particle i is interpolated from its neighbours as:
-   rho_i = sum_j[ mj·Wij ]
+   rho_i = sum_j[ mj*Wij ]
 
   The Pressure is given by an equation-of-state depending on interpolated
-properties of the particles. Currently: Pi = K·(rho_i-rho0)
+properties of the particles. Currently: Pi = K*(rho_i-rho0)
 
   An artificial viscosity is introduced to allow shock phenomena ans stabilize
-the algorithm. visij = -nu( vij·rij)/(rij^2+epsilon) epsilon ~ 0.001 v: velocity
+the algorithm. visij = -nu( vij*rij)/(rij^2+epsilon) epsilon ~ 0.001 v: velocity
     r: particle position
 
 
@@ -76,7 +76,7 @@ template <class Kernel> struct DensityTransverser {
   // Starting density of each particle
   inline __device__ real zero() { return real(0); }
 
-  // rho_i = sum_j( mj · Wij)
+  // rho_i = sum_j( mj * Wij)
   inline __device__ real compute(real4 ri, real4 rj, real massi, real massj) {
     real3 rij = box.apply_pbc(make_real3(rj) - make_real3(ri));
     return massj * kernel(rij, support);
@@ -90,7 +90,7 @@ template <class Kernel> struct DensityTransverser {
 };
 
 // Compute Pressure, this simple functor codes the ideal gas state eq. Pi =
-// K·(rho_i - rho0)
+// K*(rho_i - rho0)
 struct Density2Pressure {
   real gasStiffness, restDensity;
   Density2Pressure(real gasStiffness, real restDensity)
@@ -102,7 +102,7 @@ struct Density2Pressure {
 };
 
 // Computes artificial viscosity from vij and rij: vis =
-// nu·(vj·rij)/(rij^2+epsilon·h^2)
+// nu*(vj*rij)/(rij^2+epsilon*h^2)
 struct ArtificialViscosity {
   real viscosityPrefactor, epsilon;
   ArtificialViscosity(real pre, real e = 0.001)
@@ -115,7 +115,7 @@ struct ArtificialViscosity {
 };
 
 // Compute and sum the force on each particle:
-//  Fi = sum_j( mi·mj·(Pi/rho_i^2 + Pj/rho_j^2)· rij · W(rij)
+//  Fi = sum_j( mi*mj*(Pi/rho_i^2 + Pj/rho_j^2)* rij * W(rij)
 template <class Kernel> struct ForceTransverser {
   Kernel kernel; // Interpolation kernel
   real support;  // Support distance of the kernel

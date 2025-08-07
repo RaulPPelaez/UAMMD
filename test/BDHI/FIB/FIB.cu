@@ -19,7 +19,7 @@ using namespace uammd;
 
 real temperature, viscosity, rh, tolerance;
 
-// RPY kernel M(\vec{r}) = f(r)·I + g(r)·\vec{r}\otimes\vec{r}/r^2
+// RPY kernel M(\vec{r}) = f(r)*I + g(r)*\vec{r}\otimes\vec{r}/r^2
 // M0 = f(0)
 long double f(long double r, long double a = rh) {
   long double M0 = 1 / (6 * M_PIl * viscosity * a);

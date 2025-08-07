@@ -65,11 +65,11 @@ class KrylovSubspace {
   real *computeSquareRoot() {
     int size = getSubSpaceSize();
     diagonalizeSubSpace();
-    /***Hdiag_temp = Hdiag·P·e1****/
+    /***Hdiag_temp = Hdiag*P*e1****/
     for (int j = 0; j < size; j++) {
       htemp[j] = sqrt(htemp[j]) * P[size * j];
     }
-    /***** Htemp = H^1/2·e1 = Pt· hdiag_temp ****/
+    /***** Htemp = H^1/2*e1 = Pt* hdiag_temp ****/
     /*Compute with blas*/
     real *h_P = P.data();
     real alpha = 1.0;
@@ -126,22 +126,22 @@ public:
     resize(subSpaceDimension + 1);
     auto d_V = detail::getRawPointer(V);
     auto d_w = detail::getRawPointer(w);
-    /*w = D·vi*/
+    /*w = D*vi*/
     dot->setSize(N);
     dot->operator()(d_V + N * i, d_w);
     if (i > 0) {
-      /*w = w-h[i-1][i]·vi*/
+      /*w = w-h[i-1][i]*vi*/
       real alpha = -hsup[i - 1];
       device_axpy(cublas_handle, N, &alpha, d_V + N * (i - 1), 1, d_w, 1);
     }
     /*h[i][i] = dot(w, vi)*/
     device_dot(cublas_handle, N, d_w, 1, d_V + N * i, 1, &(hdiag[i]));
-    /*w = w-h[i][i]·vi*/
+    /*w = w-h[i][i]*vi*/
     real alpha = -hdiag[i];
     device_axpy(cublas_handle, N, &alpha, d_V + N * i, 1, d_w, 1);
     /*h[i+1][i] = h[i][i+1] = norm(w)*/
     device_nrm2(cublas_handle, N, (real *)d_w, 1, &(hsup[i]));
-    /*v_(i+1) = w·1/ norm(w)*/
+    /*v_(i+1) = w*1/ norm(w)*/
     real tol = 1e-3 * hdiag[i] / normz;
     if (hsup[i] < tol)
       hsup[i] = real(0.0);
@@ -158,13 +158,13 @@ public:
 
   int getSubSpaceSize() { return subSpaceDimension; }
 
-  // Computes the current result guess sqrt(M)·v, stores in BdW
+  // Computes the current result guess sqrt(M)*v, stores in BdW
   void computeCurrentResultEstimation(real *BdW) {
     int m = getSubSpaceSize();
-    /**** y = ||z||_2 * Vm · H^1/2 · e_1 *****/
-    /**** H^1/2·e1 = Pt· first_column_of(sqrt(Hdiag)·P) ******/
+    /**** y = ||z||_2 * Vm * H^1/2 * e_1 *****/
+    /**** H^1/2*e1 = Pt* first_column_of(sqrt(Hdiag)*P) ******/
     real *HhalfDotE1 = computeSquareRoot();
-    /*y = ||z||_2 * Vm · H^1/2 · e1 = Vm · (z2·hdiag_temp)*/
+    /*y = ||z||_2 * Vm * H^1/2 * e1 = Vm * (z2*hdiag_temp)*/
     real *Vm = getTransformationMatrix();
     real beta = 0.0;
     device_gemv(cublas_handle, N, m, &this->normz, Vm, N, HhalfDotE1, 1, &beta,

@@ -60,11 +60,11 @@ int main(int argc, char *argv[]) {
   }
   if (shift)
     sys->log<System::MESSAGE>("[System] LJ Parameters: sigma %e, epsilon %e, "
-                              "cutOff %e·sigma, shift: truncated and shifted",
+                              "cutOff %e*sigma, shift: truncated and shifted",
                               sigma, epsilon, cutOff);
   else
     sys->log<System::MESSAGE>("[System] LJ Parameters: sigma %e, epsilon %e, "
-                              "cutOff %e·sigma, shift: truncated",
+                              "cutOff %e*sigma, shift: truncated",
                               sigma, epsilon, cutOff);
 
   auto pot = make_shared<Potential::LJ>();

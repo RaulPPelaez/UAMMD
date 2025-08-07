@@ -1,9 +1,9 @@
 // Raul P. Pelaez 1028. Taken from after eq. 20 in [1]
-//   v = M·F
+//   v = M*F
 //  Put two particles at a distance r, pull particle 0 with Fx = 1 and particle
 //  1 with Fx = -1
 //
-// hydrodynamic force acting on particle 0 -> v = M0·F_0 + M(r)·F_1 = M0-M((r)
+// hydrodynamic force acting on particle 0 -> v = M0*F_0 + M(r)*F_1 = M0-M((r)
 //
 // This code returns:   M0(L)/v = M0(L)/(M0-M(r))
 // References:

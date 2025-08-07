@@ -6,7 +6,7 @@
 #include "utils/cufftPrecisionAgnostic.h"
 namespace uammd {
 
-// A functor to compute a fourier correlation, computes a·b^*
+// A functor to compute a fourier correlation, computes a*b^*
 struct Convolution {
   real nomalization;
   Convolution(real normalization) : nomalization(normalization) {}
@@ -30,7 +30,7 @@ public:
                 CUFFT_Real2Complex<real>::value);
   }
 
-  // Computes S(k) = <a_k·b_k^*> given a(r) and b(r)
+  // Computes S(k) = <a_k*b_k^*> given a(r) and b(r)
   template <class RealIterator> auto compute(RealIterator a, RealIterator b) {
     int n = ncells.x * ncells.y * ncells.z;
     int nhat = (ncells.x / 2 + 1) * ncells.y * ncells.z;

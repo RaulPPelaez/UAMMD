@@ -21,7 +21,7 @@ hydrodynamic radius given here cannot be enforced exactly, rather the most
 approximate one will be computed by selecting an appropiate cellDimension (which
 will be an FFT wise number). par.hydrodynamicRadius = 1.0;
 //Instead of the hydrodynamic radius the cell dimensions can be provided
-directly. Giving rh~0.91·L/cellDim
+directly. Giving rh~0.91*L/cellDim
 //par.cells=make_int3(64,64,64); //cells.z == 1 means 2D
 //In any case a message will be issued with the used hydrodynamic radius.
 par.dt = 0.01;
@@ -45,11 +45,11 @@ A brief summary of the algorithm:
 
 eq. 36 in [1] can be rewritten as:
 
-\tilde{\vec{v}}^{n+1} = \mathcal{L}^{-1}·\vec{g} -> fluid velocity
+\tilde{\vec{v}}^{n+1} = \mathcal{L}^{-1}*\vec{g} -> fluid velocity
 
 Where:
 
-\mathcal{L}^{-1} = (\rho/dt·\bf{I} - \eta/2 L)^{-1} · P
+\mathcal{L}^{-1} = (\rho/dt*\bf{I} - \eta/2 L)^{-1} * P
 \vec{g} = (\rho/dt\bf{I} + \eta/2 L)\vec{v}^n + DW^n + SF^{n+1/2} - D(\rho
 \vec{v}\vec{v}^T)^n+1/2 -> fluid forcing ^ noise                  ^ advection P
 = \bf{I} - G(DG)^-1 D -> projection to divergence free space
@@ -61,8 +61,8 @@ S: Spreading operator (transmits particle properties to fluid)
 W: Symmetric noise tensor, Gaussian numbers with mean 0 and std 1
 
 On the other hand the particles and fluid are coupled with:
-\vec{u}^n = J·\vec{v}
-Where J is the interpolation operator defined as J^T = dV·S
+\vec{u}^n = J*\vec{v}
+Where J is the interpolation operator defined as J^T = dV*S
 Where dV is the volume of a grid cell.
 
 The particles are updated following the mid point (predictor-corrector) scheme
@@ -71,7 +71,7 @@ developed in [1].
 About J and S:
 
 S_cellj = sum_i=0^N{\delta(ri-r_cellj)} ->particles to fluid
-J_i = dV·sum_j=0^ncells{\delta(ri-r_cellj)}->fluid to particles
+J_i = dV*sum_j=0^ncells{\delta(ri-r_cellj)}->fluid to particles
 
 Where \delta is an spreading kernel (smeared delta).
 The default kernel used is the 3-point Peskin kernel, see IBM_kernels.cuh.

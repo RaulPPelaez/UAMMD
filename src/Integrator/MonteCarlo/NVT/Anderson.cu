@@ -148,7 +148,7 @@ template <class Pot> void Anderson<Pot>::updateJumpSize() {
   sys->log<System::DEBUG>("[MC_NVT::Anderson] Current acceptance ratio: %e",
                           currentAcceptanceRatio);
   sys->log<System::DEBUG>(
-      "[MC_NVT::Anderson] Current step size: %e, %e·cellSize", jumpSize,
+      "[MC_NVT::Anderson] Current step size: %e, %e*cellSize", jumpSize,
       jumpSize / grid.cellSize.x);
 }
 

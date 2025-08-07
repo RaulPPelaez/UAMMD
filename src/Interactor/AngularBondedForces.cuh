@@ -100,7 +100,7 @@ struct Angular {
     // //sijk cant be zero to avoid division by zero
     // if(sijk<std::numeric_limits<real>::min()) sijk =
     // std::numeric_limits<real>::min(); ampli = -kspring * (acos(cijk) -
-    // ang0)/sijk; //The force amplitude -k·(theta-theta_0)
+    // ang0)/sijk; //The force amplitude -k*(theta-theta_0)
     // ampli = -kspring*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0;
     // //k(1-cos(ang-ang0))
     if (ang0 == real(0.0)) {

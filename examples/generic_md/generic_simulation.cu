@@ -308,7 +308,7 @@ auto createIntegratorSPH(UAMMD sim) {
   SPH::Parameters params;
   params.box = Box(sim.par.L);
   // Pressure for a given particle "i" in SPH will be computed as
-  // gasStiffness·(density_i - restDensity) Where density is computed as a
+  // gasStiffness*(density_i - restDensity) Where density is computed as a
   // function of the masses of the surroinding particles Particle mass starts as
   // 1, but you can change this in customizations.cuh
   params.support = sim.par.support_sph; // Cut off distance for the SPH kernel
@@ -639,7 +639,7 @@ void writeDefaultDatamain(std::string datamain) {
   out << "#cutOff_dpd 1" << std::endl;
   out << "#These parameters will be used by SPH only" << std::endl;
   out << "#Pressure for a given particle \"i\" in SPH will be computed as "
-         "gasStiffness·(density_i - restDensity)"
+         "gasStiffness*(density_i - restDensity)"
       << std::endl;
   out << "#Where density is computed as a function of the masses of the "
          "surroinding particles"
