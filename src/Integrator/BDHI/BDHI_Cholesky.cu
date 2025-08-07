@@ -2,11 +2,11 @@
 
   Computes the hydrodynamic interactions between particles in the system by
   maintaining a 3Nx3N mobility matrix with the RPY tensor in memory
-  and explicitly computing M·F as a matrix-vector product.
+  and explicitly computing M*F as a matrix-vector product.
 
   Note that only the upper part of M is stored, as M is symmetric.
 
-  The brownian noise is computed as BdW = chol(M)·dW with cuSOLVER and cuBLAS
+  The brownian noise is computed as BdW = chol(M)*dW with cuSOLVER and cuBLAS
 
 References:
 [1] https://github.com/RaulPPelaez/UAMMD/wiki/BDHI_Cholesky
@@ -91,7 +91,7 @@ Cholesky::Cholesky(shared_ptr<ParticleGroup> pg, Parameters par)
         rpy(0, par.hydrodynamicRadius, par.hydrodynamicRadius).x);
   else {
     System::log<System::MESSAGE>("[BDHI::Cholesky] Self mobility dependent on "
-                                 "particle radius as 1/(6πηa)");
+                                 "particle radius as 1/(6*pi*eta*a)");
   }
   if (par.hydrodynamicRadius < 0 and !pd->isRadiusAllocated())
     System::log<System::CRITICAL>(
@@ -197,7 +197,7 @@ void Cholesky::computeMF(real3 *MF, cudaStream_t st) {
       indexIter, force.raw(), force3.begin(), numberParticles);
   real alpha = 1.0;
   real beta = 0;
-  /*Compute M·F*/
+  /*Compute M*F*/
   real *d_M = thrust::raw_pointer_cast(mobilityMatrix.data());
   real *d_force3 = (real *)thrust::raw_pointer_cast(force3.data());
   CublasSafeCall(cublassymv(handle, CUBLAS_FILL_MODE_UPPER, 3 * numberParticles,
@@ -224,7 +224,7 @@ void Cholesky::computeBdW(real3 *BdW, cudaStream_t st) {
                        3 * numberParticles + ((3 * numberParticles) % 2),
                        real(0.0), real(1.0));
   CublasSafeCall(cublasSetStream(handle, st));
-  /*Compute B·dW -> y = M·y*/
+  /*Compute B*dW -> y = M*y*/
   CublasSafeCall(cublastrmv(
       handle, // B is an upper triangular matrix (with non unit diagonal)
       CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_T, CUBLAS_DIAG_NON_UNIT,

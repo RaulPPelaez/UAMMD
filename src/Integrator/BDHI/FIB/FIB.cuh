@@ -19,7 +19,7 @@ hydrodynamic radius given here cannot be enforced exactly, rather the most
 approximate one will be computed by selecting an appropiate cellDimension (which
 will be an FFT wise number). par.hydrodynamicRadius = 1.0;
 //Instead of the hydrodynamic radius the cell dimensions can be provided
-directly. Giving rh~0.91·L/cellDim
+directly. Giving rh~0.91*L/cellDim
 //par.cells=make_int3(64,64,64); //cells.z == 1 means 2D
 //In any case a message will be issued with the used hydrodynamic radius.
 par.dt = 0.01;
@@ -57,10 +57,10 @@ to solve the velocity without computing or storing the pressure and can be
 written as:
   \mathcal{L}^-1 = -L^{-1}P
   Where L is the Laplacian operator and P aa projector onto the divergence-free
-space. P = I-L^{-1}·G -> \hat{P} = I-k·k^T/|k|^2 with PBC, G is gradient, \hat
+space. P = I-L^{-1}*G -> \hat{P} = I-k*k^T/|k|^2 with PBC, G is gradient, \hat
 represents Fourier space
 
-So \hat{\mathcal{L}^-1} =  1/|k|^2 (I - k·k^T/|k|^2)
+So \hat{\mathcal{L}^-1} =  1/|k|^2 (I - k*k^T/|k|^2)
 
 The different quantities are stored in a staggered grid, see [2].
 Vectors (velocity) is stored at cell faces, scalars at cell centers and tensors
@@ -68,7 +68,7 @@ at cell nodes (noise).
 
 The fluid forcing can be written as:
 
-\vec{g} = S^n·F^n + sqrt(2·\eta·kT/(dt·dV))·\hat{D}\bf{W}^{n,1} + kT/\delta [
+\vec{g} = S^n*F^n + sqrt(2*\eta*kT/(dt*dV))*\hat{D}\bf{W}^{n,1} + kT/\delta [
 S(q^n + \delta/2\hat{\bf{W}}^n) - S(q^n - \delta/2\hat{\bf{W}}^n)]\hat{\bf{W}}^n
 = particle forces + random advection + thermal drift Where S: Spreading
 operator.
@@ -76,19 +76,19 @@ operator.
 \bf{W}: Collection of independent Wienner processes.
 F: Forces acting on particles
 
-v_particles = J·v_fluid
+v_particles = J*v_fluid
 
-J: Interpolation operator J^T = dV·S
+J: Interpolation operator J^T = dV*S
 
 The particles are updated following the mid point (predictor-corrector) schemes
 developed in [1]. See midPointStep and improvedMidPointStep for more info.
-Euler: x^{t+dt} = x^t + v_particles·dt
+Euler: x^{t+dt} = x^t + v_particles*dt
 
 
 About J and S:
 
 S_cellj = sum_i=0^N{\delta(ri-r_cellj)} ->particles to fluid
-J_i = dV·sum_j=0^ncells{\delta(ri-r_cellj)}->fluid to particles
+J_i = dV*sum_j=0^ncells{\delta(ri-r_cellj)}->fluid to particles
 
 Where \delta is an spreading kernel (smeared delta).
 The default kernel used is the 3-point Peskin kernel, see IBM_kernels.cuh.

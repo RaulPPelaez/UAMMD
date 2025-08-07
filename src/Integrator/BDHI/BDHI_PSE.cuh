@@ -2,8 +2,8 @@
 Brownian Dynamics with Hydrodynamic interactions.
 
 
-  As this is a BDHI module. BDHI_PSE computes the terms M·F and B·dW in the
-differential equation: dR = K·R·dt + M·F·dt + sqrt(2Tdt)· B·dW
+  As this is a BDHI module. BDHI_PSE computes the terms M*F and B*dW in the
+differential equation: dR = K*R*dt + M*F*dt + sqrt(2Tdt)* B*dW
 
   The mobility, M, is computed according to the Rotne-Prager-Yamakawa (RPY)
 tensor.
@@ -14,42 +14,42 @@ that: M = Mr + Mw Mr - A real space short range contribution. Mw - A wave space
 long range contribution.
 
   Such as:
-     M·F = Mr·F + Mw·F
-     B·dW = sqrt(Mr)·dWr + sqrt(Mw)·dWw
+     M*F = Mr*F + Mw*F
+     B*dW = sqrt(Mr)*dWr + sqrt(Mw)*dWw
 ####################      Short Range     #########################
 
 
-  Mr·F: The short range contribution of M·F is computed using a neighbour list
+  Mr*F: The short range contribution of M*F is computed using a neighbour list
 (this is like a sparse matrix-vector product in which each element is computed
 on the fly), see PSE_ns::RPYNearTransverser. The RPY near part function (see
 Apendix 1 in [1]) is precomputed and stored in texture memory, see
 PSE_ns::RPYPSE_nearTextures.
 
-  sqrt(Mr)·dW: The near part stochastic contribution is computed using the
+  sqrt(Mr)*dW: The near part stochastic contribution is computed using the
 Lanczos algorithm (see misc/LanczosAlgorithm.cuh), the function that computes
-M·v is provided via a functor called PSE_ns::Dotctor, the logic of M·v itself is
-the same as in M·F (see PSE_ns::RPYNearTransverser) and is computed with the
+M*v is provided via a functor called PSE_ns::Dotctor, the logic of M*v itself is
+the same as in M*F (see PSE_ns::RPYNearTransverser) and is computed with the
 same neighbour list.
 
 ###################        Far range     ###########################
 
 
 
-  Mw·F:  Mw·F = σ·St·FFTi·B·FFTf·S · F. The long range wave space part.
-         -σ: The volume of a grid cell
+  Mw*F:  Mw*F = sigma*St*FFTi*B*FFTf*S * F. The long range wave space part.
+         -sigma: The volume of a grid cell
          -S: An operator that spreads each element of a vector to a regular grid
 using a gaussian kernel. -FFT: Fast fourier transform operator. -B: A fourier
 scaling factor in wave space to transform forces to velocities, see eq.9 in [1].
 
-  sqrt(Mw)·dWw: The far range stochastic contribution is computed in fourier
-space along M·F as: Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+
-√σ·St·FFTi·√B·dWw = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw) Only one St·FFTi is
+  sqrt(Mw)*dWw: The far range stochastic contribution is computed in fourier
+space along M*F as: Mw*F + sqrt(Mw)*dWw = sigma*St*FFTi*B*FFTf*S*F+
+sqrt(sigma)*St*FFTi*sqrt(B)*dWw = sigma*St*FFTi( B*FFTf*S*F + 1/sqrt(sigma)*sqrt(B)*dWw) Only one St*FFTi is
 needed, the stochastic term is added as a velocity in fourier space. dWw is a
 gaussian random vector of complex numbers, special care must be taken to ensure
 the correct conjugacy properties needed for the FFT. See
 pse_ns::fourierBrownianNoise
 
-Therefore, in the case of Mdot_far, for computing M·F, Bw·dWw is also summed.
+Therefore, in the case of Mdot_far, for computing M*F, Bw*dWw is also summed.
 
 computeBdW computes only the real space stochastic contribution.
 
@@ -90,8 +90,10 @@ public:
   ~PSE() {}
 
   void setup_step(cudaStream_t st = 0) {}
-  /*Compute M·F = Mr·F + Mw·F, also includes the far field stochastic
-   * displacements*/
+  /**
+   * @brief Computes \f{M \cdot F = M_r \cdot F + M_w \cdot F\f}, including
+   * the far-field stochastic displacements.
+   */
   void computeMF(real3 *MF, cudaStream_t st) {
     System::log<System::DEBUG1>("[BDHI::PSE] Computing MF....");
     int numberParticles = pg->getNumberParticles();
@@ -128,9 +130,15 @@ public:
   void computeDivM(real3 *divM, cudaStream_t st = 0) {};
   void finish_step(cudaStream_t st = 0) {};
 
-  // Computes both the stochastic and deterministic contributions.
-  // The noise is multiplied by prefactor before summing to the result.
-  // MF = Mobility*force + prefactor*sqrt(2*T*M)dW
+  /**
+   * @brief Computes both stochastic and deterministic contributions:
+   * \f[
+   * \mathbf{MF} = \text{Mobility} \cdot \mathbf{force} + \text{prefactor} \cdot
+   * \sqrt{2 T M} \cdot dW
+   * \f]
+   *
+   * The noise is scaled by the prefactor before adding to the result.
+   */
   void computeHydrodynamicDisplacements(real4 *force, real3 *MF,
                                         real temperature, real noise_prefactor,
                                         cudaStream_t st = 0) {

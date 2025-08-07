@@ -2,7 +2,7 @@
 derived class implementation
 
   Solves the following stochastic differential equation:
-     X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*kb*T*dt)·B·dW + T·divM·dt(in 2D)
+     X[t+dt] = dt(K*X[t]+M*F[t]) + sqrt(2*kb*T*dt)*B*dW + T*divM*dt(in 2D)
    Being:
      X - Positions
      M - Mobility matrix
@@ -16,13 +16,13 @@ B=sqrt(M) div(M) - Divergence of the mobility matrix, only non-zero in 2D
   The module offers several ways to compute and solve the different terms.
 
   BDHI::Cholesky:
-  -Computing M·F and B·dW  explicitly storing M and performing a Cholesky
+  -Computing M*F and B*dW  explicitly storing M and performing a Cholesky
 decomposition on M.
 
   BDHI::Lanczos:
   -A Lanczos iterative method to reduce M to a smaller Krylov subspace and
-performing the operation B·dW there, the product M·F is performed in a
-matrix-free way, recomputing M every time M·v is needed.
+performing the operation B*dW there, the product M*F is performed in a
+matrix-free way, recomputing M every time M*v is needed.
 
   BDHI::PSE:
   -The Positively Split Edwald Method, which takes the computation to fourier
@@ -82,8 +82,8 @@ public:
   real getSelfMobility() { return bdhi->getSelfMobility(); }
 
 private:
-  thrust::device_vector<real3> MF;  /*Result of M·F*/
-  thrust::device_vector<real3> BdW; /*Result of B·dW*/
+  thrust::device_vector<real3> MF;  /*Result of M*F*/
+  thrust::device_vector<real3> BdW; /*Result of B*dW*/
   thrust::device_vector<real3> K;   /*Shear 3x3 matrix*/
 
   cudaStream_t stream, stream2;

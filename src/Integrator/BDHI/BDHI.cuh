@@ -53,7 +53,7 @@ struct RotnePragerYamakawa {
     return c12 * (M0 * invrh);
   }
 
-  // Taken from "Rotne–Prager–Yamakawa approximation for different-sized
+  // Taken from "Rotne-Prager-Yamakawa approximation for different-sized
   // particles in application to macromolecular bead models", P.J. Zik et.al.
   // 2014
   inline __host__ __device__ real2 RPY_differentSizes(real r, real ai,

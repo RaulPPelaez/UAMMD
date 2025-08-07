@@ -917,7 +917,7 @@ void ICM::printMessages(Parameters par) {
     real v = sqrt(temperature / (density * dx * dx * dx));
     real a = v * dt / dx;
     real b = viscosity * dt / (density * dx * dx);
-    sys->log<System::MESSAGE>("[Hydro::ICM] CFL numbers: α = %f; β = %f", a, b);
+    sys->log<System::MESSAGE>("[Hydro::ICM] CFL numbers: alpha = %f; beta = %f", a, b);
     if (a > 1) {
       sys->log<System::WARNING>("[Hydro::ICM] CFL numbers above 1 can cause "
                                 "numerical issues and poor accuracy.");

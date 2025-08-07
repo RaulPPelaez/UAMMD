@@ -2,14 +2,14 @@
 
   See BDHI_EulerMaruyama.cuh to see how it is used
 
-  Any BDHI method needs to do only three things: compute M·F, sqrt(M)·dW,
+  Any BDHI method needs to do only three things: compute M*F, sqrt(M)*dW,
   div(M).
 
 
   BDHI::Cholesky stores the full Mobility Matrix and computes the stochastic
   term via cholesky decomposition.
 
-  sqrt(M)dW = B·dW -> D = B·B^T
+  sqrt(M)dW = B*dW -> D = B*B^T
 
   It uses cuBLAS for Mv products and cuSOLVER for Cholesky decomposition
 

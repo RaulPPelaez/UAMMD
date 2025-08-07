@@ -4,7 +4,7 @@
   Computes the mobility matrix on the fly when needed, so it is a mtrix free
   method.
 
-  M·F is computed as an NBody interaction (a dense Matrix vector product).
+  M*F is computed as an NBody interaction (a dense Matrix vector product).
 
   BdW is computed using the Lanczos algorithm [1].
 
@@ -31,7 +31,7 @@ Lanczos::Lanczos(shared_ptr<ParticleGroup> pg, Parameters par)
   auto pd = pg->getParticleData();
   // Lanczos algorithm computes,
   // given an object that computes the product of a Matrix(M) and a vector(v),
-  // sqrt(M)·v
+  // sqrt(M)*v
   lanczosAlgorithm = std::make_shared<lanczos::Solver>();
   if (par.hydrodynamicRadius > 0)
     System::log<System::MESSAGE>(
@@ -39,7 +39,7 @@ Lanczos::Lanczos(shared_ptr<ParticleGroup> pg, Parameters par)
         rpy(0, par.hydrodynamicRadius, par.hydrodynamicRadius).x);
   else {
     System::log<System::MESSAGE>("[BDHI::Lanczos] Self mobility dependent on "
-                                 "particle radius as 1/(6πηa)");
+                                 "particle radius as 1/(6*pi*eta*a)");
   }
   if (par.hydrodynamicRadius < 0 and !pd->isRadiusAllocated())
     System::log<System::CRITICAL>(
@@ -59,11 +59,11 @@ Lanczos::Lanczos(shared_ptr<ParticleGroup> pg, Parameters par)
 }
 
 namespace Lanczos_ns {
-/*Compute the product Mv = M·v, computing M on the fly when needed, without
+/*Compute the product Mv = M*v, computing M on the fly when needed, without
  * storing it*/
 /*This critital compute is the 99% of the execution time in a BDHI simulation*/
 /*Each thread handles one particle with the other N, including itself*/
-/*That is 3 full lines of M, or 3 elements of M·v per thread, being the x y z of
+/*That is 3 full lines of M, or 3 elements of M*v per thread, being the x y z of
  * ij with j=0:N-1*/
 /*In other words. M is made of NxN boxes of size 3x3,
   defining the x,y,z mobility between particle pairs,
@@ -99,13 +99,13 @@ template <class vtype> struct NbodyMatrixFreeMobilityDot {
     /*Self mobility*/
     if (r == real(0.0))
       return f * vj;
-    /*This expression is a little obfuscated, Mij*vj = f(rij)·I + g(rij)/rij^2 ·
-      \vec{rij}\diadic \vec{rij} ) · \vec{vij} Where f and g are the
+    /*This expression is a little obfuscated, Mij*vj = f(rij)*I + g(rij)/rij^2 *
+      \vec{rij}\diadic \vec{rij} ) * \vec{vij} Where f and g are the
       hydrodinamic kernel coefficients
     */
     const real gv = gdivr2 * dot(rij, vj);
-    /*gv = g(r)·( vx·rx + vy·ry + vz·rz )*/
-    /*(g(r)·v·(r(diadic)r) )_ß = gv·r_ß*/
+    /*gv = g(r)*( vx*rx + vy*ry + vz*rz )*/
+    /*(g(r)*v*(r(diadic)r) )_beta = gv*r_beta*/
     const real3 Mv_t = f * vj + gv * rij;
     return Mv_t;
   }
@@ -126,7 +126,7 @@ template <class vtype> struct NbodyMatrixFreeMobilityDot {
   BDHI::RotnePragerYamakawa rpy;
 };
 
-/*A functor to pass to LanczosAlgorithm the operation Mv = M·v*/
+/*A functor to pass to LanczosAlgorithm the operation Mv = M*v*/
 template <typename vtype> struct Dotctor : public lanczos::MatrixDot {
   using myTransverser = Lanczos_ns::NbodyMatrixFreeMobilityDot<vtype>;
   myTransverser Mv_tr;
@@ -145,8 +145,8 @@ template <typename vtype> struct Dotctor : public lanczos::MatrixDot {
 } // namespace Lanczos_ns
 
 void Lanczos::computeMF(real3 *MF, cudaStream_t st) {
-  /*For M·v product. Being M the Mobility and v an arbitrary array.
-    The M·v product can be seen as an Nbody interaction Mv_j = sum_i(Mij*vi)
+  /*For M*v product. Being M the Mobility and v an arbitrary array.
+    The M*v product can be seen as an Nbody interaction Mv_j = sum_i(Mij*vi)
     Where Mij = RPY( |rij|^2 ).
 
     Although M is 3Nx3N, it is treated as a Matrix of NxN boxes of size 3x3,
@@ -179,7 +179,7 @@ void Lanczos::computeBdW(real3 *BdW, cudaStream_t st) {
     real *radius_ptr = this->hydrodynamicRadius > 0 ? nullptr : radius.raw();
     Lanczos_ns::Dotctor<real3> Mdot(rpy, this->hydrodynamicRadius, radius_ptr,
                                     nbody, st);
-    // Filling V instead of an external array (for v in sqrt(M)·v) is faster
+    // Filling V instead of an external array (for v in sqrt(M)*v) is faster
     uninitialized_cached_vector<real3> noise(numberParticles);
     curandgeneratenormal(curng, (real *)noise.data().get(),
                          3 * numberParticles + (3 * numberParticles) % 2,
