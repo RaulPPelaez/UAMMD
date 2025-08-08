@@ -352,8 +352,8 @@ private:
     real maxv = std::max({maxvx, maxvy, maxvz});
     real a_v = maxv * par.dt / h;
     System::log<System::MESSAGE>(
-        "[ICM_Compressible] Advective CFL Numbers: alpha_c ~ %g; alpha_v ~ %g", a_c,
-        a_v);
+        "[ICM_Compressible] Advective CFL Numbers: alpha_c ~ %g; alpha_v ~ %g",
+        a_c, a_v);
     real maxDensity = *thrust::max_element(currentFluid.density.begin(),
                                            currentFluid.density.end());
     real kinematicViscosity = par.shearViscosity / maxDensity;
@@ -362,9 +362,10 @@ private:
                                             par.hydrodynamicRadius);
     real b_c = selfDiffusion * par.dt / (h * h);
     System::log<System::MESSAGE>(
-        "[ICM_Compressible] Viscous CFL Numbers: beta ~ %g; beta_c ~ %g", b, b_c);
-    System::log<System::MESSAGE>("[ICM_Compressible] Fluid cell Re=alpha_c/beta=%g",
-                                 a_c / b);
+        "[ICM_Compressible] Viscous CFL Numbers: beta ~ %g; beta_c ~ %g", b,
+        b_c);
+    System::log<System::MESSAGE>(
+        "[ICM_Compressible] Fluid cell Re=alpha_c/beta=%g", a_c / b);
     real Sc = kinematicViscosity / selfDiffusion;
     System::log<System::MESSAGE>("[ICM_Compressible] Schmidt number: %g", Sc);
   }

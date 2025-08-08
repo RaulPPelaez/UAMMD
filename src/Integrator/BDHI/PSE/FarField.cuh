@@ -469,8 +469,9 @@ private:
     // eq 19 and beyond in [1].
     // The sqrt(2*T/dt) factor needs to be here because far noise is summed to
     // the M*F term.
-    /*Add the stochastic noise to the fourier velocities if T>0 -> 1/sqrt(sigma)*sqrt(B)*dWw
-    */
+    /*Add the stochastic noise to the fourier velocities if T>0 ->
+     * 1/sqrt(sigma)*sqrt(B)*dWw
+     */
     if (temperature > real(0.0)) {
       auto d_gridVelsFourier =
           (cufftComplex3 *)thrust::raw_pointer_cast(gridVelsFourier.data());
@@ -527,8 +528,9 @@ private:
 };
 
 /*Far contribution of M*F and B*dW
-  Mw*F + sqrt(Mw)*dWw = sigma*St*FFTi*G_k*FFTf*S*F+ sqrt(sigma)*St*FFTi*sqrt(G_k)dWw =
-  = sigma*St*FFTi( G_k*FFTf*S*F + 1/sqrt(sigma)*sqrt(G_k)*dWw)
+  Mw*F + sqrt(Mw)*dWw = sigma*St*FFTi*G_k*FFTf*S*F+
+  sqrt(sigma)*St*FFTi*sqrt(G_k)dWw = = sigma*St*FFTi( G_k*FFTf*S*F +
+  1/sqrt(sigma)*sqrt(G_k)*dWw)
 */
 void FarField::computeHydrodynamicDisplacements(real4 *pos, real4 *forces,
                                                 real3 *MF, int numberParticles,

@@ -172,7 +172,8 @@ template <class vtype> struct RPYNearTransverser {
      * elements of v*/
     /*This expression is a little obfuscated, Mr_ij*vj*/
     /*
-      Mr = (f(r)*I+(g(r)-f(r))*r(diadic)r)/(6*pi*vis*a) - > (M*v)_beta = (f(r)*v_beta
+      Mr = (f(r)*I+(g(r)-f(r))*r(diadic)r)/(6*pi*vis*a) - > (M*v)_beta =
+      (f(r)*v_beta
       + (g(r)-f(r))*v*(r(diadic)r))/(6*pi*vis*a) Where f and g are the RPY
       coefficients, which are already divided by 6*pi*vis*a in the table.
     */

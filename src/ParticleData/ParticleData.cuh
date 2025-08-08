@@ -228,7 +228,7 @@ public:
 #define GET_PROPERTY_T(Name, name) GET_PROPERTY_R(Name, name);
 #define GET_PROPERTY_R(Name, name)                                             \
   inline auto get##Name(access::location dev, access::mode mode)               \
-      ->decltype(name.data(dev, mode)) {                                       \
+      -> decltype(name.data(dev, mode)) {                                      \
     if (!name.isAllocated())                                                   \
       name.resize(numberParticles);                                            \
     if (!name.isAllocated() or mode == access::mode::write or                  \
@@ -248,7 +248,7 @@ public:
 #define GET_PROPERTY_IF_ALLOC_T(Name, name) GET_PROPERTY_IF_ALLOC_R(Name, name)
 #define GET_PROPERTY_IF_ALLOC_R(Name, name)                                    \
   inline auto get##Name##IfAllocated(access::location dev, access::mode mode)  \
-      ->decltype(name.data(dev, mode)) {                                       \
+      -> decltype(name.data(dev, mode)) {                                      \
     if (!name.isAllocated()) {                                                 \
       decltype(name.data(dev, mode)) tmp;                                      \
       return tmp;                                                              \

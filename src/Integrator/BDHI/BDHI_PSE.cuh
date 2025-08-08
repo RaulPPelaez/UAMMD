@@ -43,11 +43,11 @@ scaling factor in wave space to transform forces to velocities, see eq.9 in [1].
 
   sqrt(Mw)*dWw: The far range stochastic contribution is computed in fourier
 space along M*F as: Mw*F + sqrt(Mw)*dWw = sigma*St*FFTi*B*FFTf*S*F+
-sqrt(sigma)*St*FFTi*sqrt(B)*dWw = sigma*St*FFTi( B*FFTf*S*F + 1/sqrt(sigma)*sqrt(B)*dWw) Only one St*FFTi is
-needed, the stochastic term is added as a velocity in fourier space. dWw is a
-gaussian random vector of complex numbers, special care must be taken to ensure
-the correct conjugacy properties needed for the FFT. See
-pse_ns::fourierBrownianNoise
+sqrt(sigma)*St*FFTi*sqrt(B)*dWw = sigma*St*FFTi( B*FFTf*S*F +
+1/sqrt(sigma)*sqrt(B)*dWw) Only one St*FFTi is needed, the stochastic term is
+added as a velocity in fourier space. dWw is a gaussian random vector of complex
+numbers, special care must be taken to ensure the correct conjugacy properties
+needed for the FFT. See pse_ns::fourierBrownianNoise
 
 Therefore, in the case of Mdot_far, for computing M*F, Bw*dWw is also summed.
 
