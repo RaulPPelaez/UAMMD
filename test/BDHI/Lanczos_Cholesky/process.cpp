@@ -9,7 +9,7 @@
   In each step of the simulation the displacement of a certain particle, except
   the i=0, will be given by:
 
-  dxi/dt = M·F = M0i = f(r)·I + g(r)/r^2 * (r\diadic r)
+  dxi/dt = M*F = M0i = f(r)*I + g(r)/r^2 * (r\diadic r)
 
   This code computes f(r) and g(r) from the displacements of particles at each
   time step and compares it with the theoretical RPY tensor with particles of

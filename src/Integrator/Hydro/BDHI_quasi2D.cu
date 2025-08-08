@@ -278,13 +278,14 @@ template <class HydroKernel> void BDHI2D<HydroKernel>::spreadParticleForces() {
 
 template <class HydroKernel> void BDHI2D<HydroKernel>::convolveFourier() {
   sys->log<System::DEBUG2>("[BDHI::BDHI2D] Wave space convolution");
-  // In: S·F -> Out: FFT·S·F
+  // In: S*F -> Out: FFT*S*F
   forwardTransformVelocities();
-  // In: FFT·S·F -> Out: B·FFT·S·F
+  // In: FFT*S*F -> Out: B*FFT*S*F
   applyGreenFunctionConvolutionFourier();
-  // In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
+  // In: B*FFT*S*F -> Out: B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw
   addStochastichTermFourier();
-  // In: B·FFT·S·F + 1/√σ·√B·dWw -> Out FFTi·(B·FFT·S·F + 1/√σ·√B·dWw )
+  // In: B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw -> Out FFTi*(B*FFT*S*F +
+  // 1/sqrt(sigma)*sqrt(B)*dWw )
   inverseTransformVelocities();
   CudaCheckError();
 }
@@ -451,7 +452,7 @@ void BDHI2D<HydroKernel>::applyGreenFunctionConvolutionFourier() {
 
 template <class HydroKernel>
 void BDHI2D<HydroKernel>::addStochastichTermFourier() {
-  /*Add if T>0 -> 1/√σ·√B·dWw */
+  /*Add if T>0 -> 1/sqrt(sigma)*sqrt(B)*dWw */
   if (temperature > 0) {
     auto d_gridVels =
         (cufftComplex2 *)thrust::raw_pointer_cast(gridVelsFourier.data());

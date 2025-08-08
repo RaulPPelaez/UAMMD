@@ -42,10 +42,14 @@ public:
 
 namespace detail {
 using cufftComplex3 = cufftComplex3_t<real>;
-/*Apply the projection operator to a wave number with a certain complex factor.
-  res = (I-k^k)·factor
-  See i.e eq. 16 in [1].
-*/
+/**
+ * Apply the projection operator to a wave number with a given complex factor.
+ *
+ * Computes:
+ *   res = (I - k * k) * factor
+ *
+ * See, e.g., equation 16 in [1].
+ */
 __device__ cufftComplex3 projectFourier(real3 k, cufftComplex3 factor) {
   const real invk2 = real(1.0) / dot(k, k);
   cufftComplex3 res;
@@ -68,10 +72,16 @@ __device__ cufftComplex3 projectFourier(real3 k, cufftComplex3 factor) {
   return res;
 }
 
-/* Precomputes the fourier scaling factor B (see eq. 9 and 20.5 in [1]),
-   Returns B(||k||^2, xi, eta) = 1/(vis·Vol) ·
-   sinc(k·rh)^2/k^2·Hashimoto(k,xi,eta)
-*/
+/**
+ * Precomputes the Fourier-space scaling factor B.
+ *
+ * See equations 9 and 20.5 in [1].
+ *
+ * Returns:
+ *   B(||k||^2, xi, eta) = (1 / (viscosity * Vol)) *
+ *                         (sinc(k * rh))^2 / |k|^2 *
+ *                         Hashimoto(k, xi, eta)
+ */
 __device__ real greensFunction(real3 waveVector, real shearStrain,
                                real rh, // Hydrodynamic radius
                                real viscosity,
@@ -108,13 +118,19 @@ __device__ real greensFunction(real3 waveVector, real shearStrain,
   return B;
 }
 
-/*Scales fourier transformed forces in the regular grid to obtain velocities,
-  (Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F
-  also adds stochastic fourier noise, see addBrownianNoise
-  Input: gridForces = FFTf·S·F
-  Output:gridVels = B·FFTf·S·F + 1/√σ·√B·dWw
-  See sec. B.2 in [1]
-*/
+/**
+ * Scales Fourier-transformed forces on the regular grid to obtain velocities.
+ *
+ * Computes:
+ *   (Mw * F)_deterministic = sigma * St * FFTi * B * FFTf * S * F
+ * Also adds stochastic Fourier noise. See addBrownianNoise.
+ *
+ * Input:
+ *   gridForces = FFTf * S * F
+ * Output:
+ *   gridVels = B * FFTf * S * F + (1 / sqrt(sigma)) * sqrt(B) * dWw
+ * See section B.2 in [1].
+ */
 __global__ void forceFourier2Vel(
     cufftComplex3 *gridForces, /*Input array*/
     cufftComplex3 *gridVels,   /*Output array, can be the same as input*/
@@ -136,9 +152,14 @@ __global__ void forceFourier2Vel(
                                 B * gridForces[id]);
 }
 
-/*Compute gaussian complex noise dW, std = prefactor -> ||z||^2 =
- * <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
-/*A complex random number for each direction*/
+/**
+ * @brief Computes Gaussian complex noise dW with a given standard deviation.
+ *
+ * The generated complex noise satisfies:
+ *   ||z||^2 = <x^2> / sqrt(2) + <y^2> / sqrt(2) = prefactor
+ *
+ * A complex random number is generated for each direction.
+ */
 __device__ cufftComplex3 generateNoise(real prefactor, uint id, uint seed1,
                                        uint seed2) {
   // Uncomment to use uniform numbers instead of gaussian
@@ -194,16 +215,25 @@ __device__ bool isNyquistWaveNumber(int3 cell, int3 ncells) {
   return nyquist;
 }
 
-/*Computes the long range stochastic velocity term
-  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
-  = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
-  See sec. B.2 in [1]
-  This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds
-  1/√σ·√B(k)·dWw. Keeping special care that v_k = v*_{N-k}, which implies that
-  dWw_k = dWw*_{N-k}
-*/
+/**
+ * @brief Computes the long-range stochastic velocity term:
+ * \f[
+ * M_w \cdot F + \sqrt{M_w} \cdot dW_w = \sigma \cdot \text{St} \cdot
+ * \text{FFTi} \cdot B \cdot \text{FFTf} \cdot S \cdot F +
+ * \sqrt{\sigma} \cdot \text{St} \cdot \text{FFTi} \cdot \sqrt{B} \cdot dW_w =
+ * \sigma \cdot \text{St} \cdot \text{FFTi} \left( B \cdot \text{FFTf} \cdot S
+ * \cdot F + \frac{1}{\sqrt{\sigma}} \cdot \sqrt{B} \cdot dW_w \right)
+ * \f]
+ * See section B.2 in [1].
+ *
+ * This kernel receives \f$v_k = \text{gridVelsFourier} = B \cdot \text{FFTf}
+ * \cdot S \cdot F\f$ as input and adds the noise term
+ * \f$\frac{1}{\sqrt{\sigma}} \cdot \sqrt{B(k)} \cdot dW_w\f$. Special care is
+ * taken so that
+ * \f$v_k = v^*_{N-k}\f$, implying \f$dW_{w,k} = dW^*_{w, N-k}\f$.
+ */
 __global__ void fourierBrownianNoise(cufftComplex3 *gridVelsFourier, Grid grid,
-                                     real prefactor, /* sqrt(2·T/dt)*/
+                                     real prefactor, /* sqrt(2T/dt)*/
                                      real shearStrain, real hydrodynamicRadius,
                                      real viscosity, real split, real eta,
                                      uint seed1, uint seed2) {
@@ -233,7 +263,7 @@ __global__ void fourierBrownianNoise(cufftComplex3 *gridVelsFourier, Grid grid,
   const bool nyquist = isNyquistWaveNumber(cell, nk);
   if (nyquist) {
     /*Nyquist points are their own conjugates, so they must be real.
-      ||r||^2 = <x^2> = ||Real{z}||^2 = <Real{z}^2>·sqrt(2) =  prefactor*/
+      ||r||^2 = <x^2> = ||Real{z}||^2 = <Real{z}^2>*sqrt(2) =  prefactor*/
     constexpr real nqsc = real(1.41421356237310); // sqrt(2)
     noise.x.x *= nqsc;
     noise.x.y = 0;
@@ -242,7 +272,7 @@ __global__ void fourierBrownianNoise(cufftComplex3 *gridVelsFourier, Grid grid,
     noise.z.x *= nqsc;
     noise.z.y = 0;
   }
-  /*Z = sqrt(B)·(I-k^k)·dW*/
+  /*Z = sqrt(B)*(I-k^k)*dW*/
   { // Compute for v_k wave number
     const int3 ik = indexToWaveNumber(id, nk);
     const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
@@ -304,7 +334,7 @@ public:
     System::log<System::MESSAGE>("[BDHI::PSE] Box Size: %f %f %f",
                                  box.boxSize.x, box.boxSize.y, box.boxSize.z);
     System::log<System::MESSAGE>(
-        "[BDHI::PSE] Unitless splitting factor ξ·a: %f",
+        "[BDHI::PSE] Unitless splitting factor xi*a: %f",
         psi * par.hydrodynamicRadius);
     const int3 n = grid.cellDim;
     System::log<System::MESSAGE>("[BDHI::PSE] Far range grid size: %d %d %d",
@@ -316,10 +346,18 @@ public:
     cufftDestroy(cufft_plan_forward);
   }
 
-  /*Far contribution of M·F and B·dW
-    Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
-    = σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
-  */
+  /**
+   * @brief Computes the far-field contribution of \f{M \cdot F\f} and \f{B
+   * \cdot dW\f}:
+   * \f[
+   * M_w \cdot F + \sqrt{M_w} \cdot dW_w = \sigma \cdot \text{St} \cdot
+   * \text{FFTi} \cdot G_k \cdot \text{FFTf} \cdot S \cdot F +
+   * \sqrt{\sigma} \cdot \text{St} \cdot \text{FFTi} \cdot \sqrt{G_k} \cdot dW_w
+   * =
+   * \sigma \cdot \text{St} \cdot \text{FFTi} \left( G_k \cdot \text{FFTf} \cdot
+   * S \cdot F + \frac{1}{\sqrt{\sigma}} \cdot \sqrt{G_k} \cdot dW_w \right)
+   * \f]
+   */
   void computeHydrodynamicDisplacements(real4 *pos, real4 *forces, real3 *Mv,
                                         int numberParticles, real temperature,
                                         real prefactor, cudaStream_t st);
@@ -348,10 +386,10 @@ private:
   void initializeKernel(real tolerance);
   void initializeGrid(real tolerance);
 
-  // Computes S·F
+  // Computes SF
   auto spreadForce(real4 *pos, real4 *forces, int numberParticles,
                    cudaStream_t st) {
-    /*Spread force on particles to grid positions -> S·F*/
+    /*Spread force on particles to grid positions -> SF */
     System::log<System::DEBUG2>("[BDHI::PSE] Particles to grid");
     // auto force = pd->getForce(access::location::gpu, access::mode::read);
     auto force_r3 = thrust::make_transform_iterator(forces, detail::ToReal3());
@@ -380,7 +418,7 @@ private:
         (cufftComplex *)thrust::raw_pointer_cast(gridVelsFourier.data());
     cufftSetStream(cufft_plan_forward, st);
     /*Take the grid spreaded forces and apply take it to wave space ->
-     * FFTf·S·F*/
+     * FFTf*S*F*/
     CufftSafeCall(cufftExecReal2Complex<real>(cufft_plan_forward, d_gridVels,
                                               d_gridVelsFourier));
     return gridVelsFourier;
@@ -391,7 +429,7 @@ private:
                        cudaStream_t st) {
     System::log<System::DEBUG2>("[BDHI::PSE] Wave space velocity scaling");
     /*Scale the wave space grid forces, transforming in velocities ->
-     * B·FFT·S·F*/
+     * B*FFT*S*F*/
     auto d_gridVelsFourier =
         (cufftComplex3 *)thrust::raw_pointer_cast(gridVelsFourier.data());
     const int3 n = grid.cellDim;
@@ -403,17 +441,17 @@ private:
     CudaCheckError();
   }
 
-  // Returns G_k·FFT(S·F)
+  // Returns G_k*FFT(S*F)
   auto deterministicPart(real4 *pos, real4 *forces, int numberParticles,
                          cudaStream_t st) {
     // In the absence of forces there is no need to compute the deterministic
     // part
     if (forces) {
-      // S·F
+      // S*F
       auto gridVels = spreadForce(pos, forces, numberParticles, st);
-      // FFT(S·F)
+      // FFT(S*F)
       auto gridVelsFourier = forwardTransformForces(gridVels, st);
-      // G_k·FFT(S·F)
+      // G_k*FFT(S*F)
       convolveFourier(gridVelsFourier, st);
       return gridVelsFourier;
     } else {
@@ -425,13 +463,14 @@ private:
     }
   }
 
-  // Adds the stochastic part in Fourier space ( 1/dV sqrt(G_k)·dW )
+  // Adds the stochastic part in Fourier space ( 1/dV sqrt(G_k)*dW )
   void addBrownianNoise(cached_vector<cufftComplex3> &gridVelsFourier,
                         real temperature, real prefactor, cudaStream_t st) {
     // eq 19 and beyond in [1].
     // The sqrt(2*T/dt) factor needs to be here because far noise is summed to
-    // the M·F term.
-    /*Add the stochastic noise to the fourier velocities if T>0 -> 1/√σ·√B·dWw
+    // the M*F term.
+    /*Add the stochastic noise to the fourier velocities if T>0 ->
+     * 1/sqrt(sigma)*sqrt(B)*dWw
      */
     if (temperature > real(0.0)) {
       auto d_gridVelsFourier =
@@ -443,10 +482,10 @@ private:
       real noise_prefactor = prefactor * sqrt(2 * temperature / (dV));
       int Nthreads = 128;
       int Nblocks = (n.z * n.y * (n.x / 2 + 1)) / Nthreads + 1;
-      // In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
+      // In: B*FFT*S*F -> Out: B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw
       detail::fourierBrownianNoise<<<Nblocks, Nthreads, 0, st>>>(
           d_gridVelsFourier, grid,
-          noise_prefactor, // 1/√σ· sqrt(2*T/dt),
+          noise_prefactor, // 1/sqrt(sigma) * sqrt(2*T/dt),
           shearStrain, hydrodynamicRadius, viscosity, psi, eta,
           seed, // Saru needs two seeds apart from thread id
           seed2);
@@ -467,20 +506,20 @@ private:
     auto d_gridVelsFourier =
         (cufftComplex *)thrust::raw_pointer_cast(gridVelsFourier.data());
     cufftSetStream(cufft_plan_inverse, st);
-    /*Take the fourier velocities back to real space ->  FFTi·(B·FFT·S·F +
-     * 1/√σ·√B·dWw )*/
+    /*Take the fourier velocities back to real space ->  FFTi*(B*FFT*S*F +
+     * 1/sqrt(sigma)*sqrt(B)*dWw )*/
     CufftSafeCall(cufftExecComplex2Real<real>(cufft_plan_inverse,
                                               d_gridVelsFourier, d_gridVels));
     return gridVels;
   }
 
-  // Computes J·v. Interpolates the velocities at the particles positions
+  // Computes J*v. Interpolates the velocities at the particles positions
   void interpolateVelocity(cached_vector<real3> &gridVels, real4 *pos,
                            real3 *MF, int numberParticles, cudaStream_t st) {
     System::log<System::DEBUG2>("[BDHI::PSE] Grid to particles");
     /*Interpolate the real space velocities back to the particle positions ->
-      Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F +
-      1/√σ·√B·dWw )*/
+      Output: Mv = Mw*F + sqrt(2*T/dt)*sqrt(Mw)dWw = sigma*St*FFTi*(B*FFT*S*F +
+      1/sqrt(sigma)*sqrt(B)*dWw )*/
     auto d_gridVels = (real3 *)thrust::raw_pointer_cast(gridVels.data());
     IBM<Kernel> ibm(kernel, grid);
     ibm.gather(pos, MF, d_gridVels, numberParticles, st);
@@ -488,9 +527,10 @@ private:
   }
 };
 
-/*Far contribution of M·F and B·dW
-  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·G_k·FFTf·S·F+ √σ·St·FFTi·√G_k·dWw =
-  = σ·St·FFTi( G_k·FFTf·S·F + 1/√σ·√G_k·dWw)
+/*Far contribution of M*F and B*dW
+  Mw*F + sqrt(Mw)*dWw = sigma*St*FFTi*G_k*FFTf*S*F+
+  sqrt(sigma)*St*FFTi*sqrt(G_k)dWw = = sigma*St*FFTi( G_k*FFTf*S*F +
+  1/sqrt(sigma)*sqrt(G_k)*dWw)
 */
 void FarField::computeHydrodynamicDisplacements(real4 *pos, real4 *forces,
                                                 real3 *MF, int numberParticles,
@@ -499,10 +539,10 @@ void FarField::computeHydrodynamicDisplacements(real4 *pos, real4 *forces,
                                                 cudaStream_t st) {
   System::log<System::DEBUG1>("[BDHI::PSE] Computing MF wave space....");
   System::log<System::DEBUG2>("[BDHI::PSE] Setting vels to zero...");
-  // G_k·FFT(S·F)
+  // G_k*FFT(S*F)
   // The computation is skipped if the forces are not provided (nullptr)
   auto gridVelsFourier = deterministicPart(pos, forces, numberParticles, st);
-  // 1/√σ·√G_k·dWw
+  // 1/sqrt(sigma)*sqrt(G_k)*dWw
   // The computation is skipped if temperature is zero
   addBrownianNoise(gridVelsFourier, temperature, prefactor, st);
   // FFTi
@@ -566,7 +606,7 @@ void FarField::initializeKernel(real tolerance) {
   /*Grid spreading/interpolation parameters*/
   /*Gaussian spreading/interpolation kernel support points neighbour distance
     See eq. 19 and sec 4.1 in [2]*/
-  // m = C·sqrt(pi·P), from sec 4.1 we choose C=0.976
+  // m = C*sqrt(pi*P), from sec 4.1 we choose C=0.976
   constexpr double C = 0.976;
   double m = 1;
   /*I have empirically found that 0.1*tolerance here gives the desired overal

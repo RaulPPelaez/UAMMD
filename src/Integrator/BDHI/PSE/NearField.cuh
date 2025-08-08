@@ -102,13 +102,13 @@ private:
 };
 
 namespace pse_ns {
-/*Compute the product M_nearv = M_near·v by transversing a neighbour list
+/*Compute the product M_nearv = M_near*v by transversing a neighbour list
 
   This operation can be seen as an sparse MatrixVector product.
-  Mv_i = sum_j ( Mr_ij·vj )
+  Mv_i = sum_j ( Mr_ij*vj )
 */
 /*Each thread handles one particle with the other N, including itself*/
-/*That is 3 full lines of M, or 3 elements of M·v per thread, being the x y z of
+/*That is 3 full lines of M, or 3 elements of M*v per thread, being the x y z of
  * ij with j=0:N-1*/
 /*In other words. M is made of NxN boxes of size 3x3,
   defining the x,y,z mobility between particle pairs,
@@ -122,7 +122,7 @@ template <class vtype> struct RPYNearTransverser {
   typedef real3 infoType;
 
   RPYNearTransverser(vtype *v, real3 *Mv,
-                     /*RPY_near(r) = F(r)·(I-r^r) + G(r)·r^r*/
+                     /*RPY_near(r) = F(r)*(I-r^r) + G(r)*r^r*/
                      TabulatedFunction<real2> FandG, real rcut, Box box,
                      real shearStrain)
       : v(v), Mv(Mv), FandG(FandG), box(box), shearStrain(shearStrain) {
@@ -149,7 +149,7 @@ template <class vtype> struct RPYNearTransverser {
     rij.x -= Lx * round(rij.x / Lx);
     return rij;
   }
-  /*Compute the dot product Mr_ij(3x3)·vj(3)*/
+  /*Compute the dot product Mr_ij(3x3)*vj(3)*/
   inline __device__ computeType compute(const real4 &pi, const real4 &pj,
                                         const infoType &vi,
                                         const infoType &vj) {
@@ -158,28 +158,29 @@ template <class vtype> struct RPYNearTransverser {
     if (r2 >= rcut2)
       return real3();
     /*Fetch RPY coefficients from a table, see RPYPSE_near*/
-    /* Mreal(r) = (F(r)·I + (G(r)-F(r))·rr)/(6*pi*vis*a) */
+    /* Mreal(r) = (F(r)*I + (G(r)-F(r))*rr)/(6*pi*vis*a) */
     // f and g are divided by 6*pi*vis*a in the texture
     const real2 fg = FandG.get<cub::LOAD_LDG>(sqrt(r2));
     const real f = fg.x;
     const real g = fg.y;
     /*If i==j */
     if (r2 == real(0.0)) {
-      /*M_ii·vi = F(0)*I·vi/(6*pi*vis*a) */
+      /*M_ii*vi = F(0)*I*vi/(6*pi*vis*a) */
       return f * make_real3(vj);
     }
-    /*Update the result with Mr_ij·vj, the current box dot the current three
+    /*Update the result with Mr_ij*vj, the current box dot the current three
      * elements of v*/
-    /*This expression is a little obfuscated, Mr_ij·vj*/
+    /*This expression is a little obfuscated, Mr_ij*vj*/
     /*
-      Mr = (f(r)*I+(g(r)-f(r))*r(diadic)r)/(6*pi*vis*a) - > (M·v)_ß = (f(r)·v_ß
-      + (g(r)-f(r))·v·(r(diadic)r))/(6*pi*vis*a) Where f and g are the RPY
+      Mr = (f(r)*I+(g(r)-f(r))*r(diadic)r)/(6*pi*vis*a) - > (M*v)_beta =
+      (f(r)*v_beta
+      + (g(r)-f(r))*v*(r(diadic)r))/(6*pi*vis*a) Where f and g are the RPY
       coefficients, which are already divided by 6*pi*vis*a in the table.
     */
     const real invr2 = real(1.0) / r2;
     const real gmfv = (g - f) * dot(rij, vj) * invr2;
-    /*gmfv = (g(r)-f(r))·( vx·rx + vy·ry + vz·rz )*/
-    /*((g(r)-f(r))·v·(r(diadic)r) )_ß = gmfv·r_ß*/
+    /*gmfv = (g(r)-f(r))*( vx*rx + vy*ry + vz*rz )*/
+    /*((g(r)-f(r))*v*(r(diadic)r) )_beta = gmfv*r_beta*/
     return make_real3(f * vj + gmfv * rij);
   }
 
@@ -194,11 +195,11 @@ template <class vtype> struct RPYNearTransverser {
   real shearStrain;
 };
 
-/*LanczosAlgorithm needs a functor that computes the product M·v*/
+/*LanczosAlgorithm needs a functor that computes the product M*v*/
 /*Dotctor takes a list transverser and a cell list on construction,
-  and the operator () takes an array v and returns the product M·v*/
+  and the operator () takes an array v and returns the product M*v*/
 struct Dotctor : lanczos::MatrixDot {
-  /*Dotctor uses the same transverser as in Mr·F*/
+  /*Dotctor uses the same transverser as in Mr*F*/
   using myTransverser = RPYNearTransverser<real3>;
   myTransverser Mv_tr;
   shared_ptr<NearField::NeighbourList> cl;
@@ -268,7 +269,7 @@ void NearField::computeStochasticDisplacements(real3 *BdW, real temperature,
   }
   int numberParticles = pg->getNumberParticles();
   pse_ns::Dotctor Mvdot_near(tr, cl, numberParticles, st);
-  /*Lanczos algorithm to compute M_near^1/2 · noise. See LanczosAlgorithm.cuh*/
+  /*Lanczos algorithm to compute M_near^1/2 * noise. See LanczosAlgorithm.cuh*/
   uninitialized_cached_vector<real3> noise(numberParticles);
   const auto id_tr = thrust::make_counting_iterator<uint>(0);
   const uint seed2 = pg->getParticleData()->getSystem()->rng().next32();

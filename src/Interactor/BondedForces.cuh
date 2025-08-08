@@ -55,7 +55,7 @@ namespace BondedType {
 
 namespace detail {
 inline __device__ real harmonicForceModulusDivR(real invr, real k, real r0) {
-  const real f = -k * (real(1.0) - r0 * invr); // F = -k·(r-r0)·rvec/r
+  const real f = -k * (real(1.0) - r0 * invr); // F = -k*(r-r0)*rvec/r
   return f;
 }
 

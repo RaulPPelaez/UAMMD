@@ -4,7 +4,7 @@ BDHI::EulerMaruyama
   Computes the mobility matrix on the fly when needed, so it is a mtrix free
 method.
 
-  M·F is computed as an NBody interaction (a dense Matrix vector product).
+  M*F is computed as an NBody interaction (a dense Matrix vector product).
 
   BdW is computed using the Lanczos algorithm [1].
 

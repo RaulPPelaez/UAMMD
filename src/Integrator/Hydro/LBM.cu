@@ -7,7 +7,7 @@ References:
 
 [1] Optimized implementation of the Lattice Boltzmann Method on a graphics
 processing unit towards real-time fluid simulation.  N. Delbosc et al.
-http://dx.doi.org/10.1016/j.camwa.2013.10.002 [2] Accelerating fluid–solid
+http://dx.doi.org/10.1016/j.camwa.2013.10.002 [2] Accelerating fluid-solid
 simulations (Lattice-Boltzmann & Immersed-Boundary) on heterogeneous
 architectures. Pedro Valero-Lara et. al.
 https://hal.archives-ouvertes.fr/hal-01225734

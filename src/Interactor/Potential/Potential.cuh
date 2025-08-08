@@ -54,7 +54,7 @@ struct LJFunctor {
                  (invr6 - real(1.0)) -
              params.shift;
     // if(params.shift != real(0.0)){
-    //   ////With shift, u(r) = lj(r)-lj(rc)  -(r-rc)·(dlj(r)/dr|_rc)
+    //   ////With shift, u(r) = lj(r)-lj(rc)  -(r-rc)*(dlj(r)/dr|_rc)
     //   // real rc = sqrt(params.cutOff2);
     //   // real invrc2 = real(params.sigma2)/(params.cutOff2);
     //   // real invrc6 = invrc2*invrc2*invrc2;

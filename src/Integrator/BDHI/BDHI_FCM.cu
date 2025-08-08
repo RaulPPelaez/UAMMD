@@ -58,7 +58,7 @@ void FCMIntegrator::computeCurrentForces() {
 
 namespace FCM_ns {
 /*
-  dR = dt(KR+MF) + sqrt(2*T*dt)·BdW +T·divM·dt -> divergence is commented out
+  dR = dt(KR+MF) + sqrt(2*T*dt)*BdW +T*divM*dt -> divergence is commented out
   for the moment
 */
 /*With all the terms computed, update the positions*/

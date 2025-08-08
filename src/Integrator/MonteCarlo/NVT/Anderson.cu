@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2018-2020. Adapted from Pablo Ibañez Freire's MonteCarlo
+/*Raul P. Pelaez 2018-2020. Adapted from Pablo Ibanez Freire's MonteCarlo
 Anderson code.
 
   This module implements Anderson's Monte Carlo NVT GPU algorithm [1].
@@ -148,7 +148,7 @@ template <class Pot> void Anderson<Pot>::updateJumpSize() {
   sys->log<System::DEBUG>("[MC_NVT::Anderson] Current acceptance ratio: %e",
                           currentAcceptanceRatio);
   sys->log<System::DEBUG>(
-      "[MC_NVT::Anderson] Current step size: %e, %e·cellSize", jumpSize,
+      "[MC_NVT::Anderson] Current step size: %e, %e*cellSize", jumpSize,
       jumpSize / grid.cellSize.x);
 }
 

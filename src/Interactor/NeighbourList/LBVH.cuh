@@ -44,7 +44,7 @@ https://doi.org/10.1016/j.cpc.2016.02.003 [2] Maximizing Parallelism in the
 Construction of BVHs,Octrees, andk-d Trees, Tero Karras. 2012.
 https://devblogs.nvidia.com/wp-content/uploads/2012/11/karras2012hpg_paper.pdf
    [3] Ray casting using a roped BVH with CUDA. R. Torres, et. al. 2009.
-https://doi.org/10.1145/1980462.1980483 pp. 95–102. [4] Quantized bounding
+https://doi.org/10.1145/1980462.1980483 pp. 95-102. [4] Quantized bounding
 volume hierarchies for neighbor search in molecular simulations on graphics
 processing units. Michael P. Howard, et. al.
 https://doi.org/10.1016/j.commatsci.2019.04.004

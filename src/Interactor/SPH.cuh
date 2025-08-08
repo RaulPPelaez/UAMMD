@@ -4,7 +4,7 @@
 (i.e VerletNVE).
 
   Computes a force on each particle as:
-  Fi = sum_j[  mj·(Pj/rhoj^2 + Pi/rhoi^2 + visij)·grad_i(Wij) ]
+  Fi = sum_j[  mj*(Pj/rhoj^2 + Pi/rhoi^2 + visij)*grad_i(Wij) ]
 
   Where:
     j: The neighbours of i (within a distance given by the support of Wij)
@@ -18,18 +18,18 @@
 See SPH_ns::Kernel
 
   The density on a given particle i is interpolated from its neighbours as:
-   rho_i = sum_j[ mj·Wij ]
+   rho_i = sum_j[ mj*Wij ]
 
   The Pressure is given by an equation-of-state depending on interpolated
-properties of the particles. Currently: Pi = K·(rho_i-rho0)
+properties of the particles. Currently: Pi = K*(rho_i-rho0)
 
   An artificial viscosity is introduced to allow shock phenomena ans stabilize
-the algorithm. visij = -nu( vij·rij)/(rij^2+epsilon) epsilon ~ 0.001 v: velocity
+the algorithm. visij = -nu( vij*rij)/(rij^2+epsilon) epsilon ~ 0.001 v: velocity
     r: particle position
 
 References:
 [1] Smoothed particle hydrodynamics. JJ Monaghan. Rep. Prog. Phys. 68 (2005)
-1703–1759 doi:10.1088/0034-4885/68/8/R01
+1703-1759 doi:10.1088/0034-4885/68/8/R01
 
  */
 

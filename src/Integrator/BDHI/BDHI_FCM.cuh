@@ -111,11 +111,23 @@ public:
 
   void setup_step(cudaStream_t st = 0) {}
 
-  /*Compute M·F and B·dW in Fourier space
-  σ = dx*dy*dz; h^3 in [1]
-  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
-  = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
-*/
+  /**
+   * @brief Computes \f{M \cdot F\f} and \f{B \cdot dW\f} in Fourier space.
+   *
+   * \f[
+   * \sigma = dx \cdot dy \cdot dz \quad (\text{cell volume as } h^3 \text{ in
+   * [1]})
+   * \f]
+   *
+   * The computation follows:
+   * \f[
+   * M_w \cdot F + \sqrt{M_w} \cdot dW_w = \sigma \cdot \text{St} \cdot
+   * \text{FFTi} \cdot B \cdot \text{FFTf} \cdot S \cdot F +
+   * \sqrt{\sigma} \cdot \text{St} \cdot \text{FFTi} \cdot \sqrt{B} \cdot dW_w =
+   * \sigma \cdot \text{St} \cdot \text{FFTi} \left( B \cdot \text{FFTf} \cdot S
+   * \cdot F + \frac{1}{\sqrt{\sigma}} \cdot \sqrt{B} \cdot dW_w \right)
+   * \f]
+   */
   void computeMF(real3 *MF, cudaStream_t st = 0) {
     System::log<System::DEBUG1>("[BDHI::FCM] Computing MF....");
     auto pd = pg->getParticleData();

@@ -246,7 +246,7 @@ template <class IterPos, class IterForce, class Kernel>
 cached_vector<real3>
 spreadForces(IterPos &pos, IterForce &force, int numberParticles,
              std::shared_ptr<Kernel> kernel, Grid grid, cudaStream_t st) {
-  /*Spread force on particles to grid positions -> S·F*/
+  /*Spread force on particles to grid positions -> SF*/
   System::log<System::DEBUG2>("[BDHI::FCM] Particles to grid");
   auto force_r3 = thrust::make_transform_iterator(force, ToReal3());
   int3 n = grid.cellDim;
@@ -298,7 +298,7 @@ cached_vector<complex3> forwardTransform(cached_vector<real3> &gridReal, int3 n,
   auto d_gridFourier = (complex *)thrust::raw_pointer_cast(gridFourier.data());
   auto d_gridReal = (real *)thrust::raw_pointer_cast(gridReal.data());
   cufftSetStream(plan, st);
-  /*Take the grid spreaded forces and apply take it to wave space -> FFTf·S·F*/
+  /*Take the grid spreaded forces and apply take it to wave space -> FFTf*SF*/
   CufftSafeCall(cufftExecReal2Complex<real>(plan, d_gridReal, d_gridFourier));
   return gridFourier;
 }
@@ -330,7 +330,7 @@ void addSpreadTorquesFourier(IterPos &pos, IterTorque &torque,
                              std::shared_ptr<Kernel> kernel, cufftHandle plan,
                              cached_vector<complex3> &gridVelsFourier,
                              cudaStream_t st) {
-  /*Spread force on particles to grid positions -> S·F*/
+  /*Spread force on particles to grid positions -> SF*/
   System::log<System::DEBUG2>("[BDHI::FCM] Spreading torques");
   int3 n = grid.cellDim;
   int nx = 2 * (n.x / 2 + 1);
@@ -357,12 +357,21 @@ void addSpreadTorquesFourier(IterPos &pos, IterTorque &torque,
   CudaCheckError();
 }
 
-/*Scales fourier transformed forces in the regular grid to obtain velocities,
-  (Mw·F)_deterministic = σ·St·FFTi·B·FFTf·S·F
-   Input: gridForces = FFTf·S·F
-   Output:gridVels = B·FFTf·S·F -> B \propto (I-k^k/|k|^2)
+/**
+ * @brief Scales Fourier-transformed forces on a regular grid to obtain
+ * velocities.
+ *
+ * \f[
+ * (M_w \cdot F)_{\text{deterministic}} = \sigma \cdot \text{St} \cdot
+ * \text{FFTi} \cdot B \cdot \text{FFTf} \cdot S \cdot F
+ * \f]
+ * @param  gridForces Input forces \f$\text{gridForces} = \text{FFTf} \cdot S
+ * \cdot F\f$
+ * @param gridVels Output array, can be the same as input. \f$\text{gridVels} =
+ * B \cdot \text{FFTf} \cdot S \cdot F\f \to B \propto \left( I -
+ * \mathbf{k}^\mathbf{k} / \vert \mathbf{k} \vert^2$
+ * @note This is executed with one thread per Fourier node.
  */
-/*A thread per fourier node*/
 __global__ void
 forceFourier2Vel(const complex3 *gridForces, /*Input array*/
                  complex3 *gridVels, /*Output array, can be the same as input*/
@@ -390,7 +399,7 @@ forceFourier2Vel(const complex3 *gridForces, /*Input array*/
 void convolveFourier(cached_vector<complex3> &gridVelsFourier, real viscosity,
                      Grid grid, cudaStream_t st) {
   System::log<System::DEBUG2>("[BDHI::FCM] Wave space velocity scaling");
-  /*Scale the wave space grid forces, transforming in velocities -> B·FFT·S·F*/
+  /*Scale the wave space grid forces, transforming in velocities -> B*FFT*S*F */
   auto d_gridVelsFourier =
       (complex3 *)thrust::raw_pointer_cast(gridVelsFourier.data());
   const int3 n = grid.cellDim;
@@ -401,16 +410,32 @@ void convolveFourier(cached_vector<complex3> &gridVelsFourier, real viscosity,
   CudaCheckError();
 }
 
-/*Computes the long range stochastic velocity term
-  Mw·F + sqrt(Mw)·dWw = σ·St·FFTi·B·FFTf·S·F+ √σ·St·FFTi·√B·dWw =
-  = σ·St·FFTi( B·FFTf·S·F + 1/√σ·√B·dWw)
-  See sec. B.2 in [1]
-  This kernel gets v_k = gridVelsFourier = B·FFtt·S·F as input and adds
-  1/√σ·√B(k)·dWw. Keeping special care that v_k = v*_{N-k}, which implies that
-  dWw_k = dWw*_{N-k}
-*/
+/**
+ * @brief Computes the long-range stochastic velocity term.
+ *
+ * \f[
+ * M_w \cdot F + \sqrt{M_w} \cdot dW_w =
+ * \sigma \cdot \text{St} \cdot \text{FFTi} \cdot B \cdot \text{FFTf} \cdot S
+ * \cdot F +
+ * \sqrt{\sigma} \cdot \text{St} \cdot \text{FFTi} \cdot \sqrt{B} \cdot dW_w
+ * \f]
+ * \f[
+ * = \sigma \cdot \text{St} \cdot \text{FFTi} \left( B \cdot \text{FFTf} \cdot S
+ * \cdot F +
+ * \frac{1}{\sqrt{\sigma}} \cdot \sqrt{B} \cdot dW_w \right)
+ * \f]
+ *
+ * See Sec. B.2 in [1].
+ *
+ * This kernel receives \f$v_k = \text{gridVelsFourier} = B \cdot \text{FFTf}
+ * \cdot S \cdot F\f$ as input, and adds the term \f$\frac{1}{\sqrt{\sigma}}
+ * \cdot \sqrt{B(k)} \cdot dW_w\f$.
+ *
+ * Special care is taken to ensure that \f$v_k = v^*_{N-k}\f$, which implies
+ * \f$dW_{w,k} = dW^*_{w, N-k}\f$.
+ */
 __global__ void fourierBrownianNoise(complex3 *gridVelsFourier, Grid grid,
-                                     real prefactor, /* sqrt(2·T/dt)*/
+                                     real prefactor, /* sqrt(2T/dt)*/
                                      real viscosity, uint seed1, uint seed2) {
   const uint id = blockIdx.x * blockDim.x + threadIdx.x;
   const int3 nk = grid.cellDim;
@@ -438,7 +463,7 @@ __global__ void fourierBrownianNoise(complex3 *gridVelsFourier, Grid grid,
   const bool nyquist = isNyquistWaveNumber(cell, nk);
   if (nyquist) {
     /*Nyquist points are their own conjugates, so they must be real.
-      ||r||^2 = <x^2> = ||Real{z}||^2 = <Real{z}^2>·sqrt(2) =  prefactor*/
+      ||r||^2 = <x^2> = ||Real{z}||^2 = <Real{z}^2>*sqrt(2) =  prefactor*/
     constexpr real nqsc = real(1.41421356237310); // sqrt(2)
     noise.x.x *= nqsc;
     noise.x.y = 0;
@@ -447,7 +472,7 @@ __global__ void fourierBrownianNoise(complex3 *gridVelsFourier, Grid grid,
     noise.z.x *= nqsc;
     noise.z.y = 0;
   }
-  /*Z = sqrt(B)·(I-k^k)·dW*/
+  /*Z = sqrt(B) \cdot (I-k^k) \cdot dW*/
   { // Compute for v_k wave number
     const int3 ik = indexToWaveNumber(id, nk);
     const real3 k = waveNumberToWaveVector(ik, grid.box.boxSize);
@@ -491,8 +516,9 @@ void addBrownianNoise(cached_vector<complex3> &gridVelsFourier,
                       uint seed, Grid grid, cudaStream_t st) {
   static uint seed2 = 0;
   // The sqrt(2*T/dt) factor needs to be here because far noise is summed to the
-  // M·F term.
-  /*Add the stochastic noise to the fourier velocities if T>0 -> 1/√σ·√B·dWw */
+  // MF term.
+  /*Add the stochastic noise to the fourier velocities if T>0 ->
+   * 1/sqrt(sigma)*sqrt(B)*dWw */
   if (temperature > real(0.0)) {
     seed2++;
     auto d_gridVelsFourier =
@@ -506,10 +532,10 @@ void addBrownianNoise(cached_vector<complex3> &gridVelsFourier,
         prefactor * sqrt(fourierNormalization * 2 * temperature / (dV));
     int Nthreads = 128;
     int Nblocks = (n.z * n.y * (n.x / 2 + 1)) / Nthreads + 1;
-    // In: B·FFT·S·F -> Out: B·FFT·S·F + 1/√σ·√B·dWw
+    // In: B*FFT*S*F -> Out: B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw
     fourierBrownianNoise<<<Nblocks, Nthreads, 0, st>>>(
         d_gridVelsFourier, grid,
-        noisePrefactor, // 1/√σ· sqrt(2*T/dt),
+        noisePrefactor, // 1/sqrt(sigma) * sqrt(2*T/dt),
         viscosity, seed, seed2);
     CudaCheckError();
   }
@@ -525,7 +551,7 @@ cached_vector<real3> inverseTransform(cached_vector<complex3> &gridFourier,
   auto d_gridFourier = (complex *)thrust::raw_pointer_cast(gridFourier.data());
   auto d_gridReal = (real *)thrust::raw_pointer_cast(gridReal.data());
   cufftSetStream(plan, st);
-  // Take the grid fourier forces and apply take it to real space -> FFTf·S·F
+  // Take the grid fourier forces and apply take it to real space -> FFTf*S*F
   CufftSafeCall(cufftExecComplex2Real<real>(plan, d_gridFourier, d_gridReal));
   return gridReal;
 }
@@ -536,9 +562,11 @@ interpolateVelocity(IterPos &pos, cached_vector<real3> &gridVels, Grid grid,
                     std::shared_ptr<Kernel> kernel, int numberParticles,
                     cudaStream_t st) {
   System::log<System::DEBUG2>("[BDHI::FCM] Grid to particles");
-  /*Interpolate the real space velocities back to the particle positions ->
-    Output: Mv = Mw·F + sqrt(2*T/dt)·√Mw·dWw = σ·St·FFTi·(B·FFT·S·F +
-    1/√σ·√B·dWw )*/
+  /* Interpolate the real-space velocities back to the particle positions.
+    Output: Mv = Mw * F + sqrt(2 * T / dt) * sqrt(Mw) * dWw =
+        sigma * St * FFTi * (B * FFT * S * F + (1 / sqrt(sigma)) * sqrt(B)* dWw)
+  */
+
   real3 *d_gridVels = thrust::raw_pointer_cast(gridVels.data());
   int3 n = grid.cellDim;
   int nx = 2 * (n.x / 2 + 1);

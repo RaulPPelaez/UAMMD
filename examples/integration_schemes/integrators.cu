@@ -120,7 +120,7 @@ std::shared_ptr<Integrator> createIntegratorSPH(UAMMD sim) {
   real3 L = make_real3(32, 32, 32);
   params.box = Box(L);
   // Pressure for a given particle "i" in SPH will be computed as
-  // gasStiffness·(density_i - restDensity) Where density is computed as a
+  // gasStiffness*(density_i - restDensity) Where density is computed as a
   // function of the masses of the surroinding particles Particle mass starts as
   // 1, but you can change this in customizations.cuh
   params.support = 2.4;   // Cut off distance for the SPH kernel

@@ -50,24 +50,46 @@ __device__ real3 getGradientFourier(int3 ik, int3 nk, real3 L) {
   return dk;
 }
 
-/*Apply the projection operator to a wave number with a certain real3 factor.
-  res = (I-\hat{k}^\hat{k})·factor
-  k2 is the laplacian operator in Fourier space, just the wave vector squared.
-  dk is the gradient operator in Fourier space, it is equal to the wave vector
-  but with the unpaired modes set to zero fr is the factor to project
-*/
+/**
+ * @brief Applies the projection operator to a wave number with a given real3
+ * factor.
+ *
+ * Computes the projection:
+ * \f[
+ * \mathbf{res} = \left( \mathbf{I} - \hat{\mathbf{k}}^\hat{\mathbf{k}}
+ * \right) \cdot \mathbf{fr}
+ * \f]
+ *
+ * @param k2 The laplacian operator in Fourier space, which is just the wave
+ * vector squared.
+ * @param dk The gradient operator in Fourier space. It is equal to the wave
+ * vector but with the unpaired modes set to zero.
+ * @param fr The vector to be projected.
+ * @return The projected vector \f$\mathbf{res}\f$.
+ */
 __device__ real3 projectFourier(real k2, real3 dk, real3 fr) {
   const real invk2 = real(1.0) / k2;
   real3 vr = fr - dk * dot(fr, dk * invk2);
   return vr;
 }
 
-/*Apply the projection operator to a wave number with a certain complex3 factor.
-  res = (I-\hat{k}^\hat{k})·factor
-  k2 is the laplacian operator in Fourier space, just the wave vector squared.
-  dk is the gradient operator in Fourier space, it is equal to the wave vector
-  but with the unpaired modes set to zero fr is the factor to project
-*/
+/**
+ * @brief Applies the projection operator to a wave number with a given complex3
+ * factor.
+ *
+ * Computes the projection:
+ * \f[
+ * \mathbf{res} = \left( \mathbf{I} - \hat{\mathbf{k}}^\hat{\mathbf{k}} \right)
+ * \cdot \mathbf{fr}
+ * \f]
+ *
+ * @param k2 The Laplacian operator in Fourier space, which is just the wave
+ * vector squared.
+ * @param dk The gradient operator in Fourier space. It is equal to the wave
+ * vector but with the unpaired modes set to zero.
+ * @param fr The complex-valued vector to be projected.
+ * @return The projected complex vector \f$\mathbf{res}\f$.
+ */
 __device__ complex3 projectFourier(real k2, real3 dk, complex3 factor) {
   real3 re =
       projectFourier(k2, dk, make_real3(factor.x.x, factor.y.x, factor.z.x));
@@ -77,9 +99,19 @@ __device__ complex3 projectFourier(real k2, real3 dk, complex3 factor) {
   return res;
 }
 
-/*Compute gaussian complex noise dW, std = prefactor -> ||z||^2 =
- * <x^2>/sqrt(2)+<y^2>/sqrt(2) = prefactor*/
-/*A complex random number for each direction*/
+/**
+ * @brief Computes Gaussian complex noise \f$dW\f$ with a given standard
+ * deviation.
+ *
+ * The complex noise is generated such that:
+ * \f[
+ * \| z \|^2 = \frac{\langle x^2 \rangle}{\sqrt{2}} + \frac{\langle y^2
+ * \rangle}{\sqrt{2}} = \text{prefactor}
+ * \f]
+ *
+ * @param prefactor The target variance magnitude for the noise.
+ * @return A complex-valued noise vector \f$dW\f$ with the specified statistics.
+ */
 __device__ complex3 generateNoise(
     real prefactor, uint id, uint seed1,
     uint seed2) { // Uncomment to use uniform numbers instead of gaussian

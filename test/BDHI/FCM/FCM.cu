@@ -18,7 +18,7 @@ All output is adimensional.
 #include <vector>
 using namespace uammd;
 
-// FCM kernel M(\vec{r}) = f(r)·I + g(r)·\vec{r}\otimes\vec{r}/r^2
+// FCM kernel M(\vec{r}) = f(r)*I + g(r)*\vec{r}\otimes\vec{r}/r^2
 // M0 = f(0)
 long double f(long double r, double rh, double viscosity) {
   return (1.0 / (8.0 * M_PIl * viscosity * r)) *
@@ -272,10 +272,10 @@ void computePairMobilityMatrix(real3 L, double F, real3 dist, long double *M,
 
 void computePairMobilityOpenBoundary(double *M, real3 rij, double rh,
                                      double viscosity) {
-  // When applying a force \vec{force_i} = (-1)^i·\hat{\beta} to particle i, the
+  // When applying a force \vec{force_i} = (-1)^i*\hat{\beta} to particle i, the
   // velocity of the other particle will be v_\alpha =
-  // M_{alpha\beta}(r)-M_{\alpha\beta}(0) = (f(r)-f(0))·\delta_{\alpha\beta}+
-  // g(r)·r_\alpha*r_\beta/r^2
+  // M_{alpha\beta}(r)-M_{\alpha\beta}(0) = (f(r)-f(0))*\delta_{\alpha\beta}+
+  // g(r)*r_\alpha*r_\beta/r^2
   for (int i = 0; i < 9; i++) {
     M[i] = 0;
   }

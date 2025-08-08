@@ -102,7 +102,7 @@ FIB::FIB(shared_ptr<ParticleGroup> pg, Parameters par)
                                  "radius or the number of cells!");
     real hgrid = Kernel::adviseGridSize(par.hydrodynamicRadius, par.tolerance);
     cellDim = make_int3(box.boxSize / hgrid);
-    /*FFT likes a number of cells as cellDim.i = 2^n·3^l·5^m */
+    /*FFT likes a number of cells as cellDim.i = 2^n*3^l*5^m */
     cellDim = FIB_ns::nextFFTWiseSize3D(cellDim);
   }
   if (par.cells.x > 0)
@@ -266,10 +266,10 @@ struct Direction {
 };
 
 // Adds the stochastic term to the current velocity: v_i +=
-// noisePrefactor*\hat{D}·W^n noisePrefactor will be proportional to
-// sqrt(\eta·kT/(dt·Vcell)) depending on the temporal integrator. W is a
+// noisePrefactor*\hat{D}*W^n noisePrefactor will be proportional to
+// sqrt(\eta*kT/(dt*Vcell)) depending on the temporal integrator. W is a
 // symmetric tensor with 3 white gaussian numbers per direction (staggered grid,
-// W is defined at the cell centers and edges and \hat{D}·W in the faces)
+// W is defined at the cell centers and edges and \hat{D}*W in the faces)
 // W^{\alpha\alpha} are in the centers with variance 2
 // W^{\alpha\beta} are in the edges with variance 1
 __global__ void addRandomAdvection(
@@ -296,7 +296,7 @@ __global__ void addRandomAdvection(
   const int ncells = grid.getNumberCells();
   // I will draw 6 random numbers for each cell
   real3 DW = make_real3(0);
-  //(\nabla·W)_\alpha^i = \nabla^i·(W_{\alpha x}, W_{\alpha y}, W_{\alpha z}) ->
+  //(\nabla*W)_\alpha^i = \nabla^i*(W_{\alpha x}, W_{\alpha y}, W_{\alpha z}) ->
   // -> \partial_\alpha^i W_{\alpha\beta} = 1/d\alpha
   // (W^{\alpha\beta}_{i+\alpha/2} - W^{\alpha\beta}_{i-\alpha/2})
   constexpr real sqrt2 = real(1.41421356237310);
@@ -391,7 +391,7 @@ __global__ void addRandomAdvection(
 
 // Computes thermal drift term using RFD
 // kbT/\delta [ S(q^n + \delta/2\hat{W}^n) - S(q^n - \delta/2\hat{W}^n) ]
-// ·\hat{W}^n See eq. 32 and 33 in [1]
+// *\hat{W}^n See eq. 32 and 33 in [1]
 template <class Kernel = IBM_kernels::Peskin::threePoint>
 __global__ void addThermalDrift(real4 *pos, real3 *gridVels, Grid grid,
                                 real driftPrefactor, // kbT/deltaRDF
@@ -524,7 +524,7 @@ __device__ int3 computeSupportShift(real3 pos, int3 celli, Grid grid,
   return P;
 }
 
-// Computes S·F and adds it to gridVels
+// Computes S*F and adds it to gridVels
 template <class Kernel = IBM_kernels::Peskin::threePoint, class IndexIterator>
 __global__ void spreadParticleForces(real4 *pos, real4 *force, real3 *gridVels,
                                      IndexIterator index, Grid grid,
@@ -617,8 +617,8 @@ inline __device__ vec3 cellToWaveNumber(const int3 &cell, const int3 &cellDim,
 }
 
 /*Apply the divergence free projection operator, P, to a wave number with a
-  certain complex factor. res = (I-k^k)·factor -> k is unitary See i.e below eq.
-  45 [2]. P = I-G(DG)^-1 D = I-D*(DD*)^-1 D = I-D*L^-1 D = I-k·k^T/|k|^2
+  certain complex factor. res = (I-k^k)*factor -> k is unitary See i.e below eq.
+  45 [2]. P = I-G(DG)^-1 D = I-D*(DD*)^-1 D = I-D*L^-1 D = I-k*k^T/|k|^2
 */
 inline __device__ cufftComplex3 projectFourier(const real3 &k,
                                                const cufftComplex3 &factor) {
@@ -663,10 +663,10 @@ inline __device__ cufftComplex3 shiftVelocity(cufftComplex3 vk,
 
 // See eq. 28 in [1].
 // Apply 1/\eta\mathcal{L}^-1 operator to SF + noise in Fourier space. PBC makes
-// \mathcal{L}^-1 = -P·L^-1 where P = I-G(DG)^-1 D
+// \mathcal{L}^-1 = -P*L^-1 where P = I-G(DG)^-1 D
 __global__ void solveStokesFourier(
     const cufftComplex3 *fluidForcing, // g
-    cufftComplex3 *gridVels, // on exit this is: 1/\eta·\mathcal{L}^-1·g
+    cufftComplex3 *gridVels, // on exit this is: 1/\eta*\mathcal{L}^-1*g
     real viscosity, Grid grid) {
   /*I expect a 3D grid of threads, one for each fourier node/grid cell*/
   /*Get my cell*/
@@ -710,10 +710,10 @@ __global__ void solveStokesFourier(
   {
     const real invL =
         real(-1.0) / dot(keff, keff); //\hat{L}^-1 = 1/(ik)^2 = -1/|keff|^2
-    // Project into divergence free space. i.e Apply \mathcal{L}^-1 = P·L^-1
+    // Project into divergence free space. i.e Apply \mathcal{L}^-1 = P*L^-1
     // operator. Transforming fluid forcing into fluid velocity
     const real prefactor =
-        real(-1.0) * invL / viscosity;         // Applies -L^-1·\eta^-1
+        real(-1.0) * invL / viscosity;         // Applies -L^-1*\eta^-1
     vk = projectFourier(keff, prefactor * vk); // Applies P
   }
   // Store new velocity shifted back to cell faces, normalize FFT
@@ -762,7 +762,7 @@ midPointStep(real4 *pos, // q^n in predictor and euler, q^{n+1/2} in corrector
     prefactor *= real(0.5);
   constexpr int numberNeighbourCells =
       supportCells * supportCells * supportCells;
-  // J = dV·S
+  // J = dV*S
   const real dV = grid.cellSize.x * grid.cellSize.y * grid.cellSize.z;
   // Sum contribution of neighbouring cells
   for (int i = 0; i < numberNeighbourCells; i++) {
@@ -777,7 +777,7 @@ midPointStep(real4 *pos, // q^n in predictor and euler, q^{n+1/2} in corrector
       // Cel lindex of neighbour
       const int jcellx = grid.getCellIndex(celljx);
       // Distance from particle i to center of cell j
-      // p += J·v = dV·\delta(p_x_i-cell_x_j)·v_x_j
+      // p += J*v = dV*\delta(p_x_i-cell_x_j)*v_x_j
       const real v_jx = gridVels[jcellx].x;
       const real3 r = grid.distanceToCellCenter(
           posCurrent - make_real3(real(0.5) * grid.cellSize.x, 0, 0), celljx);
@@ -821,7 +821,7 @@ midPointStep(real4 *pos, // q^n in predictor and euler, q^{n+1/2} in corrector
   }
 }
 } // namespace FIB_ns
-// v += S·F. Computes the force acting on the particles and applies the
+// v += S*F. Computes the force acting on the particles and applies the
 // spreading operator to it.
 void FIB::spreadParticleForces() {
   int numberParticles = pg->getNumberParticles();
@@ -846,7 +846,7 @@ void FIB::spreadParticleForces() {
       pos.raw(), force.raw(), d_gridVels, indexIter, grid, numberParticles,
       *kernel);
 }
-// v += prefactor·\tilde{D}·W
+// v += prefactor*\tilde{D}*W
 // Prefactor will be proportional to sqrt(4*viscosity*temperature/(dt*dV))
 // depending on the integration method This function will use the current
 // contents of the random array and will not change it in any way
@@ -869,7 +869,7 @@ void FIB::randomAdvection(real noisePrefactor) {
 }
 
 // v +=  kbT/\delta [ S(q^n + \delta/2\hat{W}^n) - S(q^n - \delta/2\hat{W}^n) ]
-// ·\hat{W}^n
+// *\hat{W}^n
 // See eq. 32 and 33 in [1]
 void FIB::thermalDrift() {
   if (temperature == real(0.0))
@@ -887,7 +887,7 @@ void FIB::thermalDrift() {
       *kernel, (uint)seed, (uint)step);
 }
 
-// Takes \vec{g} = S·F + noise + thermalDrift and transforms it to v =
+// Takes \vec{g} = S*F + noise + thermalDrift and transforms it to v =
 // 1/\eta\mathcal{L}^-1\vec{g} in Fourier space See eq. 28 and beyond in [1].
 void FIB::applyStokesSolutionOperator() {
   cufftReal *d_gridVels =
@@ -971,7 +971,7 @@ void FIB::forwardMidpoint() {
     CurandSafeCall(curandgeneratenormal(curng,
                                         thrust::raw_pointer_cast(random.data()),
                                         random.size(), 0.0, 1.0));
-    // sqrt(2·vis·kT/(dt·dV))·\hat{D}\bf{W}^{n,1}
+    // sqrt(2*vis*kT/(dt*dV))*\hat{D}\bf{W}^{n,1}
     double dV = grid.cellSize.x * grid.cellSize.y * grid.cellSize.z;
     real noisePrefactor = sqrt(2 * viscosity * temperature / (dt * dV));
     randomAdvection(noisePrefactor);
@@ -982,16 +982,16 @@ void FIB::forwardMidpoint() {
   // with RFD
   thermalDrift();
   sys->log<System::DEBUG2>("[BDHI::FIB] Spread particle forces");
-  // S^n·F^n
+  // S^n*F^n
   spreadParticleForces();
   sys->log<System::DEBUG2>("[BDHI::FIB] Solve fluid");
-  // v = vis^-1\mathcal{\bf{L}}^-1·g
+  // v = vis^-1\mathcal{\bf{L}}^-1*g
   applyStokesSolutionOperator();
   sys->log<System::DEBUG2>("[BDHI::FIB] Predictor step");
-  // q^{n+1/2} = q^n + dt/2·J^n·v
+  // q^{n+1/2} = q^n + dt/2*J^n*v
   predictorStep();
   sys->log<System::DEBUG2>("[BDHI::FIB] Corrector");
-  // //q^n+1 = q^n + dt·J^{n+1/2}·v
+  // q^n+1 = q^n + dt*J^{n+1/2}*v
   correctorStep();
   for (auto updatable : updatables)
     updatable->updateSimulationTime((step + 1) * dt);
@@ -1008,25 +1008,25 @@ void FIB::forwardImprovedMidpoint() {
     CurandSafeCall(curandgeneratenormal(curng,
                                         thrust::raw_pointer_cast(random.data()),
                                         random.size(), 0.0, 1.0));
-    // sqrt(4·vis·kT/(dt·dV))·\hat{D}\bf{W}^{n,1}
+    // sqrt(4*vis*kT/(dt*dV))*\hat{D}\bf{W}^{n,1}
     double dV = grid.cellSize.x * grid.cellSize.y * grid.cellSize.z;
     real noisePrefactor = sqrt(4 * viscosity * temperature / (dt * dV));
     randomAdvection(noisePrefactor);
   }
   sys->log<System::DEBUG2>("[BDHI::FIB] Spread particle forces");
-  // S^n·F^n
+  // S^n*F^n
   spreadParticleForces();
   sys->log<System::DEBUG2>("[BDHI::FIB] Solve fluid");
-  // v = vis^-1\mathcal{\bf{L}}^-1·g
+  // v = vis^-1\mathcal{\bf{L}}^-1*g
   applyStokesSolutionOperator();
   sys->log<System::DEBUG2>("[BDHI::FIB] Predictor step");
-  // q^{n+1/2} = q^n + dt/2·J^n·v
+  // q^{n+1/2} = q^n + dt/2*J^n*v
   predictorStep();
   for (auto updatable : updatables)
     updatable->updateSimulationTime((step + 0.5) * dt);
   // Clean velocity for next half step
   thrust::fill(gridVels.begin(), gridVels.end(), real3());
-  // sqrt(vis·kT/(dt·dV))·\hat{D}(\bf{W}^{n,1}+\bf{W}^{n,2})
+  // sqrt(vis*kT/(dt*dV))*\hat{D}(\bf{W}^{n,1}+\bf{W}^{n,2})
   {
     double dV = grid.cellSize.x * grid.cellSize.y * grid.cellSize.z;
     real noisePrefactor = sqrt(viscosity * temperature / (dt * dV));
@@ -1042,13 +1042,13 @@ void FIB::forwardImprovedMidpoint() {
   // with RFD
   thermalDrift();
   sys->log<System::DEBUG2>("[BDHI::FIB] Spread particle forces");
-  // S^{n+1/2}·F^{n+1/2}
+  // S^{n+1/2}*F^{n+1/2}
   spreadParticleForces();
   sys->log<System::DEBUG2>("[BDHI::FIB] Solve fluid");
-  // v = vis^-1\mathcal{\bf{L}}^-1·g
+  // v = vis^-1\mathcal{\bf{L}}^-1*g
   applyStokesSolutionOperator();
   sys->log<System::DEBUG2>("[BDHI::FIB] Corrector");
-  // q^n+1 = q^n + dt·J^{n+1/2}·v
+  // q^n+1 = q^n + dt*J^{n+1/2}*v
   correctorStep();
   for (auto updatable : updatables)
     updatable->updateSimulationTime((step + 1) * dt);

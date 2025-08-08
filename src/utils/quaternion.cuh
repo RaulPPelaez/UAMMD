@@ -174,7 +174,7 @@ QUATTR Quat Quat::getConjugate() const { return Quat(n, -v); }
 /*
    Returns the quaternion that encondes a rotation of ang radians
    around the axis vrot
-   q = (cos(phi/2),vrot·sin(phi/2))
+   q = (cos(phi/2),vrot*sin(phi/2))
  */
 QUATTR Quat rotVec2Quaternion(real3 vrot, real phi) {
   real norm = (dot(vrot, vrot));

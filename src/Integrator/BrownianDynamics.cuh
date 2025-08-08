@@ -1,10 +1,10 @@
-/*Raul P. Pelaez 2017-2020. Brownian Dynamics integrators
+/**Raul P. Pelaez 2017-2020. Brownian Dynamics integrators
 
   Solves the following differential equation:
-      X[t+dt] = dt(K·X[t]+M·F[t]) + sqrt(2*Tdt)·dW·B
+      X[t+dt] = dt(KX[t]+MF[t]) + sqrt(2*Tdt)*dW B
    Being:
      X - Positions
-     M - Self Diffusion  coefficient -> 1/(6·pi·vis·radius)
+     M - Self Diffusion  coefficient -> 1/(6 \pi*viscosity*radius)
      K - Shear matrix
      dW- Noise vector
      B - sqrt(M)

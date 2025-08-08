@@ -20,10 +20,10 @@ namespace GronbechJensen_ns {
 
 // Integrate the movement 0.5 dt and reset the forces in the first step
 // (step==1) Uses the Gronbech Jensen scheme[1]
-//   r[t+dt] = r[t] + b·dt·v[t] + b·dt^2/(2·m) + b·dt/(2·m) · noise[t+dt]
-//   v[t+dt] = a·v[t] + dt/(2·m)·(a·f[t] + f[t+dt]) + b/m·noise[t+dt]
-//  b = 1/( 1 + \gamma·dt/(2·m))
-//  a = (1 - \gamma·dt/(2·m) ) ·b
+//   r[t+dt] = r[t] + b*dt*v[t] + b*dt^2/(2*m) + b*dt/(2*m) * noise[t+dt]
+//   v[t+dt] = a*v[t] + dt/(2*m)*(a*f[t] + f[t+dt]) + b/m*noise[t+dt]
+//  b = 1/( 1 + \gamma*dt/(2*m))
+//  a = (1 - \gamma*dt/(2*m) ) *b
 //  \gamma = friction*mass
 template <int step>
 __global__ void integrateGPU(real4 *__restrict__ pos, real3 *__restrict__ vel,

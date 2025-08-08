@@ -129,7 +129,7 @@ using connection = nod::connection;
  *
  * The ParticleData class manages particle properties such as position,
  * velocity, mass, charge, force, energy, and more. Properties are allocated
- * lazily — they are only initialized upon first access. It supports both CPU
+ * lazily - they are only initialized upon first access. It supports both CPU
  * and GPU memory access modes and controls exclusive write access to ensure
  * data integrity across computational modules.
  *

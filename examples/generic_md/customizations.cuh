@@ -319,7 +319,7 @@ struct HarmonicBond {
     real3 r12 = pos[1] - pos[0];
     real r2 = dot(r12, r12);
     const real invr = rsqrt(r2);
-    const real f = -bi.k * (real(1.0) - bi.r0 * invr); // F = -k·(r-r0)·rvec/r
+    const real f = -bi.k * (real(1.0) - bi.r0 * invr); // F = -k*(r-r0)*rvec/r
     ComputeType ct;
     ct.force = f * r12;
     ct.energy = comp.energy ? (real(0.5) * bi.k * sq(real(1.0) / invr - bi.r0))
@@ -393,7 +393,7 @@ struct Angular {
     // //sijk cant be zero to avoid division by zero
     // if(sijk<std::numeric_limits<real>::min()) sijk =
     // std::numeric_limits<real>::min(); ampli = -kspring * (acos(cijk) -
-    // ang0)/sijk; //The force amplitude -k·(theta-theta_0)
+    // ang0)/sijk; //The force amplitude -k*(theta-theta_0)
     // ampli = -kspring*(-sijk*cos(ang0)+cijk*sin(ang0))+ang0;
     // //k(1-cos(ang-ang0))
     if (ang0 == real(0.0)) {
