@@ -185,7 +185,7 @@ PYBIND11_MODULE(uammd, m) {
       . // You can also set default values for the arguments
       def_readwrite("sigma", &Parameters::sigma, "LJ sigma")
       . // You can also allow each member to be modifiable and add a doc string
-        // to it
+      // to it
       def_readwrite("epsilon", &Parameters::epsilon, "LJ epsilon")
       .def_readwrite("cutOff", &Parameters::cutOff, "LJ cutOff")
       .def_readwrite("box", &Parameters::box, "Domain")

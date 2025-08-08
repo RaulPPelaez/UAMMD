@@ -247,8 +247,8 @@ TEST(DPStokesIntegrator, ObeysFluctuationDissipationBalanceAtEveryHeight) {
     for (int i = 0; i < navg; i++) {
       pd->getPos(access::cpu, access::write)[0] = {0, 0, z, 0};
       dpstokes_integrator->forwardTime();
-      auto r = (make_real3(
-          pd->getPos(access::cpu, access::read)[0]))-make_real3(0, 0, z);
+      auto r = (make_real3(pd->getPos(access::cpu, access::read)[0])) -
+               make_real3(0, 0, z);
       avg += r * r;
     }
     auto sigma = avg / navg;

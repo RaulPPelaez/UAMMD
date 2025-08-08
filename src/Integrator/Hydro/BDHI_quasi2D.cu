@@ -284,7 +284,8 @@ template <class HydroKernel> void BDHI2D<HydroKernel>::convolveFourier() {
   applyGreenFunctionConvolutionFourier();
   // In: B*FFT*S*F -> Out: B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw
   addStochastichTermFourier();
-  // In: B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw -> Out FFTi*(B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw )
+  // In: B*FFT*S*F + 1/sqrt(sigma)*sqrt(B)*dWw -> Out FFTi*(B*FFT*S*F +
+  // 1/sqrt(sigma)*sqrt(B)*dWw )
   inverseTransformVelocities();
   CudaCheckError();
 }
