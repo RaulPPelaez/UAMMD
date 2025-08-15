@@ -69,17 +69,23 @@ private:
 //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
 struct BarnettMagland {
   IBM_kernels::BarnettMagland bm;
-  real a;
+  real ax;
+  real ay;
+  real az;
   int3 support;
 
-  BarnettMagland(real w, real beta, real i_alpha, real h, real H, int nz)
+  BarnettMagland(real w, real beta, real i_alpha, real hx, real hy, real H,
+                 int nz)
       : H(H), nz(nz), bm(i_alpha, beta) {
     int supportxy = w + 0.5;
-    this->rmax = w * h * 0.5;
+    real h_max = thrust::max(hx, hy);
+    this->rmax = w * h_max * 0.5;
     support.x = support.y = supportxy;
     int ct = ceil((nz - 1) * (acos((H * 0.5 - rmax) / (0.5 * H)) / M_PI));
     support.z = 2 * ct + 1;
-    this->a = h;
+    this->ax = hx;
+    this->ay = hy;
+    this->az = min(hx, hy);
     System::log<System::MESSAGE>("BM kernel: beta: %g, alpha: %g, w: %g", beta,
                                  i_alpha, w);
   }
@@ -97,11 +103,11 @@ struct BarnettMagland {
   }
 
   inline __host__ __device__ real phiX(real r, real3 pi) const {
-    return bm.phi(r / a) / a;
+    return bm.phi(r / ax) / ax;
   }
 
   inline __host__ __device__ real phiY(real r, real3 pi) const {
-    return bm.phi(r / a) / a;
+    return bm.phi(r / ay) / ay;
   }
   // For this algorithm we spread a particle and its image to enforce the force
   // density outside the slab is zero. A particle on the wall position will
@@ -110,8 +116,8 @@ struct BarnettMagland {
     real top_rimg = H - real(2.0) * pi.z + r;
     real bot_rimg = -H - real(2.0) * pi.z + r;
     real rimg = thrust::min(fabs(top_rimg), fabs(bot_rimg));
-    real phi_img = bm.phi(rimg / a) / a;
-    real phi = bm.phi(r / a) / a;
+    real phi_img = bm.phi(rimg / az) / az;
+    real phi = bm.phi(r / az) / az;
     return phi - phi_img;
   }
 
@@ -336,10 +342,12 @@ private:
     //  grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
     // }
     real H = grid.box.boxSize.z;
-    this->kernel = std::make_shared<Kernel>(par.w, par.beta, par.alpha,
-                                            grid.cellSize.y, H, grid.cellDim.z);
+    this->kernel =
+        std::make_shared<Kernel>(par.w, par.beta, par.alpha, grid.cellSize.x,
+                                 grid.cellSize.y, H, grid.cellDim.z);
     this->kernelTorque = std::make_shared<KernelTorque>(
-        par.w_d, par.beta_d, par.alpha_d, grid.cellSize.y, H, grid.cellDim.z);
+        par.w_d, par.beta_d, par.alpha_d, grid.cellSize.x, grid.cellSize.y, H,
+        grid.cellDim.z);
   }
 
   void initializeQuadratureWeights() {
