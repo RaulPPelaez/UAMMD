@@ -351,9 +351,10 @@ private:
     this->kernel = std::make_shared<Kernel>(par.w, par.beta_x, par.beta_y,
                                             par.alpha, grid.cellSize.x,
                                             grid.cellSize.y, H, grid.cellDim.z);
+    // TODO modify torques kernel for betas
     this->kernelTorque = std::make_shared<KernelTorque>(
-        par.w_d, par.beta_d, par.alpha_d, grid.cellSize.x, grid.cellSize.y, H,
-        grid.cellDim.z);
+        par.w_d, par.beta_d, par.beta_d, par.alpha_d, grid.cellSize.x,
+        grid.cellSize.y, H, grid.cellDim.z);
   }
 
   void initializeQuadratureWeights() {
