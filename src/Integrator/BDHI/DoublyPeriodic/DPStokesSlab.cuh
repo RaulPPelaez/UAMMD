@@ -48,7 +48,8 @@ public:
     real tolerance = 1e-7;
     real w, w_d;
     real hydrodynamicRadius;
-    real beta = -1;
+    real beta_x = -1;
+    real beta_y = -1;
     real beta_d = -1;
     real alpha = -1;
     real alpha_d = -1;

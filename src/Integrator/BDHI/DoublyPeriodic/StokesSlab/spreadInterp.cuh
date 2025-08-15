@@ -68,15 +68,17 @@ private:
 
 //[1] Taken from https://arxiv.org/pdf/1712.04732.pdf
 struct BarnettMagland {
-  IBM_kernels::BarnettMagland bm;
+  IBM_kernels::BarnettMagland bm_x;
+  IBM_kernels::BarnettMagland bm_y;
+  IBM_kernels::BarnettMagland bm_z;
   real ax;
   real ay;
   real az;
   int3 support;
 
-  BarnettMagland(real w, real beta, real i_alpha, real hx, real hy, real H,
-                 int nz)
-      : H(H), nz(nz), bm(i_alpha, beta) {
+  BarnettMagland(real w, real beta_x, real beta_y, real i_alpha, real hx,
+                 real hy, real H, int nz)
+      : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y) {
     int supportxy = w + 0.5;
     real h_max = thrust::max(hx, hy);
     this->rmax = w * h_max * 0.5;
@@ -86,8 +88,12 @@ struct BarnettMagland {
     this->ax = hx;
     this->ay = hy;
     this->az = thrust::min(hx, hy);
-    System::log<System::MESSAGE>("BM kernel: beta: %g, alpha: %g, w: %g", beta,
-                                 i_alpha, w);
+
+    real beta_z = beta_x ? hx < hy : beta_y;
+    this->bm_z = IBM_kernels::BarnettMagland(i_alpha, beta_z);
+    System::log<System::MESSAGE>(
+        "BM kernel: beta_x: %g beta_y %g, alpha: %g, w: %g", beta_x, beta_y,
+        i_alpha, w);
   }
 
   inline __host__ __device__ int3 getMaxSupport() const { return support; }
@@ -103,11 +109,11 @@ struct BarnettMagland {
   }
 
   inline __host__ __device__ real phiX(real r, real3 pi) const {
-    return bm.phi(r / ax) / ax;
+    return bm_x.phi(r / ax) / ax;
   }
 
   inline __host__ __device__ real phiY(real r, real3 pi) const {
-    return bm.phi(r / ay) / ay;
+    return bm_y.phi(r / ay) / ay;
   }
   // For this algorithm we spread a particle and its image to enforce the force
   // density outside the slab is zero. A particle on the wall position will
@@ -116,8 +122,8 @@ struct BarnettMagland {
     real top_rimg = H - real(2.0) * pi.z + r;
     real bot_rimg = -H - real(2.0) * pi.z + r;
     real rimg = thrust::min(fabs(top_rimg), fabs(bot_rimg));
-    real phi_img = bm.phi(rimg / az) / az;
-    real phi = bm.phi(r / az) / az;
+    real phi_img = bm_z.phi(rimg / az) / az;
+    real phi = bm_z.phi(r / az) / az;
     return phi - phi_img;
   }
 
@@ -215,7 +221,8 @@ class SpreadInterp {
 public:
   struct Parameters {
     real w, w_d;
-    real beta = -1;
+    real beta_x = -1;
+    real beta_y = -1;
     real beta_d = -1;
     real alpha = -1;
     real alpha_d = -1;
@@ -342,9 +349,9 @@ private:
     //  grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
     // }
     real H = grid.box.boxSize.z;
-    this->kernel =
-        std::make_shared<Kernel>(par.w, par.beta, par.alpha, grid.cellSize.x,
-                                 grid.cellSize.y, H, grid.cellDim.z);
+    this->kernel = std::make_shared<Kernel>(par.w, par.beta_x, par.beta_y,
+                                            par.alpha, grid.cellSize.x,
+                                            grid.cellSize.y, H, grid.cellDim.z);
     this->kernelTorque = std::make_shared<KernelTorque>(
         par.w_d, par.beta_d, par.alpha_d, grid.cellSize.x, grid.cellSize.y, H,
         grid.cellDim.z);
