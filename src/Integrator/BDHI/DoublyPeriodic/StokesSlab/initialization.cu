@@ -42,7 +42,8 @@ DPStokes::DPStokes(DPStokes::Parameters par)
   this->ibm = std::make_shared<SpreadInterp>(
       grid, SpreadInterp::Parameters{.w = par.w,
                                      .w_d = par.w_d,
-                                     .beta = par.beta,
+                                     .beta_x = par.beta_x,
+                                     .beta_y = par.beta_y,
                                      .beta_d = par.beta_d,
                                      .alpha = par.alpha,
                                      .alpha_d = par.alpha_d});
