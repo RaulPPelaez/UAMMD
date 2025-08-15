@@ -79,7 +79,7 @@ struct BarnettMagland {
   BarnettMagland(real w, real beta_x, real beta_y, real i_alpha, real hx,
                  real hy, real H, int nz)
       : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y),
-        bm_z(i_alpha, (beta_x ? hx < hy : beta_y)) {
+        bm_z(i_alpha, (hx < hy ? beta_x : beta_y)) {
     int supportxy = w + 0.5;
     real h_max = thrust::max(hx, hy);
     this->rmax = w * h_max * 0.5;
