@@ -78,7 +78,8 @@ struct BarnettMagland {
 
   BarnettMagland(real w, real beta_x, real beta_y, real i_alpha, real hx,
                  real hy, real H, int nz)
-      : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y) {
+      : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y),
+        bm_z(i_alpha, (beta_x ? hx < hy : beta_y)) {
     int supportxy = w + 0.5;
     real h_max = thrust::max(hx, hy);
     this->rmax = w * h_max * 0.5;
@@ -89,8 +90,6 @@ struct BarnettMagland {
     this->ay = hy;
     this->az = thrust::min(hx, hy);
 
-    real beta_z = beta_x ? hx < hy : beta_y;
-    this->bm_z = IBM_kernels::BarnettMagland(i_alpha, beta_z);
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g beta_y %g, alpha: %g, w: %g", beta_x, beta_y,
         i_alpha, w);
