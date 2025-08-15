@@ -85,7 +85,7 @@ struct BarnettMagland {
     support.z = 2 * ct + 1;
     this->ax = hx;
     this->ay = hy;
-    this->az = max(hx, hy);
+    this->az = thrust::min(hx, hy);
     System::log<System::MESSAGE>("BM kernel: beta: %g, alpha: %g, w: %g", beta,
                                  i_alpha, w);
   }
