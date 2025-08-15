@@ -81,7 +81,7 @@ struct BarnettMagland {
       : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y),
         bm_z(i_alpha, (hx < hy ? beta_x : beta_y)) {
     int supportxy = w + 0.5;
-    real h_max = thrust::max(hx, hy);
+    real h_max = thrust::min(hx, hy);
     this->rmax = w * h_max * 0.5;
     support.x = support.y = supportxy;
     int ct = ceil((nz - 1) * (acos((H * 0.5 - rmax) / (0.5 * H)) / M_PI));
