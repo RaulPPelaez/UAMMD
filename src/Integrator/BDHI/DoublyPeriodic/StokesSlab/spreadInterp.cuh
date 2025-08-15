@@ -337,9 +337,9 @@ private:
     // }
     real H = grid.box.boxSize.z;
     this->kernel = std::make_shared<Kernel>(par.w, par.beta, par.alpha,
-                                            grid.cellSize.x, H, grid.cellDim.z);
+                                            grid.cellSize.y, H, grid.cellDim.z);
     this->kernelTorque = std::make_shared<KernelTorque>(
-        par.w_d, par.beta_d, par.alpha_d, grid.cellSize.x, H, grid.cellDim.z);
+        par.w_d, par.beta_d, par.alpha_d, grid.cellSize.y, H, grid.cellDim.z);
   }
 
   void initializeQuadratureWeights() {
