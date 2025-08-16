@@ -71,7 +71,8 @@ void DPStokes::setUpGrid(Parameters par) {
     cellDim = nextFFTWiseSize3D(cellDim);
   }
   this->grid = Grid(Box(make_real3(Lx, Ly, H)), cellDim);
-  System::log<System::MESSAGE>("[DPStokes] Selected h: %g", grid.cellSize.x);
+  System::log<System::MESSAGE>("[DPStokes] Selected hx: %g, hy: %g",
+                               grid.cellSize.x, grid.cellSize.y);
 }
 
 void DPStokes::printStartingMessages(Parameters par) {
