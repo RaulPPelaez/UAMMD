@@ -79,7 +79,7 @@ struct BarnettMagland {
   BarnettMagland(real w, real beta_x, real beta_y, real i_alpha, real hx,
                  real hy, real H, int nz)
       : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y),
-        bm_z(i_alpha, 0.5 * (beta_x + beta_y)) {
+        bm_z(i_alpha, (hx < hy ? beta_x : beta_y)) {
     int supportxy = w + 0.5;
     real h_max = thrust::min(hx, hy);
     this->rmax = w * h_max * 0.5;
@@ -92,7 +92,7 @@ struct BarnettMagland {
 
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g, beta_y: %g, beta_z: %g, alpha: %g, w: %g",
-        beta_x, beta_y, 0.5 * (beta_x + beta_y), i_alpha, w);
+        beta_x, beta_y, (hx < hy ? beta_x : beta_y), i_alpha, w);
   }
 
   inline __host__ __device__ int3 getMaxSupport() const { return support; }
