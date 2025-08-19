@@ -50,6 +50,7 @@ public:
     real hydrodynamicRadius;
     real beta_x = -1;
     real beta_y = -1;
+    real beta_z = -1;
     real beta_d = -1;
     real alpha = -1;
     real alpha_d = -1;

@@ -76,10 +76,10 @@ struct BarnettMagland {
   real az;
   int3 support;
 
-  BarnettMagland(real w, real beta_x, real beta_y, real i_alpha, real hx,
-                 real hy, real H, int nz)
+  BarnettMagland(real w, real beta_x, real beta_y, real beta_z, real i_alpha,
+                 real hx, real hy, real H, int nz)
       : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y),
-        bm_z(i_alpha, (hx < hy ? beta_x : beta_y)) {
+        bm_z(i_alpha, beta_z) {
     int supportxy = w + 0.5;
     real h_max = thrust::min(hx, hy);
     this->rmax = w * h_max * 0.5;
@@ -88,7 +88,7 @@ struct BarnettMagland {
     support.z = 2 * ct + 1;
     this->ax = hx;
     this->ay = hy;
-    this->az = thrust::min(hx, hy);
+    this->az = sin(M_PI / (nz - 1)) * H;
 
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g, beta_y: %g, beta_z: %g, alpha: %g, w: %g",
@@ -222,6 +222,7 @@ public:
     real w, w_d;
     real beta_x = -1;
     real beta_y = -1;
+    real beta_z = -1;
     real beta_d = -1;
     real alpha = -1;
     real alpha_d = -1;
@@ -348,13 +349,13 @@ private:
     //  grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
     // }
     real H = grid.box.boxSize.z;
-    this->kernel = std::make_shared<Kernel>(par.w, par.beta_x, par.beta_y,
-                                            par.alpha, grid.cellSize.x,
-                                            grid.cellSize.y, H, grid.cellDim.z);
+    this->kernel = std::make_shared<Kernel>(
+        par.w, par.beta_x, par.beta_y, par.beta_z, par.alpha, grid.cellSize.x,
+        grid.cellSize.y, H, grid.cellDim.z);
     // TODO modify torques kernel for betas
     this->kernelTorque = std::make_shared<KernelTorque>(
-        par.w_d, par.beta_d, par.beta_d, par.alpha_d, grid.cellSize.x,
-        grid.cellSize.y, H, grid.cellDim.z);
+        par.w_d, par.beta_d, par.beta_d, par.beta_d, par.alpha_d,
+        grid.cellSize.x, grid.cellSize.y, H, grid.cellDim.z);
   }
 
   void initializeQuadratureWeights() {
