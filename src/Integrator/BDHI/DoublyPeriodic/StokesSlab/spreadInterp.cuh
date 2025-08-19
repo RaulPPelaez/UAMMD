@@ -92,7 +92,9 @@ struct BarnettMagland {
 
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g, beta_y: %g, beta_z: %g, alpha: %g, w: %g",
-        beta_x, beta_y, 0.5 * (beta_x + beta_y), i_alpha, w);
+        beta_x, beta_y, beta_z, i_alpha, w);
+    System::log<System::MESSAGE>("BM kernel: ax: %g, ay: %g, az: %g", ax, ay,
+                                 az);
   }
 
   inline __host__ __device__ int3 getMaxSupport() const { return support; }
