@@ -44,6 +44,7 @@ DPStokes::DPStokes(DPStokes::Parameters par)
                                      .w_d = par.w_d,
                                      .beta_x = par.beta_x,
                                      .beta_y = par.beta_y,
+                                     .beta_z = par.beta_z,
                                      .beta_d = par.beta_d,
                                      .alpha = par.alpha,
                                      .alpha_d = par.alpha_d});
