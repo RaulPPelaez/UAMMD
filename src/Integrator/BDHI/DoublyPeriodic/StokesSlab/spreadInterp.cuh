@@ -86,8 +86,10 @@ struct BarnettMagland {
     support.x = support.y = supportxy;
     int ct = ceil((nz - 1) * (acos((H * 0.5 - rmax) / (0.5 * H)) / M_PI));
     support.z = 2 * ct + 1;
-    this->ax = hx;
-    this->ay = hy;
+    this->ax = thrust::min(hx, hy);
+    this->ay = thrust::min(hx, hy);
+    // this->ax = hx;
+    // this->ay = hy;
     // this->az = sin(M_PI / (nz - 1)) * 0.5 * H;
     this->az = thrust::min(hx, hy);
 
