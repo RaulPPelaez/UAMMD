@@ -88,7 +88,7 @@ struct BarnettMagland {
     support.z = 2 * ct + 1;
     this->ax = hx;
     this->ay = hy;
-    this->az = min(hx, hy);
+    this->az = sin(M_PI / (nz - 1)) * 0.5 * H;
 
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g, beta_y: %g, beta_z: %g, alpha: %g, w: %g",
