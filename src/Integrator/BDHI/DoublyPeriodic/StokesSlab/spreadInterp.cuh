@@ -81,7 +81,7 @@ struct BarnettMagland {
       : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y),
         bm_z(i_alpha, beta_z) {
     int supportxy = w + 0.5;
-    real h_max = thrust::min(hx, hy);
+    real h_max = thrust::max(hx, hy);
     this->rmax = w * h_max * 0.5;
     support.x = support.y = supportxy;
     int ct = ceil((nz - 1) * (acos((H * 0.5 - rmax) / (0.5 * H)) / M_PI));
@@ -89,6 +89,7 @@ struct BarnettMagland {
     this->ax = hx;
     this->ay = hy;
     this->az = sin(M_PI / (nz - 1)) * 0.5 * H;
+    // this->az = thrust::min(hx, hy);
 
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g, beta_y: %g, beta_z: %g, alpha: %g, w: %g",
