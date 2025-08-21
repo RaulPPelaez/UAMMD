@@ -76,10 +76,10 @@ struct BarnettMagland {
   real az;
   int3 support;
 
-  BarnettMagland(real w, real beta_x, real beta_y, real beta_z, real i_alpha,
-                 real hx, real hy, real H, int nz)
-      : H(H), nz(nz), bm_x(i_alpha, beta_x), bm_y(i_alpha, beta_y),
-        bm_z(i_alpha, beta_z) {
+  BarnettMagland(real w, real3 beta, real i_alpha, real hx, real hy, real H,
+                 int nz)
+      : H(H), nz(nz), bm_x(i_alpha, beta.x), bm_y(i_alpha, beta.y),
+        bm_z(i_alpha, beta.z) {
     int supportxy = w + 0.5;
     real h_max = thrust::max(hx, hy);
     this->rmax = w * h_max * 0.5;
@@ -92,7 +92,7 @@ struct BarnettMagland {
 
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g, beta_y: %g, beta_z: %g, alpha: %g, w: %g",
-        beta_x, beta_y, beta_z, i_alpha, w);
+        beta.x, beta.y, beta.z, i_alpha, w);
     System::log<System::MESSAGE>("BM kernel: ax: %g, ay: %g, az: %g", ax, ay,
                                  az);
   }
@@ -222,12 +222,8 @@ class SpreadInterp {
 public:
   struct Parameters {
     real w, w_d;
-    real beta_x = -1;
-    real beta_y = -1;
-    real beta_z = -1;
-    real beta_xd = -1;
-    real beta_yd = -1;
-    real beta_zd = -1;
+    real3 beta = {-1.0, -1.0, -1.0};
+    real3 beta_d = {-1.0, -1.0, -1.0};
     real alpha = -1;
     real alpha_d = -1;
   };
@@ -353,12 +349,18 @@ private:
     //  grid.cellDim.x, grid.cellDim.y, grid.cellDim.z, supportxy);
     // }
     real H = grid.box.boxSize.z;
-    this->kernel = std::make_shared<Kernel>(
-        par.w, par.beta_x, par.beta_y, par.beta_z, par.alpha, grid.cellSize.x,
-        grid.cellSize.y, H, grid.cellDim.z);
+
+    par.beta.y = (par.beta.y < 0.0) ? par.beta.x : par.beta.y;
+    par.beta_d.y = (par.beta_d.y < 0.0) ? par.beta_d.x : par.beta_d.y;
+    par.beta.z = (par.beta.z < 0.0) ? par.beta.x : par.beta.z;
+    par.beta_d.z = (par.beta_d.z < 0.0) ? par.beta_d.x : par.beta_d.z;
+
+    this->kernel =
+        std::make_shared<Kernel>(par.w, par.beta, par.alpha, grid.cellSize.x,
+                                 grid.cellSize.y, H, grid.cellDim.z);
     this->kernelTorque = std::make_shared<KernelTorque>(
-        par.w_d, par.beta_xd, par.beta_yd, par.beta_zd, par.alpha_d,
-        grid.cellSize.x, grid.cellSize.y, H, grid.cellDim.z);
+        par.w_d, par.beta_d, par.alpha_d, grid.cellSize.x, grid.cellSize.y, H,
+        grid.cellDim.z);
   }
 
   void initializeQuadratureWeights() {

@@ -48,12 +48,8 @@ public:
     real tolerance = 1e-7;
     real w, w_d;
     real hydrodynamicRadius;
-    real beta_x = -1;
-    real beta_y = -1;
-    real beta_z = -1;
-    real beta_xd = -1;
-    real beta_yd = -1;
-    real beta_zd = -1;
+    real3 beta = {-1.0, -1.0, -1.0};
+    real3 beta_d = {-1.0, -1.0, -1.0};
     real alpha = -1;
     real alpha_d = -1;
     // Can be either none, bottom or slit
