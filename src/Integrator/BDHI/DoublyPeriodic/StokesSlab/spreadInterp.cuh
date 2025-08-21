@@ -88,7 +88,6 @@ struct BarnettMagland {
     support.z = 2 * ct + 1;
     this->ax = hx;
     this->ay = hy;
-    // this->az = sin(M_PI / (nz - 1)) * 0.5 * H;
     this->az = thrust::min(hx, hy);
 
     System::log<System::MESSAGE>(
@@ -226,7 +225,9 @@ public:
     real beta_x = -1;
     real beta_y = -1;
     real beta_z = -1;
-    real beta_d = -1;
+    real beta_dx = -1;
+    real beta_dy = -1;
+    real beta_dz = -1;
     real alpha = -1;
     real alpha_d = -1;
   };
@@ -355,9 +356,8 @@ private:
     this->kernel = std::make_shared<Kernel>(
         par.w, par.beta_x, par.beta_y, par.beta_z, par.alpha, grid.cellSize.x,
         grid.cellSize.y, H, grid.cellDim.z);
-    // TODO modify torques kernel for betas
     this->kernelTorque = std::make_shared<KernelTorque>(
-        par.w_d, par.beta_d, par.beta_d, par.beta_d, par.alpha_d,
+        par.w_d, par.beta_dx, par.beta_dy, par.beta_dz, par.alpha_d,
         grid.cellSize.x, grid.cellSize.y, H, grid.cellDim.z);
   }
 
