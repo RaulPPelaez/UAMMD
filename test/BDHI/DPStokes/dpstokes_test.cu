@@ -24,7 +24,7 @@ TEST(DPStokes, CanBeCreated) {
   par.ny = 32;
   par.nz = 32;
   par.w = 6;
-  par.beta = 13;
+  par.beta.x = 13;
   par.alpha = par.w * 0.5;
   par.mode = DPStokes::WallMode::slit;
   par.viscosity = 1;
@@ -45,7 +45,7 @@ auto getDPStokesParamtersOnlyForce(real Lx, real Ly, real H, real viscosity,
   par.ny = ny;
   par.nz = int(M_PI * H / (2 * h));
   par.w = 6;
-  par.beta = 1.714 * par.w;
+  par.beta.x = 1.714 * par.w;
   par.alpha = par.w * 0.5;
   par.mode = DPStokes::WallMode::slit;
   par.viscosity = viscosity;
