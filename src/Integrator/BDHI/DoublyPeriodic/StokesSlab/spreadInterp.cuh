@@ -225,9 +225,9 @@ public:
     real beta_x = -1;
     real beta_y = -1;
     real beta_z = -1;
-    real beta_dx = -1;
-    real beta_dy = -1;
-    real beta_dz = -1;
+    real beta_xd = -1;
+    real beta_yd = -1;
+    real beta_zd = -1;
     real alpha = -1;
     real alpha_d = -1;
   };
@@ -357,7 +357,7 @@ private:
         par.w, par.beta_x, par.beta_y, par.beta_z, par.alpha, grid.cellSize.x,
         grid.cellSize.y, H, grid.cellDim.z);
     this->kernelTorque = std::make_shared<KernelTorque>(
-        par.w_d, par.beta_dx, par.beta_dy, par.beta_dz, par.alpha_d,
+        par.w_d, par.beta_xd, par.beta_yd, par.beta_zd, par.alpha_d,
         grid.cellSize.x, grid.cellSize.y, H, grid.cellDim.z);
   }
 
