@@ -29,7 +29,8 @@ preferred-citation:
       given-names: Rafael
   title: Universally Adaptable Multiscale Molecular Dynamics (UAMMD). A native-GPU software ecosystem for complex fluids, soft matter, and beyond
   doi: https://doi.org/10.1016/j.cpc.2024.109363
-  type: article-journal
+  type: article
+  journal: Computer Physics Communications
   pages: '109363'
   year: '2025'
   conference: {}
