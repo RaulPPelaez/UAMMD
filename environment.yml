@@ -13,3 +13,4 @@ dependencies:
   - libblas
   - pybind11
   - python 3.11.*
+  - fftw  # [test]
