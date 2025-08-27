@@ -22,8 +22,15 @@ using gpu_container = thrust::device_vector<T, managed_allocator<T>>;
 template <class T>
 using cached_vector = thrust::device_vector<T, managed_allocator<T>>;
 #endif
-
-enum class WallMode { bottom, slit, none };
+/**
+ * @enum WallMode
+ * @brief Specifies the mode of wall configuration in the simulation.
+ */
+enum class WallMode {
+  bottom, ///< Only the bottom wall is present.
+  slit,   ///< Both top and bottom walls are present, forming a slit.
+  none,   ///< No walls are present.
+};
 
 class IndexToWaveNumber {
   const int nkx, nky;
