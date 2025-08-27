@@ -30,7 +30,6 @@ TEST(DPStokes, CanBeCreated) {
   par.viscosity = 1;
   par.Lx = par.Ly = 1;
   par.H = 1;
-  par.tolerance = 1e-4;
   auto dpstokes = std::make_shared<DPStokes>(par);
 }
 
@@ -52,7 +51,6 @@ auto getDPStokesParamtersOnlyForce(real Lx, real Ly, real H, real viscosity,
   par.Lx = Lx;
   par.Ly = Ly;
   par.H = H;
-  par.tolerance = 1e-4;
   return par;
 }
 auto getDPStokesParamtersOnlyForce(real Lxy, real H, real viscosity,
