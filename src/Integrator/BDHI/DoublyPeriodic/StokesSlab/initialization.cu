@@ -27,7 +27,7 @@ void checkInputValidity(DPStokes::Parameters par) {
 }; // namespace detail
 DPStokes::DPStokes(DPStokes::Parameters par)
     : viscosity(par.viscosity), H(par.H), Lx(par.Lx), Ly(par.Ly),
-      tolerance(par.tolerance), mode(par.mode) {
+      mode(par.mode) {
   detail::checkInputValidity(par);
   setUpGrid(par);
   this->fct = std::make_shared<FastChebyshevTransform>(grid.cellDim);
@@ -48,23 +48,16 @@ DPStokes::DPStokes(DPStokes::Parameters par)
   CudaCheckError();
 }
 
-namespace DPStokes_ns {
-double proposeCellSize(real tolerance, real width) {
-  double h = (1.3 - std::min((-log10(tolerance)) / 10.0, 0.9)) * width;
-  return h;
-}
-} // namespace DPStokes_ns
 
 void DPStokes::setUpGrid(Parameters par) {
   System::log<System::DEBUG>("[DPStokes] setUpGrid");
   int3 cellDim = {par.nx, par.ny, par.nz};
-  if (cellDim.x < 0) {
-    double h = DPStokes_ns::proposeCellSize(par.tolerance, gw);
-    constexpr int minimumNumberCells = 16;
-    h = std::min(h, Lx / double(minimumNumberCells));
-    System::log<System::MESSAGE>("[DPStokes] Proposed h: %g", h);
-    cellDim = make_int3(make_real3(Lx, Ly, H) / h);
-    cellDim = nextFFTWiseSize3D(cellDim);
+  if (cellDim.x < 0 || cellDim.y < 0) {
+    throw std::runtime_error(
+        "[DPStokes] Invalid argument: cell dimensions must be positive");
+  }
+  if (cellDim.z < 0) {
+    cellDim.z = M_PI*H/std::min(Lx/cellDim.x,Ly/cellDim.y);
   }
   this->grid = Grid(Box(make_real3(Lx, Ly, H)), cellDim);
   System::log<System::MESSAGE>("[DPStokes] Selected hx: %g, hy: %g",
@@ -72,7 +65,6 @@ void DPStokes::setUpGrid(Parameters par) {
 }
 
 void DPStokes::printStartingMessages(Parameters par) {
-  System::log<System::MESSAGE>("[DPStokes] tolerance: %g", par.tolerance);
   System::log<System::MESSAGE>("[DPStokes] viscosity: %g", viscosity);
   System::log<System::MESSAGE>("[DPStokes] cells: %d %d %d", grid.cellDim.x,
                                grid.cellDim.y, grid.cellDim.z);
