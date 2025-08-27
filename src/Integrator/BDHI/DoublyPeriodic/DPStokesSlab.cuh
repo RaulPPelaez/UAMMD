@@ -432,6 +432,64 @@ class DPStokesIntegrator : public Integrator {
       0; // How many times we have updated the RFD (for random numbers)
   uint stepsLanczos =
       0; // How many times we have updated Lanczos (for random numbers)
+  // Returns the thermal drift term: temperature*dt*(\partial_q \cdot M)
+  auto computeThermalDrift() {
+    if (par.temperature) {
+      auto pos = pd->getPos(access::gpu, access::read);
+      const int numberParticles = pd->getNumParticles();
+      this->stepsRFD++;
+      auto noise2 =
+          detail::fillRandomVectorReal3(numberParticles, seedRFD, stepsRFD);
+      auto cit = thrust::make_counting_iterator(0);
+      auto posp = thrust::make_transform_iterator(
+          cit, detail::SumPosAndNoise(pos.raw(), noise2.data().get(),
+                                      deltaRFD * 0.5));
+      auto mpw = dpstokes->Mdot(posp, noise2.data().get(), numberParticles, 0);
+      auto posm = thrust::make_transform_iterator(
+          cit, detail::SumPosAndNoise(pos.raw(), noise2.data().get(),
+                                      -deltaRFD * 0.5));
+      auto mmw = dpstokes->Mdot(posm, noise2.data().get(), numberParticles, 0);
+      using namespace thrust::placeholders;
+      thrust::transform(mpw.begin(), mpw.end(), mmw.begin(), mpw.begin(),
+                        make_real3(par.dt * par.temperature / deltaRFD) *
+                            (_1 - _2));
+      return mpw;
+    } else {
+      return cached_vector<real3>();
+    }
+  }
+
+  // Returns sqrt(2*M*temperature/dt)dW
+  auto computeFluctuations() {
+    const int numberParticles = pd->getNumParticles();
+    cached_vector<real3> bdw(numberParticles);
+    thrust::fill(bdw.begin(), bdw.end(), real3());
+    if (par.temperature) {
+      this->stepsLanczos++;
+      auto pos = pd->getPos(access::gpu, access::read);
+      detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
+      auto noise =
+          detail::fillRandomVectorReal3(numberParticles, seed, stepsLanczos,
+                                        sqrt(2 * par.temperature / par.dt));
+      lanczos->run(dot, (real *)bdw.data().get(), (real *)noise.data().get(),
+                   par.tolerance, 3 * numberParticles);
+    }
+    return bdw;
+  }
+
+  // Returns the product of the forces and the mobility matrix, M F
+  auto computeDeterministicDisplacements() {
+    auto pos = pd->getPos(access::gpu, access::read);
+    auto force = pd->getForce(access::gpu, access::read);
+    if (pd->isTorqueAllocated()) {
+      System::log<System::EXCEPTION>(
+          "[DPStokes] Torques are not yet implemented");
+      throw std::runtime_error("Operation not implemented");
+    }
+    const int numberParticles = pd->getNumParticles();
+    return dpstokes->Mdot(pos.raw(), force.raw(), numberParticles, 0);
+  }
+
 public:
   template <class T> using cached_vector = cached_vector<T>;
   /**
@@ -458,6 +516,7 @@ public:
     lanczos = std::make_shared<lanczos::Solver>();
     System::log<System::MESSAGE>("[DPStokes] dt %g", par.dt);
     System::log<System::MESSAGE>("[DPStokes] temperature: %g", par.temperature);
+    System::log<System::MESSAGE>("[DPStokes] tolerance: %g", par.tolerance);
     this->seed = pd->getSystem()->rng().next32();
     this->seedRFD = pd->getSystem()->rng().next32();
     this->deltaRFD = 1e-6;
@@ -520,63 +579,6 @@ private:
   void resetForces() {
     auto force = pd->getForce(access::gpu, access::write);
     thrust::fill(thrust::cuda::par, force.begin(), force.end(), real4());
-  }
-  // Returns the thermal drift term: temperature*dt*(\partial_q \cdot M)
-  auto computeThermalDrift() {
-    if (par.temperature) {
-      auto pos = pd->getPos(access::gpu, access::read);
-      const int numberParticles = pd->getNumParticles();
-      this->stepsRFD++;
-      auto noise2 =
-          detail::fillRandomVectorReal3(numberParticles, seedRFD, stepsRFD);
-      auto cit = thrust::make_counting_iterator(0);
-      auto posp = thrust::make_transform_iterator(
-          cit, detail::SumPosAndNoise(pos.raw(), noise2.data().get(),
-                                      deltaRFD * 0.5));
-      auto mpw = dpstokes->Mdot(posp, noise2.data().get(), numberParticles, 0);
-      auto posm = thrust::make_transform_iterator(
-          cit, detail::SumPosAndNoise(pos.raw(), noise2.data().get(),
-                                      -deltaRFD * 0.5));
-      auto mmw = dpstokes->Mdot(posm, noise2.data().get(), numberParticles, 0);
-      using namespace thrust::placeholders;
-      thrust::transform(mpw.begin(), mpw.end(), mmw.begin(), mpw.begin(),
-                        make_real3(par.dt * par.temperature / deltaRFD) *
-                            (_1 - _2));
-      return mpw;
-    } else {
-      return cached_vector<real3>();
-    }
-  }
-
-  // Returns sqrt(2*M*temperature/dt)dW
-  auto computeFluctuations() {
-    const int numberParticles = pd->getNumParticles();
-    cached_vector<real3> bdw(numberParticles);
-    thrust::fill(bdw.begin(), bdw.end(), real3());
-    if (par.temperature) {
-      this->stepsLanczos++;
-      auto pos = pd->getPos(access::gpu, access::read);
-      detail::LanczosAdaptor dot(dpstokes, pos.raw(), numberParticles);
-      auto noise =
-          detail::fillRandomVectorReal3(numberParticles, seed, stepsLanczos,
-                                        sqrt(2 * par.temperature / par.dt));
-      lanczos->run(dot, (real *)bdw.data().get(), (real *)noise.data().get(),
-                   par.tolerance, 3 * numberParticles);
-    }
-    return bdw;
-  }
-
-  // Returns the product of the forces and the mobility matrix, M F
-  auto computeDeterministicDisplacements() {
-    auto pos = pd->getPos(access::gpu, access::read);
-    auto force = pd->getForce(access::gpu, access::read);
-    if (pd->isTorqueAllocated()) {
-      System::log<System::EXCEPTION>(
-          "[DPStokes] Torques are not yet implemented");
-      throw std::runtime_error("Operation not implemented");
-    }
-    const int numberParticles = pd->getNumParticles();
-    return dpstokes->Mdot(pos.raw(), force.raw(), numberParticles, 0);
   }
 };
 } // namespace DPStokesSlab_ns
