@@ -48,7 +48,6 @@ DPStokes::DPStokes(DPStokes::Parameters par)
   CudaCheckError();
 }
 
-
 void DPStokes::setUpGrid(Parameters par) {
   System::log<System::DEBUG>("[DPStokes] setUpGrid");
   int3 cellDim = {par.nx, par.ny, par.nz};
@@ -57,7 +56,7 @@ void DPStokes::setUpGrid(Parameters par) {
         "[DPStokes] Invalid argument: cell dimensions must be positive");
   }
   if (cellDim.z < 0) {
-    cellDim.z = M_PI*H/std::min(Lx/cellDim.x,Ly/cellDim.y);
+    cellDim.z = M_PI * H / std::min(Lx / cellDim.x, Ly / cellDim.y);
   }
   this->grid = Grid(Box(make_real3(Lx, Ly, H)), cellDim);
   System::log<System::MESSAGE>("[DPStokes] Selected hx: %g, hy: %g",
