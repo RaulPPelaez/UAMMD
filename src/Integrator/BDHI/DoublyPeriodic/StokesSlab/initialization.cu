@@ -23,10 +23,6 @@ void checkInputValidity(DPStokes::Parameters par) {
         "[DPStokes] Domain width (Lx, Ly) was not set");
     throw std::runtime_error("[DPStokes] Invalid argument");
   }
-  // if(par.dt <= 0){
-  //   System::log<System::EXCEPTION>("[DPStokes] dt was not set");
-  //   throw std::runtime_error("[DPStokes] Invalid argument");
-  // }
 }
 }; // namespace detail
 DPStokes::DPStokes(DPStokes::Parameters par)
