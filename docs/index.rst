@@ -196,7 +196,6 @@ Although this documentation should be your primary source of knowledge for UAMMD
    Integrator/BrownianDynamics
    Integrator/BrownianHydrodynamics
    Integrator/FluctuatingHydrodynamics
-   Integrator/MonteCarlo
 
 .. toctree::
    :maxdepth: 4
@@ -217,15 +216,11 @@ Although this documentation should be your primary source of knowledge for UAMMD
 
    ParameterUpdatable
    InputFile
-   TabulatedFunctions
-   Grid
    ParticleSorter
    BoundaryValueProblemSolver
    FastChebyshevTransform
    LanczosAlgorithm
    ProgrammingTools
-   ErrorHandling
-   PostProcessing
    VectorTypes
    RandomNumbers
    Containers
