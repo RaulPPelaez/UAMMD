@@ -35,6 +35,7 @@ examples/data.main*
 *.data
 docs/_static
 docs/_build
+docs/doxygen
 docs/uammd
 /test/misc/ibm/ltximg/
 __pycache__
@@ -42,3 +43,4 @@ examples/build
 .cache
 compile_commands.json
 !Doxyfile
+.vscode

@@ -290,6 +290,9 @@ TAB_SIZE               = 4
 # @} or use a double escape (\\{ and \\})
 
 ALIASES                =
+ALIASES += rst="\verbatim embed:rst:leading-asterisk"
+ALIASES += endrst="\endverbatim"
+ALIASES += refuammd{1}="@ref uammd::\1 \"\1\""
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C sources
 # only. Doxygen will then generate output that is more tailored for C. For
