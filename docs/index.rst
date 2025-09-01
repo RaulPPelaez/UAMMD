@@ -5,7 +5,7 @@
 
 .. _index:
 
-Welcome to the UAMMD v2 documentation!
+Welcome to the UAMMD v3 documentation!
 =========================================
 ----------------------------------------------------
 Universally Adaptable Multiscale Molecular Dynamics
