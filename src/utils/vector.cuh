@@ -20,7 +20,6 @@ namespace uammd {
 #ifdef __CUDACC_VER_MAJOR__
 #if __CUDACC_VER_MAJOR__ > 12
 using double4 = double4_16a;
-using uint4 = uint4_16a;
 #endif
 #endif
 namespace detail {
