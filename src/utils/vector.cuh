@@ -22,6 +22,7 @@ namespace uammd {
   using double4 = double4_a16;
   using uint4 = uint4_a16;
 #endif
+#endif
 namespace detail {
 template <class T> struct IsAnAdmisibleVectorType {
   static constexpr bool value =
