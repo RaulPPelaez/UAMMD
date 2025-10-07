@@ -408,6 +408,7 @@ VECATTR real2 make_real2(uint3 a) { return make_real2(real(a.x), real(a.y)); }
 
 VECATTR real dot(real2 a, real2 b) { return a.x * b.x + a.y * b.y; }
 
+} // namespace uammd
 ////////////////DOUBLE PRECISION//////////////////////
 #ifdef SINGLE_PRECISION
 VECATTR double3 make_double3(uammd::real4 a) {
@@ -519,7 +520,7 @@ VECATTR double4 operator/(const double &b, const double4 &a) {
   return make_double4(b / a.x, b / a.y, b / a.z, b / a.w);
 }
 VECATTR void operator/=(double4 &a, const double &b) { a *= 1.0 / b; }
-} // namespace uammd
+
 VECATTR double dot(double4 a, double4 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 }
