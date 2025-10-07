@@ -410,6 +410,7 @@ VECATTR real dot(real2 a, real2 b) { return a.x * b.x + a.y * b.y; }
 
 } // namespace uammd
 ////////////////DOUBLE PRECISION//////////////////////
+namespace uammd {
 #ifdef SINGLE_PRECISION
 VECATTR double3 make_double3(uammd::real4 a) {
   return make_double3(a.x, a.y, a.z);
@@ -422,10 +423,10 @@ VECATTR double3 make_double3(uammd::real4 a) {
   return make_double3(a.x, a.y, a.z);
 }
 #endif
+
 VECATTR float4 make_float4(double4 a) {
   return make_float4(float(a.x), float(a.y), float(a.z), float(a.w));
 }
-
 VECATTR double4 make_double4(double s) { return make_double4(s, s, s, s); }
 VECATTR double4 make_double4(double3 a) {
   return make_double4(a.x, a.y, a.z, 0.0f);
@@ -532,7 +533,7 @@ VECATTR double4 normalize(double4 v) {
 VECATTR double4 floorf(double4 v) {
   return make_double4(floor(v.x), floor(v.y), floor(v.z), floor(v.w));
 }
-
+} // namespace uammd
 /////////////////////DOUBLE3///////////////////////////////
 
 VECATTR int3 make_int3(double3 a) {
