@@ -43,8 +43,8 @@ probably the traversal MCStepKernel.
 #include "Interactor/NeighbourList/common.cuh"
 #include "utils/TransverserUtils.cuh"
 #include <third_party/saruprng.cuh>
-#include <thrust/iterator/permutation_iterator.h>
 #include <thrust/extrema.h>
+#include <thrust/iterator/permutation_iterator.h>
 namespace uammd {
 namespace MC_NVT {
 
