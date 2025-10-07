@@ -30,7 +30,6 @@ template <class T> struct IsAnAdmisibleVectorType {
                                uint4>();
 };
 } // namespace detail
-} // namespace uammd
 
 template <class T,
           uammd::SFINAE::enable_if_t<
@@ -307,7 +306,6 @@ VECATTR float4 normalize(float4 v) {
   return v * invLen;
 }
 
-namespace uammd {
 /////////////////REAL4////////////////////////////////
 
 VECATTR real4 make_real4(real x, real y, real z, real w) {
@@ -408,9 +406,7 @@ VECATTR real2 make_real2(uint3 a) { return make_real2(real(a.x), real(a.y)); }
 
 VECATTR real dot(real2 a, real2 b) { return a.x * b.x + a.y * b.y; }
 
-} // namespace uammd
 ////////////////DOUBLE PRECISION//////////////////////
-namespace uammd {
 #ifdef SINGLE_PRECISION
 VECATTR double3 make_double3(uammd::real4 a) {
   return make_double3(a.x, a.y, a.z);
@@ -533,7 +529,6 @@ VECATTR double4 normalize(double4 v) {
 VECATTR double4 floorf(double4 v) {
   return make_double4(floor(v.x), floor(v.y), floor(v.z), floor(v.w));
 }
-} // namespace uammd
 /////////////////////DOUBLE3///////////////////////////////
 
 VECATTR int3 make_int3(double3 a) {
@@ -824,7 +819,6 @@ VECATTR int3 operator*(const int3 &a, const int &b) {
 }
 VECATTR int3 operator*(const int &b, const int3 &a) { return a * b; }
 
-namespace uammd {
 VECATTR thrust::tuple<real, real, real>
 operator+(real3 a, thrust::tuple<real, real, real> b) {
   return thrust::make_tuple(a.x + thrust::get<0>(b), a.y + thrust::get<1>(b),
@@ -834,9 +828,7 @@ VECATTR real3 operator+(thrust::tuple<real, real, real> b, real3 a) {
   return make_real3(a.x + thrust::get<0>(b), a.y + thrust::get<1>(b),
                     a.z + thrust::get<2>(b));
 }
-} // namespace uammd
 
-namespace uammd {
 ////////////////////////////////////VEC2///////////////////////////////////////
 template <class T> struct vec2 {
   T x, y;
