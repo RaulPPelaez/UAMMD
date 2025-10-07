@@ -99,6 +99,7 @@ nothing.
 #include "utils/InitialConditions.cuh"
 #include "utils/InputFile.h"
 #include <fstream>
+#include <thrust/extrema.h>
 
 using namespace uammd;
 using std::endl;

@@ -32,18 +32,12 @@ const char *cufftGetErrorString(cufftResult_t err) {
     return "CUFFT_INVALID_SIZE\n";
   case CUFFT_UNALIGNED_DATA:
     return "CUFFT_UNALIGNED_DATA\n";
-  case CUFFT_INCOMPLETE_PARAMETER_LIST:
-    return "CUFFT_INCOMPLETE_PARAMETER_LIST \n";
   case CUFFT_INVALID_DEVICE:
     return "CUFFT_INVALID_DEVICE \n";
-  case CUFFT_PARSE_ERROR:
-    return "CUFFT_PARSE_ERROR    \n";
   case CUFFT_NO_WORKSPACE:
     return "CUFFT_NO_WORKSPACE   \n";
   case CUFFT_NOT_IMPLEMENTED:
     return "CUFFT_NOT_IMPLEMENTED \n";
-  case CUFFT_LICENSE_ERROR:
-    return "CUFFT_LICENSE_ERROR  \n";
 #ifdef CUFFT_NOT_SUPPORTED
   case CUFFT_NOT_SUPPORTED:
     return "CUFFT_NOT_SUPPORTED  \n";
