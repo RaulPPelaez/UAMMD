@@ -44,6 +44,7 @@ probably the traversal MCStepKernel.
 #include "utils/TransverserUtils.cuh"
 #include <third_party/saruprng.cuh>
 #include <thrust/iterator/permutation_iterator.h>
+#include <thrust/extrema.h>
 namespace uammd {
 namespace MC_NVT {
 
