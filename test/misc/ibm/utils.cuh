@@ -3,6 +3,7 @@
 #include "misc/ChevyshevUtils.cuh"
 #include "misc/IBM.cuh"
 #include <thrust/complex.h>
+#include <thrust/extrema.h>
 #include <uammd.cuh>
 
 using namespace uammd;
