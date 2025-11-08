@@ -46,7 +46,7 @@ inline std::istream &operator>>(std::istream &in, double3 &f) {
   return in >> f.x >> f.y >> f.z;
 }
 
-inline std::istream &operator>>(std::istream &in, double4 &f) {
+inline std::istream &operator>>(std::istream &in, double4_16a &f) {
   return in >> f.x >> f.y >> f.z >> f.w;
 }
 

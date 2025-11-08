@@ -77,7 +77,8 @@ enum CacheLoadModifier
  */
 
 /**
- * \brief Thread utility for reading memory using cub::CacheLoadModifier cache modifiers.  Can be used to load any data type.
+ * \brief Thread utility for reading memory using cub::CacheLoadModifier cache
+ * modifiers.  Can be used to load any data type.
  *
  * \par Example
  * \code
@@ -92,8 +93,8 @@ enum CacheLoadModifier
  * short val = cub::ThreadLoad<cub::LOAD_DEFAULT>(d_in + threadIdx.x);
  *
  * // 256-bit load using cache-volatile modifier
- * double4 *d_in;
- * double4 val = cub::ThreadLoad<cub::LOAD_CV>(d_in + threadIdx.x);
+ * double4_16a *d_in;
+ * double4_16a val = cub::ThreadLoad<cub::LOAD_CV>(d_in + threadIdx.x);
  *
  * // 96-bit load using cache-streaming modifier
  * struct TestFoo { bool a; short b; };

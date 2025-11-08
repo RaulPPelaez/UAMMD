@@ -75,7 +75,8 @@ enum CacheStoreModifier
  */
 
 /**
- * \brief Thread utility for writing memory using cub::CacheStoreModifier cache modifiers.  Can be used to store any data type.
+ * \brief Thread utility for writing memory using cub::CacheStoreModifier cache
+ * modifiers.  Can be used to store any data type.
  *
  * \par Example
  * \code
@@ -92,8 +93,8 @@ enum CacheStoreModifier
  * cub::ThreadStore<cub::STORE_DEFAULT>(d_out + threadIdx.x, val);
  *
  * // 256-bit store using write-through modifier
- * double4 *d_out;
- * double4 val;
+ * double4_16a *d_out;
+ * double4_16a val;
  * cub::ThreadStore<cub::STORE_WT>(d_out + threadIdx.x, val);
  *
  * // 96-bit store using cache-streaming cache modifier

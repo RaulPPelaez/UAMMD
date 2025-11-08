@@ -23,7 +23,7 @@ using real4 = float4;
 using real = double;
 using real2 = double2;
 using real3 = double3;
-using real4 = double4;
+using real4 = double4_16a;
 
 #endif
 } // namespace uammd

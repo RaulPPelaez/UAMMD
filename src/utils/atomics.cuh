@@ -64,8 +64,8 @@ inline __device__ real3 atomicAdd(real3 *address, real3 val) {
   return newval;
 }
 
-inline __device__ double4 atomicAdd(double4 *address, double4 val) {
-  double4 newval;
+inline __device__ double4_16a atomicAdd(double4_16a *address, double4_16a val) {
+  double4_16a newval;
   if (val.x)
     newval.x = atomicAdd(&(*address).x, val.x);
   if (val.y)

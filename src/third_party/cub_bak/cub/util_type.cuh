@@ -338,7 +338,7 @@ __CUB_ALIGN_BYTES(ulonglong2, 16)
 __CUB_ALIGN_BYTES(double2, 16)
 __CUB_ALIGN_BYTES(longlong4, 16)
 __CUB_ALIGN_BYTES(ulonglong4, 16)
-__CUB_ALIGN_BYTES(double4, 16)
+__CUB_ALIGN_BYTES(double4_16a, 16)
 
 template <typename T> struct AlignBytes<volatile T> : AlignBytes<T> {};
 template <typename T> struct AlignBytes<const T> : AlignBytes<T> {};

@@ -71,9 +71,10 @@ int main(int argc, char *argv[]) {
   // Or:
   fourTwos = {0, 0, 0, 0};
   fourTwos += 2;
-  // You get the idea, there is also int2, int3, int4, uint2, double4, etc etc.
-  // We will see later that UAMMD defines particle properties using these types.
-  // Theres also the possibility of reading/writing these types. For example:
+  // You get the idea, there is also int2, int3, int4, uint2, double4_16a, etc
+  // etc. We will see later that UAMMD defines particle properties using these
+  // types. Theres also the possibility of reading/writing these types. For
+  // example:
   std::cout << "Contents of fourValues:" << fourValues << std::endl;
   // Now that we are here, lets create a gpu vector of one of these types and
   // fill it with something:
