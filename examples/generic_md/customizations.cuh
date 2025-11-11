@@ -1,4 +1,4 @@
-/*Raul P. Pelaez 2021
+/*Raul P. Pelaez 2021-2025
   Customizations for generic_simulation.cu
   You can modify this file to tweak the different interactions available there.
 
@@ -58,7 +58,8 @@ struct Parameters {
   real gaussianWidth;
   // DPD
   real gamma_dpd, A_dpd, cutOff_dpd;
-  // SPH
+  real gamma_par_dpd, gamma_perp_dpd;
+  //SPH
   real support_sph;
   real gasStiffness_sph;
   real restDensity_sph;
