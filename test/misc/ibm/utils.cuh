@@ -29,11 +29,11 @@ struct Gaussian {
 
   inline __host__ __device__ int3 getSupport(real3 pos, int3 cell) const {
     real bound = Htot * real(0.5);
-    real ztop = thrust::min(pos.z + rmax, bound);
-    real zbot = thrust::max(pos.z - rmax, -bound);
+    real ztop = uammd::min(pos.z + rmax, bound);
+    real zbot = uammd::max(pos.z - rmax, -bound);
     int czb = int((nz - 1) * (acos(ztop / bound) / real(M_PI)));
     int czt = int((nz - 1) * (acos(zbot / bound) / real(M_PI)));
-    int sz = 2 * thrust::max(cell.z - czb, czt - cell.z) + 1;
+    int sz = 2 * uammd::max(cell.z - czb, czt - cell.z) + 1;
     return make_int3(support.x, support.y, sz);
   }
 
