@@ -97,7 +97,7 @@ public:
           pd->getForce(access::location::gpu, access::mode::readwrite);
       thrust::transform(thrust::cuda::par.on(st), forces.begin(), forces.end(),
                         thrust::make_constant_iterator(gravity), forces.begin(),
-                        thrust::plus<real4>());
+                        cuda::std::plus<real4>());
     }
   }
 

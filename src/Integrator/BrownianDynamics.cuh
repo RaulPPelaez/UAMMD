@@ -87,7 +87,7 @@ public:
         thrust::make_constant_iterator<real>(1.5 * temperature);
     thrust::transform(thrust::cuda::par, energy_gr,
                       energy_gr + pg->getNumberParticles(), energy_per_particle,
-                      energy_gr, thrust::plus<real>());
+                      energy_gr, cuda::std::plus<real>());
     return 0;
   }
 

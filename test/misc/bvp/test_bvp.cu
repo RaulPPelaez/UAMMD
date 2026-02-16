@@ -48,14 +48,14 @@ public:
 
 template <class BoundaryConditions, class Klist>
 class BoundaryConditionsDispatch {
-  Klist klist;
+  const Klist *klist;
   real H;
 
 public:
-  BoundaryConditionsDispatch(Klist klist, real H) : klist(klist), H(H) {}
+  BoundaryConditionsDispatch(const Klist &klist, real H) : klist(&klist), H(H) {}
 
   BoundaryConditions operator()(int i) const {
-    return BoundaryConditions(klist[i], H);
+    return BoundaryConditions((*klist)[i], H);
   }
 };
 

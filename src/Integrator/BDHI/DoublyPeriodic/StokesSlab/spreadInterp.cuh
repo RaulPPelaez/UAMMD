@@ -26,12 +26,12 @@ struct Gaussian {
 
   inline __host__ __device__ int3 getSupport(int3 cell) const {
     real ch = real(-0.5) * H * cospi((real(cell.z)) / (nz - 1));
-    real zmax = thrust::min(ch + rmax, H * real(0.5));
+    real zmax = uammd::min(ch + rmax, H * real(0.5));
     int czt = int((nz) * (acos(real(-2.0) * (zmax) / H) / real(M_PI)));
-    real zmin = thrust::max(ch - rmax, -H * real(0.5));
+    real zmin = uammd::max(ch - rmax, -H * real(0.5));
     int czb = int((nz) * (acos(real(-2.0) * (zmin) / H) / real(M_PI)));
-    int sz = 2 * thrust::max(czt - cell.z, cell.z - czb) + 1;
-    return make_int3(support.x, support.y, thrust::min(sz, support.z));
+    int sz = 2 * uammd::max(czt - cell.z, cell.z - czb) + 1;
+    return make_int3(support.x, support.y, uammd::min(sz, support.z));
   }
 
   inline __host__ __device__ real phiX(real r) const {
@@ -50,7 +50,7 @@ struct Gaussian {
     } else {
       real top_rimg = H - 2 * pi.z + r;
       real bot_rimg = -H - 2 * pi.z + r;
-      real rimg = thrust::min(fabs(top_rimg), fabs(bot_rimg));
+      real rimg = uammd::min(fabs(top_rimg), fabs(bot_rimg));
       real phi_img =
           rimg >= rmax ? real(0.0) : prefactor * exp(tau * rimg * rimg);
       real phi = prefactor * exp(tau * r * r);
@@ -81,14 +81,14 @@ struct BarnettMagland {
       : H(H), nz(nz), bm_x(i_alpha, beta.x), bm_y(i_alpha, beta.y),
         bm_z(i_alpha, beta.z) {
     int supportxy = w + 0.5;
-    real h_max = thrust::max(hx, hy);
+    real h_max = uammd::max(hx, hy);
     this->rmax = w * h_max * 0.5;
     support.x = support.y = supportxy;
     int ct = ceil((nz - 1) * (acos((H * 0.5 - rmax) / (0.5 * H)) / M_PI));
     support.z = 2 * ct + 1;
     this->ax = hx;
     this->ay = hy;
-    this->az = thrust::min(hx, hy);
+    this->az = uammd::min(hx, hy);
 
     System::log<System::MESSAGE>(
         "BM kernel: beta_x: %g, beta_y: %g, beta_z: %g, alpha: %g, w: %g",
@@ -101,11 +101,11 @@ struct BarnettMagland {
 
   inline __host__ __device__ int3 getSupport(real3 pos, int3 cell) const {
     real bound = H * real(0.5);
-    real ztop = thrust::min(pos.z + rmax, bound);
-    real zbot = thrust::max(pos.z - rmax, -bound);
+    real ztop = uammd::min(pos.z + rmax, bound);
+    real zbot = uammd::max(pos.z - rmax, -bound);
     int czb = int((nz - 1) * (acos(ztop / bound) / real(M_PI)));
     int czt = int((nz - 1) * (acos(zbot / bound) / real(M_PI)));
-    int sz = 2 * thrust::max(cell.z - czb, czt - cell.z) + 1;
+    int sz = 2 * uammd::max(cell.z - czb, czt - cell.z) + 1;
     return make_int3(support.x, support.y, sz);
   }
 
@@ -122,7 +122,7 @@ struct BarnettMagland {
   inline __host__ __device__ real phiZ(real r, real3 pi) const {
     real top_rimg = H - real(2.0) * pi.z + r;
     real bot_rimg = -H - real(2.0) * pi.z + r;
-    real rimg = thrust::min(fabs(top_rimg), fabs(bot_rimg));
+    real rimg = uammd::min(fabs(top_rimg), fabs(bot_rimg));
     real phi_img = bm_z.phi(rimg / az) / az;
     real phi = bm_z.phi(r / az) / az;
     return phi - phi_img;
