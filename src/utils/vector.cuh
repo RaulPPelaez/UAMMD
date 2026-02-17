@@ -21,8 +21,8 @@ namespace detail {
 template <class T> struct IsAnAdmisibleVectorType {
   static constexpr bool value =
       uammd::SFINAE::is_one_of<T, float2, float3, float4, double2, double3,
-                               uammd::double4_type, int2, int3, int4, uint2, uint3,
-                               uint4>();
+                               uammd::double4_type, int2, int3, int4, uint2,
+                               uint3, uint4>();
 };
 } // namespace detail
 } // namespace uammd
@@ -303,7 +303,7 @@ VECATTR float4 normalize(float4 v) {
 }
 
 VECATTR uammd::double4_type make_uammd_double4(double x, double y, double z,
-                                                double w) {
+                                               double w) {
   uammd::double4_type v;
   v.x = x;
   v.y = y;
@@ -369,7 +369,9 @@ VECATTR real3 make_real3(real3 a) { return make_real3(a.x, a.y, a.z); }
 
 #ifdef SINGLE_PRECISION
 VECATTR real3 make_real3(double3 a) { return make_real3(a.x, a.y, a.z); }
-VECATTR real3 make_real3(uammd::double4_type a) { return make_real3(a.x, a.y, a.z); }
+VECATTR real3 make_real3(uammd::double4_type a) {
+  return make_real3(a.x, a.y, a.z);
+}
 #else
 template <typename T> VECATTR real3 make_real3(float2 a, T b) {
   return make_real3(a.x, a.y, b);
@@ -431,7 +433,9 @@ VECATTR float4 make_float4(uammd::double4_type a) {
   return make_float4(float(a.x), float(a.y), float(a.z), float(a.w));
 }
 
-VECATTR uammd::double4_type make_double4(double s) { return make_uammd_double4(s, s, s, s); }
+VECATTR uammd::double4_type make_double4(double s) {
+  return make_uammd_double4(s, s, s, s);
+}
 VECATTR uammd::double4_type make_double4(double3 a) {
   return make_uammd_double4(a.x, a.y, a.z, 0.0f);
 }
@@ -449,7 +453,8 @@ VECATTR uammd::double4_type make_double4(float4 a) {
 }
 
 //////DOUBLE4///////////////
-VECATTR uammd::double4_type operator+(const uammd::double4_type &a, const uammd::double4_type &b) {
+VECATTR uammd::double4_type operator+(const uammd::double4_type &a,
+                                      const uammd::double4_type &b) {
   return make_uammd_double4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
 }
 VECATTR void operator+=(uammd::double4_type &a, const uammd::double4_type &b) {
@@ -458,10 +463,14 @@ VECATTR void operator+=(uammd::double4_type &a, const uammd::double4_type &b) {
   a.z += b.z;
   a.w += b.w;
 }
-VECATTR uammd::double4_type operator+(const uammd::double4_type &a, const double &b) {
+VECATTR uammd::double4_type operator+(const uammd::double4_type &a,
+                                      const double &b) {
   return make_uammd_double4(a.x + b, a.y + b, a.z + b, a.w + b);
 }
-VECATTR uammd::double4_type operator+(const double &b, const uammd::double4_type &a) { return a + b; }
+VECATTR uammd::double4_type operator+(const double &b,
+                                      const uammd::double4_type &a) {
+  return a + b;
+}
 VECATTR void operator+=(uammd::double4_type &a, const double &b) {
   a.x += b;
   a.y += b;
@@ -469,7 +478,8 @@ VECATTR void operator+=(uammd::double4_type &a, const double &b) {
   a.w += b;
 }
 
-VECATTR uammd::double4_type operator-(const uammd::double4_type &a, const uammd::double4_type &b) {
+VECATTR uammd::double4_type operator-(const uammd::double4_type &a,
+                                      const uammd::double4_type &b) {
   return make_uammd_double4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
 }
 VECATTR void operator-=(uammd::double4_type &a, const uammd::double4_type &b) {
@@ -478,10 +488,12 @@ VECATTR void operator-=(uammd::double4_type &a, const uammd::double4_type &b) {
   a.z -= b.z;
   a.w -= b.w;
 }
-VECATTR uammd::double4_type operator-(const uammd::double4_type &a, const double &b) {
+VECATTR uammd::double4_type operator-(const uammd::double4_type &a,
+                                      const double &b) {
   return make_uammd_double4(a.x - b, a.y - b, a.z - b, a.w - b);
 }
-VECATTR uammd::double4_type operator-(const double &b, const uammd::double4_type &a) {
+VECATTR uammd::double4_type operator-(const double &b,
+                                      const uammd::double4_type &a) {
   return make_uammd_double4(b - a.x, b - a.y, b - a.z, b - a.w);
 }
 VECATTR void operator-=(uammd::double4_type &a, const double &b) {
@@ -490,7 +502,8 @@ VECATTR void operator-=(uammd::double4_type &a, const double &b) {
   a.z -= b;
   a.w -= b;
 }
-VECATTR uammd::double4_type operator*(const uammd::double4_type &a, const uammd::double4_type &b) {
+VECATTR uammd::double4_type operator*(const uammd::double4_type &a,
+                                      const uammd::double4_type &b) {
   return make_uammd_double4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
 }
 VECATTR void operator*=(uammd::double4_type &a, const uammd::double4_type &b) {
@@ -499,17 +512,22 @@ VECATTR void operator*=(uammd::double4_type &a, const uammd::double4_type &b) {
   a.z *= b.z;
   a.w *= b.w;
 }
-VECATTR uammd::double4_type operator*(const uammd::double4_type &a, const double &b) {
+VECATTR uammd::double4_type operator*(const uammd::double4_type &a,
+                                      const double &b) {
   return make_uammd_double4(a.x * b, a.y * b, a.z * b, a.w * b);
 }
-VECATTR uammd::double4_type operator*(const double &b, const uammd::double4_type &a) { return a * b; }
+VECATTR uammd::double4_type operator*(const double &b,
+                                      const uammd::double4_type &a) {
+  return a * b;
+}
 VECATTR void operator*=(uammd::double4_type &a, const double &b) {
   a.x *= b;
   a.y *= b;
   a.z *= b;
   a.w *= b;
 }
-VECATTR uammd::double4_type operator/(const uammd::double4_type &a, const uammd::double4_type &b) {
+VECATTR uammd::double4_type operator/(const uammd::double4_type &a,
+                                      const uammd::double4_type &b) {
   return make_uammd_double4(a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w);
 }
 VECATTR void operator/=(uammd::double4_type &a, const uammd::double4_type &b) {
@@ -518,13 +536,17 @@ VECATTR void operator/=(uammd::double4_type &a, const uammd::double4_type &b) {
   a.z /= b.z;
   a.w /= b.w;
 }
-VECATTR uammd::double4_type operator/(const uammd::double4_type &a, const double &b) {
+VECATTR uammd::double4_type operator/(const uammd::double4_type &a,
+                                      const double &b) {
   return (1.0 / b) * a;
 }
-VECATTR uammd::double4_type operator/(const double &b, const uammd::double4_type &a) {
+VECATTR uammd::double4_type operator/(const double &b,
+                                      const uammd::double4_type &a) {
   return make_uammd_double4(b / a.x, b / a.y, b / a.z, b / a.w);
 }
-VECATTR void operator/=(uammd::double4_type &a, const double &b) { a *= 1.0 / b; }
+VECATTR void operator/=(uammd::double4_type &a, const double &b) {
+  a *= 1.0 / b;
+}
 
 VECATTR double dot(uammd::double4_type a, uammd::double4_type b) {
   return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;

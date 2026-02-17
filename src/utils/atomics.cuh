@@ -64,7 +64,8 @@ inline __device__ real3 atomicAdd(real3 *address, real3 val) {
   return newval;
 }
 
-inline __device__ uammd::double4_type atomicAdd(uammd::double4_type *address, uammd::double4_type val) {
+inline __device__ uammd::double4_type atomicAdd(uammd::double4_type *address,
+                                                uammd::double4_type val) {
   uammd::double4_type newval;
   if (val.x)
     newval.x = atomicAdd(&(*address).x, val.x);

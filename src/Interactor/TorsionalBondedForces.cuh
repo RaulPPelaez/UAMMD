@@ -177,8 +177,8 @@ public:
     }
     if (comp.energy) {
       const real cosPhi = uammd::max(
-          real(-1.0), uammd::min(real(1.0), dot(v123, v234) * rsqrt(v123q) *
-                                                 rsqrt(v234q)));
+          real(-1.0),
+          uammd::min(real(1.0), dot(v123, v234) * rsqrt(v123q) * rsqrt(v234q)));
       const real dphi = signOfPhi(r12, r23, r34) * acos(cosPhi) - bi.phi0;
       ct.energy =
           real(0.25) * bi.kdih * (1 + cos(dphi)); // U=kdih(1+cos(phi-phi0))
