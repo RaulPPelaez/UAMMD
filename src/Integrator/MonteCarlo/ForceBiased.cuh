@@ -318,7 +318,7 @@ private:
     auto expDenominator = thrust::transform_reduce(
         thrust::cuda::par.on(st), zip, zip + numberElements,
         forcebiased_ns::TransitionKernel(stepSize), real(),
-        thrust::plus<real>());
+        cuda::std::plus<real>());
     CudaCheckError();
     return expDenominator / (4.0 * stepSize);
   }

@@ -176,9 +176,9 @@ public:
       return ct;
     }
     if (comp.energy) {
-      const real cosPhi = thrust::max(
-          real(-1.0), thrust::min(real(1.0), dot(v123, v234) * rsqrt(v123q) *
-                                                 rsqrt(v234q)));
+      const real cosPhi = uammd::max(
+          real(-1.0),
+          uammd::min(real(1.0), dot(v123, v234) * rsqrt(v123q) * rsqrt(v234q)));
       const real dphi = signOfPhi(r12, r23, r34) * acos(cosPhi) - bi.phi0;
       ct.energy =
           real(0.25) * bi.kdih * (1 + cos(dphi)); // U=kdih(1+cos(phi-phi0))
@@ -187,9 +187,9 @@ public:
       return ct;
     const real invsqv123 = rsqrt(v123q);
     const real invsqv234 = rsqrt(v234q);
-    const real cosPhi = thrust::max(
+    const real cosPhi = uammd::max(
         real(-1.0),
-        thrust::min(real(1.0), dot(v123, v234) * invsqv123 * invsqv234));
+        uammd::min(real(1.0), dot(v123, v234) * invsqv123 * invsqv234));
     const real phi = signOfPhi(r12, r23, r34) * acos(cosPhi);
     if (fabs(phi) < real(1e-10) or real(M_PI) - fabs(phi) < real(1e-10)) {
       return ct;
