@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <vector>
 
+
 using namespace uammd;
 using std::endl;
 using std::make_shared;
@@ -123,7 +124,7 @@ protected:
 
   real4 runPoissonSimulation(real L, real r, real tolerance, real gw,
                              real split) {
-    int N = 2;
+    int N = 3;
     auto pd = make_shared<ParticleData>(N, sys);
     Box box(L);
     {
@@ -132,8 +133,10 @@ protected:
       auto ori = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5)) * L, 0);
       pos[0] = make_real4(-r * 0.5, 0, 0, 0) + ori;
       pos[1] = make_real4(r * 0.5, 0, 0, 0) + ori;
-      charge[0] = 1;
-      charge[1] = -1;
+      pos[2] = make_real4(r * 0.5, 0, 0, 0) + ori;
+      charge[0] = 1.0;
+      charge[1] = -0.5;
+      charge[2] = -0.5;
     }
     Poisson::Parameters par;
     par.box = box;
@@ -152,6 +155,38 @@ protected:
     result = force[0];
     return result;
   }
+
+  real4 runPoissonField(real L, real r, real tolerance, real gw,
+                      real split) {
+  int N = 3;
+  auto pd = make_shared<ParticleData>(N, sys);
+  Box box(L);
+  {
+    auto pos = pd->getPos(access::location::cpu, access::mode::write);
+    auto charge = pd->getCharge(access::location::cpu, access::mode::write);
+    auto ori = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5)) * L, 0);
+    pos[0] = make_real4(-r * 0.5, 0, 0, 0) + ori;
+    pos[1] = make_real4(r * 0.5, 0, 0, 0) + ori;
+    pos[2] = make_real4(r * 0.5, 0, 0, 0) + ori;
+    charge[0] = 1;
+    charge[1] = -0.5;
+    charge[2] = -0.5;
+  }
+
+  Poisson::Parameters par;
+  par.box = box;
+  par.epsilon = 1;
+  par.gw = gw;
+  par.tolerance = tolerance;
+  par.split = split;
+
+  auto poisson = make_shared<Poisson>(pd, par);
+
+  auto field = poisson->computeFieldPotentialAtParticles();
+
+  auto field_h = field;
+  return field_h[0];
+}
 };
 
 TEST_F(PoissonTest, SingleSimulationTest) {
@@ -169,6 +204,21 @@ TEST_F(PoissonTest, SingleSimulationTest) {
   real relativeDifference =
       std::abs(1.0 - std::abs(force.x / theoreticalField));
   ASSERT_LT(relativeDifference, 1e-3);
+
+  // TESTING WITH FIELD CALCULATION METHOD
+  real4 field;
+  field = runPoissonField(L, r, tolerance, gw, split);
+  ASSERT_LT(field.y, 1e-10);
+  ASSERT_LT(field.z, 1e-10);
+  ASSERT_GT(field.x, 0);
+  real relativeFieldDifference =
+      std::abs(1.0 - std::abs(field.x / theoreticalField));
+  //print the results for debugging
+  ASSERT_LT(relativeFieldDifference, 1e-3)
+      << "Field calculation method deviation too large: relative difference = "
+      << relativeFieldDifference << ", force = " << force.x
+      << ", field = " << field.x << ", theoretical = " << theoreticalField
+      << std::endl;
 }
 
 TEST_F(PoissonTest, InfiniteBoxSizeTest) {
@@ -176,30 +226,46 @@ TEST_F(PoissonTest, InfiniteBoxSizeTest) {
   real gw = 0.001;
   real maxDeviation = 0.0;
   real maxDeviationDistance = 0.0;
+  real maxDeviationFromField = 0.0;
+  real maxDeviationDistanceFromField = 0.0;
   for (real r = 2.0; r <= 24.0; r += 4.0) {
     std::vector<real> boxSizes;
     std::vector<real> fieldValues;
+    std::vector<real> fieldValuesFromField;
     for (real L = std::max(real(16.0), 4 * r); L <= 450.0; L += 4.0) {
       real split = std::max(1.0 - (L - 16.0) / (128.0 - 16.0) * 0.9, 0.1);
       real3 force =
           make_real3(runPoissonSimulation(L, r, tolerance, gw, split));
+      real3 field = make_real3(runPoissonField(L, r, tolerance, gw, split));
       real fieldMagnitude = sqrt(dot(force, force));
+      real fieldMagnitudeFromField = sqrt(dot(field, field));
       boxSizes.push_back(L);
       fieldValues.push_back(fieldMagnitude);
+      fieldValuesFromField.push_back(fieldMagnitudeFromField);
     }
     real extrapolatedField =
         PolynomialFit::fitAndGetConstantTerm(boxSizes, fieldValues);
+    real extrapolatedFieldFromField =
+        PolynomialFit::fitAndGetConstantTerm(boxSizes, fieldValuesFromField);
     real theoreticalField = calculateTheoreticalField(r, gw);
     real deviation =
         std::abs(1.0 - std::abs(extrapolatedField / theoreticalField));
+    real deviationFromField =
+        std::abs(1.0 - std::abs(extrapolatedFieldFromField / theoreticalField));
     if (deviation > maxDeviation) {
       maxDeviation = deviation;
       maxDeviationDistance = r;
     }
-    std::cout << "Distance " << r << ": deviation = " << deviation
-              << ", extrapolated = " << extrapolatedField
+    if (deviationFromField > maxDeviation) {
+      maxDeviationFromField = deviationFromField;
+      maxDeviationDistanceFromField = r;
+    }
+    std::cout << "Distance " << r << ": deviation = " << deviation << ", deviation from field = " << deviationFromField
+              << ", extrapolated = " << extrapolatedField << ", extrapolated from field = " << extrapolatedFieldFromField
               << ", theoretical = " << theoreticalField << std::endl;
   }
   ASSERT_LT(maxDeviation, 1e-4)
       << "Maximum deviation too large at distance " << maxDeviationDistance;
+  ASSERT_LT(maxDeviationFromField, 1e-4)
+      << "Maximum deviation from field too large at distance " << maxDeviationDistanceFromField;
 }
