@@ -54,7 +54,7 @@ public:
     }
   }
 
-  [[deprecated("computeFieldAtParticles is deprecated. Use computeFieldPotentialAtParticles instead")]]
+  //[[deprecated("computeFieldAtParticles is deprecated. Use computeFieldPotentialAtParticles instead")]]
   thrust::device_vector<real4> computeFieldAtParticles() {
     thrust::device_vector<real4> fieldAtParticles(pg->getNumberParticles());
     thrust::fill(fieldAtParticles.begin(), fieldAtParticles.end(), real4());
