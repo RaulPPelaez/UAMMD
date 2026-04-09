@@ -41,11 +41,11 @@ struct Gaussian {
 
   inline __host__ __device__ int3 getSupport(real3 pos, int3 cell) const {
     real bound = Htot * real(0.5);
-    real ztop = thrust::min(pos.z + rmax, bound);
-    real zbot = thrust::max(pos.z - rmax, -bound);
+    real ztop = uammd::min(pos.z + rmax, bound);
+    real zbot = uammd::max(pos.z - rmax, -bound);
     int czb = int((nz - 1) * (acos(ztop / bound) / real(M_PI)));
     int czt = int((nz - 1) * (acos(zbot / bound) / real(M_PI)));
-    int sz = 2 * thrust::max(cell.z - czb, czt - cell.z) + 1;
+    int sz = 2 * uammd::max(cell.z - czb, czt - cell.z) + 1;
     return make_int3(support.x, support.y, sz);
   }
 
@@ -152,9 +152,9 @@ public:
     auto lastParticles = thrust::partition_copy(
         thrust::cuda::par.on(st), cit, cit + numberParticles, nearWalls.begin(),
         farFromWalls.begin(), predicate);
-    int nnear = thrust::distance(nearWalls.begin(), lastParticles.first);
+    int nnear = int(lastParticles.first - nearWalls.begin());
     nearWalls.resize(nnear);
-    int nfar = thrust::distance(farFromWalls.begin(), lastParticles.second);
+    int nfar = int(lastParticles.second - farFromWalls.begin());
     farFromWalls.resize(nfar);
     identifyImageCharges(positions, H, thresholdDistance, nnear, st);
     CudaCheckError();
@@ -175,7 +175,7 @@ private:
       auto lastParticle = thrust::partition_copy(
           thrust::cuda::par.on(st), cit, cit + nnear, imagesTop.begin(),
           thrust::make_discard_iterator(), hasImageCharge);
-      imagesTop.resize(thrust::distance(imagesTop.begin(), lastParticle.first));
+      imagesTop.resize(int(lastParticle.first - imagesTop.begin()));
     }
     imagesBottom.resize(nnear);
     System::log<System::DEBUG2>("Searching for bottom images");
@@ -185,8 +185,7 @@ private:
       auto lastParticle = thrust::partition_copy(
           thrust::cuda::par.on(st), cit, cit + nnear, imagesBottom.begin(),
           thrust::make_discard_iterator(), hasImageCharge);
-      imagesBottom.resize(
-          thrust::distance(imagesBottom.begin(), lastParticle.first));
+      imagesBottom.resize(int(lastParticle.first - imagesBottom.begin()));
     }
   }
 };

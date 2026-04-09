@@ -338,7 +338,7 @@ __global__ void MCStepKernel(PotentialTransverser pot, CellList cl, real4 *pos,
         computeEnergyDifference(group_i, newPos, oldPos, pos, cl, pot, celli);
     // Metropolis acceptance rule
     const real Z = rng.f();
-    const real acceptanceProbabilty = thrust::min(real(1.0), exp(-beta * dH));
+    const real acceptanceProbabilty = uammd::min(real(1.0), exp(-beta * dH));
     if (Z <= acceptanceProbabilty) {
       pos[i] = newPos;
       if (acceptedCounter) {

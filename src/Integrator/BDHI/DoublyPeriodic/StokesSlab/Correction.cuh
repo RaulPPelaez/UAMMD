@@ -144,7 +144,7 @@ __global__ void cleanSolutionZeroMode(complex4 *insideSolution, int nkx,
 template <class Iterator>
 void sumRange(Iterator a, Iterator b, int size, cudaStream_t st) {
   thrust::transform(thrust::cuda::par.on(st), a, a + size, b, a,
-                    thrust::plus<complex>());
+                    cuda::std::plus<complex>());
 }
 
 void sumCorrectionToInsideSolution(FluidData<complex> &correction,

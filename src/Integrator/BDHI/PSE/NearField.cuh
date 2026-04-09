@@ -73,7 +73,7 @@ private:
           "parameter (%e)",
           rcut, 0.5 * box.boxSize.x, split);
       throw std::runtime_error(
-          "[BDHI::PSE] Cut off is too large, try decrasing psi");
+          "[BDHI::PSE] Cut off is too large, try increasing psi");
     }
     this->cl = std::make_shared<NeighbourList>(pg);
     const double a = par.hydrodynamicRadius;

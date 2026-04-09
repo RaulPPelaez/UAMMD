@@ -178,7 +178,7 @@ void sumCorrectionToInsideSolution(cached_vector<cufftComplex4> &correction,
   System::log<System::DEBUG>("Sum correction to solution");
   thrust::transform(thrust::cuda::par.on(st), insideSolution.begin(),
                     insideSolution.end(), correction.begin(),
-                    insideSolution.begin(), thrust::plus<cufftComplex4>());
+                    insideSolution.begin(), cuda::std::plus<cufftComplex4>());
 }
 
 __global__ void

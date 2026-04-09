@@ -194,7 +194,7 @@ TEST(PSE, SelfDiffusionIsCorrectUpToToleranceComputeMF) {
     pse->computeBdW(BdW.data().get(), 0);
     // Sum MF to BdW
     thrust::transform(thrust::cuda::par, BdW.begin(), BdW.end(), MF.begin(),
-                      BdW.begin(), thrust::plus<real3>());
+                      BdW.begin(), cuda::std::plus<real3>());
     real3 dx = BdW[0];
     dx2 += dx * dx;
   }

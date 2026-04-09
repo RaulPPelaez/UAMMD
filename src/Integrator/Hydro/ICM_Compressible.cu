@@ -201,11 +201,11 @@ auto sumVelocities(const DataXYZ &v1, const DataXYZ &v2) {
   int size = v1.size();
   DataXYZ v3(size);
   thrust::transform(thrust::cuda::par, v1.x(), v1.x() + size, v2.x(), v3.x(),
-                    thrust::plus<real>());
+                    cuda::std::plus<real>());
   thrust::transform(thrust::cuda::par, v1.y(), v1.y() + size, v2.y(), v3.y(),
-                    thrust::plus<real>());
+                    cuda::std::plus<real>());
   thrust::transform(thrust::cuda::par, v1.z(), v1.z() + size, v2.z(), v3.z(),
-                    thrust::plus<real>());
+                    cuda::std::plus<real>());
   return v3;
 }
 } // namespace icm_compressible

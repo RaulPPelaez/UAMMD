@@ -130,7 +130,7 @@ __device__ real wca_force(real r2) {
     return 0;
   const real invr2 = real(1.0) / r2;
   const real invr6 = invr2 * invr2 * invr2;
-  const real fmoddivr = thrust::max(
+  const real fmoddivr = uammd::max(
       real(200), (real(-48.0) * invr6 + real(24.0)) * invr6 * invr2);
   return fmoddivr;
 }

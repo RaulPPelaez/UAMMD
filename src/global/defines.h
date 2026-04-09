@@ -14,6 +14,22 @@
 #define forj(x, y) for (int j = x; j < int(y); j++)
 namespace uammd {
 
+template <class T>
+inline __host__ __device__ constexpr T min(const T a, const T b) {
+  return (b < a) ? b : a;
+}
+
+template <class T>
+inline __host__ __device__ constexpr T max(const T a, const T b) {
+  return (a < b) ? b : a;
+}
+
+#if defined(CUDART_VERSION) && (CUDART_VERSION >= 13000)
+using double4_type = double4_16a;
+#else
+using double4_type = double4;
+#endif
+
 #if defined SINGLE_PRECISION
 using real = float;
 using real2 = float2;
@@ -23,7 +39,7 @@ using real4 = float4;
 using real = double;
 using real2 = double2;
 using real3 = double3;
-using real4 = double4;
+using real4 = double4_type;
 
 #endif
 } // namespace uammd
