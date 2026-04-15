@@ -1,3 +1,4 @@
+#pragma once
 #include "Interactor/SpectralEwaldPoisson.cuh"
 #include "Interactor/DoublyPeriodic/DPPoissonSlab.cuh"
 #include "uammd.cuh"
