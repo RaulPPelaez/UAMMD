@@ -3,10 +3,10 @@ channels:
   - conda-forge
 dependencies:
   - cmake >=3.22
-  - cuda-version < 12.9
+  - cuda-version 12.*
   - gxx 11.*
   - cuda-libraries-dev
-  - cuda-nvcc
+  - cuda-nvcc 
   - make
   - blas-devel
   - liblapacke
