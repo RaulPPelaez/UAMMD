@@ -121,10 +121,13 @@ public:
     }
   }
 
-  thrust::device_vector<real4> computeFieldPotentialAtParticles(){
-    thrust::device_vector<real4> fieldPotentialAtParticles(pg->getNumberParticles());
-    thrust::fill(fieldPotentialAtParticles.begin(), fieldPotentialAtParticles.end(), real4());
-    auto fieldPotentialAtParticles_ptr = thrust::raw_pointer_cast(fieldPotentialAtParticles.data());
+  thrust::device_vector<real4> computeFieldPotentialAtParticles() {
+    thrust::device_vector<real4> fieldPotentialAtParticles(
+        pg->getNumberParticles());
+    thrust::fill(fieldPotentialAtParticles.begin(),
+                 fieldPotentialAtParticles.end(), real4());
+    auto fieldPotentialAtParticles_ptr =
+        thrust::raw_pointer_cast(fieldPotentialAtParticles.data());
     farField(0, fieldPotentialAtParticles_ptr);
     nearFieldFieldPotential(0, fieldPotentialAtParticles_ptr);
     return fieldPotentialAtParticles;
@@ -153,7 +156,8 @@ private:
   void farField(cudaStream_t st, real4 *fieldPotentialAtParticles = nullptr);
   void nearFieldForce(cudaStream_t st);
   void nearFieldEnergy(cudaStream_t st);
-  void nearFieldFieldPotential(cudaStream_t st, real4 *fieldPotentialAtParticles = nullptr);
+  void nearFieldFieldPotential(cudaStream_t st,
+                               real4 *fieldPotentialAtParticles = nullptr);
 
   void spreadCharges(real *gridCharges, cudaStream_t st);
   void forwardTransformCharge(real *gridCharges,

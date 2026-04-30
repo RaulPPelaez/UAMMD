@@ -54,7 +54,8 @@ public:
     }
   }
 
-  [[deprecated("computeFieldAtParticles is deprecated. Use computeFieldPotentialAtParticles instead")]]
+  [[deprecated("computeFieldAtParticles is deprecated. Use "
+               "computeFieldPotentialAtParticles instead")]]
   thrust::device_vector<real4> computeFieldAtParticles() {
     thrust::device_vector<real4> fieldAtParticles(pg->getNumberParticles());
     thrust::fill(fieldAtParticles.begin(), fieldAtParticles.end(), real4());
@@ -62,10 +63,10 @@ public:
     farField->compute(0, field_ptr);
     nearField->compute(0, field_ptr);
 
-    // Reset w component to 0.0 to preserve backwards compatibility with old code.
-    // That only used the field.
+    // Reset w component to 0.0 to preserve backwards compatibility with old
+    // code. That only used the field.
     thrust::for_each(fieldAtParticles.begin(), fieldAtParticles.end(),
-                 [] __device__ (real4 &v) { v.w = 0.0; });
+                     [] __device__(real4 & v) { v.w = 0.0; });
 
     return fieldAtParticles;
   }

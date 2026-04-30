@@ -281,24 +281,15 @@ private:
 struct NearFieldFieldPotentialTransverser {
   using returnInfo = real4; // (Ex, Ey, Ez, phi)
 
-  NearFieldFieldPotentialTransverser(real4 *field_potential_ptr,
-                                     real *charge,
+  NearFieldFieldPotentialTransverser(real4 *field_potential_ptr, real *charge,
                                      TabulatedFunction<real> gf,
-                                     TabulatedFunction<real> gff,
-                                     Box box)
-      : field_potential_ptr(field_potential_ptr),
-        charge(charge),
-        greensFunction(gf),
-        greensFunctionField(gff),
-        box(box) {}
+                                     TabulatedFunction<real> gff, Box box)
+      : field_potential_ptr(field_potential_ptr), charge(charge),
+        greensFunction(gf), greensFunctionField(gff), box(box) {}
 
-  inline __device__ returnInfo zero() const {
-    return make_real4(0, 0, 0, 0);
-  }
+  inline __device__ returnInfo zero() const { return make_real4(0, 0, 0, 0); }
 
-  inline __device__ real getInfo(int pi) const {
-    return charge[pi];
-  }
+  inline __device__ real getInfo(int pi) const { return charge[pi]; }
 
   inline __device__ returnInfo compute(const real4 &pi, const real4 &pj,
                                        real chargei, real chargej) const {
@@ -330,10 +321,10 @@ struct NearFieldFieldPotentialTransverser {
   }
 
 private:
-  real4 *field_potential_ptr;   // (Ex, Ey, Ez, phi)
+  real4 *field_potential_ptr; // (Ex, Ey, Ez, phi)
   real *charge;
-  TabulatedFunction<real> greensFunction;        // G(r^2)
-  TabulatedFunction<real> greensFunctionField;   // dG/dr
+  TabulatedFunction<real> greensFunction;      // G(r^2)
+  TabulatedFunction<real> greensFunctionField; // dG/dr
   Box box;
 };
 
@@ -363,11 +354,11 @@ void Poisson::farField(cudaStream_t st, real4 *fieldPotentialAtParticles) {
 
   // If the user requested the field and potential at the particles
   if (fieldPotentialAtParticles) {
-      auto pos = pd->getPos(access::location::gpu, access::mode::read);
-      IBM<Kernel> ibm(kernel, grid,
-                      IBM_ns::LinearIndex3D(2 * (n.x / 2 + 1), n.y, n.z));
-      ibm.gather(pos.begin(), fieldPotentialAtParticles, gridFieldPotential.get(),
-                 pg->getNumberParticles(), st);
+    auto pos = pd->getPos(access::location::gpu, access::mode::read);
+    IBM<Kernel> ibm(kernel, grid,
+                    IBM_ns::LinearIndex3D(2 * (n.x / 2 + 1), n.y, n.z));
+    ibm.gather(pos.begin(), fieldPotentialAtParticles, gridFieldPotential.get(),
+               pg->getNumberParticles(), st);
   }
 }
 
@@ -385,15 +376,17 @@ void Poisson::nearFieldForce(cudaStream_t st) {
   }
 }
 
-void Poisson::nearFieldFieldPotential(cudaStream_t st, real4 *fieldPotentialAtParticles) {
+void Poisson::nearFieldFieldPotential(cudaStream_t st,
+                                      real4 *fieldPotentialAtParticles) {
   if (split > 0) {
     sys->log<System::DEBUG2>("[Poisson] Near field potential computation");
     if (!nl)
       nl = std::make_shared<NeighbourList>(pg);
     nl->update(box, nearFieldCutOff, st);
     auto charge = pd->getCharge(access::location::gpu, access::mode::read);
-    auto tr = Poisson_ns::NearFieldFieldPotentialTransverser(fieldPotentialAtParticles,
-        charge.begin(), *nearFieldPotentialGreensFunction, *nearFieldGreensFunction, box);
+    auto tr = Poisson_ns::NearFieldFieldPotentialTransverser(
+        fieldPotentialAtParticles, charge.begin(),
+        *nearFieldPotentialGreensFunction, *nearFieldGreensFunction, box);
     nl->transverseList(tr, st);
   }
 }
