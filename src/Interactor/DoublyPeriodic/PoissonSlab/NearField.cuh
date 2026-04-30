@@ -197,7 +197,7 @@ struct NearFieldTransverser {
     if (energy_ptr)
       energy_ptr[pi] += qi * total.w;
     if (field_ptr)
-      field_ptr[pi] += make_real4(make_real3(total), 0);
+      field_ptr[pi] += total;
   }
 
 private:

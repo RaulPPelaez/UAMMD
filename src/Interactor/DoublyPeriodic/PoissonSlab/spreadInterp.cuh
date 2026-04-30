@@ -244,7 +244,7 @@ struct FieldPotential2ForceEnergy {
     force[i] += charge[i] * make_real4(fande.x, fande.y, fande.z, 0);
     energy[i] += charge[i] * fande.w;
     if (field)
-      field[i] += make_real4(fande.x, fande.y, fande.z, 0);
+      field[i] += fande;
   }
 };
 

@@ -170,15 +170,25 @@ __global__ void scaleFFTToForwardChebyshevTransform(cufftComplex2 *signal,
   signal[ib + zi * nbatch] *= real(1.0) / real(2 * nz - 2);
 }
 
+__global__ void addComplex4Kernel(cufftComplex4 *dst, const cufftComplex4 *src,
+                                  int n) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n)
+    dst[i] += src[i];
+}
 } // namespace detail
 
 void sumCorrectionToInsideSolution(cached_vector<cufftComplex4> &correction,
                                    cached_vector<cufftComplex4> &insideSolution,
                                    cudaStream_t st) {
   System::log<System::DEBUG>("Sum correction to solution");
-  thrust::transform(thrust::cuda::par.on(st), insideSolution.begin(),
-                    insideSolution.end(), correction.begin(),
-                    insideSolution.begin(), cuda::std::plus<cufftComplex4>());
+  int n = insideSolution.size();
+  auto inSol = thrust::raw_pointer_cast(insideSolution.data());
+  auto corr = thrust::raw_pointer_cast(correction.data());
+  int blocksize = 128;
+  int nblocks = n / blocksize + 1;
+
+  detail::addComplex4Kernel<<<nblocks, blocksize, 0, st>>>(inSol, corr, n);
 }
 
 __global__ void

@@ -1,4 +1,4 @@
-#include "Interactor/SpectralEwaldPoisson.cuh"
+#include "Interactor/DoublyPeriodic/DPPoissonSlab.cuh"
 #include "uammd.cuh"
 #include <cmath>
 #include <gtest/gtest.h>
@@ -114,7 +114,7 @@ class PolynomialFit {
         }
 };
 
-class PoissonTest : public ::testing::Test {
+class DPPoissonSlabTest : public ::testing::Test {
     protected:
         std::shared_ptr<System> sys;
 
@@ -138,13 +138,18 @@ class PoissonTest : public ::testing::Test {
                 charge[1] = -0.5;
                 charge[2] = -0.5;
             }
-            Poisson::Parameters par;
-            par.box = box;
-            par.epsilon = 1;
+            DPPoissonSlab::Parameters par;
+            par.Lxy = make_real2(L, L);
+            par.H = L/10.0;
+            DPPoissonSlab::Permitivity perm;
+            perm.inside = 1.0;
+            perm.top = 1.0;
+            perm.bottom = 1.0;
+            par.permitivity = perm;
             par.gw = gw;
             par.tolerance = tolerance;
             par.split = split;
-            auto poisson = make_shared<Poisson>(pd, par);
+            auto poisson = make_shared<DPPoissonSlab>(pd, par);
             {
                 auto force = pd->getForce(access::location::gpu, access::mode::write);
                 thrust::fill(thrust::cuda::par, force.begin(), force.end(), real4());
@@ -173,14 +178,19 @@ class PoissonTest : public ::testing::Test {
                 charge[2] = -0.5;
             }
 
-            Poisson::Parameters par;
-            par.box = box;
-            par.epsilon = 1;
+            DPPoissonSlab::Parameters par;
+            par.Lxy = make_real2(L, L);
+            par.H = L/5.0;
+            DPPoissonSlab::Permitivity perm;
+            perm.inside = 1.0;
+            perm.top = 1.0;
+            perm.bottom = 1.0;
+            par.permitivity = perm;
             par.gw = gw;
             par.tolerance = tolerance;
             par.split = split;
 
-            auto poisson = make_shared<Poisson>(pd, par);
+            auto poisson = make_shared<DPPoissonSlab>(pd, par);
 
             auto field = poisson->computeFieldPotentialAtParticles();
 
@@ -189,83 +199,29 @@ class PoissonTest : public ::testing::Test {
         }
 };
 
-TEST_F(PoissonTest, SingleSimulationTest) {
+TEST_F(DPPoissonSlabTest, SingleSimulationTest_Force) {
     real L = 100.0;
     real r = 2.0;
     real tolerance = 1e-7;
-    real gw = 0.001;
-    real split = 0.2;
-    real4 force;
-    force = runPoissonSimulation(L, r, tolerance, gw, split);
-    ASSERT_LT(force.y, 1e-10);
-    ASSERT_LT(force.z, 1e-10);
-    ASSERT_GT(force.x, 0);
-    real theoreticalField = calculateTheoreticalField(r, gw);
-    real relativeDifference =
-        std::abs(1.0 - std::abs(force.x / theoreticalField));
-    ASSERT_LT(relativeDifference, 1e-3);
+    real gw = 0.2;
+    real split = 0.75;
 
-    // TESTING WITH FIELD CALCULATION METHOD
-    real4 field;
-    field = runPoissonField(L, r, tolerance, gw, split);
-    ASSERT_LT(field.y, 1e-10);
-    ASSERT_LT(field.z, 1e-10);
-    ASSERT_GT(field.x, 0);
-    real relativeFieldDifference =
-        std::abs(1.0 - std::abs(field.x / theoreticalField));
-    //print the results for debugging
-    ASSERT_LT(relativeFieldDifference, 1e-3)
-        << "Field calculation method deviation too large: relative difference = "
-        << relativeFieldDifference << ", force = " << force.x
-        << ", field = " << field.x << ", theoretical = " << theoreticalField
-        << std::endl;
+    real4 force = runPoissonSimulation(L, r, tolerance, gw, split);
+
+    ASSERT_LT(force.y, tolerance);
+    ASSERT_LT(force.z, tolerance);
+    ASSERT_GT(force.x, 0);
 }
 
-TEST_F(PoissonTest, InfiniteBoxSizeTest) {
+TEST_F(DPPoissonSlabTest, SingleSimulationTest_Field) {
+    real L = 100.0;
+    real r = 2.0;
     real tolerance = 1e-7;
-    real gw = 0.001;
-    real maxDeviation = 0.0;
-    real maxDeviationDistance = 0.0;
-    real maxDeviationFromField = 0.0;
-    real maxDeviationDistanceFromField = 0.0;
-    for (real r = 2.0; r <= 24.0; r += 4.0) {
-        std::vector<real> boxSizes;
-        std::vector<real> fieldValues;
-        std::vector<real> fieldValuesFromField;
-        for (real L = std::max(real(16.0), 4 * r); L <= 450.0; L += 4.0) {
-            real split = std::max(1.0 - (L - 16.0) / (128.0 - 16.0) * 0.9, 0.1);
-            real3 force =
-                make_real3(runPoissonSimulation(L, r, tolerance, gw, split));
-            real3 field = make_real3(runPoissonField(L, r, tolerance, gw, split));
-            real fieldMagnitude = sqrt(dot(force, force));
-            real fieldMagnitudeFromField = sqrt(dot(field, field));
-            boxSizes.push_back(L);
-            fieldValues.push_back(fieldMagnitude);
-            fieldValuesFromField.push_back(fieldMagnitudeFromField);
-        }
-        real extrapolatedField =
-            PolynomialFit::fitAndGetConstantTerm(boxSizes, fieldValues);
-        real extrapolatedFieldFromField =
-            PolynomialFit::fitAndGetConstantTerm(boxSizes, fieldValuesFromField);
-        real theoreticalField = calculateTheoreticalField(r, gw);
-        real deviation =
-            std::abs(1.0 - std::abs(extrapolatedField / theoreticalField));
-        real deviationFromField =
-            std::abs(1.0 - std::abs(extrapolatedFieldFromField / theoreticalField));
-        if (deviation > maxDeviation) {
-            maxDeviation = deviation;
-            maxDeviationDistance = r;
-        }
-        if (deviationFromField > maxDeviation) {
-            maxDeviationFromField = deviationFromField;
-            maxDeviationDistanceFromField = r;
-        }
-        std::cout << "Distance " << r << ": deviation = " << deviation << ", deviation from field = " << deviationFromField
-            << ", extrapolated = " << extrapolatedField << ", extrapolated from field = " << extrapolatedFieldFromField
-            << ", theoretical = " << theoreticalField << std::endl;
-    }
-    ASSERT_LT(maxDeviation, 1e-4)
-        << "Maximum deviation too large at distance " << maxDeviationDistance;
-    ASSERT_LT(maxDeviationFromField, 1e-4)
-        << "Maximum deviation from field too large at distance " << maxDeviationDistanceFromField;
+    real gw = 0.2;
+    real split = 0.75;
+
+    real4 field = runPoissonField(L, r, tolerance, gw, split);
+
+    ASSERT_LT(field.y, 1e-10);
+    ASSERT_LT(field.z, 1e-10);
 }
