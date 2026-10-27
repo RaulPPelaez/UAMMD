@@ -109,11 +109,12 @@ class NeighbourIterator
       if (nperdim.z > 1)
         cellj.z += currentCell / (nperdim.x * nperdim.y) - 1;
       cellj = nl.grid.pbc_cell(cellj);
-      const bool isPeriodicCellInNonPeriodicBox =
-          (!nl.grid.box.isPeriodicX() and abs(cellj.x - celli.x) > 1) or
-          (!nl.grid.box.isPeriodicY() and abs(cellj.y - celli.y) > 1) or
-          (!nl.grid.box.isPeriodicZ() and abs(cellj.z - celli.z) > 1);
-      if (!isPeriodicCellInNonPeriodicBox) {
+      // pbc_cell leaves cells untouched in non periodic directions, so cellj
+      // can fall outside the grid there
+      const bool isCellOutsideGrid =
+          cellj.x < 0 or cellj.x >= n.x or cellj.y < 0 or cellj.y >= n.y or
+          cellj.z < 0 or cellj.z >= n.z;
+      if (!isCellOutsideGrid) {
         const int icellj = nl.grid.getCellIndex(cellj);
         const uint cs = nl.cellStart[icellj];
         isCurrentCellEmpty = cs < nl.VALID_CELL;
