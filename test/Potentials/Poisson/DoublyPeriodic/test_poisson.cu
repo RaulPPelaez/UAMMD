@@ -127,10 +127,13 @@ class DPPoissonSlabTest : public ::testing::Test {
             int N = 3;
             auto pd = make_shared<ParticleData>(N, sys);
             Box box(L);
+            const real H = L/10.0;
             {
                 auto pos = pd->getPos(access::location::cpu, access::mode::write);
                 auto charge = pd->getCharge(access::location::cpu, access::mode::write);
-                auto ori = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5)) * L, 0);
+                // Keep the particles inside the slab, away from the walls
+                const real3 range = make_real3(L, L, real(0.8) * H);
+                auto ori = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5)) * range, 0);
                 pos[0] = make_real4(-r * 0.5, 0, 0, 0) + ori;
                 pos[1] = make_real4(r * 0.5, 0, 0, 0) + ori;
                 pos[2] = make_real4(r * 0.5, 0, 0, 0) + ori;
@@ -140,7 +143,7 @@ class DPPoissonSlabTest : public ::testing::Test {
             }
             DPPoissonSlab::Parameters par;
             par.Lxy = make_real2(L, L);
-            par.H = L/10.0;
+            par.H = H;
             DPPoissonSlab::Permitivity perm;
             perm.inside = 1.0;
             perm.top = 1.0;
@@ -166,10 +169,13 @@ class DPPoissonSlabTest : public ::testing::Test {
             int N = 3;
             auto pd = make_shared<ParticleData>(N, sys);
             Box box(L);
+            const real H = L/5.0;
             {
                 auto pos = pd->getPos(access::location::cpu, access::mode::write);
                 auto charge = pd->getCharge(access::location::cpu, access::mode::write);
-                auto ori = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5)) * L, 0);
+                // Keep the particles inside the slab, away from the walls
+                const real3 range = make_real3(L, L, real(0.8) * H);
+                auto ori = make_real4(make_real3(sys->rng().uniform3(-0.5, 0.5)) * range, 0);
                 pos[0] = make_real4(-r * 0.5, 0, 0, 0) + ori;
                 pos[1] = make_real4(r * 0.5, 0, 0, 0) + ori;
                 pos[2] = make_real4(r * 0.5, 0, 0, 0) + ori;
@@ -180,7 +186,7 @@ class DPPoissonSlabTest : public ::testing::Test {
 
             DPPoissonSlab::Parameters par;
             par.Lxy = make_real2(L, L);
-            par.H = L/5.0;
+            par.H = H;
             DPPoissonSlab::Permitivity perm;
             perm.inside = 1.0;
             perm.top = 1.0;
@@ -208,8 +214,8 @@ TEST_F(DPPoissonSlabTest, SingleSimulationTest_Force) {
 
     real4 force = runPoissonSimulation(L, r, tolerance, gw, split);
 
-    ASSERT_LT(force.y, tolerance);
-    ASSERT_LT(force.z, tolerance);
+    ASSERT_LT(abs(force.y), tolerance);
+    ASSERT_LT(abs(force.z), tolerance);
     ASSERT_GT(force.x, 0);
 }
 
@@ -222,6 +228,6 @@ TEST_F(DPPoissonSlabTest, SingleSimulationTest_Field) {
 
     real4 field = runPoissonField(L, r, tolerance, gw, split);
 
-    ASSERT_LT(field.y, 1e-10);
-    ASSERT_LT(field.z, 1e-10);
+    ASSERT_LT(abs(field.y), tolerance * abs(field.x));
+    ASSERT_LT(abs(field.z), tolerance * abs(field.x));
 }
