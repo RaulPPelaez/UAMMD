@@ -111,9 +111,9 @@ class NeighbourIterator
       cellj = nl.grid.pbc_cell(cellj);
       // pbc_cell leaves cells untouched in non periodic directions, so cellj
       // can fall outside the grid there
-      const bool isCellOutsideGrid =
-          cellj.x < 0 or cellj.x >= n.x or cellj.y < 0 or cellj.y >= n.y or
-          cellj.z < 0 or cellj.z >= n.z;
+      const bool isCellOutsideGrid = cellj.x < 0 or cellj.x >= n.x or
+                                     cellj.y < 0 or cellj.y >= n.y or
+                                     cellj.z < 0 or cellj.z >= n.z;
       if (!isCellOutsideGrid) {
         const int icellj = nl.grid.getCellIndex(cellj);
         const uint cs = nl.cellStart[icellj];
