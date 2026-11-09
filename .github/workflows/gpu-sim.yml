@@ -1,0 +1,96 @@
+name: CUDA tests (simulated H100)
+
+# Optional, non-required check. The hosted runners have no GPU, so this builds
+# the gtest suite in test/ and runs it on a simulated NVIDIA H100
+# (https://github.com/pantheongpu/pantheonsim). A simulator cannot reproduce
+# hardware-specific behavior or timing, so it complements real-GPU testing and
+# does not replace it.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "cmake/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/gpu-sim.yml"
+
+concurrency:
+  group: gpu-sim-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: CUDA 13.0, simulated H100
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
+
+    - name: Set up the simulated GPU and CUDA toolkit
+      uses: pantheongpu/setup-pantheonsim@ca87fe3143b29166822b923d6050945c5179408c # v0.1.5
+      with:
+        gpu: nvidia/h100
+        cuda-toolkit: "13.0"
+        # Use the toolkit's own cuFFT, cuBLAS and cuSOLVER
+        library-path: 'false'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends ninja-build libopenblas-dev liblapacke-dev
+
+    # 90-virtual embeds PTX only: the simulator JIT-compiles PTX and does not
+    # run SASS. It also needs a shared CUDA runtime.
+    - name: Configure
+      run: |
+        cmake -S test -B build -G Ninja \
+              -DCMAKE_CUDA_ARCHITECTURES=90-virtual \
+              -DCMAKE_CUDA_RUNTIME_LIBRARY=Shared
+
+    - name: Build tests
+      run: cmake --build build -j3
+
+    # Tests left out for now (the rest of the suite is run):
+    # - Q2D.SelfMobility*, Q2D.ObeysFluctuation* and
+    #   SpreadInterp.PeskinKernelAdjoint2D: the 2D spread kernel writes one
+    #   element past its dynamic shared memory allocation (the allocation does
+    #   not count support.z in 2D mode). The simulator checks shared memory
+    #   bounds and aborts; hardware does not notice.
+    # - Lanczos.WorksForDiagonalMatrix*: PTX that the simulator cannot parse yet
+    #   (elect.sync with a "_" destination).
+    # - PoissonTest.SingleSimulationTest, QuadrupoleTest.SpectralEwaldPoisson:
+    #   wrong results on the simulator (the in-place 3D cuFFT D2Z transform of
+    #   a padded real array does not match the out-of-place one).
+    # - FourierChebyshevTransform.TransformOfGaussian1DIsCorrect: misses a
+    #   1e-15 absolute tolerance by a factor of three (3.3e-15).
+    # - The others did not finish within 300 s on the hosted runner.
+    - name: Test
+      run: |
+        exclude=(
+          'Q2D\.(SelfMobility|ObeysFluctuation).*'
+          'SpreadInterp\.PeskinKernelAdjoint2D'
+          'Lanczos\.WorksForDiagonalMatrix.*'
+          'PoissonTest\.SingleSimulationTest'
+          'QuadrupoleTest\.SpectralEwaldPoisson'
+          'FourierChebyshevTransform\.TransformOfGaussian1DIsCorrect'
+          'DPStokes\.ReproducesOpenBoundarySelfMobilityWithLargeDomainSlitChannel'
+          'DPStokes\.ReproducesOpenBoundarySelfMobilityWithLargeDomainBottomWall'
+          'DPStokesIntegrator\.ObeysFluctuationDissipationBalanceAtEveryHeight'
+          'FCM_impl\.SelfMobilityIsCorrectUpToTolerance'
+          'PSE\.SelfMobilityIsCorrectUpToTolerance'
+          'PSE\.SelfDiffusionIsCorrectUpToTolerance.*'
+          'PoissonTest\.InfiniteBoxSizeTest'
+          'DPPoissonSlabTest\.SingleSimulationTest_Field'
+        )
+        IFS='|'
+        vgpu run ctest --test-dir build --output-on-failure -j3 --timeout 600 \
+              -E "^(${exclude[*]})\$"
